@@ -1,6 +1,7 @@
 import SwiftUI
 import AVFoundation
 import UniformTypeIdentifiers
+import MediaPlayer
 
 struct AudioTrack: Identifiable {
     let id = UUID()
@@ -26,10 +27,65 @@ struct ContentView: View {
         do {
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
             try AVAudioSession.sharedInstance().setActive(true)
+            UIApplication.shared.beginReceivingRemoteControlEvents()
             print("✅ Audio session configured for playback.")
         } catch {
             print("❌ Failed to configure audio session: \(error.localizedDescription)")
         }
+    }
+
+    private func setupRemoteCommandCenter() {
+        let commandCenter = MPRemoteCommandCenter.shared()
+
+        commandCenter.playCommand.addTarget { _ in
+            togglePlayPause()
+            return .success
+        }
+
+        commandCenter.pauseCommand.addTarget { _ in
+            togglePlayPause()
+            return .success
+        }
+
+        commandCenter.nextTrackCommand.addTarget { _ in
+            nextTrack()
+            return .success
+        }
+
+        commandCenter.previousTrackCommand.addTarget { _ in
+            previousTrack()
+            return .success
+        }
+
+        commandCenter.changePlaybackPositionCommand.addTarget { event in
+            guard let positionEvent = event as? MPChangePlaybackPositionCommandEvent else {
+                return .commandFailed
+            }
+            player.seek(to: CMTime(seconds: positionEvent.positionTime, preferredTimescale: 600))
+            return .success
+        }
+
+        commandCenter.playCommand.isEnabled = true
+        commandCenter.pauseCommand.isEnabled = true
+        commandCenter.nextTrackCommand.isEnabled = true
+        commandCenter.previousTrackCommand.isEnabled = true
+        commandCenter.changePlaybackPositionCommand.isEnabled = true
+    }
+
+    func updateNowPlayingInfo(for track: AudioTrack) {
+        var nowPlayingInfo = [String: Any]()
+        nowPlayingInfo[MPMediaItemPropertyTitle] = track.title
+        nowPlayingInfo[MPMediaItemPropertyArtist] = track.artist
+        nowPlayingInfo[MPNowPlayingInfoPropertyElapsedPlaybackTime] = player.currentTime().seconds
+        nowPlayingInfo[MPMediaItemPropertyPlaybackDuration] = track.duration
+        nowPlayingInfo[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1.0 : 0.0
+
+        if let artworkImage = track.artwork {
+            let artwork = MPMediaItemArtwork(boundsSize: artworkImage.size) { _ in artworkImage }
+            nowPlayingInfo[MPMediaItemPropertyArtwork] = artwork
+        }
+
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
     }
 
     var body: some View {
@@ -124,6 +180,7 @@ struct ContentView: View {
         }
         .onAppear {
             configureAudioSession()
+            setupRemoteCommandCenter()
         }
         .ignoresSafeArea()
         .sheet(isPresented: $isDocumentPickerPresented) {
@@ -222,6 +279,7 @@ struct ContentView: View {
                     player.play()
                     currentTrack = track
                     isPlaying = true
+                    updateNowPlayingInfo(for: track)
                 }
             } catch {
                 print("❌ Не удалось загрузить/воспроизвести трек: \(error.localizedDescription)")
@@ -237,14 +295,41 @@ struct ContentView: View {
             player.play()
             isPlaying = true
         }
+        if let track = currentTrack {
+            updateNowPlayingInfo(for: track)
+        }
     }
 
-    func previousTrack() {
-        // Implementation of previous track functionality
-    }
-
+    // Function to play the next track in the playlist
     func nextTrack() {
-        // Implementation of next track functionality
+        // Create a playlist by concatenating the two track arrays in user-defined order
+        let playlist = tracks + importedTracks
+        // Ensure the playlist is not empty and the current track exists
+        guard !playlist.isEmpty, let current = currentTrack,
+              let currentIndex = playlist.firstIndex(where: { $0.id == current.id }) else {
+            return
+        }
+        // Calculate the next track index with wrap-around
+        let nextIndex = (currentIndex + 1) % playlist.count
+        let next = playlist[nextIndex]
+        // Play the next track
+        play(track: next)
+    }
+
+    // Function to play the previous track in the playlist
+    func previousTrack() {
+        // Create a playlist by concatenating the two track arrays in user-defined order
+        let playlist = tracks + importedTracks
+        // Ensure the playlist is not empty and the current track exists
+        guard !playlist.isEmpty, let current = currentTrack,
+              let currentIndex = playlist.firstIndex(where: { $0.id == current.id }) else {
+            return
+        }
+        // Calculate the previous track index with wrap-around
+        let prevIndex = (currentIndex - 1 + playlist.count) % playlist.count
+        let previous = playlist[prevIndex]
+        // Play the previous track
+        play(track: previous)
     }
 }
 
