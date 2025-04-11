@@ -22,6 +22,16 @@ struct ContentView: View {
     @State private var isPlaying: Bool = false
     @State private var currentTrack: AudioTrack?
 
+    private func configureAudioSession() {
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+            try AVAudioSession.sharedInstance().setActive(true)
+            print("✅ Audio session configured for playback.")
+        } catch {
+            print("❌ Failed to configure audio session: \(error.localizedDescription)")
+        }
+    }
+
     var body: some View {
         NavigationStack {
             List {
@@ -112,6 +122,9 @@ struct ContentView: View {
                 .animation(.easeInOut, value: currentTrack?.id)
             }
         }
+        .onAppear {
+            configureAudioSession()
+        }
         .ignoresSafeArea()
         .sheet(isPresented: $isDocumentPickerPresented) {
             DocumentPickerView { selectedURL in
@@ -126,30 +139,35 @@ struct ContentView: View {
         ) { result in
             switch result {
             case .success(let urls):
-                for url in urls {
-                    print("Импортирован: \(url)")
+                DispatchQueue.global(qos: .userInitiated).async {
+                    for url in urls {
+                        print("Импортирован: \(url)")
 
-                    guard url.startAccessingSecurityScopedResource() else {
-                        print("❌ Не удалось получить доступ к ресурсу")
-                        continue
-                    }
-                    defer { url.stopAccessingSecurityScopedResource() }
-
-                    let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(url.lastPathComponent)
-
-                    do {
-                        if FileManager.default.fileExists(atPath: tempURL.path) {
-                            try FileManager.default.removeItem(at: tempURL)
+                        guard url.startAccessingSecurityScopedResource() else {
+                            print("❌ Не удалось получить доступ к ресурсу")
+                            continue
                         }
-                        try FileManager.default.copyItem(at: url, to: tempURL)
-                        print("✅ Скопирован во временную директорию: \(tempURL)")
+                        defer { url.stopAccessingSecurityScopedResource() }
 
-                        let asset = AVURLAsset(url: tempURL)
-                        let duration = CMTimeGetSeconds(asset.duration)
-                        let newTrack = AudioTrack(url: tempURL, duration: duration)
-                        importedTracks.append(newTrack)
-                    } catch {
-                        print("Ошибка копирования во временную директорию: \(error)")
+                        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(url.lastPathComponent)
+
+                        do {
+                            if FileManager.default.fileExists(atPath: tempURL.path) {
+                                try FileManager.default.removeItem(at: tempURL)
+                            }
+                            try FileManager.default.copyItem(at: url, to: tempURL)
+                            print("✅ Скопирован во временную директорию: \(tempURL)")
+
+                            let asset = AVURLAsset(url: tempURL)
+                            let duration = CMTimeGetSeconds(asset.duration)
+                            let newTrack = AudioTrack(url: tempURL, duration: duration)
+
+                            DispatchQueue.main.async {
+                                importedTracks.append(newTrack)
+                            }
+                        } catch {
+                            print("Ошибка копирования во временную директорию: \(error)")
+                        }
                     }
                 }
             case .failure(let error):
