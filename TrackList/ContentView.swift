@@ -112,6 +112,7 @@ struct ContentView: View {
                 .animation(.easeInOut, value: currentTrack?.id)
             }
         }
+        .ignoresSafeArea()
         .sheet(isPresented: $isDocumentPickerPresented) {
             DocumentPickerView { selectedURL in
                 exportFolder = selectedURL
@@ -191,7 +192,11 @@ struct ContentView: View {
 
         Task {
             do {
-                try await asset.load(.isPlayable)
+                let isPlayable = try await asset.load(.isPlayable)
+                guard isPlayable else {
+                    print("❌ Файл не поддерживается")
+                    return
+                }
                 print("✅ Файл можно воспроизвести")
                 let playerItem = AVPlayerItem(asset: asset)
                 DispatchQueue.main.async {
