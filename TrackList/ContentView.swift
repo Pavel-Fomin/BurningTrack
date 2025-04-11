@@ -22,8 +22,8 @@ struct AudioTrack: Identifiable {
 }
 
 struct ContentView: View {
+    @Environment(\.editMode) private var editMode
     @State private var tracks: [AudioTrack] = []
-    @State private var importedTracks: [AudioTrack] = []
     @State private var exportFolder: URL?
     @State private var isDocumentPickerPresented = false
     @State private var isImporting = false
@@ -117,34 +117,37 @@ struct ContentView: View {
                             }
                         }
                 }
-                ForEach(importedTracks) { track in
-                    TrackRowView(track: track)
-                        .onTapGesture {
-                            if currentTrack?.id == track.id {
-                                togglePlayPause()
-                            } else {
-                                play(track: track)
-                            }
-                        }
+                .onMove { indices, newOffset in
+                    tracks.move(fromOffsets: indices, toOffset: newOffset)
                 }
-            }
-            .navigationTitle("TRACKLIST")
-            .navigationBarTitleDisplayMode(.inline)
-            .navigationBarItems(trailing:
-                HStack(spacing: 16) {
+                .onDelete { indexSet in
+                    tracks.remove(atOffsets: indexSet)
+                }            }
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Text("TRACKLIST")
+                        .font(.headline)
+                }
+                ToolbarItemGroup(placement: .navigationBarTrailing) {
+                    Button(action: {
+                        tracks.removeAll()
+                    }) {
+                        Image(systemName: "wand.and.sparkles")
+                    }
+
+                    Button(action: {
+                        isDocumentPickerPresented.toggle()
+                    }) {
+                        Image(systemName: "laser.burst")
+                    }
+
                     Button(action: {
                         isImporting = true
                     }) {
                         Image(systemName: "plus")
                     }
-                    Button(action: {
-                        isDocumentPickerPresented.toggle()
-                    }) {
-                        Image(systemName: "record.circle")
-                    }
                 }
-            )
-            
+            }
             if let track = currentTrack {
                 VStack(spacing: 8) {
                     HStack {
@@ -301,7 +304,7 @@ struct ContentView: View {
                             )
 
                             DispatchQueue.main.async {
-                                importedTracks.append(newTrack)
+                                tracks.append(newTrack)
                             }
                         } catch {
                             print("Ошибка копирования во временную директорию: \(error)")
@@ -378,7 +381,7 @@ struct ContentView: View {
     // Function to play the next track in the playlist
     func nextTrack() {
         // Create a playlist by concatenating the two track arrays in user-defined order
-        let playlist = tracks + importedTracks
+        let playlist = tracks
         // Ensure the playlist is not empty and the current track exists
         guard !playlist.isEmpty, let current = currentTrack,
               let currentIndex = playlist.firstIndex(where: { $0.id == current.id }) else {
@@ -394,7 +397,7 @@ struct ContentView: View {
     // Function to play the previous track in the playlist
     func previousTrack() {
         // Create a playlist by concatenating the two track arrays in user-defined order
-        let playlist = tracks + importedTracks
+        let playlist = tracks
         // Ensure the playlist is not empty and the current track exists
         guard !playlist.isEmpty, let current = currentTrack,
               let currentIndex = playlist.firstIndex(where: { $0.id == current.id }) else {
