@@ -2,6 +2,7 @@ import SwiftUI
 import AVFoundation
 import UniformTypeIdentifiers
 import MediaPlayer
+import AVKit
 
 func formatDuration(_ duration: TimeInterval) -> String {
     let minutes = Int(duration) / 60
@@ -29,7 +30,15 @@ struct ContentView: View {
     @State private var player: AVPlayer = AVPlayer()
     @State private var isPlaying: Bool = false
     @State private var currentTrack: AudioTrack?
-
+    @State private var currentTime: Double = 0
+    
+    private func addPeriodicTimeObserver() {
+        let interval = CMTime(seconds: 1.0, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
+        _ = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { time in
+            currentTime = time.seconds
+        }
+    }
+    
     private func configureAudioSession() {
         do {
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
@@ -83,7 +92,7 @@ struct ContentView: View {
         var nowPlayingInfo = [String: Any]()
         nowPlayingInfo[MPMediaItemPropertyTitle] = track.title
         nowPlayingInfo[MPMediaItemPropertyArtist] = track.artist
-        nowPlayingInfo[MPNowPlayingInfoPropertyElapsedPlaybackTime] = player.currentTime().seconds
+        nowPlayingInfo[MPNowPlayingInfoPropertyElapsedPlaybackTime] = currentTime
         nowPlayingInfo[MPMediaItemPropertyPlaybackDuration] = track.duration
         nowPlayingInfo[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1.0 : 0.0
 
@@ -137,8 +146,7 @@ struct ContentView: View {
             )
             
             if let track = currentTrack {
-                VStack {
-                    Spacer()
+                VStack(spacing: 8) {
                     HStack {
                         if let artwork = track.artwork {
                             Image(uiImage: artwork)
@@ -152,13 +160,13 @@ struct ContentView: View {
                                 .frame(width: 44, height: 44)
                                 .cornerRadius(4)
                         }
-
+ 
                         VStack(alignment: .leading) {
                             Text(track.artist ?? track.filename)
                                 .font(.subheadline)
                                 .foregroundColor(.primary)
                                 .lineLimit(1)
-                            
+ 
                             if let title = track.title {
                                 Text(title)
                                     .font(.subheadline)
@@ -166,30 +174,61 @@ struct ContentView: View {
                                     .lineLimit(1)
                             }
                         }
-
+ 
                         Spacer()
-
-                        Button(action: {
-                            togglePlayPause()
-                        }) {
+ 
+                        AVRoutePickerViewRepresented()
+                            .frame(width: 24, height: 24)
+                    }
+ 
+                    HStack {
+                        Text(formatDuration(currentTime))
+                            .font(.caption)
+                            .foregroundColor(.gray)
+ 
+                        Slider(value: Binding(
+                            get: { currentTime },
+                            set: { newValue in
+                                player.seek(to: CMTime(seconds: newValue, preferredTimescale: 600))
+                            }
+                        ), in: 0...track.duration)
+ 
+                        Text(formatDuration(max(0, track.duration - currentTime)))
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+ 
+                    HStack(spacing: 32) {
+                        Button(action: previousTrack) {
+                            Image(systemName: "backward.fill")
+                                .font(.title2)
+                        }
+ 
+                        Button(action: togglePlayPause) {
                             Image(systemName: isPlaying ? "pause.fill" : "play.fill")
                                 .font(.title2)
                         }
+ 
+                        Button(action: nextTrack) {
+                            Image(systemName: "forward.fill")
+                                .font(.title2)
+                        }
                     }
-                    .padding(.horizontal)
-                    .padding(.vertical, 8)
-                    .background(.ultraThinMaterial)
-                    .cornerRadius(12)
-                    .shadow(radius: 3)
-                    .padding(.horizontal)
-                    .transition(.move(edge: .bottom))
                 }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+                .background(.ultraThinMaterial)
+                .cornerRadius(12)
+                .shadow(radius: 3)
+                .padding(.horizontal)
+                .transition(.move(edge: .bottom))
                 .animation(.easeInOut, value: currentTrack?.id)
             }
         }
         .onAppear {
             configureAudioSession()
             setupRemoteCommandCenter()
+            addPeriodicTimeObserver()
         }
         .ignoresSafeArea()
         .sheet(isPresented: $isDocumentPickerPresented) {
@@ -450,4 +489,14 @@ struct TrackRowView: View {
         }
         .frame(height: 64)
     }
+}
+struct AVRoutePickerViewRepresented: UIViewRepresentable {
+    func makeUIView(context: Context) -> AVRoutePickerView {
+        let view = AVRoutePickerView()
+        view.activeTintColor = .systemBlue
+        view.tintColor = .gray
+        return view
+    }
+
+    func updateUIView(_ uiView: AVRoutePickerView, context: Context) {}
 }
