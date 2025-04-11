@@ -3,12 +3,19 @@ import AVFoundation
 import UniformTypeIdentifiers
 import MediaPlayer
 
+func formatDuration(_ duration: TimeInterval) -> String {
+    let minutes = Int(duration) / 60
+    let seconds = Int(duration) % 60
+    return String(format: "%02d:%02d", minutes, seconds)
+}
+
 struct AudioTrack: Identifiable {
     let id = UUID()
     let url: URL
     var progress: Double = 0.0
-    var artist: String = "Неизвестен"
-    var title: String = "Без названия"
+    var artist: String?
+    var title: String?
+    var filename: String
     var duration: TimeInterval = 0
     var artwork: UIImage? = nil
 }
@@ -114,22 +121,20 @@ struct ContentView: View {
             }
             .navigationTitle("TRACKLIST")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack(spacing: 16) {
-                        Button(action: {
-                            isImporting = true
-                        }) {
-                            Image(systemName: "plus")
-                        }
-                        Button(action: {
-                            isDocumentPickerPresented.toggle()
-                        }) {
-                            Image(systemName: "record.circle")
-                        }
+            .navigationBarItems(trailing:
+                HStack(spacing: 16) {
+                    Button(action: {
+                        isImporting = true
+                    }) {
+                        Image(systemName: "plus")
+                    }
+                    Button(action: {
+                        isDocumentPickerPresented.toggle()
+                    }) {
+                        Image(systemName: "record.circle")
                     }
                 }
-            }
+            )
             
             if let track = currentTrack {
                 VStack {
@@ -149,13 +154,17 @@ struct ContentView: View {
                         }
 
                         VStack(alignment: .leading) {
-                            Text(track.title)
-                                .font(.headline)
-                                .lineLimit(1)
-                            Text(track.artist)
+                            Text(track.artist ?? track.filename)
                                 .font(.subheadline)
-                                .foregroundColor(.gray)
+                                .foregroundColor(.primary)
                                 .lineLimit(1)
+                            
+                            if let title = track.title {
+                                Text(title)
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                                    .lineLimit(1)
+                            }
                         }
 
                         Spacer()
@@ -196,7 +205,7 @@ struct ContentView: View {
         ) { result in
             switch result {
             case .success(let urls):
-                DispatchQueue.global(qos: .userInitiated).async {
+                Task {
                     for url in urls {
                         print("Импортирован: \(url)")
 
@@ -216,8 +225,41 @@ struct ContentView: View {
                             print("✅ Скопирован во временную директорию: \(tempURL)")
 
                             let asset = AVURLAsset(url: tempURL)
-                            let duration = CMTimeGetSeconds(asset.duration)
-                            let newTrack = AudioTrack(url: tempURL, duration: duration)
+                            print("🧪 asset.duration.seconds = \(asset.duration.seconds)")
+                            var duration = CMTimeGetSeconds(asset.duration)
+                            if duration == 0 {
+                                let audioFile = try AVAudioFile(forReading: tempURL)
+                                print("🧪 AVAudioFile fallback duration: \(Double(audioFile.length) / audioFile.fileFormat.sampleRate)")
+                                duration = Double(audioFile.length) / audioFile.fileFormat.sampleRate
+                            }
+                            let filename = tempURL.deletingPathExtension().lastPathComponent
+                            var trackTitle: String? = nil
+                            if let metadataTitle = asset.commonMetadata.first(where: { $0.commonKey?.rawValue == "title" })?.stringValue {
+                                if metadataTitle != filename {
+                                    trackTitle = metadataTitle
+                                }
+                            }
+                            var artist: String? = nil
+                            if let metadataArtist = asset.commonMetadata.first(where: { $0.commonKey?.rawValue == "artist" })?.stringValue {
+                                artist = metadataArtist
+                            }
+                            var artworkImage: UIImage? = nil
+                            if let artworkData = AVMetadataItem.metadataItems(
+                                from: asset.commonMetadata,
+                                withKey: AVMetadataKey.commonKeyArtwork,
+                                keySpace: .common
+                            ).first?.dataValue {
+                                artworkImage = UIImage(data: artworkData)
+                            }
+                            let newTrack = AudioTrack(
+                                url: tempURL,
+                                progress: 0.0,
+                                artist: artist,
+                                title: trackTitle,
+                                filename: filename,
+                                duration: duration,
+                                artwork: artworkImage
+                            )
 
                             DispatchQueue.main.async {
                                 importedTracks.append(newTrack)
@@ -231,12 +273,6 @@ struct ContentView: View {
                 print("Ошибка импорта: \(error.localizedDescription)")
             }
         }
-    }
-
-    func formatDuration(_ duration: TimeInterval) -> String {
-        let minutes = Int(duration) / 60
-        let seconds = Int(duration) % 60
-        return String(format: "%02d:%02d", minutes, seconds)
     }
 
     func exportTracks() {
@@ -381,14 +417,37 @@ struct TrackRowView: View {
     let track: AudioTrack
 
     var body: some View {
-        HStack {
-            Text(track.title)
-                .font(.headline)
-            Spacer()
-            Text(track.artist)
-                .font(.subheadline)
-                .foregroundColor(.gray)
+        HStack(spacing: 12) {
+            if let artwork = track.artwork {
+                Image(uiImage: artwork)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 44, height: 44)
+                    .cornerRadius(4)
+            } else {
+                Rectangle()
+                    .fill(Color.gray.opacity(0.3))
+                    .frame(width: 44, height: 44)
+                    .cornerRadius(4)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(track.artist ?? track.filename)
+                    .font(.subheadline)
+                    .foregroundColor(.primary)
+
+                HStack {
+                    Text(track.title ?? "")
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                        .lineLimit(1)
+                    Spacer()
+                    Text(formatDuration(track.duration))
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
+            }
         }
-        .padding(.vertical, 4)
+        .frame(height: 64)
     }
 }
