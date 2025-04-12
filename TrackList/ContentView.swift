@@ -108,7 +108,7 @@ struct ContentView: View {
         NavigationStack {
             List {
                 ForEach(tracks) { track in
-                    TrackRowView(track: track)
+                    TrackRowView(track: track, isPlaying: isPlaying, isCurrent: currentTrack?.id == track.id)
                         .onTapGesture {
                             if currentTrack?.id == track.id {
                                 togglePlayPause()
@@ -154,7 +154,7 @@ struct ContentView: View {
                         if let artwork = track.artwork {
                             Image(uiImage: artwork)
                                 .resizable()
-                                .aspectRatio(contentMode: .fill)
+                                .aspectRatio(1, contentMode: .fit)
                                 .frame(width: 44, height: 44)
                                 .cornerRadius(4)
                         } else {
@@ -258,6 +258,10 @@ struct ContentView: View {
                         defer { url.stopAccessingSecurityScopedResource() }
 
                         let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(url.lastPathComponent)
+                        if tracks.contains(where: { $0.filename == tempURL.deletingPathExtension().lastPathComponent }) {
+                            print("⚠️ Трек уже существует в списке: \(tempURL.lastPathComponent)")
+                            continue
+                        }
 
                         do {
                             if FileManager.default.fileExists(atPath: tempURL.path) {
@@ -457,40 +461,67 @@ struct DocumentPickerRepresentable: UIViewControllerRepresentable {
 
 struct TrackRowView: View {
     let track: AudioTrack
+    let isPlaying: Bool
+    let isCurrent: Bool
 
     var body: some View {
-        HStack(spacing: 12) {
-            if let artwork = track.artwork {
-                Image(uiImage: artwork)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: 44, height: 44)
-                    .cornerRadius(4)
-            } else {
-                Rectangle()
-                    .fill(Color.gray.opacity(0.3))
-                    .frame(width: 44, height: 44)
-                    .cornerRadius(4)
+        ZStack {
+            if isCurrent {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.accentColor.opacity(0.12))
+                    .padding(.horizontal, -8)
             }
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(track.artist ?? track.filename)
-                    .font(.subheadline)
-                    .foregroundColor(.primary)
-
-                HStack {
-                    Text(track.title ?? "")
+            HStack(spacing: 12) {
+                ZStack {
+                    if let artwork = track.artwork {
+                        Image(uiImage: artwork)
+                            .resizable()
+                            .aspectRatio(1, contentMode: .fit)
+                    } else {
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.3))
+                    }
+ 
+                    if isPlaying && isCurrent {
+                        if #available(iOS 17.0, *) {
+                            Image(systemName: "waveform")
+                                .symbolEffect(.pulse, isActive: true)
+                                .foregroundColor(.white)
+                                .padding(6)
+                                .background(Color.black.opacity(0.5))
+                                .clipShape(Circle())
+                        } else {
+                            Image(systemName: "waveform")
+                                .foregroundColor(.white)
+                                .padding(6)
+                                .background(Color.black.opacity(0.5))
+                                .clipShape(Circle())
+                        }
+                    }
+                }
+                .frame(width: 44, height: 44)
+                .cornerRadius(4)
+ 
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(track.artist ?? track.filename)
                         .font(.subheadline)
-                        .foregroundColor(.gray)
-                        .lineLimit(1)
-                    Spacer()
-                    Text(formatDuration(track.duration))
-                        .font(.caption)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.primary)
+ 
+                    HStack {
+                        Text(track.title ?? "")
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                            .lineLimit(1)
+                        Spacer()
+                        Text(formatDuration(track.duration))
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
                 }
             }
+            .padding(.vertical, 6)
+            .padding(.horizontal, 8)
         }
-        .frame(height: 64)
     }
 }
 struct AVRoutePickerViewRepresented: UIViewRepresentable {
