@@ -31,6 +31,7 @@ struct ContentView: View {
     @State private var isPlaying: Bool = false
     @State private var currentTrack: AudioTrack?
     @State private var currentTime: Double = 0
+    @State private var scrollProxy: ScrollViewProxy?
     
     private func addPeriodicTimeObserver() {
         let interval = CMTime(seconds: 1.0, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
@@ -106,23 +107,30 @@ struct ContentView: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                ForEach(tracks) { track in
-                    TrackRowView(track: track, isPlaying: isPlaying, isCurrent: currentTrack?.id == track.id)
-                        .onTapGesture {
-                            if currentTrack?.id == track.id {
-                                togglePlayPause()
-                            } else {
-                                play(track: track)
+            ScrollViewReader { proxy in
+                List {
+                    ForEach(tracks) { track in
+                        TrackRowView(track: track, isPlaying: isPlaying, isCurrent: currentTrack?.id == track.id)
+                            .id(track.id)
+                            .onTapGesture {
+                                if currentTrack?.id == track.id {
+                                    togglePlayPause()
+                                } else {
+                                    play(track: track)
+                                }
                             }
-                        }
+                    }
+                    .onMove { indices, newOffset in
+                        tracks.move(fromOffsets: indices, toOffset: newOffset)
+                    }
+                    .onDelete { indexSet in
+                        tracks.remove(atOffsets: indexSet)
+                    }
                 }
-                .onMove { indices, newOffset in
-                    tracks.move(fromOffsets: indices, toOffset: newOffset)
+                .onAppear {
+                    scrollProxy = proxy
                 }
-                .onDelete { indexSet in
-                    tracks.remove(atOffsets: indexSet)
-                }            }
+            }
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Text("TRACKLIST")
@@ -164,19 +172,28 @@ struct ContentView: View {
                                 .cornerRadius(4)
                         }
  
-                        VStack(alignment: .leading) {
-                            Text(track.artist ?? track.filename)
-                                .font(.subheadline)
-                                .foregroundColor(.primary)
-                                .lineLimit(1)
- 
-                            if let title = track.title {
-                                Text(title)
+                        Button(action: {
+                            if let track = currentTrack {
+                                withAnimation {
+                                    scrollProxy?.scrollTo(track.id, anchor: .center)
+                                }
+                            }
+                        }) {
+                            VStack(alignment: .leading) {
+                                Text(track.artist ?? track.filename)
                                     .font(.subheadline)
-                                    .foregroundColor(.gray)
+                                    .foregroundColor(.primary)
                                     .lineLimit(1)
+
+                                if let title = track.title {
+                                    Text(title)
+                                        .font(.subheadline)
+                                        .foregroundColor(.gray)
+                                        .lineLimit(1)
+                                }
                             }
                         }
+                        .buttonStyle(.plain)
  
                         Spacer()
  
