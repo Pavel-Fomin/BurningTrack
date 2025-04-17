@@ -10,6 +10,18 @@ func formatDuration(_ duration: TimeInterval) -> String {
     return String(format: "%02d:%02d", minutes, seconds)
 }
 
+struct ExportPickerView: UIViewControllerRepresentable {
+    let fileURLs: [URL]
+
+    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
+        let picker = UIDocumentPickerViewController(forExporting: fileURLs, asCopy: true)
+        picker.shouldShowFileExtensions = true
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {}
+}
+
 struct AudioTrack: Identifiable {
     let id = UUID()
     let url: URL
@@ -19,19 +31,25 @@ struct AudioTrack: Identifiable {
     var filename: String
     var duration: TimeInterval = 0
     var artwork: UIImage? = nil
+    var isExporting: Bool = false // 🔄 Добавили флаг экспорта
+
 }
 
 struct ContentView: View {
     @Environment(\.editMode) private var editMode
     @State private var tracks: [AudioTrack] = []
+    @State private var exportProgress: (completed: Int, total: Int)? = nil
     @State private var exportFolder: URL?
+    @State private var exportFileURLs: [URL] = []
     @State private var isDocumentPickerPresented = false
+    @State private var isFolderPickerPresented = false
     @State private var isImporting = false
     @State private var player: AVPlayer = AVPlayer()
     @State private var isPlaying: Bool = false
     @State private var currentTrack: AudioTrack?
     @State private var currentTime: Double = 0
     @State private var scrollProxy: ScrollViewProxy?
+    @State private var isExportCancelled: Bool = false
     
     private func addPeriodicTimeObserver() {
         let interval = CMTime(seconds: 1.0, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
@@ -108,6 +126,45 @@ struct ContentView: View {
     var body: some View {
         NavigationStack {
             ScrollViewReader { proxy in
+                if let progress = exportProgress {
+                    VStack(alignment: .leading, spacing: 6) {
+                        if progress.completed < progress.total {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Записано \(progress.completed) из \(progress.total)")
+                                        .font(.caption)
+                                        .foregroundColor(.gray)
+                                    ProgressView(value: Float(progress.completed), total: Float(progress.total))
+                                        .progressViewStyle(LinearProgressViewStyle())
+                                }
+                                Spacer()
+                                Button(action: {
+                                    isExportCancelled = true
+                                    exportProgress = nil  // Очистить прогресс
+                                    print("⛔️ Экспорт прерван пользователем")
+                                }) {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .foregroundColor(.red)
+                                        .imageScale(.medium)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        } else {
+                            HStack {
+                                Text("✅ Копирование \(progress.total) завершено")
+                                    .font(.caption)
+                                    .foregroundColor(.green)
+                                Spacer()
+                                Button("Закрыть") {
+                                    exportProgress = nil
+                                }
+                                .font(.caption)
+                            }
+                        }
+                    }
+                    .padding(.top, 8)
+                    .padding(.horizontal)
+                }
                 List {
                     ForEach(tracks) { track in
                         TrackRowView(track: track, isPlaying: isPlaying, isCurrent: currentTrack?.id == track.id)
@@ -138,13 +195,14 @@ struct ContentView: View {
                 }
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
                     Button(action: {
+                        print("⚠️ Очистка треков")
                         tracks.removeAll()
                     }) {
                         Image(systemName: "wand.and.sparkles")
                     }
 
                     Button(action: {
-                        isDocumentPickerPresented.toggle()
+                        isFolderPickerPresented = true
                     }) {
                         Image(systemName: "laser.burst")
                     }
@@ -251,11 +309,13 @@ struct ContentView: View {
             addPeriodicTimeObserver()
         }
         .ignoresSafeArea()
-        .sheet(isPresented: $isDocumentPickerPresented) {
-            DocumentPickerView { selectedURL in
-                exportFolder = selectedURL
-                exportTracks()
+        .sheet(isPresented: $isFolderPickerPresented) {
+            DocumentPickerView { folder in
+                exportTracks(to: folder)
             }
+        }
+        .sheet(isPresented: $isDocumentPickerPresented) {
+            ExportPickerView(fileURLs: exportFileURLs)
         }
         .fileImporter(
             isPresented: $isImporting,
@@ -338,24 +398,78 @@ struct ContentView: View {
         }
     }
 
-    func exportTracks() {
-        guard let folder = exportFolder else { return }
+    func exportTracks(to folder: URL) {
+        DispatchQueue.global(qos: .utility).async {
+            guard folder.startAccessingSecurityScopedResource() else {
+                print("❌ Не удалось получить доступ к папке для экспорта")
+                return
+            }
+            defer { folder.stopAccessingSecurityScopedResource() }
 
-        for (index, track) in tracks.enumerated() {
-            let destinationURL = folder.appendingPathComponent(track.url.lastPathComponent, isDirectory: false)
+            print("🚀 Начинаем экспорт в: \(folder)")
+            print("🎵 Треков для записи: \(tracks.count)")
 
-            do {
-                let data = try Data(contentsOf: track.url)
-                try data.write(to: destinationURL)
+            let semaphore = DispatchSemaphore(value: 1)
+            let sortedTracks = tracks // фиксируем порядок
+            DispatchQueue.main.async {
+                exportProgress = (0, sortedTracks.count)
+            }
+            DispatchQueue.main.async {
+                exportProgress = (0, sortedTracks.count)
+            }
 
-                DispatchQueue.main.async {
-                    tracks[index].progress = 1.0
+            for (index, track) in sortedTracks.enumerated() {
+                if isExportCancelled {
+                    print("⛔️ Экспорт остановлен")
+                    break
                 }
-            } catch {
-                print("Ошибка копирования файла: \(error)")
+                semaphore.wait()
+
+                let indexString = String(format: "%02d", index + 1)
+                let originalExtension = track.url.pathExtension
+                let originalName = track.url.deletingPathExtension().lastPathComponent
+                let prefixedName = "\(indexString)_\(originalName).\(originalExtension)"
+                let destinationURL = folder.appendingPathComponent(prefixedName)
+
+                DispatchQueue.global().async {
+                    do {
+                        if FileManager.default.fileExists(atPath: destinationURL.path) {
+                            do {
+                                try FileManager.default.removeItem(at: destinationURL)
+                                print("🧹 Удалён старый файл: \(destinationURL.lastPathComponent)")
+                            } catch {
+                                print("❌ Не удалось удалить старый файл: \(error.localizedDescription)")
+                            }
+                            Thread.sleep(forTimeInterval: 0.05)
+                        }
+
+                        let data = try Data(contentsOf: track.url)
+                        try data.write(to: destinationURL)
+
+                        DispatchQueue.main.async {
+                            if let i = tracks.firstIndex(where: { $0.id == track.id }) {
+                                tracks[i].progress = 1.0
+                                exportProgress?.completed += 1
+                            }
+                        }
+
+                    } catch {
+                        print("❌ Ошибка при записи трека \(track.filename): \(error.localizedDescription)")
+                    }
+
+                    semaphore.signal()
+                }
+
+                Thread.sleep(forTimeInterval: 0.2)
+            }
+
+            DispatchQueue.main.async {
+                print("✅ Все треки экспортированы.")
+                isExportCancelled = false
             }
         }
     }
+    
 
     func play(track: AudioTrack) {
         print("\n🔊 Попытка воспроизведения трека:")
@@ -436,13 +550,17 @@ struct DocumentPickerView: View {
     var onPick: (URL) -> Void
 
     var body: some View {
-        DocumentPickerRepresentable(onPick: onPick)
-            .edgesIgnoringSafeArea(.all)
+        DocumentPickerRepresentable { url in
+            print("📁 Выбрана папка: \(url)")
+            onPick(url)
+        }
+        .edgesIgnoringSafeArea(.all)
     }
 }
 
 struct DocumentPickerRepresentable: UIViewControllerRepresentable {
     var onPick: (URL) -> Void
+    
 
     func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
         let documentPicker = UIDocumentPickerViewController(forOpeningContentTypes: [UTType.folder])
@@ -507,6 +625,13 @@ struct TrackRowView: View {
                                 .padding(6)
                                 .background(Color.black.opacity(0.5))
                                 .clipShape(Circle())
+                            if track.isExporting {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle())
+                                    .frame(width: 20, height: 20)
+                                    .background(Color.black.opacity(0.5))
+                                    .clipShape(Circle())
+                            }
                         } else {
                             Image(systemName: "waveform")
                                 .foregroundColor(.white)
