@@ -9,17 +9,10 @@ func formatDuration(_ duration: TimeInterval) -> String {
     let seconds = Int(duration) % 60
     return String(format: "%02d:%02d", minutes, seconds)
 }
+func exportTracks(_ urls: [URL]) {
+    // Только сортированные треки — по имени с префиксами
+    _ = urls.sorted(by: { $0.lastPathComponent < $1.lastPathComponent })
 
-struct ExportPickerView: UIViewControllerRepresentable {
-    let fileURLs: [URL]
-
-    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
-        let picker = UIDocumentPickerViewController(forExporting: fileURLs, asCopy: true)
-        picker.shouldShowFileExtensions = true
-        return picker
-    }
-
-    func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {}
 }
 
 struct AudioTrack: Identifiable {
@@ -31,18 +24,16 @@ struct AudioTrack: Identifiable {
     var filename: String
     var duration: TimeInterval = 0
     var artwork: UIImage? = nil
-    var isExporting: Bool = false // 🔄 Добавили флаг экспорта
+    var isExporting: Bool = false //  Добавили флаг экспорта
 
 }
 
 struct ContentView: View {
     @Environment(\.editMode) private var editMode
     @State private var tracks: [AudioTrack] = []
-    @State private var exportProgress: (completed: Int, total: Int)? = nil
-    @State private var exportFolder: URL?
+    // System export
     @State private var exportFileURLs: [URL] = []
     @State private var isDocumentPickerPresented = false
-    @State private var isFolderPickerPresented = false
     @State private var isImporting = false
     @State private var player: AVPlayer = AVPlayer()
     @State private var isPlaying: Bool = false
@@ -50,6 +41,7 @@ struct ContentView: View {
     @State private var currentTime: Double = 0
     @State private var scrollProxy: ScrollViewProxy?
     @State private var isExportCancelled: Bool = false
+    @State private var isShowingURLList = false
     
     private func addPeriodicTimeObserver() {
         let interval = CMTime(seconds: 1.0, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
@@ -63,9 +55,9 @@ struct ContentView: View {
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
             try AVAudioSession.sharedInstance().setActive(true)
             UIApplication.shared.beginReceivingRemoteControlEvents()
-            print("✅ Audio session configured for playback.")
+            print("Audio session configured for playback.")
         } catch {
-            print("❌ Failed to configure audio session: \(error.localizedDescription)")
+            print("Failed to configure audio session: \(error.localizedDescription)")
         }
     }
 
@@ -126,45 +118,6 @@ struct ContentView: View {
     var body: some View {
         NavigationStack {
             ScrollViewReader { proxy in
-                if let progress = exportProgress {
-                    VStack(alignment: .leading, spacing: 6) {
-                        if progress.completed < progress.total {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("Записано \(progress.completed) из \(progress.total)")
-                                        .font(.caption)
-                                        .foregroundColor(.gray)
-                                    ProgressView(value: Float(progress.completed), total: Float(progress.total))
-                                        .progressViewStyle(LinearProgressViewStyle())
-                                }
-                                Spacer()
-                                Button(action: {
-                                    isExportCancelled = true
-                                    exportProgress = nil  // Очистить прогресс
-                                    print("⛔️ Экспорт прерван пользователем")
-                                }) {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .foregroundColor(.red)
-                                        .imageScale(.medium)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        } else {
-                            HStack {
-                                Text("✅ Копирование \(progress.total) завершено")
-                                    .font(.caption)
-                                    .foregroundColor(.green)
-                                Spacer()
-                                Button("Закрыть") {
-                                    exportProgress = nil
-                                }
-                                .font(.caption)
-                            }
-                        }
-                    }
-                    .padding(.top, 8)
-                    .padding(.horizontal)
-                }
                 List {
                     ForEach(tracks) { track in
                         TrackRowView(track: track, isPlaying: isPlaying, isCurrent: currentTrack?.id == track.id)
@@ -195,15 +148,42 @@ struct ContentView: View {
                 }
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
                     Button(action: {
-                        print("⚠️ Очистка треков")
+                        print("Очистка треков")
                         tracks.removeAll()
                     }) {
                         Image(systemName: "wand.and.sparkles")
                     }
 
-                    Button(action: {
-                        isFolderPickerPresented = true
-                    }) {
+                    Button {
+                        let exportedTracks = tracks.enumerated().compactMap { index, track -> (from: URL, name: String)? in
+                            let prefix = String(format: "%02d", index + 1)
+                            let ext = track.url.pathExtension
+                            let base = track.url.deletingPathExtension().lastPathComponent
+                            let filename = "\(prefix)_\(base).\(ext)"
+                            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
+                            do {
+                                if FileManager.default.fileExists(atPath: tempURL.path) {
+                                    try FileManager.default.removeItem(at: tempURL)
+                                }
+                                try FileManager.default.copyItem(at: track.url, to: tempURL)
+                                return (from: tempURL, name: filename)
+                            } catch {
+                                print("Ошибка при подготовке \(filename): \(error)")
+                                return nil
+                            }
+                        }
+
+                        let picker = UIDocumentPickerViewController(forExporting: exportedTracks.map { $0.from }, asCopy: true)
+                        picker.delegate = ExportFolderPicker(tracksToExport: exportedTracks)
+                        picker.directoryURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+                        picker.allowsMultipleSelection = false
+                        picker.shouldShowFileExtensions = true
+
+                        if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                           let rootVC = scene.windows.first?.rootViewController {
+                            rootVC.present(picker, animated: true, completion: nil)
+                        }
+                    } label: {
                         Image(systemName: "laser.burst")
                     }
 
@@ -214,6 +194,7 @@ struct ContentView: View {
                     }
                 }
             }
+            // Mini-player restored
             if let track = currentTrack {
                 VStack(spacing: 8) {
                     HStack {
@@ -231,10 +212,8 @@ struct ContentView: View {
                         }
  
                         Button(action: {
-                            if let track = currentTrack {
-                                withAnimation {
-                                    scrollProxy?.scrollTo(track.id, anchor: .center)
-                                }
+                            withAnimation {
+                                scrollProxy?.scrollTo(track.id, anchor: .center)
                             }
                         }) {
                             VStack(alignment: .leading) {
@@ -309,14 +288,6 @@ struct ContentView: View {
             addPeriodicTimeObserver()
         }
         .ignoresSafeArea()
-        .sheet(isPresented: $isFolderPickerPresented) {
-            DocumentPickerView { folder in
-                exportTracks(to: folder)
-            }
-        }
-        .sheet(isPresented: $isDocumentPickerPresented) {
-            ExportPickerView(fileURLs: exportFileURLs)
-        }
         .fileImporter(
             isPresented: $isImporting,
             allowedContentTypes: [.audio],
@@ -329,14 +300,14 @@ struct ContentView: View {
                         print("Импортирован: \(url)")
 
                         guard url.startAccessingSecurityScopedResource() else {
-                            print("❌ Не удалось получить доступ к ресурсу")
+                            print("Не удалось получить доступ к ресурсу")
                             continue
                         }
                         defer { url.stopAccessingSecurityScopedResource() }
 
                         let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(url.lastPathComponent)
                         if tracks.contains(where: { $0.filename == tempURL.deletingPathExtension().lastPathComponent }) {
-                            print("⚠️ Трек уже существует в списке: \(tempURL.lastPathComponent)")
+                            print("Трек уже существует в списке: \(tempURL.lastPathComponent)")
                             continue
                         }
 
@@ -345,14 +316,14 @@ struct ContentView: View {
                                 try FileManager.default.removeItem(at: tempURL)
                             }
                             try FileManager.default.copyItem(at: url, to: tempURL)
-                            print("✅ Скопирован во временную директорию: \(tempURL)")
+                            print("Скопирован во временную директорию: \(tempURL)")
 
                             let asset = AVURLAsset(url: tempURL)
-                            print("🧪 asset.duration.seconds = \(asset.duration.seconds)")
+                            print("asset.duration.seconds = \(asset.duration.seconds)")
                             var duration = CMTimeGetSeconds(asset.duration)
                             if duration == 0 {
                                 let audioFile = try AVAudioFile(forReading: tempURL)
-                                print("🧪 AVAudioFile fallback duration: \(Double(audioFile.length) / audioFile.fileFormat.sampleRate)")
+                                print("AVAudioFile fallback duration: \(Double(audioFile.length) / audioFile.fileFormat.sampleRate)")
                                 duration = Double(audioFile.length) / audioFile.fileFormat.sampleRate
                             }
                             let filename = tempURL.deletingPathExtension().lastPathComponent
@@ -398,81 +369,9 @@ struct ContentView: View {
         }
     }
 
-    func exportTracks(to folder: URL) {
-        DispatchQueue.global(qos: .utility).async {
-            guard folder.startAccessingSecurityScopedResource() else {
-                print("❌ Не удалось получить доступ к папке для экспорта")
-                return
-            }
-            defer { folder.stopAccessingSecurityScopedResource() }
-
-            print("🚀 Начинаем экспорт в: \(folder)")
-            print("🎵 Треков для записи: \(tracks.count)")
-
-            let semaphore = DispatchSemaphore(value: 1)
-            let sortedTracks = tracks // фиксируем порядок
-            DispatchQueue.main.async {
-                exportProgress = (0, sortedTracks.count)
-            }
-            DispatchQueue.main.async {
-                exportProgress = (0, sortedTracks.count)
-            }
-
-            for (index, track) in sortedTracks.enumerated() {
-                if isExportCancelled {
-                    print("⛔️ Экспорт остановлен")
-                    break
-                }
-                semaphore.wait()
-
-                let indexString = String(format: "%02d", index + 1)
-                let originalExtension = track.url.pathExtension
-                let originalName = track.url.deletingPathExtension().lastPathComponent
-                let prefixedName = "\(indexString)_\(originalName).\(originalExtension)"
-                let destinationURL = folder.appendingPathComponent(prefixedName)
-
-                DispatchQueue.global().async {
-                    do {
-                        if FileManager.default.fileExists(atPath: destinationURL.path) {
-                            do {
-                                try FileManager.default.removeItem(at: destinationURL)
-                                print("🧹 Удалён старый файл: \(destinationURL.lastPathComponent)")
-                            } catch {
-                                print("❌ Не удалось удалить старый файл: \(error.localizedDescription)")
-                            }
-                            Thread.sleep(forTimeInterval: 0.05)
-                        }
-
-                        let data = try Data(contentsOf: track.url)
-                        try data.write(to: destinationURL)
-
-                        DispatchQueue.main.async {
-                            if let i = tracks.firstIndex(where: { $0.id == track.id }) {
-                                tracks[i].progress = 1.0
-                                exportProgress?.completed += 1
-                            }
-                        }
-
-                    } catch {
-                        print("❌ Ошибка при записи трека \(track.filename): \(error.localizedDescription)")
-                    }
-
-                    semaphore.signal()
-                }
-
-                Thread.sleep(forTimeInterval: 0.2)
-            }
-
-            DispatchQueue.main.async {
-                print("✅ Все треки экспортированы.")
-                isExportCancelled = false
-            }
-        }
-    }
-    
 
     func play(track: AudioTrack) {
-        print("\n🔊 Попытка воспроизведения трека:")
+        print("\n Попытка воспроизведения трека:")
         print("URL: \(track.url)")
         print("Файл существует: \(FileManager.default.fileExists(atPath: track.url.path))")
 
@@ -482,10 +381,10 @@ struct ContentView: View {
             do {
                 let isPlayable = try await asset.load(.isPlayable)
                 guard isPlayable else {
-                    print("❌ Файл не поддерживается")
+                    print("Файл не поддерживается")
                     return
                 }
-                print("✅ Файл можно воспроизвести")
+                print("Файл можно воспроизвести")
                 let playerItem = AVPlayerItem(asset: asset)
                 DispatchQueue.main.async {
                     player.replaceCurrentItem(with: playerItem)
@@ -495,7 +394,7 @@ struct ContentView: View {
                     updateNowPlayingInfo(for: track)
                 }
             } catch {
-                print("❌ Не удалось загрузить/воспроизвести трек: \(error.localizedDescription)")
+                print("Не удалось загрузить/воспроизвести трек: \(error.localizedDescription)")
             }
         }
     }
@@ -546,53 +445,8 @@ struct ContentView: View {
     }
 }
 
-struct DocumentPickerView: View {
-    var onPick: (URL) -> Void
 
-    var body: some View {
-        DocumentPickerRepresentable { url in
-            print("📁 Выбрана папка: \(url)")
-            onPick(url)
-        }
-        .edgesIgnoringSafeArea(.all)
-    }
-}
 
-struct DocumentPickerRepresentable: UIViewControllerRepresentable {
-    var onPick: (URL) -> Void
-    
-
-    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
-        let documentPicker = UIDocumentPickerViewController(forOpeningContentTypes: [UTType.folder])
-        documentPicker.delegate = context.coordinator
-        return documentPicker
-    }
-
-    func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {}
-
-    func makeCoordinator() -> Coordinator {
-        return Coordinator(onPick: onPick)
-    }
-
-    class Coordinator: NSObject, UIDocumentPickerDelegate {
-        var onPick: (URL) -> Void
-
-        init(onPick: @escaping (URL) -> Void) {
-            self.onPick = onPick
-        }
-
-        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
-            if let url = urls.first, url.startAccessingSecurityScopedResource() {
-                onPick(url)
-                url.stopAccessingSecurityScopedResource()
-            }
-        }
-
-        func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
-            // Handle cancellation if needed
-        }
-    }
-}
 
 struct TrackRowView: View {
     let track: AudioTrack
@@ -666,6 +520,7 @@ struct TrackRowView: View {
         }
     }
 }
+// MARK: – AirPlay Route Picker
 struct AVRoutePickerViewRepresented: UIViewRepresentable {
     func makeUIView(context: Context) -> AVRoutePickerView {
         let view = AVRoutePickerView()
@@ -674,5 +529,38 @@ struct AVRoutePickerViewRepresented: UIViewRepresentable {
         return view
     }
 
-    func updateUIView(_ uiView: AVRoutePickerView, context: Context) {}
+    func updateUIView(_ uiView: AVRoutePickerView, context: Context) {
+        // no-op
+    }
+}
+
+// Новый класс ExportFolderPicker для экспорта треков в выбранную папку
+class ExportFolderPicker: NSObject, UIDocumentPickerDelegate {
+    let tracksToExport: [(from: URL, name: String)]
+
+    init(tracksToExport: [(from: URL, name: String)]) {
+        self.tracksToExport = tracksToExport
+    }
+
+    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        guard let folderURL = urls.first else { return }
+        guard folderURL.startAccessingSecurityScopedResource() else {
+            print("Не удалось получить доступ к папке")
+            return
+        }
+        defer { folderURL.stopAccessingSecurityScopedResource() }
+
+        for (from, name) in tracksToExport {
+            let destination = folderURL.appendingPathComponent(name)
+            if FileManager.default.fileExists(atPath: destination.path) {
+                try? FileManager.default.removeItem(at: destination)
+            }
+            do {
+                try FileManager.default.copyItem(at: from, to: destination)
+                print("✅ \(name) экспортирован")
+            } catch {
+                print("❌ Ошибка экспорта \(name): \(error)")
+            }
+        }
+    }
 }
