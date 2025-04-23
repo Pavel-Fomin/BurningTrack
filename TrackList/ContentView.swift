@@ -142,10 +142,19 @@ struct ContentView: View {
                 }
             }
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Text("TRACKLIST")
-                        .font(.headline)
+                ToolbarItem(placement: .principal) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("TRACKLIST")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        if !tracks.isEmpty {
+                            Text("Треков: \(tracks.count) • \(formatDuration(tracks.reduce(0) { $0 + $1.duration }))")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
+                    }
                 }
+
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
                     Button(action: {
                         print("Очистка треков")
