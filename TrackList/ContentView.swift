@@ -10,7 +10,7 @@ import UniformTypeIdentifiers
 import MediaPlayer
 import AVKit
 
-func formatDuration(_ duration: TimeInterval) -> String {
+func formatTotalDuration(_ duration: TimeInterval) -> String {
     let totalMinutes = Int(duration) / 60
     let seconds = Int(duration) % 60
     let hours = totalMinutes / 60
@@ -165,7 +165,7 @@ struct ContentView: View {
                             .font(.headline)
                             .frame(maxWidth: .infinity, alignment: .leading)
                         if !tracks.isEmpty {
-                            Text("Треков: \(tracks.count) • \(formatDuration(tracks.reduce(0) { $0 + $1.duration }))")
+                            Text("Треков: \(tracks.count) • \(formatTotalDuration(tracks.reduce(0) { $0 + $1.duration }))")
                                 .font(.caption)
                                 .foregroundColor(.gray)
                         }
@@ -557,7 +557,7 @@ struct TrackRowView: View {
                                 .foregroundColor(.gray)
                                 .lineLimit(1)
                             Spacer()
-                            Text(formatDuration(track.duration))
+                            Text(formatTimeSimple(track.duration))
                                 .font(.caption)
                                 .foregroundColor(.gray)
                         }
@@ -568,7 +568,7 @@ struct TrackRowView: View {
 
                         HStack {
                             Spacer()
-                            Text(formatDuration(track.duration))
+                            Text(formatTimeSimple(track.duration))
                                 .font(.caption)
                                 .foregroundColor(.gray)
                         }
