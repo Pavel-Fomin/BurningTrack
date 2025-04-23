@@ -1,3 +1,9 @@
+// Форматирование времени для миниплеера (MM:SS)
+func formatTimeSimple(_ duration: TimeInterval) -> String {
+    let minutes = Int(duration) / 60
+    let seconds = Int(duration) % 60
+    return String(format: "%02d:%02d", minutes, seconds)
+}
 import SwiftUI
 import AVFoundation
 import UniformTypeIdentifiers
@@ -5,9 +11,20 @@ import MediaPlayer
 import AVKit
 
 func formatDuration(_ duration: TimeInterval) -> String {
-    let minutes = Int(duration) / 60
+    let totalMinutes = Int(duration) / 60
     let seconds = Int(duration) % 60
-    return String(format: "%02d:%02d", minutes, seconds)
+    let hours = totalMinutes / 60
+    let minutes = totalMinutes % 60
+    let days = hours / 24
+    let remainingHours = hours % 24
+
+    if days > 0 {
+        return String(format: "%dд:%02dч:%02dм", days, remainingHours, minutes)
+    } else if hours > 0 {
+        return String(format: "%02dч:%02dм", hours, minutes)
+    } else {
+        return "\(minutes) минут"
+    }
 }
 func exportTracks(_ urls: [URL]) {
     // Только сортированные треки — по имени с префиксами
@@ -248,18 +265,18 @@ struct ContentView: View {
                     }
  
                     HStack {
-                        Text(formatDuration(currentTime))
+                        Text(formatTimeSimple(currentTime))
                             .font(.caption)
                             .foregroundColor(.gray)
- 
+
                         Slider(value: Binding(
                             get: { currentTime },
                             set: { newValue in
                                 player.seek(to: CMTime(seconds: newValue, preferredTimescale: 600))
                             }
                         ), in: 0...track.duration)
- 
-                        Text(formatDuration(max(0, track.duration - currentTime)))
+
+                        Text(formatTimeSimple(max(0, track.duration - currentTime)))
                             .font(.caption)
                             .foregroundColor(.gray)
                     }
