@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		A912E3B52DA911BD0046A8B6 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = A912E3B42DA911BD0046A8B6 /* LaunchScreen.storyboard */; };
 		A912E3B72DA94B240046A8B6 /* AudioRemoteControlManager.swift..swift in Sources */ = {isa = PBXBuildFile; fileRef = A912E3B62DA94B240046A8B6 /* AudioRemoteControlManager.swift..swift */; };
+		A92DA0932DB8FFCD0032EB6D /* MetadataParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A92DA0922DB8FFCD0032EB6D /* MetadataParser.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -31,6 +32,7 @@
 /* Begin PBXFileReference section */
 		A912E3B42DA911BD0046A8B6 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		A912E3B62DA94B240046A8B6 /* AudioRemoteControlManager.swift..swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioRemoteControlManager.swift..swift; sourceTree = "<group>"; };
+		A92DA0922DB8FFCD0032EB6D /* MetadataParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetadataParser.swift; sourceTree = "<group>"; };
 		A97C86282DA326C000ED2E99 /* TrackList.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TrackList.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A97C86352DA326C200ED2E99 /* TrackListTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TrackListTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A97C863F2DA326C200ED2E99 /* TrackListUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TrackListUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -95,6 +97,7 @@
 		A97C861F2DA326C000ED2E99 = {
 			isa = PBXGroup;
 			children = (
+				A92DA0922DB8FFCD0032EB6D /* MetadataParser.swift */,
 				A912E3B62DA94B240046A8B6 /* AudioRemoteControlManager.swift..swift */,
 				A912E3B42DA911BD0046A8B6 /* LaunchScreen.storyboard */,
 				A97C862A2DA326C000ED2E99 /* TrackList */,
@@ -259,6 +262,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A92DA0932DB8FFCD0032EB6D /* MetadataParser.swift in Sources */,
 				A912E3B72DA94B240046A8B6 /* AudioRemoteControlManager.swift..swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

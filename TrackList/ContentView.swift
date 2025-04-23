@@ -327,23 +327,44 @@ struct ContentView: View {
                                 duration = Double(audioFile.length) / audioFile.fileFormat.sampleRate
                             }
                             let filename = tempURL.deletingPathExtension().lastPathComponent
-                            var trackTitle: String? = nil
-                            if let metadataTitle = asset.commonMetadata.first(where: { $0.commonKey?.rawValue == "title" })?.stringValue {
-                                if metadataTitle != filename {
-                                    trackTitle = metadataTitle
-                                }
-                            }
                             var artist: String? = nil
+                            var trackTitle: String? = nil
+                            var artworkImage: UIImage? = nil
+
+                            // Пробуем AVFoundation, как раньше:
                             if let metadataArtist = asset.commonMetadata.first(where: { $0.commonKey?.rawValue == "artist" })?.stringValue {
                                 artist = metadataArtist
                             }
-                            var artworkImage: UIImage? = nil
+                            if let metadataTitle = asset.commonMetadata.first(where: { $0.commonKey?.rawValue == "title" })?.stringValue {
+                                trackTitle = metadataTitle
+                            }
                             if let artworkData = AVMetadataItem.metadataItems(
                                 from: asset.commonMetadata,
                                 withKey: AVMetadataKey.commonKeyArtwork,
                                 keySpace: .common
                             ).first?.dataValue {
                                 artworkImage = UIImage(data: artworkData)
+                            }
+
+                            // Если artist или trackTitle не нашлись — подключаем парсер:
+                            if artist == nil || trackTitle == nil || artworkImage == nil {
+                                do {
+                                    let parsed = try MetadataParser.parseMetadata(from: tempURL)
+                                    artist = artist ?? parsed.artist
+                                    trackTitle = trackTitle ?? parsed.title ?? filename
+                                    
+                                    print("После парсинга: artist = \(artist ?? "nil"), title = \(trackTitle ?? "nil"), filename = \(filename)")
+                                    
+                                    if artworkImage == nil, let data = parsed.artworkData {
+                                        artworkImage = UIImage(data: data)
+                                    }
+                                } catch {
+                                    print("Ошибка парсинга метаданных: \(error)")
+                                    print("artist: \(artist ?? "nil")")
+                                    print("title: \(trackTitle ?? "nil")")
+                                    print("filename: \(filename)")
+                                
+                                }
                             }
                             let newTrack = AudioTrack(
                                 url: tempURL,
@@ -499,19 +520,32 @@ struct TrackRowView: View {
                 .cornerRadius(4)
  
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(track.artist ?? track.filename)
-                        .font(.subheadline)
-                        .foregroundColor(.primary)
- 
-                    HStack {
-                        Text(track.title ?? "")
+                    if let artist = track.artist, let title = track.title, !artist.isEmpty, !title.isEmpty {
+                        Text(artist)
                             .font(.subheadline)
-                            .foregroundColor(.gray)
-                            .lineLimit(1)
-                        Spacer()
-                        Text(formatDuration(track.duration))
-                            .font(.caption)
-                            .foregroundColor(.gray)
+                            .foregroundColor(.primary)
+
+                        HStack {
+                            Text(title)
+                                .font(.subheadline)
+                                .foregroundColor(.gray)
+                                .lineLimit(1)
+                            Spacer()
+                            Text(formatDuration(track.duration))
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
+                    } else {
+                        Text(track.filename)
+                            .font(.subheadline)
+                            .foregroundColor(.primary)
+
+                        HStack {
+                            Spacer()
+                            Text(formatDuration(track.duration))
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
                     }
                 }
             }
@@ -557,9 +591,9 @@ class ExportFolderPicker: NSObject, UIDocumentPickerDelegate {
             }
             do {
                 try FileManager.default.copyItem(at: from, to: destination)
-                print("✅ \(name) экспортирован")
+                print("\(name) экспортирован")
             } catch {
-                print("❌ Ошибка экспорта \(name): \(error)")
+                print("Ошибка экспорта \(name): \(error)")
             }
         }
     }
