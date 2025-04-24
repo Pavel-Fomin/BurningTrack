@@ -1,3 +1,45 @@
+import AVFoundation
+import Combine
+// Класс для управления AVPlayer и отслеживания времени воспроизведения
+class PlayerManager: ObservableObject {
+    @Published var currentTime: TimeInterval = 0.0
+    @Published var trackDuration: TimeInterval = 0.0
+    var player: AVPlayer
+    private var timeObserverToken: Any?
+
+    init(player: AVPlayer) {
+        self.player = player
+        addPeriodicTimeObserver()
+    }
+
+    deinit {
+        removePeriodicTimeObserver()
+    }
+
+    private func addPeriodicTimeObserver() {
+        removePeriodicTimeObserver()
+        let interval = CMTime(seconds: 1.0, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
+        timeObserverToken = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
+            guard let self = self else { return }
+            if let currentItem = self.player.currentItem {
+                // trackDuration больше НЕ пересчитываем тут — используем setDuration() из play(track:)
+                self.currentTime = currentItem.currentTime().seconds
+            }
+        }
+    }
+
+    private func removePeriodicTimeObserver() {
+        if let token = timeObserverToken {
+            player.removeTimeObserver(token)
+            timeObserverToken = nil
+        }
+    }
+
+    func setDuration(_ duration: TimeInterval) {
+        self.trackDuration = duration
+    }
+
+}
 // Форматирование времени для миниплеера (MM:SS)
 func formatTimeSimple(_ duration: TimeInterval) -> String {
     let minutes = Int(duration) / 60
@@ -5,7 +47,6 @@ func formatTimeSimple(_ duration: TimeInterval) -> String {
     return String(format: "%02d:%02d", minutes, seconds)
 }
 import SwiftUI
-import AVFoundation
 import UniformTypeIdentifiers
 import MediaPlayer
 import AVKit
@@ -52,20 +93,12 @@ struct ContentView: View {
     @State private var exportFileURLs: [URL] = []
     @State private var isDocumentPickerPresented = false
     @State private var isImporting = false
-    @State private var player: AVPlayer = AVPlayer()
+    @StateObject private var playerManager = PlayerManager(player: AVPlayer())
     @State private var isPlaying: Bool = false
-    @State private var currentTrack: AudioTrack?
-    @State private var currentTime: Double = 0
+    @State var currentTrack: AudioTrack?
     @State private var scrollProxy: ScrollViewProxy?
     @State private var isExportCancelled: Bool = false
     @State private var isShowingURLList = false
-    
-    private func addPeriodicTimeObserver() {
-        let interval = CMTime(seconds: 1.0, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
-        _ = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { time in
-            currentTime = time.seconds
-        }
-    }
     
     private func configureAudioSession() {
         do {
@@ -77,7 +110,8 @@ struct ContentView: View {
             print("Failed to configure audio session: \(error.localizedDescription)")
         }
     }
-
+    
+    
     private func setupRemoteCommandCenter() {
         let commandCenter = MPRemoteCommandCenter.shared()
 
@@ -105,7 +139,7 @@ struct ContentView: View {
             guard let positionEvent = event as? MPChangePlaybackPositionCommandEvent else {
                 return .commandFailed
             }
-            player.seek(to: CMTime(seconds: positionEvent.positionTime, preferredTimescale: 600))
+            playerManager.player.seek(to: CMTime(seconds: positionEvent.positionTime, preferredTimescale: 600))
             return .success
         }
 
@@ -120,7 +154,7 @@ struct ContentView: View {
         var nowPlayingInfo = [String: Any]()
         nowPlayingInfo[MPMediaItemPropertyTitle] = track.title
         nowPlayingInfo[MPMediaItemPropertyArtist] = track.artist
-        nowPlayingInfo[MPNowPlayingInfoPropertyElapsedPlaybackTime] = currentTime
+        nowPlayingInfo[MPNowPlayingInfoPropertyElapsedPlaybackTime] = playerManager.currentTime
         nowPlayingInfo[MPMediaItemPropertyPlaybackDuration] = track.duration
         nowPlayingInfo[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1.0 : 0.0
 
@@ -265,18 +299,26 @@ struct ContentView: View {
                     }
  
                     HStack {
-                        Text(formatTimeSimple(currentTime))
+                        // Отображает текущее проигранное время трека (в формате MM:SS)
+                        Text(formatTimeSimple(playerManager.currentTime))
                             .font(.caption)
                             .foregroundColor(.gray)
 
+                        // Ползунок для отображения и управления прогрессом воспроизведения
+                        // Связан с текущим временем через Binding: изменение ползунка вызывает seek
                         Slider(value: Binding(
-                            get: { currentTime },
+                            get: { playerManager.currentTime },
                             set: { newValue in
-                                player.seek(to: CMTime(seconds: newValue, preferredTimescale: 600))
+                                playerManager.player.seek(to: CMTime(seconds: newValue, preferredTimescale: 600))
+                                playerManager.currentTime = newValue
+                                if let currentTrack = currentTrack {
+                                    updateNowPlayingInfo(for: currentTrack)
+                                }
                             }
                         ), in: 0...track.duration)
 
-                        Text(formatTimeSimple(max(0, track.duration - currentTime)))
+                        // Отображает оставшееся время до конца трека (в формате MM:SS)
+                        Text(formatTimeSimple(max(0, track.duration - playerManager.currentTime)))
                             .font(.caption)
                             .foregroundColor(.gray)
                     }
@@ -311,7 +353,13 @@ struct ContentView: View {
         .onAppear {
             configureAudioSession()
             setupRemoteCommandCenter()
-            addPeriodicTimeObserver()
+            NotificationCenter.default.addObserver(
+                forName: .AVPlayerItemDidPlayToEndTime,
+                object: nil,
+                queue: .main
+            ) { _ in
+                nextTrack()
+            }
         }
         .ignoresSafeArea()
         .fileImporter(
@@ -345,13 +393,18 @@ struct ContentView: View {
                             print("Скопирован во временную директорию: \(tempURL)")
 
                             let asset = AVURLAsset(url: tempURL)
-                            print("asset.duration.seconds = \(asset.duration.seconds)")
-                            var duration = CMTimeGetSeconds(asset.duration)
-                            if duration == 0 {
-                                let audioFile = try AVAudioFile(forReading: tempURL)
-                                print("AVAudioFile fallback duration: \(Double(audioFile.length) / audioFile.fileFormat.sampleRate)")
-                                duration = Double(audioFile.length) / audioFile.fileFormat.sampleRate
-                            }
+                            let audioFile = try AVAudioFile(forReading: tempURL)
+                            // === Сравнение методов подсчёта времени ===
+                            let durationAsset = asset.duration.seconds
+                            let durationAudioFile = Double(audioFile.length) / audioFile.fileFormat.sampleRate
+                            let difference = abs(durationAsset - durationAudioFile)
+                            print("=== Проверка длительности ===")
+                            print("AVAsset duration: \(durationAsset)")
+                            print("AVAudioFile duration: \(durationAudioFile)")
+                            print("Разница: \(difference) секунд")
+                            print("=============================")
+                            // === Конец вставки сравнения ===
+                            let duration = durationAudioFile
                             let filename = tempURL.deletingPathExtension().lastPathComponent
                             var artist: String? = nil
                             var trackTitle: String? = nil
@@ -433,9 +486,25 @@ struct ContentView: View {
                 }
                 print("Файл можно воспроизвести")
                 let playerItem = AVPlayerItem(asset: asset)
+                print("AVPlayerItem duration (ignored for FLAC): \(track.duration)")
+                print("AudioTrack duration: \(track.duration)")
                 DispatchQueue.main.async {
-                    player.replaceCurrentItem(with: playerItem)
-                    player.play()
+                    playerManager.player.pause()
+                    isPlaying = false
+                    playerManager.player.seek(to: .zero)
+                    playerManager.currentTime = 0.0
+                    playerManager.setDuration(track.duration)
+                    if let current = currentTrack {
+                        updateNowPlayingInfo(for: current)
+                    }
+                    playerManager.player.replaceCurrentItem(with: playerItem)
+                    playerManager.player.seek(to: .zero)
+                    playerManager.currentTime = 0.0
+                    playerManager.setDuration(track.duration)
+                    if let current = currentTrack {
+                        updateNowPlayingInfo(for: current)
+                    }
+                    playerManager.player.play()
                     currentTrack = track
                     isPlaying = true
                     updateNowPlayingInfo(for: track)
@@ -448,10 +517,10 @@ struct ContentView: View {
 
     func togglePlayPause() {
         if isPlaying {
-            player.pause()
+            playerManager.player.pause()
             isPlaying = false
         } else {
-            player.play()
+            playerManager.player.play()
             isPlaying = true
         }
         if let track = currentTrack {
@@ -471,6 +540,9 @@ struct ContentView: View {
         // Calculate the next track index with wrap-around
         let nextIndex = (currentIndex + 1) % playlist.count
         let next = playlist[nextIndex]
+        playerManager.player.pause()
+        isPlaying = false
+        // currentTime = 0
         // Play the next track
         play(track: next)
     }
@@ -487,6 +559,12 @@ struct ContentView: View {
         // Calculate the previous track index with wrap-around
         let prevIndex = (currentIndex - 1 + playlist.count) % playlist.count
         let previous = playlist[prevIndex]
+        playerManager.player.pause()
+        isPlaying = false
+        // currentTime = 0
+        if let current = currentTrack {
+            updateNowPlayingInfo(for: current)
+        }
         // Play the previous track
         play(track: previous)
     }
