@@ -83,12 +83,15 @@ struct AudioTrack: Identifiable {
     var duration: TimeInterval = 0
     var artwork: UIImage? = nil
     var isExporting: Bool = false //  Добавили флаг экспорта
-
 }
+
 
 struct ContentView: View {
     @Environment(\.editMode) private var editMode
-    @State private var tracks: [AudioTrack] = []
+    @State private var tracks: [AudioTrack]
+    init(tracks: [AudioTrack] = []) {
+        _tracks = State(initialValue: tracks)
+    }
     // System export
     @State private var exportFileURLs: [URL] = []
     @State private var isDocumentPickerPresented = false
@@ -166,6 +169,7 @@ struct ContentView: View {
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
     }
 
+    @Environment(\.colorScheme) private var colorScheme
     var body: some View {
         NavigationStack {
             ScrollViewReader { proxy in
@@ -173,6 +177,11 @@ struct ContentView: View {
                     ForEach(tracks) { track in
                         TrackRowView(track: track, isPlaying: isPlaying, isCurrent: currentTrack?.id == track.id)
                             .id(track.id)
+                            .listRowBackground(
+                                currentTrack?.id == track.id
+                                ? (colorScheme == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.12))
+                                : Color.clear
+                            )
                             .onTapGesture {
                                 if currentTrack?.id == track.id {
                                     togglePlayPause()
@@ -188,6 +197,7 @@ struct ContentView: View {
                         tracks.remove(atOffsets: indexSet)
                     }
                 }
+                .listStyle(.plain)
                 .onAppear {
                     scrollProxy = proxy
                 }
@@ -204,6 +214,7 @@ struct ContentView: View {
                                 .foregroundColor(.gray)
                         }
                     }
+                    .padding(.bottom, 12) // паддинг хедера
                 }
 
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
@@ -254,100 +265,98 @@ struct ContentView: View {
                     }
                 }
             }
-            // Mini-player restored
-            if let track = currentTrack {
-                VStack(spacing: 8) {
-                    HStack {
-                        if let artwork = track.artwork {
-                            Image(uiImage: artwork)
-                                .resizable()
-                                .aspectRatio(1, contentMode: .fit)
-                                .frame(width: 44, height: 44)
-                                .cornerRadius(4)
-                        } else {
-                            Rectangle()
-                                .fill(Color.gray.opacity(0.3))
-                                .frame(width: 44, height: 44)
-                                .cornerRadius(4)
-                        }
- 
-                        Button(action: {
-                            withAnimation {
-                                scrollProxy?.scrollTo(track.id, anchor: .center)
+            .safeAreaInset(edge: .bottom) {
+                if let track = currentTrack {
+                    VStack(spacing: 8) {
+                        HStack {
+                            if let artwork = track.artwork {
+                                Image(uiImage: artwork)
+                                    .resizable()
+                                    .aspectRatio(1, contentMode: .fit)
+                                    .frame(width: 44, height: 44)
+                                    .cornerRadius(4)
+                            } else {
+                                Rectangle()
+                                    .fill(Color.gray.opacity(0.3))
+                                    .frame(width: 44, height: 44)
+                                    .cornerRadius(4)
                             }
-                        }) {
-                            VStack(alignment: .leading) {
-                                Text(track.artist ?? track.filename)
-                                    .font(.subheadline)
-                                    .foregroundColor(.primary)
-                                    .lineLimit(1)
 
-                                if let title = track.title {
-                                    Text(title)
+                            Button(action: {
+                                withAnimation {
+                                    scrollProxy?.scrollTo(track.id, anchor: .center)
+                                }
+                            }) {
+                                VStack(alignment: .leading) {
+                                    Text(track.artist ?? track.filename)
                                         .font(.subheadline)
-                                        .foregroundColor(.gray)
+                                        .foregroundColor(.primary)
                                         .lineLimit(1)
+
+                                    if let title = track.title {
+                                        Text(title)
+                                            .font(.subheadline)
+                                            .foregroundColor(.gray)
+                                            .lineLimit(1)
+                                    }
                                 }
                             }
-                        }
-                        .buttonStyle(.plain)
- 
-                        Spacer()
- 
-                        AVRoutePickerViewRepresented()
-                            .frame(width: 24, height: 24)
-                    }
- 
-                    HStack {
-                        // Отображает текущее проигранное время трека (в формате MM:SS)
-                        Text(formatTimeSimple(playerManager.currentTime))
-                            .font(.caption)
-                            .foregroundColor(.gray)
+                            .buttonStyle(.plain)
 
-                        // Ползунок для отображения и управления прогрессом воспроизведения
-                        // Связан с текущим временем через Binding: изменение ползунка вызывает seek
-                        Slider(value: Binding(
-                            get: { playerManager.currentTime },
-                            set: { newValue in
-                                playerManager.player.seek(to: CMTime(seconds: newValue, preferredTimescale: 600))
-                                playerManager.currentTime = newValue
-                                if let currentTrack = currentTrack {
-                                    updateNowPlayingInfo(for: currentTrack)
+                            Spacer()
+
+                            AVRoutePickerViewRepresented()
+                                .frame(width: 24, height: 24)
+                        }
+
+                        HStack {
+                            Text(formatTimeSimple(playerManager.currentTime))
+                                .font(.caption)
+                                .foregroundColor(.gray)
+
+                            Slider(value: Binding(
+                                get: { playerManager.currentTime },
+                                set: { newValue in
+                                    playerManager.player.seek(to: CMTime(seconds: newValue, preferredTimescale: 600))
+                                    playerManager.currentTime = newValue
+                                    if let currentTrack = currentTrack {
+                                        updateNowPlayingInfo(for: currentTrack)
+                                    }
                                 }
-                            }
-                        ), in: 0...track.duration)
+                            ), in: 0...track.duration)
 
-                        // Отображает оставшееся время до конца трека (в формате MM:SS)
-                        Text(formatTimeSimple(max(0, track.duration - playerManager.currentTime)))
-                            .font(.caption)
-                            .foregroundColor(.gray)
+                            Text(formatTimeSimple(max(0, track.duration - playerManager.currentTime)))
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
+
+                        HStack(spacing: 32) {
+                            Button(action: previousTrack) {
+                                Image(systemName: "backward.fill")
+                                    .font(.title2)
+                            }
+
+                            Button(action: togglePlayPause) {
+                                Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                                    .font(.title2)
+                            }
+
+                            Button(action: nextTrack) {
+                                Image(systemName: "forward.fill")
+                                    .font(.title2)
+                            }
+                        }
                     }
- 
-                    HStack(spacing: 32) {
-                        Button(action: previousTrack) {
-                            Image(systemName: "backward.fill")
-                                .font(.title2)
-                        }
- 
-                        Button(action: togglePlayPause) {
-                            Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                                .font(.title2)
-                        }
- 
-                        Button(action: nextTrack) {
-                            Image(systemName: "forward.fill")
-                                .font(.title2)
-                        }
-                    }
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(.ultraThinMaterial)
+                    )
+                    .cornerRadius(12)
+                    .shadow(radius: 3)
+                    .padding(.horizontal)
                 }
-                .padding(.horizontal)
-                .padding(.vertical, 8)
-                .background(.ultraThinMaterial)
-                .cornerRadius(12)
-                .shadow(radius: 3)
-                .padding(.horizontal)
-                .transition(.move(edge: .bottom))
-                .animation(.easeInOut, value: currentTrack?.id)
             }
         }
         .onAppear {
@@ -573,89 +582,108 @@ struct ContentView: View {
 
 
 
+// === TrackRowView: строка трека в списке ===
 struct TrackRowView: View {
     let track: AudioTrack
     let isPlaying: Bool
     let isCurrent: Bool
+    @Environment(\.colorScheme) var colorScheme
 
     var body: some View {
-        ZStack {
-            if isCurrent {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.accentColor.opacity(0.12))
-                    .padding(.horizontal, -8)
-            }
-            HStack(spacing: 12) {
-                ZStack {
-                    if let artwork = track.artwork {
-                        Image(uiImage: artwork)
-                            .resizable()
-                            .aspectRatio(1, contentMode: .fit)
-                    } else {
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.3))
-                    }
- 
-                    if isPlaying && isCurrent {
-                        if #available(iOS 17.0, *) {
-                            Image(systemName: "waveform")
-                                .symbolEffect(.pulse, isActive: true)
-                                .foregroundColor(.white)
-                                .padding(6)
-                                .background(Color.black.opacity(0.5))
-                                .clipShape(Circle())
-                            if track.isExporting {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle())
-                                    .frame(width: 20, height: 20)
-                                    .background(Color.black.opacity(0.5))
-                                    .clipShape(Circle())
-                            }
-                        } else {
-                            Image(systemName: "waveform")
-                                .foregroundColor(.white)
-                                .padding(6)
+        // Основной контент строки: обложка + информация о треке
+        HStack(spacing: 12) {
+            // === Артворк (обложка трека) ===
+            ZStack {
+                if let artwork = track.artwork {
+                    Image(uiImage: artwork)
+                        .resizable()
+                        .aspectRatio(1, contentMode: .fit)
+                } else {
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.3))
+                }
+
+                // Анимация для активного трека
+                if isPlaying && isCurrent {
+                    if #available(iOS 17.0, *) {
+                        Image(systemName: "waveform")
+                            .symbolEffect(.pulse, isActive: true)
+                            .foregroundColor(.white)
+                            .padding(6)
+                            .background(Color.black.opacity(0.5))
+                            .clipShape(Circle())
+
+                        if track.isExporting {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle())
+                                .frame(width: 20, height: 20)
                                 .background(Color.black.opacity(0.5))
                                 .clipShape(Circle())
                         }
-                    }
-                }
-                .frame(width: 44, height: 44)
-                .cornerRadius(4)
- 
-                VStack(alignment: .leading, spacing: 4) {
-                    if let artist = track.artist, let title = track.title, !artist.isEmpty, !title.isEmpty {
-                        Text(artist)
-                            .font(.subheadline)
-                            .foregroundColor(.primary)
-
-                        HStack {
-                            Text(title)
-                                .font(.subheadline)
-                                .foregroundColor(.gray)
-                                .lineLimit(1)
-                            Spacer()
-                            Text(formatTimeSimple(track.duration))
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                        }
                     } else {
-                        Text(track.filename)
-                            .font(.subheadline)
-                            .foregroundColor(.primary)
-
-                        HStack {
-                            Spacer()
-                            Text(formatTimeSimple(track.duration))
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                        }
+                        Image(systemName: "waveform")
+                            .foregroundColor(.white)
+                            .padding(6)
+                            .background(Color.black.opacity(0.5))
+                            .clipShape(Circle())
                     }
                 }
             }
-            .padding(.vertical, 6)
-            .padding(.horizontal, 8)
+            .frame(width: 44, height: 44)
+            .cornerRadius(8)
+
+            // === Информация о треке: артист, название, длительность ===
+            VStack(alignment: .leading, spacing: 2) {
+                if let artist = track.artist, let title = track.title, !artist.isEmpty, !title.isEmpty {
+                    Text(artist)
+                        .font(.subheadline)
+                        .foregroundColor(
+                            isCurrent
+                            ? (colorScheme == .dark ? .white : .black)
+                            : .primary
+                        )
+
+                    HStack {
+                        Text(title)
+                            .font(.subheadline)
+                            .foregroundColor(
+                                isCurrent
+                                ? (colorScheme == .dark ? .white.opacity(0.7) : .black.opacity(0.7))
+                                : .gray
+                            )
+                            .lineLimit(1)
+                        Spacer()
+                        Text(formatTimeSimple(track.duration))
+                            .font(.caption)
+                            .foregroundColor(
+                                isCurrent
+                                ? (colorScheme == .dark ? .white.opacity(0.7) : .black.opacity(0.7))
+                                : .gray
+                            )
+                    }
+                } else {
+                    Text(track.filename)
+                        .font(.subheadline)
+                        .foregroundColor(
+                            isCurrent
+                            ? (colorScheme == .dark ? .white : .black)
+                            : .primary
+                        )
+
+                    HStack {
+                        Spacer()
+                        Text(formatTimeSimple(track.duration))
+                            .font(.caption)
+                            .foregroundColor(
+                                isCurrent
+                                ? (colorScheme == .dark ? .white.opacity(0.7) : .black.opacity(0.7))
+                                : .gray
+                            )
+                    }
+                }
+            }
         }
+        .frame(height: 48) // ← Фиксированная высота строки
     }
 }
 // MARK: – AirPlay Route Picker
@@ -699,6 +727,18 @@ class ExportFolderPicker: NSObject, UIDocumentPickerDelegate {
             } catch {
                 print("Ошибка экспорта \(name): \(error)")
             }
+        }
+    }
+}
+struct ContentView_Previews: PreviewProvider {
+    static var previews: some View {
+        Group {
+            ContentView(tracks: AudioTrack.mockList)
+                .previewDevice("iPhone 15 Pro")
+                .preferredColorScheme(.light)
+            ContentView(tracks: AudioTrack.mockList)
+                .previewDevice("iPhone 15 Pro")
+                .preferredColorScheme(.dark)
         }
     }
 }
