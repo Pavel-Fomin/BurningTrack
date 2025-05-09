@@ -12,14 +12,14 @@ struct TrackRowPlayground: View {
         List {
             Section("Обычные треки") {
                 ForEach(0..<3) { _ in
-                    TrackRowView(track: .mock, isPlaying: false, isCurrent: false)
+                    // TrackRowView(track: .mock, isPlaying: false, isCurrent: false)
                 }
             }
             Section("Текущий трек") {
-                TrackRowView(track: .mock, isPlaying: true, isCurrent: true)
+                // TrackRowView(track: .mock, isPlaying: true, isCurrent: true)
             }
             Section("Экспортируется") {
-                TrackRowView(track: .mockExporting, isPlaying: false, isCurrent: false)
+                // TrackRowView(track: .mockExporting, isPlaying: false, isCurrent: false)
             }
         }
         .listStyle(.plain)

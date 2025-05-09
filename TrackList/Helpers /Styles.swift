@@ -23,7 +23,7 @@ extension Color {
     }
 }
 
-/// Общие стили для текста в приложении
+// MARK: - Общие стили для текста в приложении
 enum Fonts {
     static let title = Font.system(size: 24, weight: .bold, design: .default)
     static let trackArtist = Font.system(size: 16, weight: .medium, design: .default)
@@ -32,7 +32,7 @@ enum Fonts {
     static let button = Font.system(size: 16, weight: .semibold, design: .default)
 }
 
-/// Палитра цветов в HEX
+// MARK: - Палитра цветов в HEX
 enum Palette {
     static let black = Color(hex: "#000000")
     static let gray = Color(hex: "#8E8E93")
@@ -41,7 +41,7 @@ enum Palette {
     static let orange = Color(hex: "#FF9500")
 }
 
-/// Цвета приложения
+// MARK: - Цвета приложения
 enum Colors {
     static let primaryText = Palette.black
     static let secondaryText = Palette.gray
@@ -50,7 +50,7 @@ enum Colors {
     static let exportingIndicator = Palette.orange
 }
 
-/// Отступы
+// MARK: - Отступы
 enum Spacing {
     static let small: CGFloat = 4
     static let medium: CGFloat = 8
@@ -58,7 +58,7 @@ enum Spacing {
     static let extraLarge: CGFloat = 24
 }
 
-/// Системные иконки приложения
+// MARK: - Системные иконки приложения
 enum Icons {
     static let addTrack = Image(systemName: "plus")
     static let record = Image(systemName: "record.circle")
@@ -73,7 +73,7 @@ enum Icons {
 
 // MARK: - View Modifiers
 
-/// Стиль для названия трека
+// MARK: - Стиль для названия трека
 struct TrackTitleStyle: ViewModifier {
     func body(content: Content) -> some View {
         content
@@ -82,7 +82,7 @@ struct TrackTitleStyle: ViewModifier {
     }
 }
 
-/// Стиль для имени исполнителя
+// MARK: - Стиль для имени исполнителя
 struct TrackArtistStyle: ViewModifier {
     func body(content: Content) -> some View {
         content
@@ -91,7 +91,7 @@ struct TrackArtistStyle: ViewModifier {
     }
 }
 
-/// Стиль для заголовков (например, "TRACKLIST")
+// MARK: - Стиль для заголовков (например, "TRACKLIST")
 struct HeaderTitleStyle: ViewModifier {
     func body(content: Content) -> some View {
         content
@@ -100,7 +100,7 @@ struct HeaderTitleStyle: ViewModifier {
     }
 }
 
-/// Стиль для кнопок
+// MARK: - Стиль для кнопок
 struct ButtonTextStyle: ViewModifier {
     func body(content: Content) -> some View {
         content
@@ -110,7 +110,7 @@ struct ButtonTextStyle: ViewModifier {
 }
 
 
-/// Стиль для строки в списке треков
+// MARK: - Стиль для строки в списке треков
 struct TrackRowStyle: ViewModifier {
     var isCurrent: Bool
 

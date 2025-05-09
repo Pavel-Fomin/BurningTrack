@@ -2,6 +2,8 @@
 //  MetadataParser.swift
 //  TrackList
 //
+//  Парсер тегов для .Flac, Wave, Unknown
+//
 //  Created by Pavel Fomin on 23.04.2025.
 //
 
@@ -14,6 +16,8 @@ struct TrackMetadata {
     let title: String?
     let album: String?
     let artworkData: Data?
+    let duration: TimeInterval?
+
 }
 
 enum AudioFormat {
@@ -23,24 +27,35 @@ enum AudioFormat {
 class MetadataParser {
     static func parseMetadata(from url: URL) throws -> TrackMetadata {
         let format = detectFormat(for: url)
-        
+        print("🧠 Определён формат: \(format) для файла: \(url.lastPathComponent)")
+
+        let asset = AVURLAsset(url: url)
+        let duration = CMTimeGetSeconds(asset.duration)
+        print("⏱️ AVAsset duration = \(duration) сек")
+
         switch format {
         case .mp3, .alac:
-            return parseWithAVFoundation(from: url)
+            return parseWithAVFoundation(from: url, duration: duration)
         case .flac:
-            return try parseFlacVorbisComments(from: url)
+            return try parseFlacVorbisComments(from: url, duration: duration)
         case .wav, .aiff:
-            // Пока не реализовано, можно расширить потом
-            return TrackMetadata(artist: nil, title: nil, album: nil, artworkData: nil)
+            return TrackMetadata(artist: nil, title: nil, album: nil, artworkData: nil, duration: duration)
         case .unknown:
-            return TrackMetadata(artist: nil, title: nil, album: nil, artworkData: nil)
+            return TrackMetadata(artist: nil, title: nil, album: nil, artworkData: nil, duration: duration)
         }
     }
 
     private static func detectFormat(for url: URL) -> AudioFormat {
+        guard url.startAccessingSecurityScopedResource() else {
+            return .unknown
+        }
+        defer { url.stopAccessingSecurityScopedResource() }
         guard let fileHandle = try? FileHandle(forReadingFrom: url) else { return .unknown }
         defer { try? fileHandle.close() }
         let magic = try? fileHandle.read(upToCount: 4)
+        if let bytes = magic {
+            
+        }
 
         guard let bytes = magic else { return .unknown }
 
@@ -55,26 +70,38 @@ class MetadataParser {
         } else if bytes[0] == 0xFF && (bytes[1] & 0xE0) == 0xE0 { // MPEG frame sync
             return .mp3
         } else {
+            // Не удалось определить формат аудиофайла
+            assertionFailure("❗Не удалось определить формат аудиофайла: \(url.lastPathComponent)")
             return .unknown
         }
     }
 
-    private static func parseWithAVFoundation(from url: URL) -> TrackMetadata {
+    private static func parseWithAVFoundation(from url: URL, duration: TimeInterval?) -> TrackMetadata {
         let asset = AVURLAsset(url: url)
         let artist = asset.commonMetadata.first(where: { $0.commonKey?.rawValue == "artist" })?.stringValue
         let title = asset.commonMetadata.first(where: { $0.commonKey?.rawValue == "title" })?.stringValue
         let album = asset.commonMetadata.first(where: { $0.commonKey?.rawValue == "album" })?.stringValue
         let artworkData = AVMetadataItem.metadataItems(from: asset.commonMetadata, withKey: AVMetadataKey.commonKeyArtwork, keySpace: .common).first?.dataValue
-        return TrackMetadata(artist: artist, title: title, album: album, artworkData: artworkData)
+        print("AVFoundation Parsed: artist=\(artist ?? "nil"), title=\(title ?? "nil"), album=\(album ?? "nil"), duration=\(duration ?? -1), artworkData=\(artworkData != nil ? "yes" : "no")")
+        return TrackMetadata(artist: artist, title: title, album: album, artworkData: artworkData, duration: duration)
     }
 
-    private static func parseFlacVorbisComments(from url: URL) throws -> TrackMetadata {
+    private static func parseFlacVorbisComments(from url: URL, duration: TimeInterval?) throws -> TrackMetadata {
+        
+        guard url.startAccessingSecurityScopedResource() else {
+            throw NSError(domain: "MetadataParser", code: 401, userInfo: [NSLocalizedDescriptionKey: "Нет доступа к файлу"])
+        }
+        defer { url.stopAccessingSecurityScopedResource() }
+
         let fileHandle = try FileHandle(forReadingFrom: url)
+
         defer { try? fileHandle.close() }
 
         let header = try fileHandle.read(upToCount: 4)
+        
         guard header == Data([0x66, 0x4C, 0x61, 0x43]) else {
             throw NSError(domain: "MetadataParser", code: 1, userInfo: [NSLocalizedDescriptionKey: "Not a FLAC file"])
+            
         }
 
         var artist: String?
@@ -83,8 +110,14 @@ class MetadataParser {
         var artworkData: Data? = nil
 
         var isLastBlock = false
+        let currentOffset = try fileHandle.offset()
+        
         while !isLastBlock {
-            guard let blockHeader = try fileHandle.read(upToCount: 4) else { break }
+            guard let blockHeader = try fileHandle.read(upToCount: 4) else {
+                
+                break
+            }
+
             let blockType = blockHeader[0] & 0x7F
             isLastBlock = (blockHeader[0] & 0x80) != 0
             let blockSize = Int(blockHeader[1]) << 16 | Int(blockHeader[2]) << 8 | Int(blockHeader[3])
@@ -96,13 +129,16 @@ class MetadataParser {
                 title = comments["TITLE"] ?? comments["title"]
                 album = comments["ALBUM"] ?? comments["album"]
             } else if blockType == 6 { // PICTURE
-                artworkData = try? parsePictureBlock(from: fileHandle, blockSize: blockSize)
-            } else {
+                do {
+                    artworkData = try parsePictureBlock(from: fileHandle, blockSize: blockSize)
+                } catch {
+                    print("⚠️ Не удалось разобрать PICTURE-блок: \(error.localizedDescription)")
+                }            } else {
                 try fileHandle.seek(toOffset: fileHandle.offsetInFile + UInt64(blockSize))
             }
         }
-
-        return TrackMetadata(artist: artist, title: title, album: album, artworkData: artworkData)
+        print("FLAC Parsed: artist=\(artist ?? "nil"), title=\(title ?? "nil"), album=\(album ?? "nil"), duration=\(duration ?? -1), artworkData=\(artworkData != nil ? "yes" : "no")")
+        return TrackMetadata(artist: artist, title: title, album: album, artworkData: artworkData, duration: duration ?? 0)
     }
 
     private static func parseVorbisCommentBlock(_ data: Data) throws -> [String: String] {
@@ -129,12 +165,14 @@ class MetadataParser {
         while offset + 4 <= maxSafeOffset {
             let commentLength = Int(try readUInt32())
             if offset + commentLength > maxSafeOffset {
-                print("🚩 Suspiciously large comment, skipping the rest")
                 break
             }
 
             let commentData = data.subdata(in: offset..<(offset + commentLength))
             offset += commentLength
+            if let debugComment = String(data: commentData, encoding: .utf8) {
+                
+            }
 
             if let comment = String(data: commentData, encoding: .utf8),
                let equalIndex = comment.firstIndex(of: "=") {
@@ -151,9 +189,9 @@ class MetadataParser {
         let blockData = try fileHandle.read(upToCount: blockSize) ?? Data()
         var offset = 0
 
-        func readUInt32() -> UInt32 {
+        func readUInt32() throws -> UInt32 {
             guard offset + 4 <= blockData.count else {
-                fatalError("Corrupted picture block: insufficient data while reading UInt32 (offset: \(offset))")
+                throw NSError(domain: "MetadataParser", code: 100, userInfo: [NSLocalizedDescriptionKey: "Недостаточно данных в PICTURE-блоке (offset: \(offset))"])
             }
             let range = offset..<(offset + 4)
             let value = blockData.subdata(in: range).withUnsafeBytes { $0.load(as: UInt32.self) }
@@ -168,17 +206,17 @@ class MetadataParser {
             return data
         }
 
-        _ = readUInt32()                        // picture type
-        let mimeLength = Int(readUInt32())
-        _ = readData(length: mimeLength)        // MIME type
-        let descLength = Int(readUInt32())
-        _ = readData(length: descLength)        // description
-        _ = readUInt32()                        // width
-        _ = readUInt32()                        // height
-        _ = readUInt32()                        // color depth
-        _ = readUInt32()                        // colors used
+        _ = try readUInt32()                        // picture type
+        let mimeLength = Int(try readUInt32())
+        _ = readData(length: mimeLength)            // MIME type
+        let descLength = Int(try readUInt32())
+        _ = readData(length: descLength)            // description
+        _ = try readUInt32()                        // width
+        _ = try readUInt32()                        // height
+        _ = try readUInt32()                        // color depth
+        _ = try readUInt32()                        // colors used
 
-        let pictureDataLength = Int(readUInt32())
+        let pictureDataLength = Int(try readUInt32())
         let pictureData = readData(length: pictureDataLength)
 
         return pictureData

@@ -8,7 +8,7 @@ import Foundation
 import MediaPlayer
 import AVFoundation
 
-// Расширение для удобной работы с уведомлениями переключения треков
+// MARK: - Расширение для удобной работы с уведомлениями переключения треков
 extension Notification.Name {
     static let nextTrack = Notification.Name("nextTrack")
     static let previousTrack = Notification.Name("previousTrack")
@@ -22,31 +22,31 @@ class AudioRemoteControlManager {
     func setupRemoteCommands(for player: AVPlayer) {
         let commandCenter = MPRemoteCommandCenter.shared()
         
-        // Обработка команды Play
+        // MARK: - Обработка команды Play
         commandCenter.playCommand.addTarget { [weak player] event in
             player?.play()
             return .success
         }
         
-        // Обработка команды Pause
+        // MARK: - Обработка команды Pause
         commandCenter.pauseCommand.addTarget { [weak player] event in
             player?.pause()
             return .success
         }
         
-        // Команда Next Track – отправляем уведомление для переключения трека
+        // MARK: - Команда Next Track – отправляем уведомление для переключения трека
         commandCenter.nextTrackCommand.addTarget { event in
             NotificationCenter.default.post(name: .nextTrack, object: nil)
             return .success
         }
         
-        // Команда Previous Track – отправляем уведомление для переключения трека
+        // MARK: - Команда Previous Track – отправляем уведомление для переключения трека
         commandCenter.previousTrackCommand.addTarget { event in
             NotificationCenter.default.post(name: .previousTrack, object: nil)
             return .success
         }
         
-        // Команда изменения позиции воспроизведения (по ползунку)
+        // MARK: - Команда изменения позиции воспроизведения (по ползунку)
         commandCenter.changePlaybackPositionCommand.addTarget { [weak player] event in
             if let event = event as? MPChangePlaybackPositionCommandEvent,
                let player = player {
