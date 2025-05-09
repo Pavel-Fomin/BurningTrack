@@ -12,6 +12,7 @@ struct ContentView: View {
     @StateObject var playerViewModel = PlayerViewModel()
     @State private var isImporting: Bool = false
     @State private var isShowingExportPicker = false
+    @State private var showImporter = false
     
     var body: some View {
         NavigationStack {
@@ -27,9 +28,11 @@ struct ContentView: View {
                         },
                         onAddFromPlus: {
                             trackListViewModel.importMode = .newList
+                            showImporter = true
                         },
                         onAddFromContextMenu: {
                             trackListViewModel.importMode = .addToCurrent
+                            showImporter = true
                         }
                     )                    .padding(.horizontal)
                     
@@ -65,20 +68,15 @@ struct ContentView: View {
             
             // MARK: - Импорт
             .fileImporter(
-                isPresented: Binding<Bool>(
-                    get: { trackListViewModel.importMode != .none },
-                    set: { newValue in
-                        if !newValue {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                trackListViewModel.importMode = .none
-                                print("📥 fileImporter закрыт (mode сброшен)")
-                            }
-                        }
-                    }
-                ),
+                isPresented: $showImporter,
                 allowedContentTypes: [.audio],
                 allowsMultipleSelection: true
             ) { result in
+                defer {
+                    trackListViewModel.importMode = .none
+                    print("📥 importMode сброшен после обработки")
+                }
+
                 switch result {
                 case .success(let urls):
                     print("📥 fileImporter получил \(urls.count) файлов")

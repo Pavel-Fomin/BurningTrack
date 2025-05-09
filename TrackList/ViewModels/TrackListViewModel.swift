@@ -124,7 +124,7 @@ final class TrackListViewModel: ObservableObject {
         print("🧹 Плейлист очищен")
     }
     
-    // MARK: - Добавление треклиста в активный треклист
+    // MARK: - Создаёт новый пустой треклист и делает его активным
     func createNewTrackListAndSelect() {
         let newList = TrackListManager.shared.createEmptyTrackList()
         self.currentListId = newList.id
@@ -141,22 +141,11 @@ final class TrackListViewModel: ObservableObject {
 
     @Published var importMode: ImportMode = .none
 
-    var isImporting: Bool {
-        importMode != .none
-    }
 
     // MARK: - UI-действия
     func startImportForNewTrackList() {
-        print("🖋️ Вызов startImportForNewTrackList. Текущий trackListViewModel: \(ObjectIdentifier(self))")
-
-        // Сначала сбрасываем (на случай, если файлИмпорт уже открыт)
-        importMode = .none
-
-        // Даем SwiftUI обновить состояние
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            self.importMode = .newList
-            print("📂 importMode = .newList (для импорта нового списка). ViewModel: \(ObjectIdentifier(self))")
-        }
+        print("🖋️ Вызов startImportForNewTrackList. ViewModel: \(ObjectIdentifier(self))")
+        importMode = .newList
     }
     
     // MARK: - Создание нового треклиста через импорт
