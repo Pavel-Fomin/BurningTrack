@@ -34,7 +34,6 @@ struct TrackListView: View {
 
     private func trackRow(for track: Track) -> some View {
         HStack(spacing: 12) {
-            // Обложка слева
             if let image = track.artwork {
                 Image(uiImage: image)
                     .resizable()

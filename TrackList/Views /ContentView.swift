@@ -16,45 +16,46 @@ struct ContentView: View {
     
     var body: some View {
         NavigationStack {
-            ZStack {
-                Color(.systemBackground).ignoresSafeArea()
-                VStack(spacing: 0) {
-                    // MARK: - Список треклистов
-                    TrackListSelectorView(
-                        viewModel: trackListViewModel,
-                        selectedId: $trackListViewModel.currentListId,
-                        onSelect: { id in
-                            trackListViewModel.selectTrackList(id: id)
-                        },
-                        onAddFromPlus: {
-                            trackListViewModel.importMode = .newList
-                            showImporter = true
-                        },
-                        onAddFromContextMenu: {
-                            trackListViewModel.importMode = .addToCurrent
-                            showImporter = true
-                        }
-                    )                    .padding(.horizontal)
-                    
-                    TrackListView(
-                        trackListViewModel: trackListViewModel,
-                        playerViewModel: playerViewModel
-                    )
-                    
-                    if playerViewModel.currentTrack != nil {
-                        MiniPlayerView(
-                            playerViewModel: playerViewModel,
-                            trackListViewModel: trackListViewModel
-                        )
+            VStack(spacing: 0) {
+                // MARK: - Список треклистов
+                TrackListSelectorView(
+                    viewModel: trackListViewModel,
+                    selectedId: $trackListViewModel.currentListId,
+                    onSelect: { id in
+                        trackListViewModel.selectTrackList(id: id)
+                    },
+                    onAddFromPlus: {
+                        trackListViewModel.importMode = .newList
+                        showImporter = true
+                    },
+                    onAddFromContextMenu: {
+                        trackListViewModel.importMode = .addToCurrent
+                        showImporter = true
                     }
+                )
+                .padding(.top, 12)
+                .padding(.horizontal)
+                
+                TrackListView(
+                    trackListViewModel: trackListViewModel,
+                    playerViewModel: playerViewModel
+                )
+                
+                if playerViewModel.currentTrack != nil {
+                    MiniPlayerView(
+                        playerViewModel: playerViewModel,
+                        trackListViewModel: trackListViewModel
+                    )
                 }
+
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Text("TRACKLIST")
-                        .font(.headline)
+                        .font(.system(size: 28, weight: .bold))
                         .foregroundColor(.primary)
+                        .padding(.top, 12)
                 }
                 
             }

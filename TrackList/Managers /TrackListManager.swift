@@ -15,8 +15,8 @@ final class TrackListManager {
     
     
     // MARK: - Директория с плейлистами
-    private var trackListFolderURL: URL? {
-        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("TrackLists")
+    private var documentsDirectory: URL? {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
     }
     
     // MARK: - Загрузка списка всех плейлистов (метаинформация)
@@ -96,7 +96,7 @@ final class TrackListManager {
                 print("— \(track.fileName) (\(track.artist ?? "неизвестный артист") — \(track.title ?? "неизвестный трек")), duration: \(track.duration)")
             }
         }
-        print("======================================\n")
+        
     }
     // MARK: - Получить выбранный треклист (если выбран)
     func getCurrentTrackList() -> TrackList? {
@@ -203,5 +203,28 @@ final class TrackListManager {
         
         selectedTrackListId = newId
         return TrackList(id: newId, name: name, createdAt: createdAt, tracks: importedTracks)
+    }
+    
+    
+    // MARK: - Удаляет треклист по ID: удаляет JSON-файл и убирает мету из tracklists.json
+    func deleteTrackList(id: UUID) {
+        // 1. Удаляем файл с треками
+        if let fileURL = documentsDirectory?.appendingPathComponent("tracklist_\(id.uuidString).json") {
+            do {
+                try FileManager.default.removeItem(at: fileURL)
+                print("✅ Удалён файл: \(fileURL.lastPathComponent)")
+            } catch {
+                print("❌ Не удалось удалить файл: \(error)")
+            }
+        }
+
+        // 2. Загружаем и фильтруем метаинформацию
+        var metas = loadTrackListMetas()
+        metas.removeAll { $0.id == id }
+
+        // 3. Сохраняем обновлённую мету
+        saveTrackListMetas(metas)
+        
+        print("🗑️ Треклист с ID \(id) удалён")
     }
 }
