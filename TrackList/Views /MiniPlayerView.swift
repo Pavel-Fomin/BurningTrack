@@ -11,95 +11,102 @@ import SwiftUI
 struct MiniPlayerView: View {
     @ObservedObject var playerViewModel: PlayerViewModel
     @ObservedObject var trackListViewModel: TrackListViewModel
-
+    
     var body: some View {
         if let track = playerViewModel.currentTrack {
-            VStack(spacing: 8) {
-                HStack(spacing: 12) {
-                    if let artwork = track.artwork {
-                        Image(uiImage: artwork)
-                            .resizable()
-                            .aspectRatio(1, contentMode: .fit)
-                            .frame(width: 44, height: 44)
-                            .cornerRadius(6)
-                    } else {
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.3))
-                            .frame(width: 44, height: 44)
-                            .cornerRadius(6)
-                    }
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(track.artist ?? "Неизвестный артист")
-                            .font(.subheadline)
-                            .foregroundColor(.primary)
-                            .lineLimit(1)
-
-                        Text(track.title ?? track.fileName)
-                            .font(.footnote)
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
-                    }
-
-                    Spacer()
-
+            VStack {
+                VStack(spacing: 4) {
                     HStack(spacing: 12) {
-                        Button(action: {
-                            // Пока отключено
-                        }) {
-                            Image(systemName: "backward.fill")
-                                .font(.title2)
+                        if let artwork = track.artwork {
+                            Image(uiImage: artwork)
+                                .resizable()
+                                .aspectRatio(1, contentMode: .fill)
+                                .frame(width: 40, height: 40)
+                                .cornerRadius(5)
+                        } else {
+                            Rectangle()
+                                .fill(Color.gray.opacity(0.3))
+                                .frame(width: 40, height: 40)
+                                .cornerRadius(5)
                         }
-
-                        Button(action: {
-                            playerViewModel.togglePlayPause()
-                        }) {
-                            Image(systemName: playerViewModel.isPlaying ? "pause.fill" : "play.fill")
-                                .font(.title2)
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(track.artist ?? "Неизвестный артист")
+                                .font(.caption)
+                                .foregroundColor(.primary)
+                                .lineLimit(1)
+                            
+                            Text(track.title ?? track.fileName)
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
                         }
-
-                        Button(action: {
-                            // Пока отключено
-                        }) {
-                            Image(systemName: "forward.fill")
-                                .font(.title2)
+                        
+                        Spacer()
+                        
+                        HStack(spacing: 8) {
+                            Button(action: {}) {
+                                Image(systemName: "backward.fill")
+                                    .font(.body)
+                            }
+                            Button(action: {
+                                playerViewModel.togglePlayPause()
+                            }) {
+                                Image(systemName: playerViewModel.isPlaying ? "pause.fill" : "play.fill")
+                                    .font(.body)
+                            }
+                            Button(action: {}) {
+                                Image(systemName: "forward.fill")
+                                    .font(.body)
+                            }
                         }
                     }
+                    
+                    HStack(alignment: .center, spacing: 12) {
+                        Text(formatTimeSmart(playerViewModel.currentTime))
+                            .font(.caption2)
+                            .frame(width: 40, alignment: .leading)
+
+                        ProgressBar(
+                            progress: playerViewModel.trackDuration > 0
+                                ? playerViewModel.currentTime / playerViewModel.trackDuration
+                                : 0,
+                            onSeek: { ratio in
+                                let newTime = ratio * playerViewModel.trackDuration
+                                playerViewModel.currentTime = newTime
+                                playerViewModel.seek(to: newTime)
+                            },
+                            height: 10
+                        )
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, 4) // визуальное выравнивание
+
+                        Text("-\(formatTimeSmart(playerViewModel.trackDuration - playerViewModel.currentTime))")
+                            .font(.caption2)
+                            .frame(width: 40, alignment: .trailing)
+                    }
+                    .padding(.top, 8) // отступ между строками
+                    
                 }
-
-                HStack {
-                    Text(formatTimeSmart(playerViewModel.currentTime))
-                        .font(.caption)
-                        .frame(width: 40, alignment: .leading)
-
-                    Slider(
-                        value: Binding(
-                            get: { playerViewModel.currentTime },
-                            set: { newValue in
-                                playerViewModel.currentTime = newValue
-                                playerViewModel.seek(to: newValue)
-                            }
-                        ),
-                        in: 0...max(playerViewModel.trackDuration, playerViewModel.currentTime)
-                    )
-                    .accentColor(.blue)
-
-                    Text("-\(formatTimeSmart(playerViewModel.trackDuration - playerViewModel.currentTime))")
-                        .font(.caption)
-                        .frame(width: 40, alignment: .trailing)
-                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 12)
+                .background(.ultraThinMaterial)
+                .cornerRadius(12)
+                .shadow(radius: 4)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 12)
             }
         }
     }
-}
-
-struct MiniPlayerView_Previews: PreviewProvider {
-    static var previews: some View {
-        MiniPlayerView(
-            playerViewModel: PlayerViewModel(),
-            trackListViewModel: TrackListViewModel()
-        )
-        .padding()
-        .previewDisplayName("Mini Player Preview")
+    
+    struct MiniPlayerView_Previews: PreviewProvider {
+        static var previews: some View {
+            MiniPlayerView(
+                playerViewModel: PlayerViewModel(),
+                trackListViewModel: TrackListViewModel()
+            )
+            .padding()
+            .previewDisplayName("Mini Player Preview")
+        }
     }
 }

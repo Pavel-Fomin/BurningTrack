@@ -16,38 +16,43 @@ struct ContentView: View {
     
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                // MARK: - Список треклистов
-                TrackListSelectorView(
-                    viewModel: trackListViewModel,
-                    selectedId: $trackListViewModel.currentListId,
-                    onSelect: { id in
-                        trackListViewModel.selectTrackList(id: id)
-                    },
-                    onAddFromPlus: {
-                        trackListViewModel.importMode = .newList
-                        showImporter = true
-                    },
-                    onAddFromContextMenu: {
-                        trackListViewModel.importMode = .addToCurrent
-                        showImporter = true
-                    }
-                )
-                .padding(.top, 12)
-                .padding(.horizontal)
-                
-                TrackListView(
-                    trackListViewModel: trackListViewModel,
-                    playerViewModel: playerViewModel
-                )
-                
+            ZStack(alignment: .bottom) {
+                VStack(spacing: 0) {
+                    // Заголовок и чипсы
+                    TrackListSelectorView(
+                        viewModel: trackListViewModel,
+                        selectedId: $trackListViewModel.currentListId,
+                        onSelect: { id in
+                            trackListViewModel.selectTrackList(id: id)
+                        },
+                        onAddFromPlus: {
+                            trackListViewModel.importMode = .newList
+                            showImporter = true
+                        },
+                        onAddFromContextMenu: {
+                            trackListViewModel.importMode = .addToCurrent
+                            showImporter = true
+                        }
+                    )
+                    .padding(.top, 12)
+                    .padding(.horizontal)
+
+                    // Список треков
+                    TrackListView(
+                        trackListViewModel: trackListViewModel,
+                        playerViewModel: playerViewModel
+                    )
+                    .background(Color(.systemBackground).ignoresSafeArea())
+                }
+
+                // Мини-плеер поверх
                 if playerViewModel.currentTrack != nil {
                     MiniPlayerView(
                         playerViewModel: playerViewModel,
                         trackListViewModel: trackListViewModel
                     )
+                    .padding(.bottom, 0)
                 }
-
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
