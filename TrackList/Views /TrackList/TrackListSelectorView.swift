@@ -2,7 +2,7 @@
 //  TrackListSelectorView.swift
 //  TrackList
 //
-//  Компонент выбора треклиста
+//  Компонент выбора треклиста(группа чип-вью)
 //
 //  Created by Pavel Fomin on 08.05.2025.
 //
@@ -20,28 +20,13 @@ struct TrackListSelectorView: View {
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                if viewModel.isEditingTrackLists {
+                if viewModel.isEditing {
                     // Кнопка "Готово" слева
                     doneButton
                 }
 
-                // Кнопка "Изменить" внутри скролла, будет вытеснена
-                if !viewModel.isEditingTrackLists {
-                    editButton
-                }
-
-                // Spacer, который толкает кнопку "Изменить" вправо
-                if !viewModel.isEditingTrackLists {
-
-                }
-
-                // Кнопка "+"
-                if !viewModel.isEditingTrackLists {
-                    addButton
-                }
-
                 // Чипсы
-                ForEach(viewModel.allTrackLists, id: \.id) { list in
+                ForEach(viewModel.trackLists, id: \.id) { list in
                     TrackListChipView(
                         trackList: list,
                         isSelected: list.id == selectedId,
@@ -59,9 +44,9 @@ struct TrackListSelectorView: View {
                                 viewModel.deleteTrackList(id: list.id)
                             }
                         },
-                        isEditing: viewModel.isEditingTrackLists && list.id != selectedId,
+                        isEditing: viewModel.isEditing && list.id != selectedId,
                         onEdit: {
-                            viewModel.isEditingTrackLists = true
+                            viewModel.isEditing = true
                         }
                     )
                 }
@@ -71,39 +56,12 @@ struct TrackListSelectorView: View {
         }
     }
 
-    // MARK: - Кнопка "+"
-    private var addButton: some View {
-        Button(action: {
-            print("🟢 Кнопка '+' нажата")
-            onAddFromPlus()
-        }) {
-            Image(systemName: "plus")
-                .resizable()
-                .frame(width: 16, height: 16)
-                .padding(8)
-                .background(Circle().fill(Color.gray.opacity(0.3)))
-                .foregroundColor(.primary)
-        }
-    }
-
-    // MARK: - Кнопка "Редактировать"
-    private var editButton: some View {
-        Button(action: {
-            withAnimation {
-                viewModel.isEditingTrackLists = true
-            }
-        }) {
-            Image(systemName: "wand.and.sparkles.inverse")
-                .font(.system(size: 20))
-                .foregroundColor(.primary)
-        }
-    }
-
+    
     // MARK: - Кнопка "Готово"
     private var doneButton: some View {
         Button(action: {
             withAnimation {
-                viewModel.isEditingTrackLists = false
+                viewModel.isEditing = false
             }
         }) {
             Image(systemName: "checkmark.circle.fill")

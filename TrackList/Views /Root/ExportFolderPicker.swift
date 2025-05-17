@@ -2,7 +2,7 @@
 //  ExportFolderPicker.swift
 //  TrackList
 //
-//  Компонент выбора папки
+//  Компонент выбора папки экспорта
 //
 //  Created by Pavel Fomin on 06.05.2025.
 //

@@ -17,14 +17,15 @@ struct ContentView: View {
     var body: some View {
         NavigationStack {
             ZStack(alignment: .bottom) {
+                Color(.systemBackground) // Адаптивный фон под весь экран
+                    .ignoresSafeArea()
+                
                 VStack(spacing: 0) {
-                    // Заголовок и чипсы
-                    TrackListSelectorView(
+                    // Хедер без фоновой дымки
+                    TrackListHeaderView(
                         viewModel: trackListViewModel,
                         selectedId: $trackListViewModel.currentListId,
-                        onSelect: { id in
-                            trackListViewModel.selectTrackList(id: id)
-                        },
+                        onSelect: { trackListViewModel.selectTrackList(id: $0) },
                         onAddFromPlus: {
                             trackListViewModel.importMode = .newList
                             showImporter = true
@@ -32,20 +33,24 @@ struct ContentView: View {
                         onAddFromContextMenu: {
                             trackListViewModel.importMode = .addToCurrent
                             showImporter = true
+                        },
+                        onToggleEditMode: {
+                            withAnimation {
+                                trackListViewModel.isEditing.toggle()
+                            }
                         }
                     )
-                    .padding(.top, 12)
                     .padding(.horizontal)
-
-                    // Список треков
+                    .padding(.top, 12)
+                    
+                    // Список без серой заливки
                     TrackListView(
                         trackListViewModel: trackListViewModel,
                         playerViewModel: playerViewModel
                     )
-                    .background(Color(.systemBackground).ignoresSafeArea())
                 }
-
-                // Мини-плеер поверх
+                
+                // Мини-плеер поверх всего, без серого фона снизу
                 if playerViewModel.currentTrack != nil {
                     MiniPlayerView(
                         playerViewModel: playerViewModel,
@@ -54,16 +59,7 @@ struct ContentView: View {
                     .padding(.bottom, 0)
                 }
             }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Text("TRACKLIST")
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundColor(.primary)
-                        .padding(.top, 12)
-                }
-                
-            }
+            .navigationBarHidden(true)
             .sheet(isPresented: $isShowingExportPicker) {
                 ExportWrapper { folderURL in
                     let id = trackListViewModel.currentListId
@@ -71,8 +67,6 @@ struct ContentView: View {
                     trackListViewModel.exportTracks(to: folderURL)
                 }
             }
-            
-            // MARK: - Импорт
             .fileImporter(
                 isPresented: $showImporter,
                 allowedContentTypes: [.audio],
@@ -80,31 +74,27 @@ struct ContentView: View {
             ) { result in
                 defer {
                     trackListViewModel.importMode = .none
-                    print("📥 importMode сброшен после обработки")
                 }
-
+                
                 switch result {
                 case .success(let urls):
-                    print("📥 fileImporter получил \(urls.count) файлов")
                     switch trackListViewModel.importMode {
                     case .newList:
                         trackListViewModel.createNewTrackListViaImport(from: urls)
                     case .addToCurrent:
                         trackListViewModel.importTracks(from: urls)
                     case .none:
-                        print("⚠️ importMode = .none, ничего не делаем")
+                        break
                     }
                 case .failure(let error):
                     print("❌ Ошибка при импорте файлов: \(error.localizedDescription)")
                 }
             }
-            
-            
             .onAppear {
                 let startTime = Date()
                 let loadTime = Date().timeIntervalSince(startTime)
                 print("Приложение готово к работе за \(String(format: "%.2f", loadTime)) сек")
-                trackListViewModel.refreshAllTrackLists()
+                trackListViewModel.refreshtrackLists()
                 trackListViewModel.loadTracks()
             }
         }

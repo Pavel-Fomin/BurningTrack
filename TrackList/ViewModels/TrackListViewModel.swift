@@ -14,14 +14,14 @@ private let selectedTrackListIdKey = "selectedTrackListId"
 
 final class TrackListViewModel: ObservableObject {
     @Published var tracks: [Track] = []
-    @Published var allTrackLists: [TrackList] = [] /// Все доступные треклисты (мета + треки)
+    @Published var trackLists: [TrackList] = [] /// Все доступные треклисты (мета + треки)
     @Published var currentListId: UUID { /// Текущий активный плейлист
         didSet {
             UserDefaults.standard.set(currentListId.uuidString, forKey: selectedTrackListIdKey)
         }
     }
     
-    @Published var isEditingTrackLists: Bool = false; /// Режим редактирования
+    @Published var isEditing: Bool = false; /// Режим редактирования
     
     /// Режим импорта: для создания или добавления
     enum ImportMode {
@@ -50,13 +50,13 @@ final class TrackListViewModel: ObservableObject {
         }
 
         loadTracks()
-        refreshAllTrackLists()
+        refreshtrackLists()
     }
     
     /// Перезагружает список всех треклистов с треками
-    func refreshAllTrackLists() {
+    func refreshtrackLists() {
         let metas = TrackListManager.shared.loadTrackListMetas()
-        allTrackLists = metas.reversed().map { meta in
+        trackLists = metas.reversed().map { meta in
             let tracks = TrackListManager.shared.loadTracks(for: meta.id)
             return TrackList(id: meta.id, name: meta.name, createdAt: meta.createdAt, tracks: tracks)
         }
@@ -88,7 +88,7 @@ final class TrackListViewModel: ObservableObject {
 
             DispatchQueue.main.async {
                 self.tracks = existingTracks.map { $0.asTrack() }
-                self.refreshAllTrackLists()
+                self.refreshtrackLists()
                 print("✅ Импорт завершён: \(imported.count) треков добавлено")
             }
         }
@@ -128,7 +128,7 @@ final class TrackListViewModel: ObservableObject {
     func createEmptyTrackListAndSelect() {
         let newList = TrackListManager.shared.createEmptyTrackList()
         self.currentListId = newList.id
-        self.refreshAllTrackLists()
+        self.refreshtrackLists()
         self.loadTracks()
     }
 
@@ -151,7 +151,7 @@ final class TrackListViewModel: ObservableObject {
             DispatchQueue.main.async {
                 self.currentListId = newList.id
                 self.tracks = imported.map { $0.asTrack() }
-                self.refreshAllTrackLists()
+                self.refreshtrackLists()
                 print("✅ Новый треклист создан с \(imported.count) треками")
             }
         }
@@ -181,7 +181,7 @@ final class TrackListViewModel: ObservableObject {
         
         // Если удаляем текущий активный треклист — выберем другой
         if id == currentListId {
-            let remaining = allTrackLists.filter { $0.id != id }
+            let remaining = trackLists.filter { $0.id != id }
             if let first = remaining.first {
                 selectTrackList(id: first.id)
             } else {
@@ -191,7 +191,7 @@ final class TrackListViewModel: ObservableObject {
             }
         }
 
-        refreshAllTrackLists()
+        refreshtrackLists()
     }
     
     
