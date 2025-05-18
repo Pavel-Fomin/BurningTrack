@@ -36,9 +36,7 @@ extension ImportedTrack {
             title: title ?? fileName,
             duration: duration,
             fileName: fileName,
-            artwork: artworkBase64
-                .flatMap { Data(base64Encoded: $0) }
-                .flatMap { UIImage(data: $0) }
+            artwork: artworkId.flatMap { ArtworkManager.loadArtwork(id: $0) }
         )
     }
     

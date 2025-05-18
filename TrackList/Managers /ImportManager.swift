@@ -34,8 +34,18 @@ final class ImportManager {
                 // Парсинг метаданных
                 let parsed = try MetadataParser.parseMetadata(from: url)
 
+                // Создаём UUID заранее, чтобы использовать и для track.id, и для имени обложки
+                let trackId = UUID()
+
+                // Сохраняем .webp если формат нестандартный и есть обложка
+                if let imageData = parsed.artworkData,
+                   let image = UIImage(data: imageData),
+                   parsed.isCustomFormat == true {
+                    ArtworkManager.saveArtwork(image, id: trackId)
+                }
+
                 let newTrack = ImportedTrack(
-                    id: UUID(),
+                    id: trackId,
                     fileName: url.lastPathComponent,
                     filePath: url.path,
                     orderPrefix: String(format: "%02d", index + 1),
@@ -43,8 +53,9 @@ final class ImportManager {
                     artist: parsed.artist,
                     album: parsed.album,
                     duration: parsed.duration ?? 0,
-                    artworkBase64: parsed.artworkData?.base64EncodedString(),
-                    bookmarkBase64: bookmarkBase64
+                    artworkBase64: nil,
+                    bookmarkBase64: bookmarkBase64,
+                    artworkId: parsed.isCustomFormat == true && parsed.artworkData != nil ? trackId : nil
                 )
 
                 importedTracks.append(newTrack)

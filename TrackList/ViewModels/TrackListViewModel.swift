@@ -159,10 +159,22 @@ final class TrackListViewModel: ObservableObject {
 
     /// Удаление трека по индексам
     func removeTrack(at offsets: IndexSet) {
-        var tracks = TrackListManager.shared.loadTracks(for: currentListId)
-        tracks.remove(atOffsets: offsets)
-        TrackListManager.shared.saveTracks(tracks, for: currentListId)
-        self.tracks = tracks.map { $0.asTrack() }
+        var importedTracks = TrackListManager.shared.loadTracks(for: currentListId)
+
+        // Удаляем обложки
+        for index in offsets {
+            let track = importedTracks[index]
+            if let artworkId = track.artworkId {
+                ArtworkManager.deleteArtwork(id: artworkId)
+                print("🗑️ Удалена обложка: artwork_\(artworkId).jpg")
+            }
+        }
+
+        // Удаляем треки
+        importedTracks.remove(atOffsets: offsets)
+        TrackListManager.shared.saveTracks(importedTracks, for: currentListId)
+        self.tracks = importedTracks.map { $0.asTrack() }
+
         print("🗑 Удаление завершено")
     }
 
@@ -193,7 +205,5 @@ final class TrackListViewModel: ObservableObject {
 
         refreshtrackLists()
     }
-    
-    
     
 }

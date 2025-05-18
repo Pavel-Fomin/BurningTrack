@@ -21,6 +21,7 @@ struct ImportedTrack: Codable, Identifiable {
     let duration: Double
     let artworkBase64: String?
     let bookmarkBase64: String?
+    var artworkId: UUID?
 
     var isAvailable: Bool {
         FileManager.default.fileExists(atPath: filePath)

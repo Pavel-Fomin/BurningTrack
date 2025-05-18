@@ -17,6 +17,7 @@ struct TrackMetadata {
     let album: String?
     let artworkData: Data?
     let duration: TimeInterval?
+    let isCustomFormat: Bool
 
 }
 
@@ -39,9 +40,9 @@ class MetadataParser {
         case .flac:
             return try parseFlacVorbisComments(from: url, duration: duration)
         case .wav, .aiff:
-            return TrackMetadata(artist: nil, title: nil, album: nil, artworkData: nil, duration: duration)
+            return TrackMetadata(artist: nil, title: nil, album: nil, artworkData: nil, duration: duration, isCustomFormat: true)
         case .unknown:
-            return TrackMetadata(artist: nil, title: nil, album: nil, artworkData: nil, duration: duration)
+            return TrackMetadata(artist: nil, title: nil, album: nil, artworkData: nil, duration: duration, isCustomFormat: true)
         }
     }
 
@@ -83,7 +84,7 @@ class MetadataParser {
         let album = asset.commonMetadata.first(where: { $0.commonKey?.rawValue == "album" })?.stringValue
         let artworkData = AVMetadataItem.metadataItems(from: asset.commonMetadata, withKey: AVMetadataKey.commonKeyArtwork, keySpace: .common).first?.dataValue
         print("AVFoundation Parsed: artist=\(artist ?? "nil"), title=\(title ?? "nil"), album=\(album ?? "nil"), duration=\(duration ?? -1), artworkData=\(artworkData != nil ? "yes" : "no")")
-        return TrackMetadata(artist: artist, title: title, album: album, artworkData: artworkData, duration: duration)
+        return TrackMetadata(artist: artist, title: title, album: album, artworkData: artworkData, duration: duration, isCustomFormat: false)
     }
 
     private static func parseFlacVorbisComments(from url: URL, duration: TimeInterval?) throws -> TrackMetadata {
@@ -138,7 +139,7 @@ class MetadataParser {
             }
         }
         print("FLAC Parsed: artist=\(artist ?? "nil"), title=\(title ?? "nil"), album=\(album ?? "nil"), duration=\(duration ?? -1), artworkData=\(artworkData != nil ? "yes" : "no")")
-        return TrackMetadata(artist: artist, title: title, album: album, artworkData: artworkData, duration: duration ?? 0)
+        return TrackMetadata(artist: artist, title: title, album: album, artworkData: artworkData, duration: duration ?? 0, isCustomFormat: true)
     }
 
     private static func parseVorbisCommentBlock(_ data: Data) throws -> [String: String] {
