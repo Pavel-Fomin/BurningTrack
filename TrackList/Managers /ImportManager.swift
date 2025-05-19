@@ -39,8 +39,7 @@ final class ImportManager {
 
                 // Сохраняем .webp если формат нестандартный и есть обложка
                 if let imageData = parsed.artworkData,
-                   let image = UIImage(data: imageData),
-                   parsed.isCustomFormat == true {
+                   let image = UIImage(data: imageData) {
                     ArtworkManager.saveArtwork(image, id: trackId)
                 }
 
@@ -55,7 +54,7 @@ final class ImportManager {
                     duration: parsed.duration ?? 0,
                     artworkBase64: nil,
                     bookmarkBase64: bookmarkBase64,
-                    artworkId: parsed.isCustomFormat == true && parsed.artworkData != nil ? trackId : nil
+                    artworkId: parsed.artworkData != nil ? trackId : nil,
                 )
 
                 importedTracks.append(newTrack)
