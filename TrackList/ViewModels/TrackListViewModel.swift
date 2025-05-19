@@ -83,7 +83,7 @@ final class TrackListViewModel: ObservableObject {
     func importTracks(from urls: [URL]) {
         ImportManager().importTracks(from: urls, to: currentListId) { imported in
             var existingTracks = TrackListManager.shared.loadTracks(for: self.currentListId)
-            existingTracks.append(contentsOf: imported)
+            existingTracks.insert(contentsOf: imported, at: 0)
             TrackListManager.shared.saveTracks(existingTracks, for: self.currentListId)
 
             DispatchQueue.main.async {
