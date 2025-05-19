@@ -8,11 +8,12 @@
 import SwiftUI
 
 struct ContentView: View {
-    @StateObject var trackListViewModel = TrackListViewModel()
-    @StateObject var playerViewModel = PlayerViewModel()
+    @ObservedObject var trackListViewModel: TrackListViewModel
+    @ObservedObject var playerViewModel: PlayerViewModel
     @State private var isImporting: Bool = false
     @State private var isShowingExportPicker = false
     @State private var showImporter = false
+    
     
     var body: some View {
         NavigationStack {
@@ -24,7 +25,10 @@ struct ContentView: View {
                     // Хедер без фоновой дымки
                     TrackListHeaderView(
                         viewModel: trackListViewModel,
-                        selectedId: $trackListViewModel.currentListId,
+                        selectedId: Binding(
+                            get: { trackListViewModel.currentListId },
+                            set: { trackListViewModel.currentListId = $0 }
+                        ),
                         onSelect: { trackListViewModel.selectTrackList(id: $0) },
                         onAddFromPlus: {
                             trackListViewModel.importMode = .newList

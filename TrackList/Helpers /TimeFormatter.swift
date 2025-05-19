@@ -8,7 +8,7 @@
 import Foundation
 
 func formatTimeSmart(_ duration: TimeInterval) -> String {
-    guard duration > 0 else { return "–:–" }
+    guard duration.isFinite && duration > 0 else { return "–:–" }
     
     let totalMinutes = Int(duration) / 60
     let seconds = Int(duration) % 60

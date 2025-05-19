@@ -92,12 +92,3 @@ struct TrackListView: View {
         }
     }
 }
-struct TrackListView_Previews: PreviewProvider {
-    static var previews: some View {
-        TrackListView(
-            trackListViewModel: TrackListViewModel(),
-            playerViewModel: PlayerViewModel()
-        )
-        .environment(\.editMode, .constant(.active))
-    }
-}

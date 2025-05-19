@@ -9,8 +9,14 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct RootView: View {
-    @StateObject var trackListViewModel = TrackListViewModel()
-    @StateObject var playerViewModel = PlayerViewModel()
+    @StateObject var trackListViewModel: TrackListViewModel
+    @StateObject var playerViewModel: PlayerViewModel
+
+    init() {
+        let trackListVM = TrackListViewModel()
+        _trackListViewModel = StateObject(wrappedValue: trackListVM)
+        _playerViewModel = StateObject(wrappedValue: PlayerViewModel(trackListViewModel: trackListVM))
+    }
 
     var body: some View {
         NavigationStack {
@@ -19,12 +25,5 @@ struct RootView: View {
                 playerViewModel: playerViewModel
             )
         }
-    }
-}
-
-struct RootView_Previews: PreviewProvider {
-    static var previews: some View {
-        RootView()
-            .previewDevice("iPhone 15 Pro")
     }
 }

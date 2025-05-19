@@ -161,7 +161,7 @@ final class TrackListViewModel: ObservableObject {
     func removeTrack(at offsets: IndexSet) {
         var importedTracks = TrackListManager.shared.loadTracks(for: currentListId)
 
-        // Удаляем обложки
+        /// Удаляем обложки
         for index in offsets {
             let track = importedTracks[index]
             if let artworkId = track.artworkId {
@@ -170,7 +170,7 @@ final class TrackListViewModel: ObservableObject {
             }
         }
 
-        // Удаляем треки
+        /// Удаляем треки
         importedTracks.remove(atOffsets: offsets)
         TrackListManager.shared.saveTracks(importedTracks, for: currentListId)
         self.tracks = importedTracks.map { $0.asTrack() }

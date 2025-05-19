@@ -62,7 +62,7 @@ struct Track: Identifiable {
             artwork: UIImage?(nil)
         )
     }
-    // MARK: - Преобразование Track обратно в ImportedTrack (для сохранения в JSON)
+    // MARK: - Преобразование Track в ImportedTrack (для сохранения в JSON)
     func asImportedTrack() -> ImportedTrack {
         return ImportedTrack(
             id: self.id,
@@ -79,3 +79,8 @@ struct Track: Identifiable {
     }
 }
 
+extension Track: Equatable {
+    static func == (lhs: Track, rhs: Track) -> Bool {
+        return lhs.url == rhs.url
+    }
+}

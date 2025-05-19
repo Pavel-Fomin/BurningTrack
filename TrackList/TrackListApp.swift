@@ -14,12 +14,21 @@ import SwiftUI
 
 @main
 struct TrackListApp: App {
+    let trackListViewModel: TrackListViewModel
+    let playerViewModel: PlayerViewModel
+
+    init() {
+        let trackListVM = TrackListViewModel()
+        self.trackListViewModel = trackListVM
+        self.playerViewModel = PlayerViewModel(trackListViewModel: trackListVM)
+    }
+
     var body: some Scene {
         WindowGroup {
             NavigationStack {
                 ContentView(
-                    trackListViewModel: TrackListViewModel(),
-                    playerViewModel: PlayerViewModel()
+                    trackListViewModel: trackListViewModel,
+                    playerViewModel: playerViewModel
                 )
             }
         }

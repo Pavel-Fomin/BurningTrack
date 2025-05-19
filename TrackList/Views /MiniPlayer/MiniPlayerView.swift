@@ -45,8 +45,10 @@ struct MiniPlayerView: View {
                         Spacer()
                         
                         HStack(spacing: 8) {
-                            Button(action: {}) {
-                                Image(systemName: "backward.fill")
+                            Button(action: {
+                                playerViewModel.playPreviousTrack()
+                            }) {
+                                Image(systemName: "backward.end.fill")
                                     .font(.body)
                             }
                             Button(action: {
@@ -55,8 +57,10 @@ struct MiniPlayerView: View {
                                 Image(systemName: playerViewModel.isPlaying ? "pause.fill" : "play.fill")
                                     .font(.body)
                             }
-                            Button(action: {}) {
-                                Image(systemName: "forward.fill")
+                            Button(action: {
+                                playerViewModel.playNextTrack()
+                            }) {
+                                Image(systemName: "forward.end.fill")
                                     .font(.body)
                             }
                         }
@@ -66,11 +70,14 @@ struct MiniPlayerView: View {
                         Text(formatTimeSmart(playerViewModel.currentTime))
                             .font(.caption2)
                             .frame(width: 40, alignment: .leading)
-
+                        
                         ProgressBar(
-                            progress: playerViewModel.trackDuration > 0
+                            progress: {
+                                let ratio = playerViewModel.trackDuration > 0
                                 ? playerViewModel.currentTime / playerViewModel.trackDuration
-                                : 0,
+                                : 0
+                                return ratio
+                            }(),
                             onSeek: { ratio in
                                 let newTime = ratio * playerViewModel.trackDuration
                                 playerViewModel.currentTime = newTime
@@ -78,9 +85,12 @@ struct MiniPlayerView: View {
                             },
                             height: 10
                         )
+                        
+                        .id(playerViewModel.trackDuration)
+                        
                         .frame(maxWidth: .infinity)
                         .padding(.horizontal, 4) // визуальное выравнивание
-
+                        
                         Text("-\(formatTimeSmart(playerViewModel.trackDuration - playerViewModel.currentTime))")
                             .font(.caption2)
                             .frame(width: 40, alignment: .trailing)
@@ -99,14 +109,4 @@ struct MiniPlayerView: View {
         }
     }
     
-    struct MiniPlayerView_Previews: PreviewProvider {
-        static var previews: some View {
-            MiniPlayerView(
-                playerViewModel: PlayerViewModel(),
-                trackListViewModel: TrackListViewModel()
-            )
-            .padding()
-            .previewDisplayName("Mini Player Preview")
-        }
-    }
 }
