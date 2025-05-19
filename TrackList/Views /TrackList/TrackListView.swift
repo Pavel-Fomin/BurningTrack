@@ -15,6 +15,15 @@ struct TrackListView: View {
 
     var body: some View {
         List {
+            // Счётчик треков
+            Section {
+                Text("\(trackListViewModel.tracks.count) треков · \(trackListViewModel.formattedTotalDuration)")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .padding(.vertical, 4)
+            }
+
+            // Список треков
             ForEach(trackListViewModel.tracks) { track in
                 trackRow(for: track)
             }
@@ -28,10 +37,9 @@ struct TrackListView: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .background(Color.clear)
-        
-       
     }
 
+    // MARK: - Отображение строки трека
     private func trackRow(for track: Track) -> some View {
         HStack(spacing: 12) {
             if let image = track.artwork {
@@ -48,7 +56,7 @@ struct TrackListView: View {
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(track.artist ?? "Неизвестный артист")
+                Text(track.artist)
                     .font(.subheadline)
                     .foregroundColor(.primary)
                     .lineLimit(1)
@@ -68,8 +76,6 @@ struct TrackListView: View {
             }
 
             Spacer()
-
-           
         }
         .padding(.vertical, 4)
         .listRowBackground(
@@ -82,12 +88,7 @@ struct TrackListView: View {
                 playerViewModel.togglePlayPause()
             } else {
                 print("🎯 Tap по треку:", track.title)
-
-                if playerViewModel.currentTrack?.id == track.id {
-                    playerViewModel.togglePlayPause()
-                } else {
-                    playerViewModel.play(track: track)
-                }
+                playerViewModel.play(track: track)
             }
         }
     }

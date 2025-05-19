@@ -207,3 +207,25 @@ final class TrackListViewModel: ObservableObject {
     }
     
 }
+/// подсчет времени и длительности треклиста
+extension TrackListViewModel {
+    var totalDuration: TimeInterval {
+        tracks.reduce(0) { $0 + $1.duration }
+    }
+
+    var formattedTotalDuration: String {
+        let totalSeconds = Int(totalDuration)
+        let days = totalSeconds / 86400
+        let hours = (totalSeconds % 86400) / 3600
+        let minutes = (totalSeconds % 3600) / 60
+        let seconds = totalSeconds % 60
+
+        if days > 0 {
+            return "\(days)д \(hours)ч \(minutes)Отмин"
+        } else if hours > 0 {
+            return "\(hours)ч \(minutes)мин"
+        } else {
+            return String(format: "%d:%02d", minutes, seconds)
+        }
+    }
+}
