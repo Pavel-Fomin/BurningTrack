@@ -19,6 +19,38 @@ struct Track: Identifiable {
     let duration: TimeInterval
     let fileName: String
     let artwork: UIImage?
+    let isAvailable: Bool /// Флаг доступности трека
+    
+    func refreshAvailability() -> Track {
+        var isAvailable = false
+
+        let accessGranted = url.startAccessingSecurityScopedResource()
+        defer {
+            if accessGranted {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        if accessGranted {
+            do {
+                let _ = try Data(contentsOf: url, options: [.mappedIfSafe])
+                isAvailable = true
+            } catch {
+                print("🗑️ Файл не читается: \(error.localizedDescription)")
+            }
+        }
+
+        return Track(
+            id: self.id,
+            url: self.url,
+            artist: self.artist,
+            title: self.title,
+            duration: self.duration,
+            fileName: self.fileName,
+            artwork: self.artwork,
+            isAvailable: isAvailable
+        )
+    }
 
     // MARK: - Статический метод для загрузки метаданных
     static func load(from url: URL) async throws -> Self {
@@ -27,6 +59,7 @@ struct Track: Identifiable {
         var artist = "Неизвестен"
         var trackName = url.deletingPathExtension().lastPathComponent
         var duration: TimeInterval = 0
+        var available = FileManager.default.fileExists(atPath: url.path) //Проверка
 
         do {
             let metadata = try await asset.load(.commonMetadata)
@@ -59,7 +92,8 @@ struct Track: Identifiable {
             title: trackName,
             duration: duration,
             fileName: url.lastPathComponent,
-            artwork: UIImage?(nil)
+            artwork: nil,
+            isAvailable: available //установка флага
         )
     }
     // MARK: - Преобразование Track в ImportedTrack (для сохранения в JSON)

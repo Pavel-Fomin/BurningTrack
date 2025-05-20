@@ -12,7 +12,7 @@ struct TrackListView: View {
     @ObservedObject var trackListViewModel: TrackListViewModel
     @ObservedObject var playerViewModel: PlayerViewModel
     @Environment(\.colorScheme) var colorScheme
-
+    
     var body: some View {
         List {
             // Счётчик треков
@@ -22,7 +22,7 @@ struct TrackListView: View {
                     .foregroundColor(.secondary)
                     .padding(.vertical, 4)
             }
-
+            
             // Список треков
             ForEach(trackListViewModel.tracks) { track in
                 trackRow(for: track)
@@ -34,11 +34,14 @@ struct TrackListView: View {
                 trackListViewModel.moveTrack(from: indices, to: newOffset)
             }
         }
+        .onAppear {
+            trackListViewModel.refreshTrackAvailability()
+        }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .background(Color.clear)
     }
-
+    
     // MARK: - Отображение строки трека
     private func trackRow(for track: Track) -> some View {
         HStack(spacing: 12) {
@@ -54,29 +57,30 @@ struct TrackListView: View {
                     .frame(width: 44, height: 44)
                     .cornerRadius(6)
             }
-
+            
             VStack(alignment: .leading, spacing: 4) {
                 Text(track.artist)
                     .font(.subheadline)
                     .foregroundColor(.primary)
                     .lineLimit(1)
-
+                
                 HStack {
                     Text(track.title)
                         .font(.footnote)
                         .foregroundColor(.secondary)
                         .lineLimit(1)
-
+                    
                     Spacer()
-
+                    
                     Text(formatTimeSmart(track.duration))
                         .font(.footnote)
                         .foregroundColor(.secondary)
                 }
             }
-
+            
             Spacer()
         }
+        .opacity(track.isAvailable ? 1 : 0.4) // ✅ Вот здесь приглушение
         .padding(.vertical, 4)
         .listRowBackground(
             playerViewModel.currentTrack?.id == track.id
@@ -84,11 +88,15 @@ struct TrackListView: View {
             : Color.clear
         )
         .onTapGesture {
-            if playerViewModel.currentTrack?.id == track.id {
-                playerViewModel.togglePlayPause()
+            if track.isAvailable {
+                if playerViewModel.currentTrack?.id == track.id {
+                    playerViewModel.togglePlayPause()
+                } else {
+                    print("🎯 Tap по треку:", track.title)
+                    playerViewModel.play(track: track)
+                }
             } else {
-                print("🎯 Tap по треку:", track.title)
-                playerViewModel.play(track: track)
+                print("⛔ Трек недоступен: \(track.title)")
             }
         }
     }

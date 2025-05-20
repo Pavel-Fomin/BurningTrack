@@ -15,20 +15,19 @@ import UIKit
 extension ImportedTrack {
     func asTrack() -> Track {
         let url: URL
+        var isAvailable = false
 
         do {
             url = try resolvedURL()
-            let success = url.startAccessingSecurityScopedResource()
-            if !success {
-
-            } else {
-                
-            }
+            let accessGranted = url.startAccessingSecurityScopedResource()
+            isAvailable = accessGranted && FileManager.default.fileExists(atPath: url.path)
+            url.stopAccessingSecurityScopedResource()
         } catch {
             print("❌ Ошибка при разрешении bookmark для \(fileName): \(error)")
             url = URL(fileURLWithPath: filePath)
+            isAvailable = false // 🔥 файл НЕ существует — ставим false
         }
-
+        
         return Track(
             id: id,
             url: url,
@@ -36,8 +35,8 @@ extension ImportedTrack {
             title: title ?? fileName,
             duration: duration,
             fileName: fileName,
-            artwork: artworkId.flatMap { ArtworkManager.loadArtwork(id: $0) }
+            artwork: artworkId.flatMap { ArtworkManager.loadArtwork(id: $0) },
+            isAvailable: isAvailable
         )
     }
-    
 }

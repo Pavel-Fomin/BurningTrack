@@ -150,7 +150,20 @@ final class TrackListViewModel: ObservableObject {
 
             DispatchQueue.main.async {
                 self.currentListId = newList.id
-                self.tracks = imported.map { $0.asTrack() }
+                self.tracks = imported.map { track in
+                    let t = track.asTrack()
+                    let isAvailable = FileManager.default.fileExists(atPath: t.url.path)
+                    return Track(
+                        id: t.id,
+                        url: t.url,
+                        artist: t.artist,
+                        title: t.title,
+                        duration: t.duration,
+                        fileName: t.fileName,
+                        artwork: t.artwork,
+                        isAvailable: isAvailable
+                    )
+                }
                 self.refreshtrackLists()
                 print("✅ Новый треклист создан с \(imported.count) треками")
             }
@@ -204,6 +217,11 @@ final class TrackListViewModel: ObservableObject {
         }
 
         refreshtrackLists()
+    }
+    
+    func refreshTrackAvailability() {/// Доступность трека
+        self.tracks = self.tracks.map { $0.refreshAvailability() }
+        print("♻️ Актуализирована доступность треков")
     }
     
 }

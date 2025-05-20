@@ -14,22 +14,25 @@ struct TrackRowView: View {
     let isPlaying: Bool
     let isCurrent: Bool
     let onTap: () -> Void
-
+    
     var body: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(track.artist)
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(track.isAvailable ? .secondary : .gray)
                     .lineLimit(1)
+                
                 Text(track.title)
                     .font(.body)
-                    .foregroundColor(.primary)
+                    .foregroundColor(track.isAvailable ? .primary : .gray)
                     .lineLimit(1)
+                
                 Text(formatTimeSmart(track.duration))
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(track.isAvailable ? .secondary : .gray)
             }
+            
             Spacer()
             if isCurrent {
                 Image(systemName: isPlaying ? "pause.fill" : "play.fill")
@@ -45,27 +48,13 @@ struct TrackRowView: View {
             : Color.clear
         )
         .cornerRadius(8)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    onTap()
-                }
-    }
-}
-struct TrackRowView_Previews: PreviewProvider {
-    static var previews: some View {
-        TrackRowView(
-            track: Track(
-                id: UUID(),
-                url: URL(string: "https://example.com")!,
-                artist: "Test Artist",
-                title: "Test Track",
-                duration: 180,
-                fileName: "test.mp3",
-                artwork: nil
-            ),
-            isPlaying: true,
-            isCurrent: true,
-            onTap: {}
-        )
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if track.isAvailable {
+                onTap()
+            } else {
+                print("⛔ Трек недоступен: \(track.title)")
+            }
+        }
     }
 }
