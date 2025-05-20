@@ -54,7 +54,7 @@ final class ImportManager {
                     duration: parsed.duration ?? 0,
                     artworkBase64: nil,
                     bookmarkBase64: bookmarkBase64,
-                    artworkId: parsed.artworkData != nil ? trackId : nil,
+                    artworkId: parsed.artworkData != nil ? trackId : nil
                 )
 
                 importedTracks.append(newTrack)

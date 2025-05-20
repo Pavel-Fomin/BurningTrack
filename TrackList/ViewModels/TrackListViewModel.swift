@@ -9,10 +9,11 @@
 
 import Foundation
 import SwiftUI
+import UIKit
 
 private let selectedTrackListIdKey = "selectedTrackListId"
 
-final class TrackListViewModel: ObservableObject {
+final class TrackListViewModel: NSObject, ObservableObject {
     @Published var tracks: [Track] = []
     @Published var trackLists: [TrackList] = [] /// Все доступные треклисты (мета + треки)
     @Published var currentListId: UUID { /// Текущий активный плейлист
@@ -33,7 +34,8 @@ final class TrackListViewModel: ObservableObject {
     @Published var importMode: ImportMode = .none
     
     // MARK: - Инициализация
-    init() {
+    override init() {
+        // 1. Установка текущего ID
         let metas = TrackListManager.shared.loadTrackListMetas()
         print("📂 Все треклисты: \(metas.map { "\($0.name) (\($0.id))" })")
 
@@ -49,6 +51,10 @@ final class TrackListViewModel: ObservableObject {
             self.currentListId = defaultList.id
         }
 
+        // 2. Вызов super
+        super.init()
+
+        // 3. Только после super — вызываем методы с self
         loadTracks()
         refreshtrackLists()
     }
@@ -100,20 +106,17 @@ final class TrackListViewModel: ObservableObject {
             print("⚠️ Плейлист не выбран")
             return
         }
-        
+
         let availableTracks = list.tracks.filter { $0.isAvailable }
         if availableTracks.isEmpty {
             print("⚠️ Нет доступных треков для экспорта")
             return
         }
-        
-        ExportManager().exportTracks(availableTracks, to: folder) { result in
-            switch result {
-            case .success:
-                print("✅ Экспорт завершён")
-            case .failure(let error):
-                print("❌ Ошибка экспорта: \(error)")
-            }
+
+        if let topVC = UIApplication.topViewController() {
+            ExportManager.shared.exportViaTempAndPicker(availableTracks, presenter: topVC)
+        } else {
+            print("❌ Не удалось получить topViewController")
         }
     }
 
@@ -247,5 +250,25 @@ extension TrackListViewModel {
         }
 
         return formatter.string(from: totalDuration) ?? "0:00"
+    }
+}
+
+
+// MARK: - Обработка выбора папки для экспорта
+extension TrackListViewModel: UIDocumentPickerDelegate {
+    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        guard let folderURL = urls.first else {
+            print("⚠️ Папка не выбрана")
+            return
+        }
+        
+        // Загружаем оригинальные ImportedTrack по ID текущего треклиста
+        if let topVC = UIApplication.topViewController() {
+            let tracks = TrackListManager.shared.loadTracks(for: currentListId)
+            let availableTracks = tracks.filter { $0.isAvailable }
+            
+            ExportManager.shared.exportViaTempAndPicker(availableTracks, presenter: topVC)
+            
+        }
     }
 }

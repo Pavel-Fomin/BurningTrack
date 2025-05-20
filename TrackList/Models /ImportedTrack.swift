@@ -22,9 +22,12 @@ struct ImportedTrack: Codable, Identifiable {
     let artworkBase64: String?
     let bookmarkBase64: String?
     var artworkId: UUID?
-
+    
     var isAvailable: Bool {
-        FileManager.default.fileExists(atPath: filePath)
+        guard let url = try? resolvedURL() else {
+            return false
+        }
+        return FileManager.default.fileExists(atPath: url.path)
     }
     
     
@@ -32,24 +35,23 @@ struct ImportedTrack: Codable, Identifiable {
         guard let bookmarkBase64 = bookmarkBase64 else {
             throw URLError(.badURL, userInfo: ["reason": "bookmarkBase64 is nil"])
         }
+        
         guard let bookmarkData = Data(base64Encoded: bookmarkBase64) else {
             throw URLError(.badURL, userInfo: ["reason": "bookmarkBase64 can't be decoded"])
         }
-
+        
         var isStale = false
         let url = try URL(
             resolvingBookmarkData: bookmarkData,
-            options: [], // ← без .withSecurityScope
+            options: [], 
             relativeTo: nil,
             bookmarkDataIsStale: &isStale
         )
-
+        
         if isStale {
-            
+            print("♻️ Bookmark устарел, желательно пересоздать")
         }
-
+        
         return url
     }
-    
-    
 }

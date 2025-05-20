@@ -9,6 +9,7 @@
 
 import Foundation
 import SwiftUI
+import UIKit
 
 struct TrackListSelectorView: View {
     @ObservedObject var viewModel: TrackListViewModel
@@ -47,6 +48,17 @@ struct TrackListSelectorView: View {
                         isEditing: viewModel.isEditing && list.id != selectedId,
                         onEdit: {
                             viewModel.isEditing = true
+                        },
+                        onExport: {
+                            let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.folder], asCopy: false)
+                            picker.allowsMultipleSelection = false
+                            picker.shouldShowFileExtensions = true
+                            picker.delegate = viewModel
+
+                            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                               let root = windowScene.windows.first?.rootViewController {
+                                root.present(picker, animated: true)
+                            }
                         }
                     )
                 }
