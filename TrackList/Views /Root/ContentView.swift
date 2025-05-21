@@ -39,7 +39,7 @@ struct ContentView: View {
                             showImporter = true
                         },
                         onToggleEditMode: {
-                            withAnimation {
+                            withAnimation(.chipEditMode) {
                                 trackListViewModel.isEditing.toggle()
                             }
                         }

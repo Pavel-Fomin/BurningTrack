@@ -43,6 +43,7 @@ struct TrackListView: View {
     }
     
     // MARK: - Отображение строки трека
+    
     private func trackRow(for track: Track) -> some View {
         HStack(spacing: 12) {
             if let image = track.artwork {

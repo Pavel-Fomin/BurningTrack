@@ -217,14 +217,29 @@ final class TrackListManager {
                 print("❌ Не удалось удалить файл: \(error)")
             }
         }
-
+        
         // 2. Загружаем и фильтруем метаинформацию
         var metas = loadTrackListMetas()
         metas.removeAll { $0.id == id }
-
+        
         // 3. Сохраняем обновлённую мету
         saveTrackListMetas(metas)
         
         print("🗑️ Треклист с ID \(id) удалён")
+    }
+    
+    // MARK: - Переименовать треклист по его ID
+    
+    func renameTrackList(id: UUID, to newName: String) {
+        var meta = loadTrackListMetas()
+        
+        guard let index = meta.firstIndex(where: { $0.id == id }) else {
+            print("❌ Не найден треклист с id: \(id)")
+            return
+        }
+        
+        meta[index].name = newName
+        saveTrackListMetas(meta)
+        print("✏️ Название треклиста обновлено: \(newName)")
     }
 }

@@ -10,6 +10,8 @@
 import Foundation
 import SwiftUI
 
+// MARK: - Основная view
+
 struct TrackListChipView: View {
     let trackList: TrackList
     let isSelected: Bool
@@ -21,6 +23,8 @@ struct TrackListChipView: View {
     
     @State private var wigglePhase: Double = 0
     @State private var timer: Timer?
+    @State private var isRenaming = false
+    @State private var newName = ""
     
     
     var body: some View {
@@ -28,27 +32,28 @@ struct TrackListChipView: View {
             if isSelected {
                 Menu {
                     Button("Добавить трек", action: onAdd)
-                    
                     Button("Экспортировать") {
                         if let topVC = UIApplication.topViewController() {
-                            ExportManager.shared.exportViaTempAndPicker(trackList.tracks, presenter: topVC)
+                            let importedTracks = TrackListManager.shared.loadTracks(for: trackList.id)
+                            ExportManager.shared.exportViaTempAndPicker(importedTracks, presenter: topVC)
                         } else {
                             print("❌ Не удалось получить topViewController")
                         }
                     }
                     
+                    Button("Переименовать") {
+                        newName = trackList.name
+                        isRenaming = true
+                    }
+                    
                 } label: {
-                    Text(formatTrackListLabel(from: trackList.createdAt))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Capsule().fill(Color.blue))
-                        .foregroundColor(.white)
+                    Text(trackList.name)
+                        .chipStyle(isSelected: true)
                 }
                 
-            } else if isEditing && !isSelected {
+            } else if isEditing {
                 HStack(spacing: 4) {
-                    Text(formatTrackListLabel(from: trackList.createdAt))
-                        .foregroundColor(.primary)
+                    Text(trackList.name)
                     
                     Button(action: onDelete) {
                         Image(systemName: "trash.fill")
@@ -57,30 +62,43 @@ struct TrackListChipView: View {
                     }
                     .buttonStyle(PlainButtonStyle())
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(Capsule().fill(Color.gray.opacity(0.3)))
+                .chipStyle(isSelected: false)
                 .onTapGesture { onSelect() }
-                .offset(x: isEditing && !isSelected
-                        ? sin(wigglePhase + Double(trackList.id.uuidString.hashValue % 10)) * 2
-                        : 0)
+                .offset(x: sin(wigglePhase + Double(trackList.id.uuidString.hashValue % 10)) * 2)
                 .onAppear { startWiggle() }
                 .onDisappear { stopWiggle() }
                 
             } else {
-                Text(formatTrackListLabel(from: trackList.createdAt))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Capsule().fill(Color.gray.opacity(0.3)))
-                    .foregroundColor(.primary)
+                Text(trackList.name)
+                    .chipStyle(isSelected: false)
                     .onTapGesture { onSelect() }
             }
-            
         }
         
-}
-    
-    // MARK: - Wiggle animation
+        .alert("Переименовать плейлист", isPresented: $isRenaming, actions: {
+            TextField("Новое название", text: $newName)
+                .onChange(of: newName) { newValue in
+                    if newValue.count > 72 {
+                        newName = String(newValue.prefix(72))
+                    }
+                }
+            
+            Button("Сохранить", role: .none) {
+                let trimmed = newName.trimmingCharacters(in: .whitespaces)
+                if !trimmed.isEmpty {
+                    TrackListManager.shared.renameTrackList(id: trackList.id, to: trimmed)
+                    onEdit() /// обновляем данные
+                }
+            }
+            
+            Button("Отмена", role: .cancel) {}
+        }, message: {
+            Text("Введите новое название для плейлиста")
+        })
+    }
+        
+        // MARK: - Wiggle animation
+        
         private func startWiggle() {
             stopWiggle()
             timer = Timer.scheduledTimer(withTimeInterval: 0.016, repeats: true) { _ in
