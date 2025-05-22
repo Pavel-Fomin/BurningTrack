@@ -55,10 +55,9 @@ struct TrackListChipsGroupView: View {
         TrackListChipView(
             trackList: trackList,
             isSelected: trackList.id == selectedId,
-            onSelect: { onSelect(trackList.id) },
+            isEditing: isEditing, onSelect: { onSelect(trackList.id) },
             onAdd: onAddFromContextMenu,
             onDelete: { onDelete(trackList.id) },
-            isEditing: isEditing,
             onEdit: onRename
         )
         .id(trackList.id)
