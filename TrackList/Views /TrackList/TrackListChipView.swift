@@ -28,87 +28,83 @@ struct TrackListChipView: View {
     
     
     var body: some View {
-        Group {
-            if isSelected {
-                Menu {
-                    Button("Добавить трек", action: onAdd)
-                    Button("Экспортировать") {
-                        if let topVC = UIApplication.topViewController() {
-                            let importedTracks = TrackListManager.shared.loadTracks(for: trackList.id)
-                            ExportManager.shared.exportViaTempAndPicker(importedTracks, presenter: topVC)
-                        } else {
-                            print("❌ Не удалось получить topViewController")
+            Group {
+                // 1) Активный чип вне режима редактирования — показываем Menu
+                if isSelected && !isEditing {
+                    Menu {
+                        Button("Добавить трек", action: onAdd)
+                        Button("Экспортировать") {
+                            if let topVC = UIApplication.topViewController() {
+                                let imported = TrackListManager.shared.loadTracks(for: trackList.id)
+                                ExportManager.shared.exportViaTempAndPicker(imported, presenter: topVC)
+                            }
                         }
+                        Button("Переименовать") {
+                            newName = trackList.name
+                            isRenaming = true
+                        }
+                    } label: {
+                        Text(trackList.name)
+                            .chipStyle(isSelected: true)
                     }
-                    
-                    Button("Переименовать") {
-                        newName = trackList.name
-                        isRenaming = true
-                    }
-                    
-                } label: {
+
+                // 2) Активный чип в режиме редактирования — просто подсвеченный текст
+                } else if isSelected && isEditing {
                     Text(trackList.name)
                         .chipStyle(isSelected: true)
-                }
-                
-            } else if isEditing {
-                HStack(spacing: 4) {
-                    Text(trackList.name)
-                    
-                    Button(action: onDelete) {
-                        Image(systemName: "trash.fill")
-                            .foregroundColor(.red)
-                            .font(.system(size: 16, weight: .bold))
+                        .onTapGesture(perform: onSelect)
+
+                // 3) Невыбранный чип в режиме редактирования — с кнопкой удаления и wiggle
+                } else if isEditing {
+                    HStack(spacing: 4) {
+                        Text(trackList.name)
+                        Button(action: onDelete) {
+                            Image(systemName: "trash.fill")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(.red)
+                        }
+                        .buttonStyle(PlainButtonStyle())
                     }
-                    .buttonStyle(PlainButtonStyle())
-                }
-                .chipStyle(isSelected: false)
-                .onTapGesture { onSelect() }
-                .offset(x: sin(wigglePhase + Double(trackList.id.uuidString.hashValue % 10)) * 2)
-                .onAppear { startWiggle() }
-                .onDisappear { stopWiggle() }
-                
-            } else {
-                Text(trackList.name)
                     .chipStyle(isSelected: false)
-                    .onTapGesture { onSelect() }
+                    .offset(x: sin(wigglePhase + Double(trackList.id.uuidString.hashValue % 10)) * 2)
+                    .onAppear { startWiggle() }
+                    .onDisappear { stopWiggle() }
+                    .onTapGesture(perform: onSelect)
+
+                // 4) Обычный неактивный чип — только текст и tap
+                } else {
+                    Text(trackList.name)
+                        .chipStyle(isSelected: false)
+                        .onTapGesture(perform: onSelect)
+                }
+            }
+            // Переименование
+            .alert("Переименовать плейлист", isPresented: $isRenaming) {
+                TextField("Новое название", text: $newName)
+                Button("Сохранить") {
+                    let trimmed = newName.trimmingCharacters(in: .whitespaces)
+                    if !trimmed.isEmpty {
+                        TrackListManager.shared.renameTrackList(id: trackList.id, to: trimmed)
+                        onEdit()
+                    }
+                }
+                Button("Отмена", role: .cancel) {}
+            } message: {
+                Text("Введите новое название для плейлиста")
             }
         }
-        
-        .alert("Переименовать плейлист", isPresented: $isRenaming, actions: {
-            TextField("Новое название", text: $newName)
-                .onChange(of: newName) { newValue in
-                    if newValue.count > 72 {
-                        newName = String(newValue.prefix(72))
-                    }
-                }
-            
-            Button("Сохранить", role: .none) {
-                let trimmed = newName.trimmingCharacters(in: .whitespaces)
-                if !trimmed.isEmpty {
-                    TrackListManager.shared.renameTrackList(id: trackList.id, to: trimmed)
-                    onEdit() /// обновляем данные
-                }
-            }
-            
-            Button("Отмена", role: .cancel) {}
-        }, message: {
-            Text("Введите новое название для плейлиста")
-        })
-    }
-        
-        // MARK: - Wiggle animation
-        
+
+        // MARK: - Wiggle animation helpers
         private func startWiggle() {
             stopWiggle()
             timer = Timer.scheduledTimer(withTimeInterval: 0.016, repeats: true) { _ in
                 wigglePhase += 0.1
             }
         }
-        
         private func stopWiggle() {
             timer?.invalidate()
             timer = nil
         }
     }
 
+    // Утилита chipStyle уже объявлена отдельным модификатором
