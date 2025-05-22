@@ -206,9 +206,18 @@ final class TrackListManager {
     }
     
     
-    // MARK: - Удаляет треклист по ID: удаляет JSON-файл и убирает мету из tracklists.json
+    // MARK: - Удаляет треклист по ID:, удаляет JSON, удаляет мету из tracklists.json
+    
     func deleteTrackList(id: UUID) {
-        // 1. Удаляем файл с треками
+        
+        // 1. Удаляем обложки треков
+        let tracks = loadTracks(for: id)
+        for track in tracks {
+            if let artworkId = track.artworkId {
+                ArtworkManager.deleteArtwork(id: artworkId)
+            }
+        }
+        // 2. Удаляем файл с треками
         if let fileURL = documentsDirectory?.appendingPathComponent("tracklist_\(id.uuidString).json") {
             do {
                 try FileManager.default.removeItem(at: fileURL)
@@ -218,11 +227,11 @@ final class TrackListManager {
             }
         }
         
-        // 2. Загружаем и фильтруем метаинформацию
+        // 3. Загружаем и фильтруем метаинформацию
         var metas = loadTrackListMetas()
         metas.removeAll { $0.id == id }
         
-        // 3. Сохраняем обновлённую мету
+        // 4. Сохраняем обновлённую мету
         saveTrackListMetas(metas)
         
         print("🗑️ Треклист с ID \(id) удалён")
