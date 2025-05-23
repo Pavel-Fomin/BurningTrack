@@ -233,7 +233,6 @@ final class TrackListManager {
         
         // 4. Сохраняем обновлённую мету
         saveTrackListMetas(metas)
-        
         print("🗑️ Треклист с ID \(id) удалён")
     }
     

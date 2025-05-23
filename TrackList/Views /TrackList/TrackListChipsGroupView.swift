@@ -36,7 +36,7 @@ struct TrackListChipsGroupView: View {
                     }
                 }) {
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 28))
+                        .font(.system(size: 24))
                         .foregroundColor(.accentColor)
                 }
             }

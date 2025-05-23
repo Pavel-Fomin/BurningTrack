@@ -33,19 +33,12 @@ struct TrackListSelectorView: View {
                         },
                         onAddFromContextMenu: onAddFromContextMenu,
                     onDelete: { id in
-                        if id == selectedId {
-                            // выбранный треклист — удаляем ТОЛЬКО если он пустой
-                            let tracks = TrackListManager.shared.loadTracks(for: id)
-                            if tracks.isEmpty {
-                                viewModel.deleteTrackList(id: id)
-                            } else {
-                                print("⚠️ Нельзя удалить: треклист не пуст")
-                            }
-                        } else {
-                            // невыбранный треклист — удаляем всегда
+                        if viewModel.canDeleteTrackList(id: id) {
                             viewModel.deleteTrackList(id: id)
+                        } else {
+                            print("⚠️ Нельзя удалить: треклист не пуст")
                         }
-                        
+                    
                         },
                         onDoneEditing: {
                             viewModel.isEditing = false
