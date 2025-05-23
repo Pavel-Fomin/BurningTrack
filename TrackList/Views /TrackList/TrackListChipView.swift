@@ -25,6 +25,7 @@ struct TrackListChipView: View {
     @State private var isRenaming = false
     @State private var newName = ""
     @State private var showDeleteAlert = false
+    @State private var showClearAlert = false
     
     private var content: some View {
         Group {
@@ -32,20 +33,27 @@ struct TrackListChipView: View {
             if isSelected && !isEditing {
                 Menu {
                     Button("Добавить трек", action: onAdd)
+                    
                     Button("Экспортировать") {
                         if let topVC = UIApplication.topViewController() {
                             let imported = TrackListManager.shared.loadTracks(for: trackList.id)
                             ExportManager.shared.exportViaTempAndPicker(imported, presenter: topVC)
                         }
                     }
+
                     Button("Переименовать") {
                         newName = trackList.name
                         isRenaming = true
+                    }
+
+                    Button("Очистить треклист", role: .destructive) {
+                        showClearAlert = true
                     }
                 } label: {
                     Text(trackList.name)
                         .chipStyle(isSelected: true)
                 }
+                
                 
                 // 2) Активный чип в режиме редактирования
             } else if isSelected && isEditing {
@@ -94,6 +102,9 @@ struct TrackListChipView: View {
         }
     }
     
+    
+    // MARK: - Алерты
+    
     var body: some View {
             content
             // Универсальный алерт удаления
@@ -118,9 +129,20 @@ struct TrackListChipView: View {
                 } message: {
                     Text("Новое название треклиста")
                 }
+        
+                .alert("Очистить треклист?", isPresented: $showClearAlert) {
+                    Button("Очистить", role: .destructive) {
+                        NotificationCenter.default.post(name: .clearTrackList, object: trackList.id)
+                    }
+                    Button("Отмена", role: .cancel) {}
+                } message: {
+                    Text("Все треки из \"\(trackList.name)\" будут удалены")
+                }
+        
         }
         
         // MARK: - Wiggle animation helpers
+    
         private func startWiggle() {
             stopWiggle()
             timer = Timer.scheduledTimer(withTimeInterval: 0.016, repeats: true) { _ in

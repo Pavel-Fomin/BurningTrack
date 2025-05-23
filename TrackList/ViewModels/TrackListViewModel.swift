@@ -127,12 +127,27 @@ final class TrackListViewModel: NSObject, ObservableObject {
         }
     }
     
-    /// Очистить текущий плейлист
-    func clearTracks() {
-        guard let id = currentListId else { return }
+    /// Очистить треклист
+    func clearTrackList(id: UUID) {
+        guard id == currentListId else {
+            print("⚠️ Очистка невозможна: плейлист не активен")
+            return
+        }
+
+        var tracksToClear = TrackListManager.shared.loadTracks(for: id)
+
+        // Удаляем связанные обложки
+        for track in tracksToClear {
+            if let artworkId = track.artworkId {
+                ArtworkManager.deleteArtwork(id: artworkId)
+                print("🗑️ Удалена обложка: artwork_\(artworkId).jpg")
+            }
+        }
+
+        // Очищаем треки
         TrackListManager.shared.saveTracks([], for: id)
         self.tracks = []
-        print("🧹 Плейлист очищен")
+        print("🧹 Все треки удалены из плейлиста \(id)")
     }
     
     /// Создаёт новый пустой треклист и делает его активным

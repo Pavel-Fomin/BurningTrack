@@ -25,32 +25,36 @@ struct TrackListSelectorView: View {
                 
                 TrackListChipsGroupView( /// Чипсы
                     trackLists: viewModel.trackLists,
-                        selectedId: selectedId,
-                        isEditing: viewModel.isEditing,
-                        onSelect: { id in
-                            selectedId = id
-                            onSelect(id)
-                        },
-                        onAddFromContextMenu: onAddFromContextMenu,
+                    selectedId: selectedId,
+                    isEditing: viewModel.isEditing,
+                    onSelect: { id in
+                        selectedId = id
+                        onSelect(id)
+                    },
+                    onAddFromContextMenu: onAddFromContextMenu,
                     onDelete: { id in
                         if viewModel.canDeleteTrackList(id: id) {
                             viewModel.deleteTrackList(id: id)
                         } else {
                             print("⚠️ Нельзя удалить: треклист не пуст")
                         }
-                    
-                        },
-                        onDoneEditing: {
-                            viewModel.isEditing = false
-                        },
-                        onRename: {
-                            viewModel.refreshtrackLists()
-                        }
-                    )
-                    .padding(.leading, 0)
-                    .padding(.bottom, 12)
+                        
+                    },
+                    onDoneEditing: {
+                        viewModel.isEditing = false
+                    },
+                    onRename: {
+                        viewModel.refreshtrackLists()
                     }
+                )
+                .padding(.leading, 0)
+                .padding(.bottom, 12)
+                .onReceive(NotificationCenter.default.publisher(for: .clearTrackList)) { notification in
+                    if let id = notification.object as? UUID {
+                        viewModel.clearTrackList(id: id)
+                    }
+                }
             }
         }
-        
     }
+}
