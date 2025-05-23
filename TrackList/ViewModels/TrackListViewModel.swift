@@ -216,19 +216,22 @@ final class TrackListViewModel: NSObject, ObservableObject {
     /// Удаляет треклист, обновляет список и выбирает другой при необходимости
     func deleteTrackList(id: UUID) {
         TrackListManager.shared.deleteTrackList(id: id)
-        
-        // Если удаляем текущий активный треклист — выберем другой
+
         if id == currentListId {
-            let remaining = trackLists.filter { $0.id != id }
+            let metas = TrackListManager.shared.loadTrackListMetas()
+            let remaining = metas.filter { $0.id != id }
             if let first = remaining.first {
                 selectTrackList(id: first.id)
             } else {
-                // Если ничего не осталось — создаём новый
-                let newList = TrackListManager.shared.getOrCreateDefaultTrackList()
-                currentListId = newList.id
+                currentListId = nil
+                tracks = []
+                print("⚠️ Все треклисты удалены — ничего не выбрано")
             }
-        }
 
+        refreshtrackLists()
+    }
+
+        // Обновим список после удаления — но без ручной сборки
         refreshtrackLists()
     }
     
