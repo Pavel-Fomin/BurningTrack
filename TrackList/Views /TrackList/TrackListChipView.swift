@@ -53,7 +53,7 @@ struct TrackListChipView: View {
                     .chipStyle(isSelected: true)
                     .onTapGesture(perform: onSelect)
 
-            // 3) Невыбранный чип в режиме редактирования — с кнопкой удаления и wiggle
+            // 3) Невыбранный чип в режиме редактирования
             } else if isEditing {
                 HStack(spacing: 4) {
                     Text(trackList.name)

@@ -15,7 +15,7 @@ struct TrackListView: View {
     
     var body: some View {
         List {
-            // Счётчик треков
+            /// Счётчик треков
             Section {
                 Text("\(trackListViewModel.tracks.count) треков · \(trackListViewModel.formattedTotalDuration)")
                     .font(.subheadline)
@@ -81,7 +81,7 @@ struct TrackListView: View {
             
             Spacer()
         }
-        .opacity(track.isAvailable ? 1 : 0.4) // ✅ Вот здесь приглушение
+        .opacity(track.isAvailable ? 1 : 0.4) /// Здесь приглушение
         .padding(.vertical, 4)
         .listRowBackground(
             playerViewModel.currentTrack?.id == track.id

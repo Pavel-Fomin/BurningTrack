@@ -22,6 +22,7 @@ struct TrackListHeaderView: View {
         VStack(alignment: .leading, spacing: 12) {
             TrackListToolbar(
                 isEditing: viewModel.isEditing,
+                hasTrackLists: !viewModel.trackLists.isEmpty,
                 onAdd: onAddFromPlus,
                 onToggleEditMode: onToggleEditMode
             )
@@ -30,7 +31,7 @@ struct TrackListHeaderView: View {
                 viewModel: viewModel,
                 selectedId: Binding<UUID>(
                     get: {
-                        selectedId ?? UUID() // если nil — создаём временный ID
+                        selectedId ?? UUID() /// если nil — создаём временный ID
                     },
                     set: {
                         selectedId = $0
@@ -43,7 +44,7 @@ struct TrackListHeaderView: View {
             )
             
         }
-        .padding(.horizontal, 20)
-            .padding(.top, 8) // ← добавь сюда верхний отступ
+        .padding(.horizontal, 20) /// Боковые отступы
+            .padding(.top, 8) /// Верхний отступ
         }
     }

@@ -11,9 +11,10 @@ import SwiftUI
 
 struct TrackListToolbar: View {
     let isEditing: Bool
+    let hasTrackLists: Bool
     let onAdd: () -> Void
     let onToggleEditMode: () -> Void
-
+    
     var body: some View {
         HStack {
             // Заголовок
@@ -21,22 +22,25 @@ struct TrackListToolbar: View {
                 .font(.system(size: 28, weight: .heavy))
                 .foregroundColor(.primary)
                 .padding(.top, 4)
-
+            
             Spacer()
-
+            
             // Режим редактирования
-            Button(action: onToggleEditMode) {
-                Image(systemName: "wand.and.sparkles.inverse")
-                    .font(.title2)
+            if hasTrackLists {
+                Button(action: onToggleEditMode) {
+                    Image(systemName: "wand.and.sparkles.inverse")
+                        .font(.title2)
+                }
             }
-
-            // Новый треклист
+                
+                // Новый треклист
             Button(action: onAdd) {
-                Image(systemName: "plus")
-                    .font(.title2)
-                    .padding(.leading, 12)
+                    Image(systemName: "plus")
+                        .font(.title2)
+                        .padding(.leading, 12)
+                }
             }
+            
         }
-        
     }
-}
+

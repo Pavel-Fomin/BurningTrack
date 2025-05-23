@@ -23,7 +23,7 @@ struct TrackListSelectorView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 
-                TrackListChipsGroupView( // Чипсы
+                TrackListChipsGroupView( /// Чипсы
                     trackLists: viewModel.trackLists,
                         selectedId: selectedId,
                         isEditing: viewModel.isEditing,

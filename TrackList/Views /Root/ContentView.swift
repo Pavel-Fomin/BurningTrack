@@ -23,7 +23,7 @@ struct ContentView: View {
                 
                 VStack(spacing: 0) {
                     
-                    // 🔹 Хедер — отображается всегда
+                    // Хедер — отображается всегда
                     TrackListHeaderView(
                         viewModel: trackListViewModel,
                         selectedId: Binding(
@@ -44,7 +44,7 @@ struct ContentView: View {
                         }
                     )
                     
-                    // 🔄 Если треклистов нет — заглушка
+                    // Если треклистов нет — заглушка
                     if trackListViewModel.trackLists.isEmpty {
                         Spacer()
                         Text("Добавьте треки")
@@ -53,7 +53,7 @@ struct ContentView: View {
                             .padding(.top, 32)
                         Spacer()
                     } else {
-                        // 🟢 Здесь отобразится обычный список треков
+                        // Здесь отобразится обычный список треков
                         TrackListView(
                             trackListViewModel: trackListViewModel,
                             playerViewModel: playerViewModel
