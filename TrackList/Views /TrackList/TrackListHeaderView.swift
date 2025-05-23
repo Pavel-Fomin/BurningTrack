@@ -11,7 +11,7 @@ import SwiftUI
 
 struct TrackListHeaderView: View {
     @ObservedObject var viewModel: TrackListViewModel
-    @Binding var selectedId: UUID
+    @Binding var selectedId: UUID?
     
     let onSelect: (UUID) -> Void
     let onAddFromPlus: () -> Void
@@ -28,12 +28,22 @@ struct TrackListHeaderView: View {
             
             TrackListSelectorView(
                 viewModel: viewModel,
-                selectedId: $selectedId,
+                selectedId: Binding<UUID>(
+                    get: {
+                        selectedId ?? UUID() // если nil — создаём временный ID
+                    },
+                    set: {
+                        selectedId = $0
+                    }
+                ),
                 onSelect: onSelect,
                 onAddFromPlus: onAddFromPlus,
-                onAddFromContextMenu: onAddFromContextMenu
+                onAddFromContextMenu: onAddFromContextMenu,
+                onToggleEditMode: onToggleEditMode
             )
             
         }
+        .padding(.horizontal, 20)
+            .padding(.top, 8) // ← добавь сюда верхний отступ
+        }
     }
-}

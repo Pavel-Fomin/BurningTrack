@@ -17,6 +17,7 @@ struct TrackListSelectorView: View {
     var onSelect: (UUID) -> Void
     var onAddFromPlus: () -> Void
     var onAddFromContextMenu: () -> Void
+    let onToggleEditMode: () -> Void
     
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {

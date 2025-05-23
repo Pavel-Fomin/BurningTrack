@@ -16,9 +16,11 @@ private let selectedTrackListIdKey = "selectedTrackListId"
 final class TrackListViewModel: NSObject, ObservableObject {
     @Published var tracks: [Track] = []
     @Published var trackLists: [TrackList] = [] /// Все доступные треклисты (мета + треки)
-    @Published var currentListId: UUID { /// Текущий активный плейлист
+    @Published var currentListId: UUID? { /// Текущий активный плейлист
         didSet {
-            UserDefaults.standard.set(currentListId.uuidString, forKey: selectedTrackListIdKey)
+            if let id = currentListId {
+                UserDefaults.standard.set(id.uuidString, forKey: selectedTrackListIdKey)
+            }
         }
     }
     
@@ -46,9 +48,9 @@ final class TrackListViewModel: NSObject, ObservableObject {
             self.currentListId = uuid
             TrackListManager.shared.selectTrackList(id: uuid)
         } else {
-            print("❌ Плейлист не найден — создаём новый")
-            let defaultList = TrackListManager.shared.getOrCreateDefaultTrackList()
-            self.currentListId = defaultList.id
+            print("❌ Плейлист не найден")
+           // let defaultList = TrackListManager.shared.getOrCreateDefaultTrackList()
+            //self.currentListId = defaultList.id
         }
 
         // 2. Вызов super
@@ -87,16 +89,21 @@ final class TrackListViewModel: NSObject, ObservableObject {
 
     /// Импортировать треки в текущий плейлист
     func importTracks(from urls: [URL]) {
-        ImportManager().importTracks(from: urls, to: currentListId) { imported in
-            var existingTracks = TrackListManager.shared.loadTracks(for: self.currentListId)
-            existingTracks.insert(contentsOf: imported, at: 0)
-            TrackListManager.shared.saveTracks(existingTracks, for: self.currentListId)
-
-            DispatchQueue.main.async {
-                self.tracks = existingTracks.map { $0.asTrack() }
-                self.refreshtrackLists()
-                print("✅ Импорт завершён: \(imported.count) треков добавлено")
+            guard let id = self.currentListId else {
+                print("⚠️ Плейлист не выбран — импорт невозможен")
+                return
             }
+            ImportManager().importTracks(from: urls, to: id) { [weak self] imported in
+                guard let self = self, let id = self.currentListId else { return }
+                var existingTracks = TrackListManager.shared.loadTracks(for: id)
+                existingTracks.insert(contentsOf: imported, at: 0)
+                TrackListManager.shared.saveTracks(existingTracks, for: id)
+
+                DispatchQueue.main.async {
+                    self.tracks = existingTracks.map { $0.asTrack() }
+                    self.refreshtrackLists()
+                    print("✅ Импорт завершён: \(imported.count) треков добавлено")
+                }
         }
     }
 
@@ -122,7 +129,8 @@ final class TrackListViewModel: NSObject, ObservableObject {
 
     /// Очистить текущий плейлист
     func clearTracks() {
-        TrackListManager.shared.saveTracks([], for: currentListId)
+        guard let id = currentListId else { return }
+        TrackListManager.shared.saveTracks([], for: id)
         self.tracks = []
         print("🧹 Плейлист очищен")
     }
@@ -175,8 +183,9 @@ final class TrackListViewModel: NSObject, ObservableObject {
 
     /// Удаление трека по индексам
     func removeTrack(at offsets: IndexSet) {
-        var importedTracks = TrackListManager.shared.loadTracks(for: currentListId)
-
+            guard let id = currentListId else { return }
+            var importedTracks = TrackListManager.shared.loadTracks(for: id)
+        
         /// Удаляем обложки
         for index in offsets {
             let track = importedTracks[index]
@@ -188,17 +197,18 @@ final class TrackListViewModel: NSObject, ObservableObject {
 
         /// Удаляем треки
         importedTracks.remove(atOffsets: offsets)
-        TrackListManager.shared.saveTracks(importedTracks, for: currentListId)
-        self.tracks = importedTracks.map { $0.asTrack() }
+        TrackListManager.shared.saveTracks(importedTracks, for: id)
+                self.tracks = importedTracks.map { $0.asTrack() }
+                print("🗑 Удаление завершено")
+            }
 
-        print("🗑 Удаление завершено")
-    }
 
     /// Переместить треки внутри плейлиста
     func moveTrack(from source: IndexSet, to destination: Int) {
-        var tracks = TrackListManager.shared.loadTracks(for: currentListId)
+        guard let id = currentListId else { return }
+        var tracks = TrackListManager.shared.loadTracks(for: id)
         tracks.move(fromOffsets: source, toOffset: destination)
-        TrackListManager.shared.saveTracks(tracks, for: currentListId)
+        TrackListManager.shared.saveTracks(tracks, for: id)
         self.tracks = tracks.map { $0.asTrack() }
         print("🔀 Порядок треков обновлён")
     }
@@ -263,12 +273,16 @@ extension TrackListViewModel: UIDocumentPickerDelegate {
         }
         
         // Загружаем оригинальные ImportedTrack по ID текущего треклиста
-        if let topVC = UIApplication.topViewController() {
-            let tracks = TrackListManager.shared.loadTracks(for: currentListId)
-            let availableTracks = tracks.filter { $0.isAvailable }
-            
-            ExportManager.shared.exportViaTempAndPicker(availableTracks, presenter: topVC)
-            
-        }
-    }
-}
+        guard let id = currentListId else {
+                   print("⚠️ Плейлист не выбран — экспорт невозможен")
+                   return
+               }
+
+               let tracks = TrackListManager.shared.loadTracks(for: id)
+               let availableTracks = tracks.filter { $0.isAvailable }
+
+               if let topVC = UIApplication.topViewController() {
+                   ExportManager.shared.exportViaTempAndPicker(availableTracks, presenter: topVC)
+               }
+           }
+       }

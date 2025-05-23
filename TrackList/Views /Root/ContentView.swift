@@ -22,7 +22,8 @@ struct ContentView: View {
                     .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
-                    // Хедер без фоновой дымки
+                    
+                    // 🔹 Хедер — отображается всегда
                     TrackListHeaderView(
                         viewModel: trackListViewModel,
                         selectedId: Binding(
@@ -39,19 +40,25 @@ struct ContentView: View {
                             showImporter = true
                         },
                         onToggleEditMode: {
-                            withAnimation(.chipEditMode) {
-                                trackListViewModel.isEditing.toggle()
-                            }
+                            trackListViewModel.isEditing.toggle()
                         }
                     )
-                    .padding(.horizontal)
-                    .padding(.top, 12)
                     
-                    // Список без серой заливки
-                    TrackListView(
-                        trackListViewModel: trackListViewModel,
-                        playerViewModel: playerViewModel
-                    )
+                    // 🔄 Если треклистов нет — заглушка
+                    if trackListViewModel.trackLists.isEmpty {
+                        Spacer()
+                        Text("Добавьте треки")
+                            .font(.title3)
+                            .foregroundColor(.secondary)
+                            .padding(.top, 32)
+                        Spacer()
+                    } else {
+                        // 🟢 Здесь отобразится обычный список треков
+                        TrackListView(
+                            trackListViewModel: trackListViewModel,
+                            playerViewModel: playerViewModel
+                        )
+                    }
                 }
                 
                 // Мини-плеер поверх всего, без серого фона снизу
@@ -67,7 +74,10 @@ struct ContentView: View {
             .sheet(isPresented: $isShowingExportPicker) {
                 ExportWrapper { folderURL in
                     let id = trackListViewModel.currentListId
-                    TrackListManager.shared.selectTrackList(id: id)
+                    if let id = trackListViewModel.currentListId {
+                        TrackListManager.shared.selectTrackList(id: id)
+                    }
+                    
                     trackListViewModel.exportTracks(to: folderURL)
                 }
             }
