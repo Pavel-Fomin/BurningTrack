@@ -27,6 +27,7 @@ struct ProgressBar: View {
             let width = geometry.size.width
 
             ZStack(alignment: .leading) {
+                
                 Capsule()
                     .fill(Color.gray.opacity(0.3))
                     .frame(height: height)

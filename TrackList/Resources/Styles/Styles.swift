@@ -9,6 +9,18 @@
 import Foundation
 import SwiftUI
 
+// MARK: - Цвета приложения
+enum Colors {
+    static let primaryText = Palette.black
+    static let secondaryText = Palette.gray
+    static let background = Palette.white
+    static let accent = Palette.blue
+    static let exportingIndicator = Palette.orange
+
+    // Адаптивные цвета из .xcassets
+    static let customHeaderBackground = Color("HeaderBackground")
+}
+
 // MARK: - HEX Color Extension
 extension Color {
     init(hex: String) {
@@ -41,14 +53,6 @@ enum Palette {
     static let orange = Color(hex: "#FF9500")
 }
 
-// MARK: - Цвета приложения
-enum Colors {
-    static let primaryText = Palette.black
-    static let secondaryText = Palette.gray
-    static let background = Palette.white
-    static let accent = Palette.blue
-    static let exportingIndicator = Palette.orange
-}
 
 // MARK: - Отступы
 enum Spacing {

@@ -44,7 +44,8 @@ struct TrackListHeaderView: View {
             )
             
         }
-        .padding(.horizontal, 20) /// Боковые отступы
-            .padding(.top, 8) /// Верхний отступ
+        .padding(.horizontal, 20)
+        .padding(.top, 8)
+        .background(Colors.customHeaderBackground)
         }
     }
