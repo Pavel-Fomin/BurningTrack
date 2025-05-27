@@ -18,12 +18,12 @@ struct TrackRowView: View {
     var body: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(track.artist)
+                Text(track.title ?? track.fileName)
                     .font(.caption)
                     .foregroundColor(track.isAvailable ? .secondary : .gray)
                     .lineLimit(1)
                 
-                Text(track.title)
+                Text(track.title ?? track.fileName)
                     .font(.body)
                     .foregroundColor(track.isAvailable ? .primary : .gray)
                     .lineLimit(1)
@@ -53,7 +53,7 @@ struct TrackRowView: View {
             if track.isAvailable {
                 onTap()
             } else {
-                print("⛔ Трек недоступен: \(track.title)")
+                print("⛔️ Трек недоступен: \(track.title ?? track.fileName)")
             }
         }
     }

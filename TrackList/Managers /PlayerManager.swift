@@ -69,42 +69,53 @@ final class PlayerManager {
             }
             
             // MARK: - Запуск воспроизведения
+            
             let playerItem = AVPlayerItem(url: resolvedURL)
             player.replaceCurrentItem(with: playerItem)
             player.play()
+            
             // Загружаем duration из playerItem.asset
-            playerItem.asset.loadValuesAsynchronously(forKeys: ["duration"]) {
-                var error: NSError?
-                let status = playerItem.asset.statusOfValue(forKey: "duration", error: &error)
-                if status == .loaded {
-                    let asset = playerItem.asset
-                    let audioTrack = asset.tracks(withMediaType: .audio).first
+            Task {
+                do {
+                    let asset = await playerItem.asset
+                    let duration = try await asset.load(.duration)
+                    let audioTracks = try await asset.loadTracks(withMediaType: .audio)
+                    let timeRange = try await audioTracks.first?.load(.timeRange)
 
-                    let fromTrack = audioTrack?.timeRange.duration.seconds
-                    let fromAsset = asset.duration.seconds
+                    let fromTrack = timeRange?.duration.seconds
+                    let fromAsset = duration.seconds
                     let fromPlayer = playerItem.duration.seconds
 
-                    let duration = [fromTrack, fromPlayer, fromAsset]
+                    let bestDuration = [fromTrack, fromPlayer, fromAsset]
                         .compactMap { $0 }
                         .filter { $0.isFinite && $0 > 0 }
                         .max() ?? 0
 
-
-                    DispatchQueue.main.async {
+                    await MainActor.run {
                         NotificationCenter.default.post(
                             name: .trackDurationUpdated,
                             object: nil,
-                            userInfo: ["duration": duration]
+                            userInfo: ["duration": bestDuration]
                         )
                     }
-                } else {
-                    print("❌ Не удалось загрузить длительность:", error?.localizedDescription ?? "неизвестно")
+                } catch {
+                    print("❌ Не удалось загрузить длительность: \(error.localizedDescription)")
                 }
             }
+            
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                let trueDuration = self.player.currentItem?.duration.seconds ?? 0
-                let assetDuration = self.player.currentItem?.asset.duration.seconds ?? 0
-                print("🕵️ trueDuration:", trueDuration, "| assetDuration:", assetDuration)
+                Task {
+                    if let item = self.player.currentItem {
+                        do {
+                            let duration = try await item.asset.load(.duration)
+                            let trueDuration = item.duration.seconds
+                            let assetDuration = duration.seconds
+                            print("🕵️ trueDuration:", trueDuration, "| assetDuration:", assetDuration)
+                        } catch {
+                            print("❌ Ошибка при загрузке asset.duration:", error)
+                        }
+                    }
+                }
             }
             
         } catch {
@@ -134,7 +145,6 @@ final class PlayerManager {
     // MARK: - Продолжаем текущий трек без повторного открытия
     func playCurrent() {
         player.play()
-    
     }
     
     func observeProgress(update: @escaping (TimeInterval) -> Void) {

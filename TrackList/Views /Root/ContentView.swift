@@ -73,7 +73,6 @@ struct ContentView: View {
             .navigationBarHidden(true)
             .sheet(isPresented: $isShowingExportPicker) {
                 ExportWrapper { folderURL in
-                    let id = trackListViewModel.currentListId
                     if let id = trackListViewModel.currentListId {
                         TrackListManager.shared.selectTrackList(id: id)
                     }
@@ -86,24 +85,27 @@ struct ContentView: View {
                 allowedContentTypes: [.audio],
                 allowsMultipleSelection: true
             ) { result in
-                defer {
+                Task {
+                    switch result {
+                    case .success(let urls):
+                        switch trackListViewModel.importMode {
+                        case .newList:
+                            await trackListViewModel.createNewTrackListViaImport(from: urls)
+                        case .addToCurrent:
+                            await trackListViewModel.importTracks(from: urls)
+                        case .none:
+                            break
+                        }
+
+                    case .failure(let error):
+                        print("❌ Ошибка при импорте файлов: \(error.localizedDescription)")
+                    }
+
+                    /// 🧽 Только теперь можно завершать импорт
                     trackListViewModel.importMode = .none
                 }
-                
-                switch result {
-                case .success(let urls):
-                    switch trackListViewModel.importMode {
-                    case .newList:
-                        trackListViewModel.createNewTrackListViaImport(from: urls)
-                    case .addToCurrent:
-                        trackListViewModel.importTracks(from: urls)
-                    case .none:
-                        break
-                    }
-                case .failure(let error):
-                    print("❌ Ошибка при импорте файлов: \(error.localizedDescription)")
-                }
             }
+
             .onAppear {
                 let startTime = Date()
                 let loadTime = Date().timeIntervalSince(startTime)

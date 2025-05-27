@@ -16,7 +16,7 @@ import AVFoundation
 final class ImportManager {
     
     // MARK: - Импорт треков и сохранение в JSON
-    func importTracks(from urls: [URL], to listId: UUID, completion: @escaping ([ImportedTrack]) -> Void) {
+    func importTracks(from urls: [URL], to listId: UUID, completion: @escaping ([ImportedTrack]) -> Void) async {
         var importedTracks: [ImportedTrack] = []
 
         for (index, url) in urls.enumerated() {
@@ -32,7 +32,7 @@ final class ImportManager {
                 let bookmarkBase64 = bookmarkData.base64EncodedString()
 
                 // Парсинг метаданных
-                let parsed = try MetadataParser.parseMetadata(from: url)
+                let parsed = try await MetadataParser.parseMetadata(from: url)
 
                 // Создаём UUID заранее, чтобы использовать и для track.id, и для имени обложки
                 let trackId = UUID()

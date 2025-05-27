@@ -35,7 +35,7 @@ struct TrackListBodyView: View {
                         isPlaying: playerViewModel.isPlaying,
                         isCurrent: isCurrent,
                         onTap: {
-                            print("🖱️ Row tapped:", track.title)
+                            print("🖱️ Row tapped:", track.title ?? track.fileName)
                             if isCurrent {
                                 playerViewModel.togglePlayPause()
                             } else {

@@ -10,12 +10,13 @@
 import Foundation
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 
 struct ExportFolderPicker: UIViewControllerRepresentable {
     var onFolderPicked: (URL) -> Void
 
     func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
-        let picker = UIDocumentPickerViewController(documentTypes: ["public.folder"], in: .open)
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.folder])
         picker.delegate = context.coordinator
         picker.allowsMultipleSelection = false
         return picker

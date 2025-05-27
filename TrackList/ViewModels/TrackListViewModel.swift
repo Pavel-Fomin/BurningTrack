@@ -13,6 +13,8 @@ import UIKit
 
 private let selectedTrackListIdKey = "selectedTrackListId"
 
+
+@MainActor
 final class TrackListViewModel: NSObject, ObservableObject {
     @Published var tracks: [Track] = []
     @Published var trackLists: [TrackList] = [] /// Все доступные треклисты (мета + треки)
@@ -88,17 +90,19 @@ final class TrackListViewModel: NSObject, ObservableObject {
     }
     
     /// Импортировать треки в текущий плейлист
-    func importTracks(from urls: [URL]) {
+    func importTracks(from urls: [URL]) async {
         guard let id = self.currentListId else {
             print("⚠️ Плейлист не выбран — импорт невозможен")
             return
         }
-        ImportManager().importTracks(from: urls, to: id) { [weak self] imported in
-            guard let self = self, let id = self.currentListId else { return }
+        
+        await ImportManager().importTracks(from: urls, to: id) { imported in
+            guard let id = self.currentListId else { return }
+
             var existingTracks = TrackListManager.shared.loadTracks(for: id)
             existingTracks.insert(contentsOf: imported, at: 0)
             TrackListManager.shared.saveTracks(existingTracks, for: id)
-            
+
             DispatchQueue.main.async {
                 self.tracks = existingTracks.map { $0.asTrack() }
                 self.refreshtrackLists()
@@ -134,7 +138,7 @@ final class TrackListViewModel: NSObject, ObservableObject {
             return
         }
 
-        var tracksToClear = TrackListManager.shared.loadTracks(for: id)
+        let tracksToClear = TrackListManager.shared.loadTracks(for: id)
 
         // Удаляем связанные обложки
         for track in tracksToClear {
@@ -165,8 +169,8 @@ final class TrackListViewModel: NSObject, ObservableObject {
     }
     
     /// Создаёт новый треклист из выбранных файлов
-    func createNewTrackListViaImport(from urls: [URL]) {
-        ImportManager().importTracks(from: urls, to: UUID()) { imported in
+    func createNewTrackListViaImport(from urls: [URL]) async {
+        await ImportManager().importTracks(from: urls, to: UUID()) { imported in
             guard !imported.isEmpty else {
                 print("⚠️ Треки не выбраны, треклист не будет создан")
                 return
@@ -302,14 +306,17 @@ final class TrackListViewModel: NSObject, ObservableObject {
 
     
     // MARK: - Обработка выбора папки для экспорта
-    extension TrackListViewModel: UIDocumentPickerDelegate {
-        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
-            guard let folderURL = urls.first else {
+extension TrackListViewModel: UIDocumentPickerDelegate {
+    func documentPicker(
+        _ controller: UIDocumentPickerViewController,
+        didPickDocumentsAt urls: [URL]
+    ) {
+        Task { @MainActor in
+            guard urls.first != nil else {
                 print("⚠️ Папка не выбрана")
                 return
             }
             
-            // Загружаем оригинальные ImportedTrack по ID текущего треклиста
             guard let id = currentListId else {
                 print("⚠️ Плейлист не выбран — экспорт невозможен")
                 return
@@ -319,8 +326,11 @@ final class TrackListViewModel: NSObject, ObservableObject {
             let availableTracks = tracks.filter { $0.isAvailable }
             
             if let topVC = UIApplication.topViewController() {
-                ExportManager.shared.exportViaTempAndPicker(availableTracks, presenter: topVC)
+                ExportManager.shared.exportViaTempAndPicker(
+                    availableTracks,
+                    presenter: topVC
+                )
             }
         }
     }
-
+}

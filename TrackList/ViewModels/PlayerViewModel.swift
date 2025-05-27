@@ -31,12 +31,12 @@ final class PlayerViewModel: ObservableObject {
         }
         
         NotificationCenter.default.addObserver(
-                forName: .trackDidFinish,
-                object: nil,
-                queue: .main
-            ) { [weak self] _ in
-                self?.playNextTrack()
-            }
+            forName: .trackDidFinish,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { await self?.playNextTrack() }
+        }
 
         playerManager.setupRemoteCommandCenter(
             onPlay: { [weak self] in
@@ -88,7 +88,7 @@ final class PlayerViewModel: ObservableObject {
 
             playerManager.observeProgress { [weak self] time in
                 self?.currentTime = time
-                if let self = self, let track = self.currentTrack {
+                if let self = self {
                     self.playerManager.updatePlaybackTimeOnly(
                         currentTime: time,
                         isPlaying: self.isPlaying
@@ -105,7 +105,7 @@ final class PlayerViewModel: ObservableObject {
         if isPlaying {
             playerManager.pause()
         } else {
-            guard let track = currentTrack else { return }
+            guard currentTrack != nil else { return }
             playerManager.playCurrent()
         }
         isPlaying.toggle()
@@ -116,6 +116,7 @@ final class PlayerViewModel: ObservableObject {
         self.currentTime = time
     }
     
+    @MainActor
     func playNextTrack() {
         guard let current = currentTrack else { return }
         let tracks = trackListViewModel.tracks
@@ -128,7 +129,8 @@ final class PlayerViewModel: ObservableObject {
         let nextTrack = tracks[index + 1]
         play(track: nextTrack)
     }
-
+    
+    @MainActor
     func playPreviousTrack() {
         guard let current = currentTrack else { return }
         let tracks = trackListViewModel.tracks

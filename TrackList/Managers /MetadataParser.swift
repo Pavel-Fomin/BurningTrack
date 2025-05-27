@@ -26,23 +26,29 @@ enum AudioFormat {
 }
 
 class MetadataParser {
-    static func parseMetadata(from url: URL) throws -> TrackMetadata {
+    static func parseMetadata(from url: URL) async throws -> TrackMetadata {
         let format = detectFormat(for: url)
         print("🧠 Определён формат: \(format) для файла: \(url.lastPathComponent)")
 
         let asset = AVURLAsset(url: url)
-        let duration = CMTimeGetSeconds(asset.duration)
-        print("⏱️ AVAsset duration = \(duration) сек")
+        let duration = try await asset.load(.duration)
+        let durationSeconds = CMTimeGetSeconds(duration)
+        print("⏱️ AVAsset duration = \(durationSeconds) сек")
 
         switch format {
         case .mp3, .alac:
-            return parseWithAVFoundation(from: url, duration: duration)
+            return await parseWithAVFoundation(from: url, duration: durationSeconds)
         case .flac:
-            return try parseFlacVorbisComments(from: url, duration: duration)
-        case .wav, .aiff:
-            return TrackMetadata(artist: nil, title: nil, album: nil, artworkData: nil, duration: duration, isCustomFormat: true)
-        case .unknown:
-            return TrackMetadata(artist: nil, title: nil, album: nil, artworkData: nil, duration: duration, isCustomFormat: true)
+            return try parseFlacVorbisComments(from: url, duration: durationSeconds)
+        case .wav, .aiff, .unknown:
+            return TrackMetadata(
+                artist: nil,
+                title: nil,
+                album: nil,
+                artworkData: nil,
+                duration: durationSeconds,
+                isCustomFormat: true
+            )
         }
     }
 
@@ -51,14 +57,13 @@ class MetadataParser {
             return .unknown
         }
         defer { url.stopAccessingSecurityScopedResource() }
+
         guard let fileHandle = try? FileHandle(forReadingFrom: url) else { return .unknown }
         defer { try? fileHandle.close() }
-        let magic = try? fileHandle.read(upToCount: 4)
-        if let bytes = magic {
-            
-        }
 
-        guard let bytes = magic else { return .unknown }
+        guard let bytes = try? fileHandle.read(upToCount: 4) else {
+            return .unknown
+        }
 
         if bytes == Data([0x66, 0x4C, 0x61, 0x43]) { // "fLaC"
             return .flac
@@ -71,22 +76,54 @@ class MetadataParser {
         } else if bytes[0] == 0xFF && (bytes[1] & 0xE0) == 0xE0 { // MPEG frame sync
             return .mp3
         } else {
-            // Не удалось определить формат аудиофайла
             assertionFailure("❗Не удалось определить формат аудиофайла: \(url.lastPathComponent)")
             return .unknown
         }
     }
 
-    private static func parseWithAVFoundation(from url: URL, duration: TimeInterval?) -> TrackMetadata {
+    private static func parseWithAVFoundation(from url: URL, duration: TimeInterval?) async -> TrackMetadata {
         let asset = AVURLAsset(url: url)
-        let artist = asset.commonMetadata.first(where: { $0.commonKey?.rawValue == "artist" })?.stringValue
-        let title = asset.commonMetadata.first(where: { $0.commonKey?.rawValue == "title" })?.stringValue
-        let album = asset.commonMetadata.first(where: { $0.commonKey?.rawValue == "album" })?.stringValue
-        let artworkData = AVMetadataItem.metadataItems(from: asset.commonMetadata, withKey: AVMetadataKey.commonKeyArtwork, keySpace: .common).first?.dataValue
-        print("AVFoundation Parsed: artist=\(artist ?? "nil"), title=\(title ?? "nil"), album=\(album ?? "nil"), duration=\(duration ?? -1), artworkData=\(artworkData != nil ? "yes" : "no")")
-        return TrackMetadata(artist: artist, title: title, album: album, artworkData: artworkData, duration: duration, isCustomFormat: false)
-    }
 
+        do {
+            let metadata = try await asset.load(.commonMetadata)
+
+            let artistItem = metadata.first(where: { $0.commonKey?.rawValue == "artist" })
+            let titleItem  = metadata.first(where: { $0.commonKey?.rawValue == "title" })
+            let albumItem  = metadata.first(where: { $0.commonKey?.rawValue == "album" })
+            let artworkItem = AVMetadataItem.metadataItems(
+                from: metadata,
+                withKey: AVMetadataKey.commonKeyArtwork,
+                keySpace: .common
+            ).first
+
+            let artist = try await artistItem?.load(.stringValue)
+            let title  = try await titleItem?.load(.stringValue)
+            let album  = try await albumItem?.load(.stringValue)
+            let artworkData = try await artworkItem?.load(.dataValue)
+
+            return TrackMetadata(
+                artist: artist,
+                title: title,
+                album: album,
+                artworkData: artworkData,
+                duration: duration,
+                isCustomFormat: false
+            )
+
+        } catch {
+            print("❌ Ошибка при чтении метаданных: \(error)")
+            return TrackMetadata(
+                artist: nil,
+                title: nil,
+                album: nil,
+                artworkData: nil,
+                duration: duration,
+                isCustomFormat: false
+            )
+        }
+    }
+    
+    
     private static func parseFlacVorbisComments(from url: URL, duration: TimeInterval?) throws -> TrackMetadata {
         
         guard url.startAccessingSecurityScopedResource() else {
@@ -111,7 +148,7 @@ class MetadataParser {
         var artworkData: Data? = nil
 
         var isLastBlock = false
-        let currentOffset = try fileHandle.offset()
+        _ = try fileHandle.offset()
         
         while !isLastBlock {
             guard let blockHeader = try fileHandle.read(upToCount: 4) else {
@@ -171,9 +208,7 @@ class MetadataParser {
 
             let commentData = data.subdata(in: offset..<(offset + commentLength))
             offset += commentLength
-            if let debugComment = String(data: commentData, encoding: .utf8) {
-                
-            }
+           
 
             if let comment = String(data: commentData, encoding: .utf8),
                let equalIndex = comment.firstIndex(of: "=") {

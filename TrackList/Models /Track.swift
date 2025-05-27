@@ -14,8 +14,8 @@ import AVFoundation
 struct Track: Identifiable {
     let id: UUID
     let url: URL
-    let artist: String
-    let title: String
+    let artist: String?
+    let title: String?
     let duration: TimeInterval
     let fileName: String
     let artwork: UIImage?
@@ -59,7 +59,7 @@ struct Track: Identifiable {
         var artist = "Неизвестен"
         var trackName = url.deletingPathExtension().lastPathComponent
         var duration: TimeInterval = 0
-        var available = FileManager.default.fileExists(atPath: url.path) //Проверка
+        let available = FileManager.default.fileExists(atPath: url.path) //Проверка
 
         do {
             let metadata = try await asset.load(.commonMetadata)

@@ -60,13 +60,13 @@ struct TrackListView: View {
             }
             
             VStack(alignment: .leading, spacing: 4) {
-                Text(track.artist)
+                Text(track.artist ?? "Неизвестный артист")
                     .font(.subheadline)
                     .foregroundColor(.primary)
                     .lineLimit(1)
                 
                 HStack {
-                    Text(track.title)
+                    Text(track.title ?? track.fileName)
                         .font(.footnote)
                         .foregroundColor(.secondary)
                         .lineLimit(1)
@@ -93,11 +93,11 @@ struct TrackListView: View {
                 if playerViewModel.currentTrack?.id == track.id {
                     playerViewModel.togglePlayPause()
                 } else {
-                    print("🎯 Tap по треку:", track.title)
+                    print("📍 Тап по треку:", track.title ?? track.fileName)
                     playerViewModel.play(track: track)
                 }
             } else {
-                print("⛔ Трек недоступен: \(track.title)")
+                print("⛔️ Трек недоступен: \(track.title ?? track.fileName)")
             }
         }
     }
