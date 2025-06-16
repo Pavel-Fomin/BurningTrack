@@ -2,19 +2,19 @@
 //  TrackListBodyView.swift
 //  TrackList
 //
-//  Основная вьюха, отображающая список треков
+//  Основная View, отображающая список треков в текущем плейлисте
 //
 //  Created by Pavel Fomin on 29.04.2025.
 //
 
 import SwiftUI
 
+// MARK: - Основное тело списка треков
 struct TrackListBodyView: View {
-    @ObservedObject var trackListViewModel: TrackListViewModel
-    @ObservedObject var playerViewModel: PlayerViewModel
+    @ObservedObject var trackListViewModel: TrackListViewModel   // ViewModel треклиста
+    @ObservedObject var playerViewModel: PlayerViewModel         // ViewModel плеера
 
     var body: some View {
-        
         VStack {
             trackListView()
         }
@@ -24,6 +24,7 @@ struct TrackListBodyView: View {
         }
     }
 
+    // MARK: - Отображение списка треков
     private func trackListView() -> some View {
         ScrollViewReader { proxy in
             List {

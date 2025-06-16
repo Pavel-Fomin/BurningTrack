@@ -2,24 +2,24 @@
 //  ProgressBar.swift
 //  TrackList
 //
-//  Created by Pavel Fomin on 12.05.2025.
-//
-
-import Foundation
-//
-//  ProgressBar.swift
-//  TrackList
-//
 //  Кастомный прогресс-бар для миниплеера
+//
+//  Created by Pavel Fomin on 12.05.2025.
 //
 
 import SwiftUI
 
 struct ProgressBar: View {
-    var progress: Double    // от 0 до 1
+    /// Прогресс воспроизведения (от 0 до 1)
+    var progress: Double
+    
+    /// Обработчик перемотки
     var onSeek: (Double) -> Void
+    
+    /// Высота прогресс-бара
     var height: CGFloat = 4
 
+    /// Состояние перетаскивания
     @GestureState private var isDragging = false
 
     var body: some View {
@@ -27,11 +27,12 @@ struct ProgressBar: View {
             let width = geometry.size.width
 
             ZStack(alignment: .leading) {
-                
+                // Задний трек
                 Capsule()
                     .fill(Color.gray.opacity(0.3))
                     .frame(height: height)
 
+                // Передний трек (прогресс)
                 Capsule()
                     .fill(Color.blue)
                     .frame(width: CGFloat(progress) * width, height: height)

@@ -2,6 +2,8 @@
 //  ContentView.swift
 //  TrackList
 //
+//  Главный экран: отображает заголовок, список треков и мини-плеер
+//
 //  Created by Pavel Fomin on 28.04.2025.
 //
 
@@ -10,20 +12,20 @@ import SwiftUI
 struct ContentView: View {
     @ObservedObject var trackListViewModel: TrackListViewModel
     @ObservedObject var playerViewModel: PlayerViewModel
+
     @State private var isImporting: Bool = false
     @State private var isShowingExportPicker = false
     @State private var showImporter = false
-    
-    
+
     var body: some View {
         NavigationStack {
             ZStack(alignment: .bottom) {
-                Color(.systemBackground) // Адаптивный фон под весь экран
+                // MARK: - Фон
+                Color(.systemBackground)
                     .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
-                    
-                    // Хедер — отображается всегда
+                    // MARK: - Хедер: кнопки, выбор плейлиста
                     TrackListHeaderView(
                         viewModel: trackListViewModel,
                         selectedId: Binding(
@@ -44,7 +46,7 @@ struct ContentView: View {
                         }
                     )
                     
-                    // Если треклистов нет — заглушка
+                    // MARK: - Список треков или заглушка
                     if trackListViewModel.trackLists.isEmpty {
                         Spacer()
                         Text("Добавьте треки")
@@ -53,7 +55,6 @@ struct ContentView: View {
                             .padding(.top, 32)
                         Spacer()
                     } else {
-                        // Здесь отобразится обычный список треков
                         TrackListView(
                             trackListViewModel: trackListViewModel,
                             playerViewModel: playerViewModel
@@ -61,7 +62,7 @@ struct ContentView: View {
                     }
                 }
                 
-                // Мини-плеер поверх всего, без серого фона снизу
+                // MARK: - Мини-плеер
                 if playerViewModel.currentTrack != nil {
                     MiniPlayerView(
                         playerViewModel: playerViewModel,
@@ -70,16 +71,18 @@ struct ContentView: View {
                     .padding(.bottom, 0)
                 }
             }
-            .navigationBarHidden(true)
+
+            // MARK: - Bottom Sheet: экспорт
             .sheet(isPresented: $isShowingExportPicker) {
                 ExportWrapper { folderURL in
                     if let id = trackListViewModel.currentListId {
                         TrackListManager.shared.selectTrackList(id: id)
                     }
-                    
                     trackListViewModel.exportTracks(to: folderURL)
                 }
             }
+
+            // MARK: - FileImporter: импорт треков
             .fileImporter(
                 isPresented: $showImporter,
                 allowedContentTypes: [.audio],
@@ -101,11 +104,12 @@ struct ContentView: View {
                         print("❌ Ошибка при импорте файлов: \(error.localizedDescription)")
                     }
 
-                    /// 🧽 Только теперь можно завершать импорт
+                    // Завершение импорта
                     trackListViewModel.importMode = .none
                 }
             }
 
+            // MARK: - Инициализация при старте
             .onAppear {
                 let startTime = Date()
                 let loadTime = Date().timeIntervalSince(startTime)
@@ -113,6 +117,9 @@ struct ContentView: View {
                 trackListViewModel.refreshtrackLists()
                 trackListViewModel.loadTracks()
             }
+
+            // MARK: - Навигация
+            .navigationBarHidden(true)
         }
     }
 }

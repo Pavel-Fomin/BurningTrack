@@ -1,5 +1,5 @@
 //
-//  TrackListToolbar
+//  TrackListToolbar.swift
 //  TrackList
 //
 //  Тулбар раздела "Треклист"
@@ -9,38 +9,38 @@
 
 import SwiftUI
 
+// MARK: - Тулбар над списком треклистов
 struct TrackListToolbar: View {
-    let isEditing: Bool
-    let hasTrackLists: Bool
-    let onAdd: () -> Void
-    let onToggleEditMode: () -> Void
-    
+    let isEditing: Bool               // Текущий режим редактирования
+    let hasTrackLists: Bool           // Есть ли плейлисты для редактирования
+    let onAdd: () -> Void             // Обработчик нажатия на "+"
+    let onToggleEditMode: () -> Void  // Обработчик переключения режима
+
     var body: some View {
         HStack {
+            
             // Заголовок
             Text("TRACK LIST")
                 .font(.system(size: 28, weight: .heavy))
                 .foregroundColor(.primary)
                 .padding(.top, 4)
-            
+
             Spacer()
-            
-            // Режим редактирования
+
+            // Кнопка переключения режима редактирования (если есть плейлисты)
             if hasTrackLists {
                 Button(action: onToggleEditMode) {
                     Image(systemName: "wand.and.sparkles.inverse")
                         .font(.title2)
                 }
             }
-                
-                // Новый треклист
+
+            // Кнопка добавления нового треклиста
             Button(action: onAdd) {
-                    Image(systemName: "plus")
-                        .font(.title2)
-                        .padding(.leading, 12)
-                }
+                Image(systemName: "plus")
+                    .font(.title2)
+                    .padding(.leading, 12)
             }
-            
         }
     }
-
+}

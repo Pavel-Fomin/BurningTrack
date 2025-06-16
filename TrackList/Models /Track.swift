@@ -2,7 +2,8 @@
 //  Track.swift
 //  TrackList
 //
-//  Основная модель трека для воспроизведения. Создаётся из ImportedTrack, содержит url
+//  Модель трека для воспроизведения и отображения.
+//  Создаётся из ImportedTrack и содержит URL, обложку, флаг доступности
 //
 //  Created by Pavel Fomin on 01.05.2025.
 //
@@ -11,6 +12,7 @@ import Foundation
 import UIKit
 import AVFoundation
 
+/// Представляет один аудиотрек в приложении (после импорта)
 struct Track: Identifiable {
     let id: UUID
     let url: URL
@@ -21,6 +23,9 @@ struct Track: Identifiable {
     let artwork: UIImage?
     let isAvailable: Bool /// Флаг доступности трека
     
+    // MARK: - Проверка доступности трека (обновление isAvailable)
+    
+    /// Проверяет доступность файла вручную и возвращает новую копию трека
     func refreshAvailability() -> Track {
         var isAvailable = false
 
@@ -33,6 +38,7 @@ struct Track: Identifiable {
 
         if accessGranted {
             do {
+                // Пытаемся прочитать файл (без загрузки в память)
                 let _ = try Data(contentsOf: url, options: [.mappedIfSafe])
                 isAvailable = true
             } catch {
@@ -52,7 +58,9 @@ struct Track: Identifiable {
         )
     }
 
-    // MARK: - Статический метод для загрузки метаданных
+    // MARK: - Загрузка трека из URL с помощью AVFoundation
+    
+    /// Загружает метаданные трека через AVAsset и возвращает Track
     static func load(from url: URL) async throws -> Self {
         let asset = AVURLAsset(url: url)
 
@@ -93,16 +101,18 @@ struct Track: Identifiable {
             duration: duration,
             fileName: url.lastPathComponent,
             artwork: nil,
-            isAvailable: available //установка флага
+            isAvailable: available
         )
     }
     // MARK: - Преобразование Track в ImportedTrack (для сохранения в JSON)
+    
+    /// Конвертирует Track в ImportedTrack (для записи в JSON)
     func asImportedTrack() -> ImportedTrack {
         return ImportedTrack(
             id: self.id,
             fileName: self.fileName,
             filePath: self.url.path,
-            orderPrefix: "", // необязательно, можно заполнить позже при экспорте
+            orderPrefix: "",
             title: self.title,
             artist: self.artist,
             album: nil,
@@ -112,6 +122,8 @@ struct Track: Identifiable {
         )
     }
 }
+
+// MARK: - Equatable: сравнение по URL
 
 extension Track: Equatable {
     static func == (lhs: Track, rhs: Track) -> Bool {

@@ -2,11 +2,16 @@
 //  ChipModifier.swift
 //  TrackList
 //
+//  Модификатор внешнего вида чипов (плейлистов) в списке
+//  Применяется через .chipStyle(isSelected:)
+//  Обеспечивает единый стиль отображения выбранных и обычных чипов.
+//
 //  Created by Pavel Fomin on 21.05.2025.
 //
 
 import SwiftUI
 
+// MARK: - Визуальный модификатор чипа
 struct ChipModifier: ViewModifier {
     let isSelected: Bool
 
@@ -24,6 +29,7 @@ struct ChipModifier: ViewModifier {
     }
 }
 
+// MARK: - Cинтаксис для применения .chipStyle()
 extension View {
     func chipStyle(isSelected: Bool) -> some View {
         self.modifier(ChipModifier(isSelected: isSelected))

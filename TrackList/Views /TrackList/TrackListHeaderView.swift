@@ -2,7 +2,8 @@
 //  TrackListHeaderView.swift
 //  TrackList
 //
-//  Хедер раздела "Tracklist"
+//  Компонент хедера раздела "Треклист".
+//  Содержит тулбар с кнопками и строку выбора треклистов (чипсы)
 //
 //  Created by Pavel Fomin on 16.05.2025.
 //
@@ -20,6 +21,8 @@ struct TrackListHeaderView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            
+            // Верхний тулбар с заголовком и кнопками "+" / "Изменить"
             TrackListToolbar(
                 isEditing: viewModel.isEditing,
                 hasTrackLists: !viewModel.trackLists.isEmpty,
@@ -27,11 +30,12 @@ struct TrackListHeaderView: View {
                 onToggleEditMode: onToggleEditMode
             )
             
+            // Строка чипсов с треклистами
             TrackListSelectorView(
                 viewModel: viewModel,
                 selectedId: Binding<UUID>(
                     get: {
-                        selectedId ?? UUID() /// если nil — создаём временный ID
+                        selectedId ?? UUID() // если selectedId == nil, создаём временный ID
                     },
                     set: {
                         selectedId = $0
@@ -42,10 +46,9 @@ struct TrackListHeaderView: View {
                 onAddFromContextMenu: onAddFromContextMenu,
                 onToggleEditMode: onToggleEditMode
             )
-            
         }
         .padding(.horizontal, 20)
         .padding(.top, 8)
         .background(Colors.customHeaderBackground)
-        }
     }
+}

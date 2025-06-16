@@ -2,7 +2,8 @@
 //  ImportedTrack.swift
 //  TrackList
 //
-//  Модель, представляющая импортированный трек, включая путь к файлу, метаданные и сохранённые данные доступа (bookmarkBase64)
+//  Модель, представляющая импортированный трек.
+//  Содержит путь к файлу, метаданные, bookmark для доступа и ID обложки.
 //
 //  Created by Pavel Fomin on 01.05.2025.
 //
@@ -10,19 +11,24 @@
 import Foundation
 import UIKit
 
+/// Представляет импортированный трек, сохраняемый в JSON.
+/// Используется для восстановления доступа к файлу и отображения в списке.
 struct ImportedTrack: Codable, Identifiable {
-    let id: UUID
-    let fileName: String
-    let filePath: String
-    var orderPrefix: String
-    let title: String?
-    let artist: String?
-    let album: String?
-    let duration: Double
-    let artworkBase64: String?
-    let bookmarkBase64: String?
-    var artworkId: UUID?
+    let id: UUID                /// Уникальный идентификатор трека
+    let fileName: String        /// Имя файла (например, "track1.mp3")
+    let filePath: String        /// Путь к файлу (может быть устаревшим, используется fallback)
+    var orderPrefix: String     /// Префикс порядка (например, "01")
     
+    let title: String?          /// Название трека (если найдено в тегах)
+    let artist: String?         /// Исполнитель
+    let album: String?          /// Альбом
+    
+    let duration: Double        /// Длительность в секундах
+    let artworkBase64: String?  /// (Не используется) Базовая обложка в base64
+    let bookmarkBase64: String? /// Сохранённый bookmark для доступа к файлу
+    var artworkId: UUID?        /// ID сохранённой обложки в папке artworks
+    
+    /// Проверяет, доступен ли файл по bookmark
     var isAvailable: Bool {
         guard let url = try? resolvedURL() else {
             return false
@@ -30,7 +36,10 @@ struct ImportedTrack: Codable, Identifiable {
         return FileManager.default.fileExists(atPath: url.path)
     }
     
-    
+    /// Восстанавливает URL из base64 bookmark
+    ///
+    /// - Returns: URL к защищённому ресурсу
+    /// - Throws: URLError, если bookmark некорректен или не может быть декодирован
     func resolvedURL() throws -> URL {
         guard let bookmarkBase64 = bookmarkBase64 else {
             throw URLError(.badURL, userInfo: ["reason": "bookmarkBase64 is nil"])

@@ -2,7 +2,7 @@
 //  TrackListChipView.swift
 //  TrackList
 //
-//  Чип-вью для одного плейлиста
+//  Чип-вью для одного плейлиста: отображает название, меню и состояние редактирования
 //
 //  Created by Pavel Fomin on 08.05.2025.
 //
@@ -10,30 +10,35 @@
 import Foundation
 import SwiftUI
 
-// MARK: - Чип-вью для одного плейлиста
+// MARK: - Вью одного чипа
 struct TrackListChipView: View {
-    let trackList: TrackList
-    let isSelected: Bool
-    let isEditing: Bool
-    let onSelect: () -> Void
-    let onAdd: () -> Void
-    let onDelete: () -> Void
-    let onEdit: () -> Void
-    
+    let trackList: TrackList              // Данные плейлиста
+    let isSelected: Bool                  // Активен ли этот чип
+    let isEditing: Bool                   // Активен ли режим редактирования
+
+    // MARK: - Действия
+    let onSelect: () -> Void              // Выбор плейлиста
+    let onAdd: () -> Void                 // Добавить трек
+    let onDelete: () -> Void              // Удалить плейлист
+    let onEdit: () -> Void                // Переименовать плейлист
+
+    // MARK: - Состояния
     @State private var wigglePhase: Double = 0
     @State private var timer: Timer?
     @State private var isRenaming = false
     @State private var newName = ""
     @State private var showDeleteAlert = false
     @State private var showClearAlert = false
-    
+
+    // MARK: - Основной контент чипа
     private var content: some View {
         Group {
-            // 1) Активный чип вне режима редактирования — показываем Menu
+            
+            // Активный чип вне режима редактирования
             if isSelected && !isEditing {
                 Menu {
                     Button("Добавить трек", action: onAdd)
-                    
+
                     Button("Экспортировать") {
                         if let topVC = UIApplication.topViewController() {
                             let imported = TrackListManager.shared.loadTracks(for: trackList.id)
@@ -49,19 +54,19 @@ struct TrackListChipView: View {
                     Button("Очистить треклист", role: .destructive) {
                         showClearAlert = true
                     }
+
                 } label: {
                     Text(trackList.name)
                         .chipStyle(isSelected: true)
                 }
-                
-                
-                // 2) Активный чип в режиме редактирования
+
+            // Активный чип в режиме редактирования
             } else if isSelected && isEditing {
                 let tracks = TrackListManager.shared.loadTracks(for: trackList.id)
-                
+
                 HStack(spacing: 4) {
                     Text(trackList.name)
-                    
+
                     if tracks.isEmpty {
                         Button(role: .destructive) {
                             showDeleteAlert = true
@@ -74,11 +79,12 @@ struct TrackListChipView: View {
                 }
                 .chipStyle(isSelected: true)
                 .onTapGesture(perform: onSelect)
-                
-                // 3) Неактивный чип в режиме редактирования
+
+            // Неактивный чип в режиме редактирования
             } else if isEditing {
                 HStack(spacing: 4) {
                     Text(trackList.name)
+
                     Button(role: .destructive) {
                         showDeleteAlert = true
                     } label: {
@@ -92,8 +98,8 @@ struct TrackListChipView: View {
                 .onAppear { startWiggle() }
                 .onDisappear { stopWiggle() }
                 .onTapGesture(perform: onSelect)
-                
-                // 4) Обычный неактивный чип — только текст и tap
+
+            // Обычный чип
             } else {
                 Text(trackList.name)
                     .chipStyle(isSelected: false)
@@ -101,56 +107,51 @@ struct TrackListChipView: View {
             }
         }
     }
-    
-    
-    // MARK: - Алерты
-    
+
+    // MARK: - Основное вью
     var body: some View {
-            content
-            // Универсальный алерт удаления
-                .alert("Удалить треклист?", isPresented: $showDeleteAlert) {
-                    Button("Удалить", role: .destructive) { onDelete() }
-                    Button("Отмена", role: .cancel) {}
-                } message: {
-                    Text("\"\(trackList.name)\"")
-                }
-            
-            // Алерт переименования
-                .alert("Переименовать треклист", isPresented: $isRenaming) {
-                    TextField("Новое название треклиста", text: $newName)
-                    Button("Сохранить") {
-                        let trimmed = newName.trimmingCharacters(in: .whitespaces)
-                        if !trimmed.isEmpty {
-                            TrackListManager.shared.renameTrackList(id: trackList.id, to: trimmed)
-                            onEdit()
-                        }
-                    }
-                    Button("Отмена", role: .cancel) {}
-                } message: {
-                    Text("Новое название треклиста")
-                }
-        
-                .alert("Очистить треклист?", isPresented: $showClearAlert) {
-                    Button("Очистить", role: .destructive) {
-                        NotificationCenter.default.post(name: .clearTrackList, object: trackList.id)
-                    }
-                    Button("Отмена", role: .cancel) {}
-                } message: {
-                    Text("Все треки из \"\(trackList.name)\" будут удалены")
-                }
-        
-        }
-        
-        // MARK: - Wiggle animation helpers
-    
-        private func startWiggle() {
-            stopWiggle()
-            timer = Timer.scheduledTimer(withTimeInterval: 0.016, repeats: true) { _ in
-                wigglePhase += 0.1
+        content
+            .alert("Удалить треклист?", isPresented: $showDeleteAlert) {
+                Button("Удалить", role: .destructive) { onDelete() }
+                Button("Отмена", role: .cancel) {}
+            } message: {
+                Text("\"\(trackList.name)\"")
             }
-        }
-        private func stopWiggle() {
-            timer?.invalidate()
-            timer = nil
+
+            .alert("Переименовать треклист", isPresented: $isRenaming) {
+                TextField("Новое название треклиста", text: $newName)
+                Button("Сохранить") {
+                    let trimmed = newName.trimmingCharacters(in: .whitespaces)
+                    if !trimmed.isEmpty {
+                        TrackListManager.shared.renameTrackList(id: trackList.id, to: trimmed)
+                        onEdit()
+                    }
+                }
+                Button("Отмена", role: .cancel) {}
+            } message: {
+                Text("Новое название треклиста")
+            }
+
+            .alert("Очистить треклист?", isPresented: $showClearAlert) {
+                Button("Очистить", role: .destructive) {
+                    NotificationCenter.default.post(name: .clearTrackList, object: trackList.id)
+                }
+                Button("Отмена", role: .cancel) {}
+            } message: {
+                Text("Все треки из \"\(trackList.name)\" будут удалены")
+            }
+    }
+
+    // MARK: - Wiggle-анимация
+    private func startWiggle() {
+        stopWiggle()
+        timer = Timer.scheduledTimer(withTimeInterval: 0.016, repeats: true) { _ in
+            wigglePhase += 0.1
         }
     }
+
+    private func stopWiggle() {
+        timer?.invalidate()
+        timer = nil
+    }
+}

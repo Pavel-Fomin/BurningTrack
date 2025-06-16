@@ -2,6 +2,8 @@
 //  MiniPlayerView.swift
 //  TrackList
 //
+//  Мини-плеер: отображает текущий трек, обложку, название, прогресс и кнопки управления
+//
 //  Created by Pavel Fomin on 28.04.2025.
 //
 
@@ -15,8 +17,13 @@ struct MiniPlayerView: View {
     var body: some View {
         if let track = playerViewModel.currentTrack {
             VStack {
+                
+                // MARK: - Верхняя часть: обложка + информация + кнопки
+                
                 VStack(spacing: 4) {
                     HStack(spacing: 12) {
+                        
+                        // Обложка
                         if let artwork = track.artwork {
                             Image(uiImage: artwork)
                                 .resizable()
@@ -30,6 +37,7 @@ struct MiniPlayerView: View {
                                 .cornerRadius(5)
                         }
                         
+                        // Информация о треке
                         VStack(alignment: .leading, spacing: 2) {
                             Text(track.artist ?? "Неизвестный артист")
                                 .font(.caption)
@@ -44,6 +52,7 @@ struct MiniPlayerView: View {
                         
                         Spacer()
                         
+                        // Кнопки управления
                         HStack(spacing: 8) {
                             Button(action: {
                                 playerViewModel.playPreviousTrack()
@@ -66,11 +75,16 @@ struct MiniPlayerView: View {
                         }
                     }
                     
+                    // MARK: - Прогресс трека
+                    
                     HStack(alignment: .center, spacing: 12) {
+                        
+                        // Текущее время
                         Text(formatTimeSmart(playerViewModel.currentTime))
                             .font(.caption2)
                             .frame(width: 40, alignment: .leading)
                         
+                        // Ползунок прогресса
                         ProgressBar(
                             progress: {
                                 let ratio = playerViewModel.trackDuration > 0
@@ -89,8 +103,9 @@ struct MiniPlayerView: View {
                         .id(playerViewModel.trackDuration)
                         
                         .frame(maxWidth: .infinity)
-                        .padding(.horizontal, 4) // визуальное выравнивание
-                        
+                        .padding(.horizontal, 4) // выравнивание по краям
+
+                        // Оставшееся время
                         Text("-\(formatTimeSmart(playerViewModel.trackDuration - playerViewModel.currentTime))")
                             .font(.caption2)
                             .frame(width: 40, alignment: .trailing)

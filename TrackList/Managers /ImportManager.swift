@@ -1,7 +1,7 @@
 //
 //  ImportManager.swift
 //  TrackList
-
+//
 //  Импорт файлов, парсинг метаданных, сохранение в JSON
 //
 //  Created by Pavel Fomin on 28.04.2025.
@@ -13,36 +13,44 @@ import UIKit
 import AVFoundation
 
 // MARK: - Менеджер импорта треков в приложение
+
 final class ImportManager {
     
-    // MARK: - Импорт треков и сохранение в JSON
+    /// Импортирует список треков из URL-ов, парсит метаданные,
+    /// сохраняет обложки и возвращает список ImportedTrack через completion
+    /// - Parameters:
+    ///   - urls: массив URL-ов, полученных через fileImporter
+    ///   - listId: ID треклиста, в который производится импорт
+    ///   - completion: замыкание с массивом ImportedTrack
     func importTracks(from urls: [URL], to listId: UUID, completion: @escaping ([ImportedTrack]) -> Void) async {
         var importedTracks: [ImportedTrack] = []
 
         for (index, url) in urls.enumerated() {
+            // Запрашиваем доступ к файлу (для sandbox и iCloud)
             guard url.startAccessingSecurityScopedResource() else {
-                print("🚫 Нет доступа к \(url.lastPathComponent)")
+                print("Нет доступа к файлу: \(url.lastPathComponent)")
                 continue
             }
             defer { url.stopAccessingSecurityScopedResource() }
 
             do {
-                // Чтение bookmark
+                // Сохраняем bookmark для последующего доступа
                 let bookmarkData = try url.bookmarkData()
                 let bookmarkBase64 = bookmarkData.base64EncodedString()
 
-                // Парсинг метаданных
+                // Парсим метаданные (исполнитель, название, обложка)
                 let parsed = try await MetadataParser.parseMetadata(from: url)
 
-                // Создаём UUID заранее, чтобы использовать и для track.id, и для имени обложки
+                // Создаём ID для трека (он же ID обложки)
                 let trackId = UUID()
 
-                // Сохраняем .webp если формат нестандартный и есть обложка
+                // Сохраняем обложку, если есть
                 if let imageData = parsed.artworkData,
                    let image = UIImage(data: imageData) {
                     ArtworkManager.saveArtwork(image, id: trackId)
                 }
-
+                
+                // Формируем объект трека
                 let newTrack = ImportedTrack(
                     id: trackId,
                     fileName: url.lastPathComponent,
@@ -60,34 +68,39 @@ final class ImportManager {
                 importedTracks.append(newTrack)
 
             } catch {
-                print("❌ Ошибка парсинга \(url.lastPathComponent): \(error)")
+                print("Ошибка при импорте \(url.lastPathComponent): \(error)")
             }
         }
 
-        print("📋 Все треки импортированы: \(importedTracks.count) шт.")
+        print("Импортировано треков: \(importedTracks.count)")
         for t in importedTracks {
             print("– \(t.title ?? "без названия")")
         }
        
         completion(importedTracks)
-      }
     }
+}
 
-// MARK: - Работа с путями и чтением JSON-файлов
+// MARK: - Работа с JSON
+
 extension ImportManager {
-    
-    // MARK: - Загрузить треки из указанного JSON-файла
+   
+    /// Загружает список треков из JSON-файла по имени
+    /// - Parameter name: имя JSON-файла (без расширения)
+    /// - Returns: массив ImportedTrack, если файл успешно прочитан
     static func loadTrackList(named name: String) throws -> [ImportedTrack] {
-        print("📥 loadTrackList() вызван для списка: \(name)")
+        print("Чтение треклиста: \(name)")
         let decoder = JSONDecoder()
-
+        
+        // Путь к /Documents/TrackLists/<name>.json
         let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         let trackListsFolder = documentsURL.appendingPathComponent("TrackLists")
         let jsonURL = trackListsFolder.appendingPathComponent("\(name).json")
-
+        
+        // Чтение и декодирование JSON
         let data = try Data(contentsOf: jsonURL)
         let tracks = try decoder.decode([ImportedTrack].self, from: data)
-        print("📄 Загружено треков: \(tracks.count) из \(jsonURL.lastPathComponent)")
+        print("Загружено треков: \(tracks.count) из файла \(jsonURL.lastPathComponent)")
         return tracks
     }
 }
