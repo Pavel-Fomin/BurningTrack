@@ -1,0 +1,6 @@
+framework module tag_c {
+  umbrella header "tag_c.h"
+  export *
+  module * { export * }
+  link "tag"
+}
