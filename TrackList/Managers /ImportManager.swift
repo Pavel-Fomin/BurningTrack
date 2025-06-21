@@ -12,6 +12,7 @@ import UniformTypeIdentifiers
 import UIKit
 import AVFoundation
 
+
 // MARK: - Менеджер импорта треков в приложение
 
 final class ImportManager {
@@ -38,31 +39,34 @@ final class ImportManager {
                 let bookmarkData = try url.bookmarkData()
                 let bookmarkBase64 = bookmarkData.base64EncodedString()
 
-                // Парсим метаданные (исполнитель, название, обложка)
-                let parsed = try await MetadataParser.parseMetadata(from: url)
+                // Парсим метаданные (исполнитель, название, обложка, длительность)
+                let metadata = try await MetadataParser.parseMetadata(from: url)
 
                 // Создаём ID для трека (он же ID обложки)
                 let trackId = UUID()
 
+                // Название по умолчанию, если не найдено
+                let fallbackTitle = url.deletingPathExtension().lastPathComponent
+
                 // Сохраняем обложку, если есть
-                if let imageData = parsed.artworkData,
+                if let imageData = metadata.artworkData,
                    let image = UIImage(data: imageData) {
                     ArtworkManager.saveArtwork(image, id: trackId)
                 }
-                
+
                 // Формируем объект трека
                 let newTrack = ImportedTrack(
                     id: trackId,
                     fileName: url.lastPathComponent,
                     filePath: url.path,
                     orderPrefix: String(format: "%02d", index + 1),
-                    title: parsed.title,
-                    artist: parsed.artist,
-                    album: parsed.album,
-                    duration: parsed.duration ?? 0,
+                    title: metadata.title ?? fallbackTitle,
+                    artist: metadata.artist,
+                    album: metadata.album,
+                    duration: metadata.duration ?? 0,
                     artworkBase64: nil,
                     bookmarkBase64: bookmarkBase64,
-                    artworkId: parsed.artworkData != nil ? trackId : nil
+                    artworkId: metadata.artworkData != nil ? trackId : nil
                 )
 
                 importedTracks.append(newTrack)
