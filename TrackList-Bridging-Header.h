@@ -1,8 +1,15 @@
 //
-//  Use this file to import your target's public headers that you would like to expose to Swift.
+//  TrackList-Bridging-Header.h
+//  TrackList
+//
+//  Используется для подключения Objective-C/С++ кода в Swift
+//
+//  Created by Pavel Fomin on 21.06.2025.
 //
 
+// Подключение C-интерфейса библиотеки TagLib
 #import <tag_c/tag_c.h>
+
+// Подключение обёртки над TagLib
 #import "TLTagLibFile.h"
 
-void testTagC(const char *path);

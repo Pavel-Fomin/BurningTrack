@@ -9,7 +9,6 @@
 /* Begin PBXBuildFile section */
 		A912E3B52DA911BD0046A8B6 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = A912E3B42DA911BD0046A8B6 /* LaunchScreen.storyboard */; };
 		A97F996E2E05ABDD000BCB2E /* libtag.a in Frameworks */ = {isa = PBXBuildFile; fileRef = A97F996D2E05ABDD000BCB2E /* libtag.a */; };
-		A97F99732E05B29C000BCB2E /* TagCTest.m in Sources */ = {isa = PBXBuildFile; fileRef = A97F99722E05B29C000BCB2E /* TagCTest.m */; };
 		A97F99752E05B541000BCB2E /* libz.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = A97F99742E05B541000BCB2E /* libz.tbd */; };
 		A97F99762E05DBF7000BCB2E /* tag_c.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A97F995C2E05A843000BCB2E /* tag_c.framework */; };
 		A97F99772E05DBF7000BCB2E /* tag_c.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = A97F995C2E05A843000BCB2E /* tag_c.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -50,7 +49,6 @@
 		A912E3B42DA911BD0046A8B6 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		A97F995C2E05A843000BCB2E /* tag_c.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = tag_c.framework; path = "taglib-build-ios/tag_c.framework"; sourceTree = "<group>"; };
 		A97F996D2E05ABDD000BCB2E /* libtag.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libtag.a; path = "taglib-build-ios/install/lib/libtag.a"; sourceTree = "<group>"; };
-		A97F99722E05B29C000BCB2E /* TagCTest.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TagCTest.m; sourceTree = "<group>"; };
 		A97F99742E05B541000BCB2E /* libz.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libz.tbd; path = usr/lib/libz.tbd; sourceTree = SDKROOT; };
 		A97F9A062E07115D000BCB2E /* TrackList.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = TrackList.app; path = "/Users/pavelfomin/Documents/TrackList/build/Debug-iphoneos/TrackList.app"; sourceTree = "<absolute>"; };
 		A97F9A072E07115D000BCB2E /* TrackListTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; name = TrackListTests.xctest; path = "/Users/pavelfomin/Documents/TrackList/build/Debug-iphoneos/TrackList.app/PlugIns/TrackListTests.xctest"; sourceTree = "<absolute>"; };
@@ -131,7 +129,6 @@
 		A97C861F2DA326C000ED2E99 = {
 			isa = PBXGroup;
 			children = (
-				A97F99722E05B29C000BCB2E /* TagCTest.m */,
 				A912E3B42DA911BD0046A8B6 /* LaunchScreen.storyboard */,
 				A97C862A2DA326C000ED2E99 /* TrackList */,
 				A97C86382DA326C200ED2E99 /* TrackListTests */,
@@ -300,7 +297,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A97F99732E05B29C000BCB2E /* TagCTest.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
