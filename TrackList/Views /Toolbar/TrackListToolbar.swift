@@ -20,7 +20,7 @@ struct TrackListToolbar: View {
         HStack {
             
             // Заголовок
-            Text("TRACK LIST")
+            Text("ПЛЕЕР")
                 .font(.system(size: 28, weight: .heavy))
                 .foregroundColor(.primary)
                 .padding(.top, 4)

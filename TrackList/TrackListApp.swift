@@ -25,12 +25,10 @@ struct TrackListApp: App {
 
     var body: some Scene {
         WindowGroup {
-            NavigationStack {
-                ContentView(
-                    trackListViewModel: trackListViewModel,
-                    playerViewModel: playerViewModel
-                )
-            }
+            ContentView(
+                trackListViewModel: trackListViewModel,
+                playerViewModel: playerViewModel
+            )
         }
     }
 }

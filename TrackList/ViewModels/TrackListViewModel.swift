@@ -21,9 +21,9 @@ private let selectedTrackListIdKey = "selectedTrackListId"
 final class TrackListViewModel: NSObject, ObservableObject {
     // MARK: - Состояния
 
-    @Published var tracks: [Track] = [] /// Текущий список треков
+    @Published var tracks: [Track] = []         /// Текущий список треков
     @Published var trackLists: [TrackList] = [] /// Все доступные треклисты (мета + треки)
-    @Published var currentListId: UUID? { /// Текущий активный плейлист
+    @Published var currentListId: UUID? {       /// Текущий активный плейлист
         didSet {
             if let id = currentListId {
                 UserDefaults.standard.set(id.uuidString, forKey: selectedTrackListIdKey)
