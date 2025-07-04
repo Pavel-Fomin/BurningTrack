@@ -9,8 +9,13 @@ import Foundation
 import UniformTypeIdentifiers
 import Combine
 
+
 final class MusicLibraryManager: ObservableObject {
     static let shared = MusicLibraryManager()
+    
+    init() {
+        restoreAccess()
+    }
     
     private let bookmarkKey = "musicLibraryBookmark"
     private var isAccessing = false
@@ -20,75 +25,69 @@ final class MusicLibraryManager: ObservableObject {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
     }
     
-    private var bookmarkFileURL: URL? {
-        appDirectory?.appendingPathComponent("music_library_bookmark.json")
+    
+    // MARK: - Путь к файлу bookmarks
+    
+    private static var bookmarksFileURL: URL {
+        let folder = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        return folder.appendingPathComponent("music_bookmarks.json")
     }
     
     
     // Сохранение bookmarkData в файл
-    private func saveBookmarkDataToFile(_ data: Data) {
-        guard let url = bookmarkFileURL else {
-            print("❌ Не удалось получить путь к файлу bookmark")
-            return
+    func saveBookmarkDataToFile(_ newData: Data) {
+        let url = Self.bookmarksFileURL
+        
+        var existingDataArray: [Data] = []
+        
+        if let data = try? Data(contentsOf: url),
+           let array = try? JSONDecoder().decode([Data].self, from: data) {
+            existingDataArray = array
+        }
+        
+        // Добавим только если такой папки ещё нет
+        if !existingDataArray.contains(newData) {
+            existingDataArray.append(newData)
         }
         
         do {
-            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try data.write(to: url)
-            print("💾 BookmarkData сохранён в файл")
+            let encoded = try JSONEncoder().encode(existingDataArray)
+            try encoded.write(to: url)
+            print("💾 Сохранили \(existingDataArray.count) папок в bookmarks.json")
         } catch {
-            print("❌ Ошибка при сохранении bookmarkData в файл: \(error)")
+            print("❌ Не удалось сохранить bookmarkData: \(error)")
         }
-    }
-    
-    private func loadBookmarkDataFromFile() -> Data? {
-        guard let url = bookmarkFileURL else { return nil }
-        return try? Data(contentsOf: url)
-    }
-    
-    init() {
-        print("🎬 MusicLibraryManager init — восстанавливаем доступ")
     }
     
     @Published var folderURL: URL?
     @Published var tracks: [URL] = []
+    @Published var rootFolder: LibraryFolder?
+    @Published var attachedFolders: [LibraryFolder] = []
     
-    
-    // Сканирование папки
-    func scanMusicFolder() {
-        guard let folderURL else {
-            print("⚠️ Папка не выбрана")
-            DispatchQueue.main.async {
-                self.tracks = []
+    // Рекурсивный обход папки с вложенностью
+    func buildFolderTree(from folderURL: URL) -> LibraryFolder {
+        let fileManager = FileManager.default
+        let folderName = folderURL.lastPathComponent
+        
+        var subfolders: [LibraryFolder] = []
+        var audioFiles: [URL] = []
+        
+        if let contents = try? fileManager.contentsOfDirectory(at: folderURL, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles]) {
+            for item in contents {
+                var isDirectory: ObjCBool = false
+                if fileManager.fileExists(atPath: item.path, isDirectory: &isDirectory), isDirectory.boolValue {
+                    let subfolder = buildFolderTree(from: item)
+                    subfolders.append(subfolder)
+                } else {
+                    let ext = item.pathExtension.lowercased()
+                    if ["mp3", "flac", "wav", "aiff", "aac", "m4a", "ogg"].contains(ext) {
+                        audioFiles.append(item)
+                    }
+                }
             }
-            return
         }
         
-        do {
-            let fileManager = FileManager.default
-            let contents = try fileManager.contentsOfDirectory(
-                at: folderURL,
-                includingPropertiesForKeys: nil,
-                options: [.skipsHiddenFiles]
-            )
-            
-            let supportedExtensions = ["mp3", "flac", "wav", "aiff", "aac", "m4a", "ogg"]
-            let audioFiles = contents.filter { url in
-                let ext = url.pathExtension.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-                return supportedExtensions.contains(ext)
-            }
-            
-            DispatchQueue.main.async {
-                self.tracks = audioFiles
-            }
-            
-            print("🎵 Найдено треков в папке: \(audioFiles.count)")
-        } catch {
-            print("❌ Ошибка при сканировании папки: \(error)")
-            DispatchQueue.main.async {
-                self.tracks = []
-            }
-        }
+        return LibraryFolder(name: folderName, url: folderURL, subfolders: subfolders, audioFiles: audioFiles)
     }
     
     
@@ -103,11 +102,10 @@ final class MusicLibraryManager: ObservableObject {
                 )
                 saveBookmarkDataToFile(bookmarkData)
                 
-                // ✅ Всё внутри одного main-потока
                 DispatchQueue.main.async {
                     self.folderURL = url
-                    self.tracks = [] // Очистка треков
-                    self.scanMusicFolder() // Скан новой папки
+                    self.tracks = [] // опционально: сброс списка
+                    self.rootFolder = self.buildFolderTree(from: url)
                 }
             } catch {
                 print("❌ Не удалось создать bookmarkData: \(error)")
@@ -117,35 +115,104 @@ final class MusicLibraryManager: ObservableObject {
         }
     }
     
+    // Загрузка массива bookmarkData из файла
+    private func loadBookmarkDataFromFile() -> [Data]? {
+        let url = Self.bookmarksFileURL
+        
+        guard let data = try? Data(contentsOf: url) else {
+            print("⚠️ Файл закладок не найден: \(url.lastPathComponent)")
+            return nil
+        }
+        
+        do {
+            let array = try JSONDecoder().decode([Data].self, from: data)
+            return array
+        } catch {
+            print("❌ Не удалось декодировать bookmarkData: \(error)")
+            return nil
+        }
+    }
+    
     // Восстанавливает bookmark при запуске
+    // Восстанавливает доступ ко всем сохранённым папкам
     func restoreAccess() {
-        guard let data = loadBookmarkDataFromFile(), !isAccessing else {
-            print("ℹ️ Bookmark-файл не найден или уже получен доступ")
+        // Очистим предыдущие данные
+            attachedFolders = []
+            tracks = []
+        
+        guard let dataArray = loadBookmarkDataFromFile() else {
+            print("ℹ️ Bookmarks не найдены")
+            return
+        }
+        
+        var urls: [URL] = []
+        
+        for data in dataArray {
+            var isStale = false
+            do {
+                let url = try URL(
+                    resolvingBookmarkData: data,
+                    options: [.withoutUI], // ⚠️ убрали .withSecurityScope — он не работает на iOS
+                    relativeTo: nil,
+                    bookmarkDataIsStale: &isStale
+                )
+                
+                if url.startAccessingSecurityScopedResource() {
+                    print("✅ Доступ к папке восстановлен: \(url.lastPathComponent)")
+                    urls.append(url)
+                } else {
+                    print("❌ Не удалось начать доступ к папке: \(url.lastPathComponent)")
+                }
+            } catch {
+                print("❌ Ошибка восстановления доступа: \(error)")
+            }
+        }
+        
+        for url in urls {
+            DispatchQueue.main.async {
+                let newFolder = self.buildFolderTree(from: url)
+                self.attachedFolders.append(newFolder)
+                self.tracks.append(contentsOf: newFolder.audioFiles)
+            }
+        }
+    }
+    
+    // Удаляет bookmarkData по заданному URL
+    func removeBookmark(for folderURL: URL) {
+        let url = Self.bookmarksFileURL
+
+        guard let data = try? Data(contentsOf: url),
+              var existing = try? JSONDecoder().decode([Data].self, from: data) else {
+            print("⚠️ Не удалось загрузить bookmarkData для удаления")
             return
         }
 
-        var isStale = false
-
-        do {
-            let url = try URL(
+        // Удалим все совпадающие
+        existing.removeAll { data in
+            var isStale = false
+            if let resolved = try? URL(
                 resolvingBookmarkData: data,
-                options: [],
+                options: [.withoutUI],
                 relativeTo: nil,
                 bookmarkDataIsStale: &isStale
-            )
-
-            if url.startAccessingSecurityScopedResource() {
-                isAccessing = true // 👈 Отмечаем, что доступ получен
-                DispatchQueue.main.async {
-                    self.folderURL = url
-                    print("✅ Доступ к папке фонотеки восстановлен: \(url.lastPathComponent)")
-                    self.scanMusicFolder()
-                }
-            } else {
-                print("❌ Не удалось получить доступ к папке")
+            ) {
+                return resolved == folderURL
             }
+            return false
+        }
+
+        do {
+            let newData = try JSONEncoder().encode(existing)
+            try newData.write(to: url)
+            print("🗑️ Удалили папку из bookmarks: \(folderURL.lastPathComponent)")
         } catch {
-            print("❌ Ошибка при восстановлении bookmark: \(error)")
+            print("❌ Не удалось сохранить обновлённый список bookmarks")
+        }
+
+        // Обновим список в UI
+        DispatchQueue.main.async {
+            self.attachedFolders.removeAll { $0.url == folderURL }
+            self.tracks = self.attachedFolders.flatMap { $0.audioFiles }
         }
     }
 }

@@ -46,13 +46,13 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		A90C56022E0DF38300AAA02B /* TrackList.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TrackList.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A90C56032E0DF38300AAA02B /* TrackListTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TrackListTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A90C56042E0DF38300AAA02B /* TrackListUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TrackListUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A912E3B42DA911BD0046A8B6 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		A97F995C2E05A843000BCB2E /* tag_c.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = tag_c.framework; path = "taglib-build-ios/tag_c.framework"; sourceTree = "<group>"; };
 		A97F996D2E05ABDD000BCB2E /* libtag.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libtag.a; path = "taglib-build-ios/install/lib/libtag.a"; sourceTree = "<group>"; };
 		A97F99742E05B541000BCB2E /* libz.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libz.tbd; path = usr/lib/libz.tbd; sourceTree = SDKROOT; };
-		A97F9A062E07115D000BCB2E /* TrackList.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = TrackList.app; path = "/Users/pavelfomin/Documents/TrackList/build/Debug-iphoneos/TrackList.app"; sourceTree = "<absolute>"; };
-		A97F9A072E07115D000BCB2E /* TrackListTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; name = TrackListTests.xctest; path = "/Users/pavelfomin/Documents/TrackList/build/Debug-iphoneos/TrackList.app/PlugIns/TrackListTests.xctest"; sourceTree = "<absolute>"; };
-		A97F9A082E07115D000BCB2E /* TrackListUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; name = TrackListUITests.xctest; path = "/Users/pavelfomin/Documents/TrackList/build/Debug-iphoneos/TrackListUITests-Runner.app/PlugIns/TrackListUITests.xctest"; sourceTree = "<absolute>"; };
 		A992A15C2E04ADE800BA637D /* TrackList-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TrackList-Bridging-Header.h"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -135,6 +135,9 @@
 				A97C86422DA326C200ED2E99 /* TrackListUITests */,
 				A992A15C2E04ADE800BA637D /* TrackList-Bridging-Header.h */,
 				A992A1662E05829B00BA637D /* Frameworks */,
+				A90C56022E0DF38300AAA02B /* TrackList.app */,
+				A90C56032E0DF38300AAA02B /* TrackListTests.xctest */,
+				A90C56042E0DF38300AAA02B /* TrackListUITests.xctest */,
 			);
 			sourceTree = "<group>";
 		};
@@ -171,7 +174,7 @@
 			packageProductDependencies = (
 			);
 			productName = TrackList;
-			productReference = A97F9A062E07115D000BCB2E /* TrackList.app */;
+			productReference = A90C56022E0DF38300AAA02B /* TrackList.app */;
 			productType = "com.apple.product-type.application";
 		};
 		A97C86342DA326C200ED2E99 /* TrackListTests */ = {
@@ -194,7 +197,7 @@
 			packageProductDependencies = (
 			);
 			productName = TrackListTests;
-			productReference = A97F9A072E07115D000BCB2E /* TrackListTests.xctest */;
+			productReference = A90C56032E0DF38300AAA02B /* TrackListTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
 		A97C863E2DA326C200ED2E99 /* TrackListUITests */ = {
@@ -217,7 +220,7 @@
 			packageProductDependencies = (
 			);
 			productName = TrackListUITests;
-			productReference = A97F9A082E07115D000BCB2E /* TrackListUITests.xctest */;
+			productReference = A90C56042E0DF38300AAA02B /* TrackListUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */

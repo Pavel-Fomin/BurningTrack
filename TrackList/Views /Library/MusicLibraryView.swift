@@ -10,22 +10,41 @@ import UniformTypeIdentifiers
 
 struct MusicLibraryView: View {
     @StateObject private var manager = MusicLibraryManager.shared
+    let playerViewModel: PlayerViewModel
 
     var body: some View {
-        VStack(spacing: 16) {
-            if manager.folderURL == nil {
-                Spacer()
-                Text("Папка фонотеки не выбрана")
-                    .foregroundColor(.secondary)
-                Spacer()
-            } else if manager.tracks.isEmpty {
-                Spacer()
-                Text("Нет треков в выбранной папке")
-                    .foregroundColor(.secondary)
-                Spacer()
+        NavigationStack {
+            if manager.attachedFolders.isEmpty {
+                VStack {
+                    Spacer()
+                    Text("Папка фонотеки не выбрана")
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
+                    Spacer()
+                }
             } else {
-                List(manager.tracks, id: \.self) { trackURL in
-                    Text(trackURL.lastPathComponent)
+                List {
+                    ForEach(manager.attachedFolders) { folder in
+                        NavigationLink(destination: LibraryFolderView(folder: folder, playerViewModel: playerViewModel)) {
+                            HStack(spacing: 12) {
+                                Image(systemName: "folder")
+                                    .foregroundColor(.blue)
+                                    .frame(width: 24)
+                                Text(folder.name)
+                                    .lineLimit(1)
+                            }
+                            .padding(.vertical, 4)
+                        }
+                        
+                        .swipeActions(edge: .trailing) {
+                            Button(role: .destructive) {
+                                manager.removeBookmark(for: folder.url)
+                            } label: {
+                                Label("Открепить", systemImage: "trash")
+                            }
+                        }
+                    }
                 }
             }
         }

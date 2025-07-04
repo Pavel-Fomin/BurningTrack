@@ -14,6 +14,7 @@ struct LibraryScreen: View {
     @State private var isShowingFolderPicker = false
     private let musicLibraryManager = MusicLibraryManager.shared
     @State private var refreshTrigger = false
+    let playerViewModel: PlayerViewModel
 
     var body: some View {
         NavigationStack {
@@ -48,7 +49,7 @@ struct LibraryScreen: View {
                 // Контент
                 Group {
                     if selectedTab == 0 {
-                        MusicLibraryView()
+                        MusicLibraryView(playerViewModel: playerViewModel)
                     } else {
                         TrackListLibraryView()
                     }

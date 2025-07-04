@@ -24,7 +24,7 @@ struct ContentView: View {
                 Label("Плеер", systemImage: "play.circle.fill")
             }
 
-            LibraryScreen()
+            LibraryScreen(playerViewModel: playerViewModel)
                 .tabItem {
                     Label("Фонотека", systemImage: "music.note.list")
                 }
