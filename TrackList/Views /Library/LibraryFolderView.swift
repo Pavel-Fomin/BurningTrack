@@ -9,10 +9,10 @@ import SwiftUI
 
 struct LibraryFolderView: View {
     let folder: LibraryFolder
-    let playerViewModel: PlayerViewModel
-    
+    @ObservedObject var playerViewModel: PlayerViewModel
+
     @State private var loadedTracks: [Track] = []
-    
+
     var body: some View {
         List {
             // Подпапки
@@ -32,43 +32,44 @@ struct LibraryFolderView: View {
                     }
                 }
             }
-            
+
             // Треки
             if !loadedTracks.isEmpty {
-                Section {
-                    ForEach(loadedTracks) { track in
-                        TrackRowView(
-                            track: track,
-                            isPlaying: playerViewModel.isPlaying && playerViewModel.currentTrack?.id == track.id,
-                            isCurrent: playerViewModel.currentTrack?.id == track.id,
-                            onTap: {
-                                if track.isAvailable {
-                                    if playerViewModel.currentTrack?.id == track.id {
-                                        playerViewModel.togglePlayPause()
-                                    } else {
-                                        playerViewModel.play(track: track)
-                                    }
+                ForEach(loadedTracks) { track in
+                    TrackRowView(
+                        track: track,
+                        isPlaying: playerViewModel.isPlaying && playerViewModel.currentTrack?.id == track.id,
+                        isCurrent: playerViewModel.currentTrack?.id == track.id,
+                        onTap: {
+                            if track.isAvailable {
+                                if playerViewModel.currentTrack?.id == track.id {
+                                    playerViewModel.togglePlayPause()
                                 } else {
-                                    print("❌ Трек недоступен: \(track.title ?? track.fileName)")
+                                    playerViewModel.play(track: track)
                                 }
+                            } else {
+                                print("❌ Трек недоступен: \(track.title ?? track.fileName)")
                             }
-                        )
-                        .padding(.vertical, 4)
-                    }
+                        }
+                    )
                 }
             }
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(Color.clear)
         .navigationTitle(folder.name)
         .task {
             await loadTracksIfNeeded()
         }
     }
-    
+
+    // MARK: - Загрузка треков
     private func loadTracksIfNeeded() async {
         guard loadedTracks.isEmpty else { return }
-        
+
         var result: [Track] = []
-        
+
         for url in folder.audioFiles {
             do {
                 let track = try await Track.load(from: url)
@@ -77,8 +78,7 @@ struct LibraryFolderView: View {
                 print("⚠️ Не удалось загрузить \(url.lastPathComponent): \(error)")
             }
         }
-        
-        // Обновляем UI на главной очереди
+
         await MainActor.run {
             loadedTracks = result
         }

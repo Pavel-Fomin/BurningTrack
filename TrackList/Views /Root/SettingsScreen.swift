@@ -13,6 +13,7 @@ struct SettingsScreen: View {
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 16) {
+                
                 // Заголовок
                 Text("Настройки")
                     .font(.largeTitle)

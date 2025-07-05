@@ -19,6 +19,7 @@ struct TrackListView: View {
 
     var body: some View {
         List {
+            
             // MARK: - Счётчик треков
             Section {
                 Text("\(trackListViewModel.tracks.count) треков · \(trackListViewModel.formattedTotalDuration)")
@@ -29,7 +30,23 @@ struct TrackListView: View {
 
             // MARK: - Список треков
             ForEach(trackListViewModel.tracks) { track in
-                trackRow(for: track)
+                TrackRowView(
+                    track: track,
+                    isPlaying: playerViewModel.isPlaying && playerViewModel.currentTrack?.id == track.id,
+                    isCurrent: playerViewModel.currentTrack?.id == track.id,
+                    onTap: {
+                        if track.isAvailable {
+                            if playerViewModel.currentTrack?.id == track.id {
+                                playerViewModel.togglePlayPause()
+                            } else {
+                                playerViewModel.play(track: track)
+                            }
+                        } else {
+                            print("❌ Трек недоступен: \(track.title ?? track.fileName)")
+                        }
+                    }
+                )
+                .padding(.vertical, 4)
             }
             .onDelete { indexSet in
                 trackListViewModel.removeTrack(at: indexSet)
@@ -47,65 +64,4 @@ struct TrackListView: View {
         .background(Color.clear)
     }
 
-    // MARK: - Строка трека (ячейка в списке)
-
-    private func trackRow(for track: Track) -> some View {
-        HStack(spacing: 12) {
-            // Обложка трека или серый placeholder
-            if let image = track.artwork {
-                Image(uiImage: image)
-                    .resizable()
-                    .aspectRatio(1, contentMode: .fill)
-                    .frame(width: 44, height: 44)
-                    .cornerRadius(6)
-            } else {
-                Rectangle()
-                    .fill(Color.gray.opacity(0.3))
-                    .frame(width: 44, height: 44)
-                    .cornerRadius(6)
-            }
-
-            // Информация о треке: артист, название, длительность
-            VStack(alignment: .leading, spacing: 4) {
-                Text(track.artist ?? "Неизвестный артист")
-                    .font(.subheadline)
-                    .foregroundColor(.primary)
-                    .lineLimit(1)
-
-                HStack {
-                    Text(track.title ?? track.fileName)
-                        .font(.footnote)
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
-
-                    Spacer()
-
-                    Text(formatTimeSmart(track.duration))
-                        .font(.footnote)
-                        .foregroundColor(.secondary)
-                }
-            }
-
-            Spacer()
-        }
-        .opacity(track.isAvailable ? 1 : 0.4) // Приглушение недоступных треков
-        .padding(.vertical, 4)
-        .listRowBackground(
-            playerViewModel.currentTrack?.id == track.id
-            ? (colorScheme == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.12))
-            : Color.clear
-        )
-        .onTapGesture {
-            // Тап по строке: воспроизведение или пауза
-            if track.isAvailable {
-                if playerViewModel.currentTrack?.id == track.id {
-                    playerViewModel.togglePlayPause()
-                } else {
-                    playerViewModel.play(track: track)
-                }
-            } else {
-                print("Трек недоступен: \(track.title ?? track.fileName)")
-            }
-        }
-    }
 }

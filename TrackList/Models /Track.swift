@@ -130,3 +130,7 @@ extension Track: Equatable {
         return lhs.url == rhs.url
     }
 }
+
+// MARK: - Соответствие TrackDisplayable
+
+extension Track: TrackDisplayable { }

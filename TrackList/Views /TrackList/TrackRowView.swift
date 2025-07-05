@@ -11,54 +11,78 @@ import SwiftUI
 import Foundation
 
 struct TrackRowView: View {
-    let track: Track               // Данные трека
-    let isPlaying: Bool            // Идёт ли воспроизведение
-    let isCurrent: Bool            // Является ли трек текущим
-    let onTap: () -> Void          // Обработчик тапа
+    let track: any TrackDisplayable
+    let isPlaying: Bool
+    let isCurrent: Bool
+    let onTap: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
-            // MARK: - Информация о треке
-            VStack(alignment: .leading, spacing: 2) {
-                Text(track.title ?? track.fileName)
-                    .font(.caption)
-                    .foregroundColor(track.isAvailable ? .secondary : .gray)
-                    .lineLimit(1)
+            // MARK: - Обложка с иконкой поверх
+            ZStack {
+                if let image = track.artwork {
+                    Image(uiImage: image)
+                        .resizable()
+                        .aspectRatio(1, contentMode: .fill)
+                        .frame(width: 44, height: 44)
+                        .cornerRadius(6)
+                } else {
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.3))
+                        .frame(width: 44, height: 44)
+                        .cornerRadius(6)
+                }
 
-                Text(track.title ?? track.fileName)
-                    .font(.body)
-                    .foregroundColor(track.isAvailable ? .primary : .gray)
-                    .lineLimit(1)
-
-                Text(formatTimeSmart(track.duration))
-                    .font(.caption)
-                    .foregroundColor(track.isAvailable ? .secondary : .gray)
+                if isCurrent {
+                    Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                        .foregroundColor(.accentColor)
+                        .font(.system(size: 16, weight: .semibold))
+                        .shadow(radius: 1)
+                }
             }
 
-            Spacer()
+            // MARK: - Текстовая информация
+            let artist = track.artist?
+                .trimmingCharacters(in: .whitespaces)
+                .lowercased()
+            let hasArtist = artist != nil && artist != "" && artist != "неизвестен"
 
-            // MARK: - Иконка воспроизведения/паузы
-            if isCurrent {
-                Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                    .font(.body)
-                    .foregroundColor(.accentColor)
+            VStack(alignment: .leading, spacing: hasArtist ? 2 : 0) {
+                
+                if hasArtist, let artistText = track.artist {
+                    Text(artistText)
+                        .font(.subheadline)
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                }
+
+                HStack {
+                    Text(track.title ?? track.fileName)
+                        .font(hasArtist ? .footnote : .subheadline)
+                        .foregroundColor(hasArtist ? .secondary : .primary)
+                        .lineLimit(1)
+
+                    Spacer()
+
+                    Text(formatTimeSmart(track.duration))
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                }
             }
         }
-        .padding(.vertical, 6)
-        .padding(.horizontal, 8)
-        .background(
-            isCurrent
-            ? Color.accentColor.opacity(0.12)
-            : Color.clear
-        )
-        .cornerRadius(8)
+        .padding(.vertical, 0)
+        .padding(.horizontal, 4)
+        .opacity(track.isAvailable ? 1 : 0.4)
         .contentShape(Rectangle())
         .onTapGesture {
             if track.isAvailable {
                 onTap()
             } else {
-                print("Трек недоступен: \(track.title ?? track.fileName)")
+                print("❌ Трек недоступен: \(track.title ?? track.fileName)")
             }
         }
+        .listRowBackground(
+            isCurrent ? Color.accentColor.opacity(0.12) : Color.clear
+        )
     }
 }
