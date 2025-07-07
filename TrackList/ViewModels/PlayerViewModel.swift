@@ -87,7 +87,7 @@ final class PlayerViewModel: ObservableObject {
             playerManager.stopAccessingCurrentTrack()
             currentTrackDisplayable = track
 
-            if let libTrack = track as? LibraryTrack {
+            if track is LibraryTrack {
                 self.libraryTracksContext = context.compactMap { $0 as? LibraryTrack }
             } else {
                 self.libraryTracksContext = []
