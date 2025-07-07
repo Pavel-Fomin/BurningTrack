@@ -8,16 +8,6 @@
 import Foundation
 import UIKit
 
-//
-//  LibraryTrack.swift
-//  TrackList
-//
-//  Created by Pavel Fomin on 05.07.2025.
-//
-
-import Foundation
-import UIKit
-
 struct LibraryTrack: Identifiable, TrackDisplayable {
     let id = UUID()
     let url: URL                /// оставим для fallback
@@ -79,5 +69,16 @@ extension LibraryTrack {
         } catch {
             print("❌ Ошибка при завершении доступа: \(error.localizedDescription)")
         }
+    }
+}
+
+
+extension LibraryTrack {
+    var displayTitle: String? {
+        title ?? fileName
+    }
+
+    var displayArtist: String? {
+        artist
     }
 }

@@ -12,11 +12,16 @@ import SwiftUI
 struct LibraryTrackSectionView: View {
     let title: String
     let tracks: [LibraryTrack]
+    let allTracks: [LibraryTrack]
     let playerViewModel: PlayerViewModel
 
     var body: some View {
         Section(header: Text(title).font(.subheadline).foregroundColor(.secondary)) {
-            LibraryTrackView(tracks: tracks, playerViewModel: playerViewModel)
+            LibraryTrackView(
+                tracks: tracks,
+                allTracks: allTracks,
+                playerViewModel: playerViewModel
+            )
         }
     }
 }

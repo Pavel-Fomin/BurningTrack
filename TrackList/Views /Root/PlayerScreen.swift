@@ -12,70 +12,60 @@ import SwiftUI
 struct PlayerScreen: View {
     @ObservedObject var trackListViewModel: TrackListViewModel
     @ObservedObject var playerViewModel: PlayerViewModel
-
+    
     @State private var showImporter = false
     @State private var isShowingExportPicker = false
-
+    
     var body: some View {
         NavigationStack {
             ZStack(alignment: .bottom) {
                 Color(.systemBackground)
                     .ignoresSafeArea()
-
+                
                 VStack(spacing: 0) {
                     
-                        // MARK: - Хедер: кнопки, выбор плейлиста
+                    // MARK: - Хедер: кнопки, выбор плейлиста
                     
-                        TrackListHeaderView(
-                            viewModel: trackListViewModel,
-                            selectedId: Binding(
-                                get: { trackListViewModel.currentListId },
-                                set: { trackListViewModel.currentListId = $0 }
-                            ),
-                            onSelect: { trackListViewModel.selectTrackList(id: $0) },
-                            onAddFromPlus: {
-                                trackListViewModel.importMode = .newList
-                                showImporter = true
-                            },
-                            onAddFromContextMenu: {
-                                trackListViewModel.importMode = .addToCurrent
-                                showImporter = true
-                            },
-                            onToggleEditMode: {
-                                trackListViewModel.isEditing.toggle()
-                            }
-                        )
-                        
-                        // MARK: - Список треков или заглушка
-                    
-                        if trackListViewModel.trackLists.isEmpty {
-                            Spacer()
-                            Text("Добавьте треки")
-                                .font(.title3)
-                                .foregroundColor(.secondary)
-                                .padding(.top, 32)
-                            Spacer()
-                        } else {
-                            TrackListView(
-                                trackListViewModel: trackListViewModel,
-                                playerViewModel: playerViewModel
-                            )
+                    TrackListHeaderView(
+                        viewModel: trackListViewModel,
+                        selectedId: Binding(
+                            get: { trackListViewModel.currentListId },
+                            set: { trackListViewModel.currentListId = $0 }
+                        ),
+                        onSelect: { trackListViewModel.selectTrackList(id: $0) },
+                        onAddFromPlus: {
+                            trackListViewModel.importMode = .newList
+                            showImporter = true
+                        },
+                        onAddFromContextMenu: {
+                            trackListViewModel.importMode = .addToCurrent
+                            showImporter = true
+                        },
+                        onToggleEditMode: {
+                            trackListViewModel.isEditing.toggle()
                         }
-                    }
+                    )
                     
-                    // MARK: - Мини-плеер
-                
-                if playerViewModel.currentTrackDisplayable != nil {
-                        MiniPlayerView(
-                            playerViewModel: playerViewModel,
-                            trackListViewModel: trackListViewModel
+                    // MARK: - Список треков или заглушка
+                    
+                    if trackListViewModel.trackLists.isEmpty {
+                        Spacer()
+                        Text("Добавьте треки")
+                            .font(.title3)
+                            .foregroundColor(.secondary)
+                            .padding(.top, 32)
+                        Spacer()
+                    } else {
+                        TrackListView(
+                            trackListViewModel: trackListViewModel,
+                            playerViewModel: playerViewModel
                         )
-                        .padding(.bottom, 0)
                     }
                 }
-
+                
+                
                 // MARK: - Bottom Sheet: экспорт
-            
+                
                 .sheet(isPresented: $isShowingExportPicker) {
                     ExportWrapper { folderURL in
                         if let id = trackListViewModel.currentListId {
@@ -84,9 +74,9 @@ struct PlayerScreen: View {
                         trackListViewModel.exportTracks(to: folderURL)
                     }
                 }
-
+                
                 // MARK: - FileImporter: импорт треков
-            
+                
                 .fileImporter(
                     isPresented: $showImporter,
                     allowedContentTypes: [.audio],
@@ -103,18 +93,18 @@ struct PlayerScreen: View {
                             case .none:
                                 break
                             }
-
+                            
                         case .failure(let error):
                             print("❌ Ошибка при импорте файлов: \(error.localizedDescription)")
                         }
-
+                        
                         // Завершение импорта
                         trackListViewModel.importMode = .none
                     }
                 }
-
+                
                 // MARK: - Инициализация при старте
-            
+                
                 .onAppear {
                     let startTime = Date()
                     let loadTime = Date().timeIntervalSince(startTime)
@@ -122,10 +112,11 @@ struct PlayerScreen: View {
                     trackListViewModel.refreshtrackLists()
                     trackListViewModel.loadTracks()
                 }
-
+                
                 // MARK: - Навигация
-            
+                
                 .navigationBarHidden(true)
             }
         }
     }
+}

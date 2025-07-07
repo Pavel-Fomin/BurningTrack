@@ -26,8 +26,8 @@ struct TrackListApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView(
-                trackListViewModel: trackListViewModel,
-                playerViewModel: playerViewModel
+                playerViewModel: playerViewModel,
+                trackListViewModel: trackListViewModel
             )
         }
     }

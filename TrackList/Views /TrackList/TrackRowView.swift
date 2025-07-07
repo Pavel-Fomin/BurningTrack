@@ -10,17 +10,25 @@
 import SwiftUI
 import Foundation
 
+import SwiftUI
+import Foundation
+
 struct TrackRowView: View {
+    @ObservedObject var playerViewModel: PlayerViewModel
     let track: any TrackDisplayable
-    let isPlaying: Bool
-    let isCurrent: Bool
     let onTap: () -> Void
+
+    var isCurrent: Bool {
+        playerViewModel.currentTrackDisplayable?.id == track.id
+    }
+
+    var isPlaying: Bool {
+        isCurrent && playerViewModel.isPlaying
+    }
 
     var body: some View {
         HStack(spacing: 12) {
-            
             // MARK: - Обложка с иконкой поверх
-            
             ZStack {
                 if let image = track.artwork {
                     Image(uiImage: image)
@@ -44,14 +52,12 @@ struct TrackRowView: View {
             }
 
             // MARK: - Текстовая информация
-            
             let artist = track.artist?
                 .trimmingCharacters(in: .whitespaces)
                 .lowercased()
             let hasArtist = artist != nil && artist != "" && artist != "неизвестен"
 
             VStack(alignment: .leading, spacing: hasArtist ? 2 : 0) {
-                
                 if hasArtist, let artistText = track.artist {
                     Text(artistText)
                         .font(.subheadline)

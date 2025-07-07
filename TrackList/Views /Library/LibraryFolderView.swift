@@ -11,6 +11,10 @@ struct LibraryFolderView: View {
     let folder: LibraryFolder
     @ObservedObject var playerViewModel: PlayerViewModel
     
+    private var allVisibleTracks: [LibraryTrack] {
+        trackSections.flatMap { $0.tracks }
+    }
+    
     
     // MARK: - Вспомогательная модель секции
     
@@ -109,10 +113,9 @@ struct LibraryFolderView: View {
             LibraryTrackSectionView(
                 title: section.title,
                 tracks: section.tracks,
+                allTracks: allVisibleTracks,
                 playerViewModel: playerViewModel
             )
         }
     }
-    
 }
-   

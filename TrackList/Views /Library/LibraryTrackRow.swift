@@ -9,15 +9,13 @@ import SwiftUI
 
 struct LibraryTrackRow: View {
     let track: LibraryTrack
-    let isPlaying: Bool
-    let isCurrent: Bool
+    let playerViewModel: PlayerViewModel
     let onTap: () -> Void
 
     var body: some View {
         TrackRowView(
-            track: track as (any TrackDisplayable),
-            isPlaying: isPlaying,
-            isCurrent: isCurrent,
+            playerViewModel: playerViewModel,
+            track: track,
             onTap: onTap
         )
     }

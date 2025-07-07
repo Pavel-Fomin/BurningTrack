@@ -60,39 +60,34 @@ struct TrackListView: View {
             }
         }
         .listStyle(.plain)
-            .scrollContentBackground(.hidden)
-            .background(Color.clear)
-            .padding(.horizontal, 0) // ⬅️ ВНЕ List
-            .padding(.top, 12)
+        .scrollContentBackground(.hidden)
+        .background(Color.clear)
+        .padding(.horizontal, 0) // ⬅️ ВНЕ List
+        .padding(.top, 12)
     }
-        private struct TrackListRowsView: View {
-            let tracks: [Track]
-            let playerViewModel: PlayerViewModel
-            let onTap: (Track) -> Void
-            let onDelete: (IndexSet) -> Void
-            let onMove: (IndexSet, Int) -> Void
-            
-            var body: some View {
-                ForEach(tracks) { track in
-                    let isCurrent = (playerViewModel.currentTrackDisplayable as? Track)?.id == track.id
-                    let isPlaying = playerViewModel.isPlaying && isCurrent
-                    
-                    TrackRowView(
-                        track: track,
-                        isPlaying: isPlaying,
-                        isCurrent: isCurrent,
-                        onTap: { onTap(track) }
-                    )
-                    .padding(.vertical, 4)
-                    .listRowInsets(EdgeInsets())      /// Убираем отступы List
-                    .listRowBackground(Color.clear)   /// На всякий случай — если есть фон
-                    .padding(.vertical, 8)
-                    .padding(.horizontal,16)/// Только внутренний отступ
-                }
-                .onDelete(perform: onDelete)
-                .onMove(perform: onMove)
+    private struct TrackListRowsView: View {
+        let tracks: [Track]
+        let playerViewModel: PlayerViewModel
+        let onTap: (Track) -> Void
+        let onDelete: (IndexSet) -> Void
+        let onMove: (IndexSet, Int) -> Void
+        
+        var body: some View {
+            ForEach(tracks) { track in
+                TrackRowView(
+                    playerViewModel: playerViewModel,
+                    track: track,
+                    onTap: { onTap(track) }
+                )
+                .padding(.vertical, 4)
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
+                .padding(.vertical, 8)
+                .padding(.horizontal, 16)
             }
+            .onDelete(perform: onDelete)
+            .onMove(perform: onMove)
         }
     }
-    
+}
 

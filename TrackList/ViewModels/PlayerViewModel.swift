@@ -17,13 +17,14 @@ final class PlayerViewModel: ObservableObject {
     
     // MARK: - Состояние воспроизведения
     
-    @Published var currentTrackDisplayable: (any TrackDisplayable)?               /// Текущий воспроизводимый трек
-    @Published var isPlaying: Bool = false            /// Воспроизводится ли в данный момент
-    @Published var currentTime: TimeInterval = 0.0    /// Текущее время воспроизведения
-    @Published var trackDuration: TimeInterval = 0.0  /// Длительность трека
+    @Published var currentTrackDisplayable: (any TrackDisplayable)? /// Текущий воспроизводимый трек
+    @Published var isPlaying: Bool = false                          /// Воспроизводится ли в данный момент
+    @Published var currentTime: TimeInterval = 0.0                  /// Текущее время воспроизведения
+    @Published var trackDuration: TimeInterval = 0.0                /// Длительность трека
 
-    let playerManager = PlayerManager()               /// Низкоуровневый контроллер плеера
-    let trackListViewModel: TrackListViewModel        /// ViewModel со списком треков
+    let playerManager = PlayerManager()                             /// Низкоуровневый контроллер плеера
+    let trackListViewModel: TrackListViewModel                      /// ViewModel со списком треков
+    var libraryTracksContext: [LibraryTrack] = []
     
     
     // MARK: - Инициализация и подписка на события
@@ -76,44 +77,51 @@ final class PlayerViewModel: ObservableObject {
        
        // MARK: - Воспроизведение трека
        
-       func play(track: any TrackDisplayable) {
-           print("🧠 PlayerViewModel: play(track:) вызван с", track.fileName)
+    func play(track: any TrackDisplayable, context: [any TrackDisplayable] = []) {
+        print("🧠 PlayerViewModel: play(track:) вызван с", track.fileName)
 
-           if let current = currentTrackDisplayable,
-              current.fileName == track.fileName {
-               playerManager.playCurrent()
-           } else {
-               playerManager.stopAccessingCurrentTrack()
-               currentTrackDisplayable = track
-               playerManager.play(track: track)
+        if let current = currentTrackDisplayable,
+           current.fileName == track.fileName {
+            playerManager.playCurrent()
+        } else {
+            playerManager.stopAccessingCurrentTrack()
+            currentTrackDisplayable = track
 
-               playerManager.updateNowPlayingInfo(
-                   track: track,
-                   currentTime: 0,
-                   duration: trackDuration
-               )
+            if let libTrack = track as? LibraryTrack {
+                self.libraryTracksContext = context.compactMap { $0 as? LibraryTrack }
+            } else {
+                self.libraryTracksContext = []
+            }
 
-               DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                   self.playerManager.updateNowPlayingInfo(
-                       track: track,
-                       currentTime: 0,
-                       duration: self.trackDuration
-                   )
-               }
-           }
+            playerManager.play(track: track)
 
-           playerManager.observeProgress { [weak self] time in
-               self?.currentTime = time
-               if let self = self {
-                   self.playerManager.updatePlaybackTimeOnly(
-                       currentTime: time,
-                       isPlaying: self.isPlaying
-                   )
-               }
-           }
+            playerManager.updateNowPlayingInfo(
+                track: track,
+                currentTime: 0,
+                duration: trackDuration
+            )
 
-           isPlaying = true
-       }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                self.playerManager.updateNowPlayingInfo(
+                    track: track,
+                    currentTime: 0,
+                    duration: self.trackDuration
+                )
+            }
+        }
+
+        playerManager.observeProgress { [weak self] time in
+            self?.currentTime = time
+            if let self = self {
+                self.playerManager.updatePlaybackTimeOnly(
+                    currentTime: time,
+                    isPlaying: self.isPlaying
+                )
+            }
+        }
+
+        isPlaying = true
+    }
 
        
        // MARK: - Управление воспроизведением
@@ -136,35 +144,69 @@ final class PlayerViewModel: ObservableObject {
        
        // MARK: - Переход между треками
 
-       @MainActor
-       func playNextTrack() {
-           guard let current = currentTrackDisplayable as? Track else { return }
-           let tracks = trackListViewModel.tracks
-           guard let index = tracks.firstIndex(of: current),
-                 index + 1 < tracks.count else {
-               print("⏭ Следующего трека нет")
-               return
-           }
+    @MainActor
+    
+    // Следующий трек
+    func playNextTrack() {
+        guard let current = currentTrackDisplayable else { return }
 
-           let nextTrack = tracks[index + 1]
-           play(track: nextTrack)
-       }
-       
-       @MainActor
-       func playPreviousTrack() {
-           guard let current = currentTrackDisplayable as? Track else { return }
-           let tracks = trackListViewModel.tracks
-           guard let index = tracks.firstIndex(of: current),
-                 index - 1 >= 0 else {
-               print("⏮ Предыдущего трека нет")
-               return
-           }
+        if let libTrack = current as? LibraryTrack {
+            guard let index = libraryTracksContext.firstIndex(where: { $0.fileName == libTrack.fileName }) else {
+                print("⏭ Не найден текущий трек в списке libraryTracksContext")
+                return
+            }
 
-           let previousTrack = tracks[index - 1]
-           play(track: previousTrack)
-       }
+            let nextIndex = index + 1
+            if nextIndex < libraryTracksContext.count {
+                play(track: libraryTracksContext[nextIndex], context: libraryTracksContext)
+            } else {
+                print("⏭ Следующего трека нет в фонотеке")
+            }
+
+        } else if let track = current as? Track {
+            let tracks = trackListViewModel.tracks
+            guard let index = tracks.firstIndex(of: track),
+                  index + 1 < tracks.count else {
+                print("⏭ Следующего трека нет в треклисте")
+                return
+            }
+
+            play(track: tracks[index + 1])
+        }
+    }
        
+    @MainActor
+    
+    // Предыдущий трек
+    func playPreviousTrack() {
+        guard let current = currentTrackDisplayable else { return }
+
+        if let libTrack = current as? LibraryTrack {
+            guard let index = libraryTracksContext.firstIndex(where: { $0.fileName == libTrack.fileName }) else {
+                print("⏮ Не найден текущий трек в списке libraryTracksContext")
+                return
+            }
+
+            let prevIndex = index - 1
+            if prevIndex >= 0 {
+                play(track: libraryTracksContext[prevIndex], context: libraryTracksContext)
+            } else {
+                print("⏮ Предыдущего трека нет в фонотеке")
+            }
+
+        } else if let track = current as? Track {
+            let tracks = trackListViewModel.tracks
+            guard let index = tracks.firstIndex(of: track),
+                  index - 1 >= 0 else {
+                print("⏮ Предыдущего трека нет в треклисте")
+                return
+            }
+
+            play(track: tracks[index - 1])
+        }
+    }
        
+    
        // MARK: - Очистка ресурсов
        
        deinit {

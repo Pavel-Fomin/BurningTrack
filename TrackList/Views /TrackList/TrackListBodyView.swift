@@ -36,12 +36,11 @@ struct TrackListBodyView: View {
             List {
                 ForEach(Array(trackListViewModel.tracks.enumerated()), id: \.element.id) { index, track in
                     let isCurrent = (playerViewModel.currentTrackDisplayable as? Track)?.id == track.id
-                    let isPlaying = playerViewModel.isPlaying && isCurrent
+                    
                     
                     RowWrapper(
                         track: track,
-                        isPlaying: isPlaying,
-                        isCurrent: isCurrent,
+                        playerViewModel: playerViewModel,
                         onTap: {
                             if track.isAvailable {
                                 if isCurrent {
@@ -62,20 +61,18 @@ struct TrackListBodyView: View {
             }
         }
     }
-
-        private struct RowWrapper: View {
-                let track: Track
-                let isPlaying: Bool
-                let isCurrent: Bool
-                let onTap: () -> Void
-                
-                var body: some View {
-                    TrackRowView(
-                        track: track,
-                        isPlaying: isPlaying,
-                        isCurrent: isCurrent,
-                        onTap: onTap
-                    )
-                }
-            }
+    
+    private struct RowWrapper: View {
+        let track: Track
+        let playerViewModel: PlayerViewModel
+        let onTap: () -> Void
+        
+        var body: some View {
+            TrackRowView(
+                playerViewModel: playerViewModel,
+                track: track,
+                onTap: onTap
+            )
         }
+    }
+}

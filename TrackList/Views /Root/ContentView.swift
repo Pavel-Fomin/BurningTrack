@@ -10,29 +10,63 @@
 import SwiftUI
 
 struct ContentView: View {
+    @ObservedObject var playerViewModel: PlayerViewModel
     let trackListViewModel: TrackListViewModel
-    let playerViewModel: PlayerViewModel
+    @State private var selectedTab: Int = 0
 
     var body: some View {
-        
-        TabView {
-            PlayerScreen(
-                trackListViewModel: trackListViewModel,
-                playerViewModel: playerViewModel
-            )
+        TabView(selection: $selectedTab) {
+            ZStack(alignment: .bottom) {
+                PlayerScreen(
+                    trackListViewModel: trackListViewModel,
+                    playerViewModel: playerViewModel
+                )
+                if playerViewModel.currentTrackDisplayable != nil && selectedTab != 2 {
+                    MiniPlayerView(
+                        playerViewModel: playerViewModel,
+                        trackListViewModel: trackListViewModel
+                    )
+                    .padding(.bottom, 8)
+                }
+            }
             .tabItem {
                 Label("Плеер", systemImage: "play.circle.fill")
             }
+            .tag(0)
+         
 
-            LibraryScreen(playerViewModel: playerViewModel)
-                .tabItem {
-                    Label("Фонотека", systemImage: "music.note.list")
+            ZStack(alignment: .bottom) {
+                LibraryScreen(playerViewModel: playerViewModel)
+                if playerViewModel.currentTrackDisplayable != nil && selectedTab != 2 {
+                    MiniPlayerView(
+                        playerViewModel: playerViewModel,
+                        trackListViewModel: trackListViewModel
+                    )
+                    .padding(.bottom, 8)
                 }
-
-            SettingsScreen()
-                .tabItem {
-                    Label("Настройки", systemImage: "gearshape")
+            }
+            .tabItem {
+                Label("Фонотека", systemImage: "music.note.list")
+            }
+            .tag(1)
+            
+            
+            ZStack(alignment: .bottom) {
+                SettingsScreen()
+                if playerViewModel.currentTrackDisplayable != nil && selectedTab != 2 {
+                    MiniPlayerView(
+                        playerViewModel: playerViewModel,
+                        trackListViewModel: trackListViewModel
+                    )
+                    .padding(.bottom, 8)
                 }
+            }
+            .tabItem {
+                Label("Настройки", systemImage: "gearshape")
+            }
+            .tag(2)
+            
+            }
         }
     }
-}
+

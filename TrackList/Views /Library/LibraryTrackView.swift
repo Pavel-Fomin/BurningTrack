@@ -11,23 +11,20 @@ import SwiftUI
 
 struct LibraryTrackView: View {
     let tracks: [LibraryTrack]
+    let allTracks: [LibraryTrack]
     let playerViewModel: PlayerViewModel
-
+    
     var body: some View {
         ForEach(tracks) { track in
-            let isCurrent = playerViewModel.currentTrackDisplayable?.id == track.id
-            let isPlaying = isCurrent && playerViewModel.isPlaying
-
             LibraryTrackRow(
                 track: track,
-                isPlaying: isPlaying,
-                isCurrent: isCurrent,
+                playerViewModel: playerViewModel,
                 onTap: {
                     if track.isAvailable {
-                        if isCurrent {
+                        if playerViewModel.currentTrackDisplayable?.id == track.id {
                             playerViewModel.togglePlayPause()
                         } else {
-                            playerViewModel.play(track: track)
+                            playerViewModel.play(track: track, context: allTracks)
                         }
                     } else {
                         print("❌ Трек недоступен: \(track.title ?? track.fileName)")
