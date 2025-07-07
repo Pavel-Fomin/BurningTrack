@@ -9,7 +9,7 @@
 //
 
 import Foundation
-import AVFoundation
+@preconcurrency import AVFoundation
 import Combine
 import MediaPlayer
 
@@ -98,7 +98,10 @@ final class PlayerManager {
                 
                 let playerItem = AVPlayerItem(url: resolvedURL)
                 print("📦 AVPlayerItem создан. Статус: \(playerItem.status.rawValue)")
-                print("📺 isPlayable:", playerItem.asset.isPlayable)
+
+                let isPlayable = try await playerItem.asset.load(.isPlayable)
+                print("📺 isPlayable:", isPlayable)
+                
                 player.replaceCurrentItem(with: playerItem)
                 NotificationCenter.default.addObserver(
                     forName: .AVPlayerItemFailedToPlayToEndTime,
@@ -114,8 +117,8 @@ final class PlayerManager {
                 player.play()
                 print("▶️ Попытка воспроизведения трека: \(resolvedURL.lastPathComponent)")
                 
-                // ⏱️ Загрузка длительности
-                let asset = playerItem.asset
+                // Загрузка длительности
+                let asset = await playerItem.asset
                 let duration = try await asset.load(.duration)
                 let audioTracks = try await asset.loadTracks(withMediaType: .audio)
                 let timeRange = try await audioTracks.first?.load(.timeRange)
@@ -137,7 +140,7 @@ final class PlayerManager {
                     )
                 }
                 
-                // 🐞 Отладка (опционально)
+                // Отладка (опционально)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                     Task {
                         do {

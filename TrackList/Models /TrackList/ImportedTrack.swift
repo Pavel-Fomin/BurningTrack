@@ -68,8 +68,8 @@ struct ImportedTrack: Codable, Identifiable {
 
 extension ImportedTrack {
     func startAccessingIfNeeded() -> Bool {
+        
         // Безопасно извлекаем bookmarkBase64
-        guard let base64 = bookmarkBase64 else { return false }
         guard let base64 = bookmarkBase64,
               let data = Data(base64Encoded: base64) else { return false }
         
@@ -83,3 +83,19 @@ extension ImportedTrack {
         }
     }
 }
+
+extension ImportedTrack: TrackDisplayable {
+    var url: URL {
+        (try? resolvedURL()) ?? URL(fileURLWithPath: filePath)
+    }
+
+    var artwork: UIImage? {
+        if let artworkId = artworkId {
+            return ArtworkManager.loadArtwork(id: artworkId)
+        }
+        return nil
+    }
+}
+
+
+
