@@ -18,7 +18,9 @@ struct TrackRowView: View {
 
     var body: some View {
         HStack(spacing: 12) {
+            
             // MARK: - Обложка с иконкой поверх
+            
             ZStack {
                 if let image = track.artwork {
                     Image(uiImage: image)
@@ -42,6 +44,7 @@ struct TrackRowView: View {
             }
 
             // MARK: - Текстовая информация
+            
             let artist = track.artist?
                 .trimmingCharacters(in: .whitespaces)
                 .lowercased()

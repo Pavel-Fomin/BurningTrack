@@ -16,4 +16,5 @@ protocol TrackDisplayable: Identifiable {
     var duration: Double { get }
     var isAvailable: Bool { get }
     var fileName: String { get }
+    var url: URL { get }
 }

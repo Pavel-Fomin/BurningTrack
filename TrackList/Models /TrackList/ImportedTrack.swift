@@ -64,3 +64,22 @@ struct ImportedTrack: Codable, Identifiable {
         return url
     }
 }
+
+
+extension ImportedTrack {
+    func startAccessingIfNeeded() -> Bool {
+        // Безопасно извлекаем bookmarkBase64
+        guard let base64 = bookmarkBase64 else { return false }
+        guard let base64 = bookmarkBase64,
+              let data = Data(base64Encoded: base64) else { return false }
+        
+        var isStale = false
+        do {
+            let url = try URL(resolvingBookmarkData: data, bookmarkDataIsStale: &isStale)
+            return url.startAccessingSecurityScopedResource()
+        } catch {
+            print("❌ Ошибка доступа к ImportedTrack: \(error)")
+            return false
+        }
+    }
+}

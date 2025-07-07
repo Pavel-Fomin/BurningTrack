@@ -10,10 +10,15 @@
 import SwiftUI
 
 // MARK: - Основное тело списка треков
-struct TrackListBodyView: View {
-    @ObservedObject var trackListViewModel: TrackListViewModel   // ViewModel треклиста
-    @ObservedObject var playerViewModel: PlayerViewModel         // ViewModel плеера
 
+struct TrackListBodyView: View {
+    
+    // ViewModel треклиста
+    @ObservedObject var trackListViewModel: TrackListViewModel
+    
+    // ViewModel плеера
+    @ObservedObject var playerViewModel: PlayerViewModel
+    
     var body: some View {
         VStack {
             trackListView()
@@ -23,24 +28,27 @@ struct TrackListBodyView: View {
             trackListViewModel.loadTracks()
         }
     }
-
+    
     // MARK: - Отображение списка треков
+    
     private func trackListView() -> some View {
         ScrollViewReader { proxy in
             List {
                 ForEach(Array(trackListViewModel.tracks.enumerated()), id: \.element.id) { index, track in
-                    let isCurrent = playerViewModel.currentTrack?.id == track.id
-
-                    TrackRowView(
+                    let isCurrent = (playerViewModel.currentTrackDisplayable as? Track)?.id == track.id
+                    let isPlaying = playerViewModel.isPlaying && isCurrent
+                    
+                    RowWrapper(
                         track: track,
-                        isPlaying: playerViewModel.isPlaying,
+                        isPlaying: isPlaying,
                         isCurrent: isCurrent,
                         onTap: {
-                            print("🖱️ Row tapped:", track.title ?? track.fileName)
-                            if isCurrent {
-                                playerViewModel.togglePlayPause()
-                            } else {
-                                playerViewModel.play(track: track)
+                            if track.isAvailable {
+                                if isCurrent {
+                                    playerViewModel.togglePlayPause()
+                                } else {
+                                    playerViewModel.play(track: track)
+                                }
                             }
                         }
                     )
@@ -54,4 +62,20 @@ struct TrackListBodyView: View {
             }
         }
     }
-}
+
+        private struct RowWrapper: View {
+                let track: Track
+                let isPlaying: Bool
+                let isCurrent: Bool
+                let onTap: () -> Void
+                
+                var body: some View {
+                    TrackRowView(
+                        track: track,
+                        isPlaying: isPlaying,
+                        isCurrent: isCurrent,
+                        onTap: onTap
+                    )
+                }
+            }
+        }

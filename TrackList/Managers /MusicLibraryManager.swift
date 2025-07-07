@@ -8,6 +8,8 @@
 import Foundation
 import UniformTypeIdentifiers
 import Combine
+import AVFoundation
+import UIKit
 
 
 final class MusicLibraryManager: ObservableObject {
@@ -213,6 +215,44 @@ final class MusicLibraryManager: ObservableObject {
         DispatchQueue.main.async {
             self.attachedFolders.removeAll { $0.url == folderURL }
             self.tracks = self.attachedFolders.flatMap { $0.audioFiles }
+        }
+    }
+    
+    func generateLibraryTracks(from urls: [URL]) async -> [LibraryTrack] {
+        await withTaskGroup(of: LibraryTrack?.self) { group in
+            for url in urls {
+                group.addTask {
+                    let asset = AVURLAsset(url: url)
+                    let duration = try? await asset.load(.duration)
+                    let durationSeconds = duration.map(CMTimeGetSeconds)
+
+                    let resourceValues = try? url.resourceValues(forKeys: [.creationDateKey, .contentModificationDateKey])
+                    let addedDate = resourceValues?.creationDate ?? resourceValues?.contentModificationDate ?? Date()
+
+                    let metadata = try? await MetadataParser.parseMetadata(from: url)
+
+                    let bookmarkData = try? url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
+                    let bookmarkBase64 = bookmarkData?.base64EncodedString() ?? ""
+
+                    return LibraryTrack(
+                        url: url,
+                        bookmarkBase64: bookmarkBase64,
+                        title: metadata?.title,
+                        artist: metadata?.artist,
+                        duration: metadata?.duration ?? durationSeconds ?? 0,
+                        artwork: metadata?.artworkData.flatMap { UIImage(data: $0) },
+                        addedDate: addedDate
+                    )
+                }
+            }
+
+            var results: [LibraryTrack] = []
+            for await result in group {
+                if let track = result {
+                    results.append(track)
+                }
+            }
+            return results
         }
     }
 }

@@ -65,7 +65,7 @@ struct PlayerScreen: View {
                     
                     // MARK: - Мини-плеер
                 
-                    if playerViewModel.currentTrack != nil {
+                if playerViewModel.currentTrackDisplayable != nil {
                         MiniPlayerView(
                             playerViewModel: playerViewModel,
                             trackListViewModel: trackListViewModel

@@ -16,27 +16,30 @@ struct TrackListView: View {
     @ObservedObject var trackListViewModel: TrackListViewModel
     @ObservedObject var playerViewModel: PlayerViewModel
     @Environment(\.colorScheme) var colorScheme
-
+    
     var body: some View {
         List {
             
             // MARK: - Счётчик треков
-            Section {
+            
+            Group {
                 Text("\(trackListViewModel.tracks.count) треков · \(trackListViewModel.formattedTotalDuration)")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .padding(.vertical, 4)
+                    .padding(.horizontal,16)
             }
-
+            .listRowInsets(EdgeInsets())
+            .listRowBackground(Color.clear)
+            
             // MARK: - Список треков
-            ForEach(trackListViewModel.tracks) { track in
-                TrackRowView(
-                    track: track,
-                    isPlaying: playerViewModel.isPlaying && playerViewModel.currentTrack?.id == track.id,
-                    isCurrent: playerViewModel.currentTrack?.id == track.id,
-                    onTap: {
+            Section {
+                TrackListRowsView(
+                    tracks: trackListViewModel.tracks,
+                    playerViewModel: playerViewModel,
+                    onTap: { track in
                         if track.isAvailable {
-                            if playerViewModel.currentTrack?.id == track.id {
+                            if (playerViewModel.currentTrackDisplayable as? Track)?.id == track.id {
                                 playerViewModel.togglePlayPause()
                             } else {
                                 playerViewModel.play(track: track)
@@ -44,24 +47,52 @@ struct TrackListView: View {
                         } else {
                             print("❌ Трек недоступен: \(track.title ?? track.fileName)")
                         }
+                    },
+                    onDelete: { indexSet in
+                        trackListViewModel.removeTrack(at: indexSet)
+                    },
+                    onMove: { indices, newOffset in
+                        trackListViewModel.moveTrack(from: indices, to: newOffset)
                     }
                 )
-                .padding(.vertical, 4)
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
             }
-            .onDelete { indexSet in
-                trackListViewModel.removeTrack(at: indexSet)
-            }
-            .onMove { indices, newOffset in
-                trackListViewModel.moveTrack(from: indices, to: newOffset)
-            }
-        }
-        .onAppear {
-            // Проверка доступности треков при отображении
-            trackListViewModel.refreshTrackAvailability()
         }
         .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-        .background(Color.clear)
+            .scrollContentBackground(.hidden)
+            .background(Color.clear)
+            .padding(.horizontal, 0) // ⬅️ ВНЕ List
+            .padding(.top, 12)
     }
+        private struct TrackListRowsView: View {
+            let tracks: [Track]
+            let playerViewModel: PlayerViewModel
+            let onTap: (Track) -> Void
+            let onDelete: (IndexSet) -> Void
+            let onMove: (IndexSet, Int) -> Void
+            
+            var body: some View {
+                ForEach(tracks) { track in
+                    let isCurrent = (playerViewModel.currentTrackDisplayable as? Track)?.id == track.id
+                    let isPlaying = playerViewModel.isPlaying && isCurrent
+                    
+                    TrackRowView(
+                        track: track,
+                        isPlaying: isPlaying,
+                        isCurrent: isCurrent,
+                        onTap: { onTap(track) }
+                    )
+                    .padding(.vertical, 4)
+                    .listRowInsets(EdgeInsets())      /// Убираем отступы List
+                    .listRowBackground(Color.clear)   /// На всякий случай — если есть фон
+                    .padding(.vertical, 8)
+                    .padding(.horizontal,16)/// Только внутренний отступ
+                }
+                .onDelete(perform: onDelete)
+                .onMove(perform: onMove)
+            }
+        }
+    }
+    
 
-}

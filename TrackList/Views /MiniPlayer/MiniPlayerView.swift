@@ -15,7 +15,7 @@ struct MiniPlayerView: View {
     @ObservedObject var trackListViewModel: TrackListViewModel
     
     var body: some View {
-        if let track = playerViewModel.currentTrack {
+        if let track = playerViewModel.currentTrackDisplayable {
             VStack {
                 
                 // MARK: - Верхняя часть: обложка + информация + кнопки

@@ -26,15 +26,14 @@ struct TrackMetadata {
 // MARK: - Основной парсер метаданных
 
 final class MetadataParser {
-
-    /// Асинхронно получает длительность через AVAsset и теги через TagLib
+    static let shared = MetadataParser()
+    
+    // Асинхронно получает длительность через AVAsset и теги через TagLib
     static func parseMetadata(from url: URL) async throws -> TrackMetadata {
-        // Получаем длительность
         let asset = AVURLAsset(url: url)
         let duration = try await asset.load(.duration)
         let durationSeconds = CMTimeGetSeconds(duration)
-
-        // Парсим через TagLib
+        
         return TLTagLibFile(fileURL: url).readMetadata(duration: durationSeconds)
     }
 }
