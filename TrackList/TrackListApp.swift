@@ -16,6 +16,8 @@ import SwiftUI
 struct TrackListApp: App {
     let trackListViewModel: TrackListViewModel
     let playerViewModel: PlayerViewModel
+    @StateObject private var toast = ToastManager()
+
 
     init() {
         let trackListVM = TrackListViewModel()
@@ -29,6 +31,7 @@ struct TrackListApp: App {
                 playerViewModel: playerViewModel,
                 trackListViewModel: trackListViewModel
             )
+            .environmentObject(toast)
         }
     }
 }

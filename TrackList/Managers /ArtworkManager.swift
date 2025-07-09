@@ -11,8 +11,9 @@
 import UIKit
 
 struct ArtworkManager {
-    /// URL до папки /Documents/artworks
-    /// Создаётся при первом обращении, если ещё не существует
+    
+    // URL до папки /Documents/artworks
+    // Создаётся при первом обращении, если ещё не существует
     static let artworksFolderURL: URL = {
         let fileManager = FileManager.default
         let documents = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!

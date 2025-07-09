@@ -12,7 +12,8 @@ import Foundation
 import UIKit
 import AVFoundation
 
-/// Представляет один аудиотрек в приложении (после импорта)
+// MARK: - Представляет один аудиотрек в приложении (после импорта)
+
 struct Track: Identifiable {
     let id: UUID
     let url: URL
@@ -22,6 +23,7 @@ struct Track: Identifiable {
     let fileName: String
     let artwork: UIImage?
     let isAvailable: Bool /// Флаг доступности трека
+    
     
     // MARK: - Проверка доступности трека (обновление isAvailable)
     
@@ -134,3 +136,21 @@ extension Track: Equatable {
 // MARK: - Соответствие TrackDisplayable
 
 extension Track: TrackDisplayable { }
+
+
+// MARK: - Инициализатор
+
+extension Track {
+    init(from libraryTrack: LibraryTrack) {
+        self.init(
+            id: libraryTrack.id,
+            url: libraryTrack.url,
+            artist: libraryTrack.artist,
+            title: libraryTrack.title,
+            duration: libraryTrack.duration,
+            fileName: libraryTrack.fileName,
+            artwork: libraryTrack.artwork,
+            isAvailable: libraryTrack.isAvailable
+        )
+    }
+}

@@ -98,7 +98,7 @@ struct MiniPlayerView: View {
                             withAnimation(.spring()) { dragOffsetX = 0 }
                         }
                 )
-                
+               
                 
                 // MARK: - Прогресс трека
                 
@@ -138,6 +138,13 @@ struct MiniPlayerView: View {
                 .padding(.top, 8) /// отступ между строками
                 
             }
+            
+            .background(
+                GeometryReader { proxy in
+                    Color.clear
+                        .preference(key: MiniPlayerHeightPreferenceKey.self, value: proxy.size.height)
+                }
+            )
             .padding(.horizontal, 12)
             .padding(.vertical, 12)
             .background(.ultraThinMaterial)

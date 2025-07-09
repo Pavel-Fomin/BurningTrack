@@ -13,71 +13,67 @@ struct LibraryScreen: View {
     @State private var selectedTab = 0
     @State private var isShowingFolderPicker = false
     private let musicLibraryManager = MusicLibraryManager.shared
-    @State private var refreshTrigger = false
+    @State private var path: [LibraryFolder] = []
+    
     let playerViewModel: PlayerViewModel
+    @EnvironmentObject var toast: ToastManager
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 12) {
-                
-                // Заголовок, как в плеере
-                HStack {
-                    Text("Фонотека")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-
-                    Spacer()
-
-                    Button(action: {
-                        isShowingFolderPicker = true
-                    }) {
-                        Image(systemName: "plus")
-                            .font(.title2)
-                    }
-                }
-                .padding(.horizontal)
-                .padding(.top, 8)
-
-                // Переключатель Музыка / Треклисты
-                Picker("Раздел", selection: $selectedTab) {
-                    Text("Музыка").tag(0)
-                    Text("Треклисты").tag(1)
-                }
-                .pickerStyle(.segmented)
-                .padding(.horizontal)
-
-                // Контент
-                Group {
-                    if selectedTab == 0 {
-                        MusicLibraryView(playerViewModel: playerViewModel)
-                    } else {
-                        TrackListLibraryView()
+        NavigationStack(path: $path) {
+            ZStack {
+                VStack(spacing: 12) {
+                    if path.isEmpty {
+                        LibraryHeaderView(
+                            selectedTab: $selectedTab,
+                            onAddFolder: {
+                                isShowingFolderPicker = true
+                            }
+                        )
                     }
 
+                    Group {
+                        if selectedTab == 0 {
+                            MusicLibraryView(
+                                path: $path,
+                                playerViewModel: playerViewModel
+                            )
+                        } else {
+                            TrackListLibraryView()
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                if let data = toast.data {
+                    ToastView(data: data)
+                        .padding(.bottom, 24)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .animation(.easeInOut(duration: 0.3), value: data.id)
+                }
             }
-        }
-        
-        .onAppear {
-            print("🧭 LibraryScreen появился — восстанавливаем доступ к папке")
-            musicLibraryManager.restoreAccess()
-    
-        }
-        
-        .fileImporter(
-            isPresented: $isShowingFolderPicker,
-            allowedContentTypes: [.folder],
-            allowsMultipleSelection: false
-        ) { result in
-            switch result {
-            case .success(let urls):
-                if let folderURL = urls.first {
-                    MusicLibraryManager.shared.saveBookmark(for: folderURL)
-                    MusicLibraryManager.shared.restoreAccess()
+            .navigationDestination(for: LibraryFolder.self) { folder in
+                LibraryFolderView(
+                    folder: folder,
+                    playerViewModel: playerViewModel
+                )
+            }
+            .onAppear {
+                musicLibraryManager.restoreAccess()
+            }
+            .fileImporter(
+                isPresented: $isShowingFolderPicker,
+                allowedContentTypes: [.folder],
+                allowsMultipleSelection: false
+            ) { result in
+                switch result {
+                case .success(let urls):
+                    if let folderURL = urls.first {
+                        musicLibraryManager.saveBookmark(for: folderURL)
+                        musicLibraryManager.restoreAccess()
+                    }
+                case .failure(let error):
+                    print("❌ Ошибка выбора папки: \(error.localizedDescription)")
                 }
-            case .failure(let error):
-                print("❌ Ошибка выбора папки: \(error.localizedDescription)")
             }
         }
     }

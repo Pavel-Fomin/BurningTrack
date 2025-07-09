@@ -82,3 +82,10 @@ extension LibraryTrack {
         artist
     }
 }
+
+
+extension LibraryTrack: Equatable {
+    static func == (lhs: LibraryTrack, rhs: LibraryTrack) -> Bool {
+        lhs.id == rhs.id
+    }
+}

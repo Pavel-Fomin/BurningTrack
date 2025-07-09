@@ -10,7 +10,6 @@ import SwiftUI
 struct LibraryFolderView: View {
     let folder: LibraryFolder
     @ObservedObject var playerViewModel: PlayerViewModel
-    
     private var allVisibleTracks: [LibraryTrack] {
         trackSections.flatMap { $0.tracks }
     }
@@ -19,7 +18,7 @@ struct LibraryFolderView: View {
     // MARK: - Вспомогательная модель секции
     
     struct TrackSection: Identifiable {
-        let id = UUID()
+        let id: String // ← был UUID
         let title: String
         let tracks: [LibraryTrack]
     }
@@ -27,19 +26,21 @@ struct LibraryFolderView: View {
     @State private var trackSections: [TrackSection] = []
     
     var body: some View {
-        List {
-            folderSectionView()
-            trackSectionsView()
+        ZStack {
+            List {
+                folderSectionView()
+                trackSectionsView()
+            }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(Color.clear)
+            .navigationTitle(folder.name)
+            .task {
+                await loadTracksIfNeeded()
+            }
         }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-        .background(Color.clear)
-        .navigationTitle(folder.name)
-        .task {
-            await loadTracksIfNeeded()
-        }
+        
     }
-    
     
     // MARK: - Загрузка треков
     
@@ -51,71 +52,84 @@ struct LibraryFolderView: View {
         let grouped = groupTracksByDate(libraryTracks)
         
         await MainActor.run {
+            // Проверяем: одинаковые ли секции (по id и количеству)
+            let current = trackSections.flatMap { $0.tracks.map(\.id) }
+            let new = grouped.flatMap { $0.tracks.map(\.id) }
+
+            guard current != new else { return } // если ничего не изменилось — не обновляем
+
             trackSections = grouped
+        
         }
     }
-    
-    
-    // MARK: - Группировка по дате
-    
-    private func groupTracksByDate(_ tracks: [LibraryTrack]) -> [TrackSection] {
-        let calendar = Calendar.current
         
-        let grouped = Dictionary(grouping: tracks) { track in
-            let date = track.addedDate
+        // MARK: - Группировка по дате
+        
+        private func groupTracksByDate(_ tracks: [LibraryTrack]) -> [TrackSection] {
+            let calendar = Calendar.current
             
-            if calendar.isDateInToday(date) {
-                return "Сегодня"
-            } else if calendar.isDateInYesterday(date) {
-                return "Вчера"
-            } else {
-                let formatter = DateFormatter()
-                formatter.dateStyle = .medium
-                formatter.timeStyle = .none
-                formatter.locale = .current
-                return formatter.string(from: date)
+            let grouped = Dictionary(grouping: tracks) { track in
+                let date = track.addedDate
+                
+                if calendar.isDateInToday(date) {
+                    return "Сегодня"
+                } else if calendar.isDateInYesterday(date) {
+                    return "Вчера"
+                } else {
+                    let formatter = DateFormatter()
+                    formatter.dateStyle = .medium
+                    formatter.timeStyle = .none
+                    formatter.locale = .current
+                    return formatter.string(from: date)
+                }
             }
+            
+            return grouped
+                .map { TrackSection(id: $0.key, title: $0.key, tracks: $0.value.sorted { $0.addedDate > $1.addedDate }) }
+                .sorted { $0.tracks.first!.addedDate > $1.tracks.first!.addedDate }
         }
         
-        return grouped
-            .map { TrackSection(title: $0.key, tracks: $0.value.sorted { $0.addedDate > $1.addedDate }) }
-            .sorted { $0.tracks.first!.addedDate > $1.tracks.first!.addedDate }
-    }
-    
-    
-    // MARK: - Секция подпапок
-    
-    @ViewBuilder
-    private func folderSectionView() -> some View {
-        if !folder.subfolders.isEmpty {
-            Section {
-                ForEach(folder.subfolders) { subfolder in
-                    NavigationLink(destination: LibraryFolderView(folder: subfolder, playerViewModel: playerViewModel)) {
-                        HStack(spacing: 12) {
-                            Image(systemName: "folder")
-                                .foregroundColor(.blue)
-                                .frame(width: 24)
-                            Text(subfolder.name)
-                                .lineLimit(1)
+        
+        // MARK: - Секция подпапок
+        
+        @ViewBuilder
+        private func folderSectionView() -> some View {
+            if !folder.subfolders.isEmpty {
+                Section {
+                    ForEach(folder.subfolders) { subfolder in
+                        NavigationLink(
+                            destination: LibraryFolderView(
+                                folder: subfolder,
+                                playerViewModel: playerViewModel
+                            )
+                        ) {
+                            HStack(spacing: 12) {
+                                Image(systemName: "folder")
+                                    .foregroundColor(.blue)
+                                    .frame(width: 24)
+                                Text(subfolder.name)
+                                    .lineLimit(1)
+                            }
+                            .padding(.vertical, 4)
                         }
-                        .padding(.vertical, 4)
+                        
                     }
                 }
             }
         }
-    }
-    
-    // MARK: - Секция треков с разделителями по дате
-    
-    @ViewBuilder
-    private func trackSectionsView() -> some View {
-        ForEach(trackSections) { section in
-            LibraryTrackSectionView(
-                title: section.title,
-                tracks: section.tracks,
-                allTracks: allVisibleTracks,
-                playerViewModel: playerViewModel
-            )
+        
+        
+        // MARK: - Секция треков
+        
+        @ViewBuilder
+        private func trackSectionsView() -> some View {
+            ForEach(trackSections, id: \.id) { section in
+                LibraryTrackSectionView(
+                    title: section.title,
+                    tracks: section.tracks,
+                    allTracks: allVisibleTracks,
+                    playerViewModel: playerViewModel
+                )
+            }
         }
     }
-}

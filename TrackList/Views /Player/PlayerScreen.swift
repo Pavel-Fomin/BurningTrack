@@ -26,23 +26,17 @@ struct PlayerScreen: View {
                     
                     // MARK: - Хедер: кнопки, выбор плейлиста
                     
-                    TrackListHeaderView(
-                        viewModel: trackListViewModel,
-                        selectedId: Binding(
-                            get: { trackListViewModel.currentListId },
-                            set: { trackListViewModel.currentListId = $0 }
-                        ),
-                        onSelect: { trackListViewModel.selectTrackList(id: $0) },
-                        onAddFromPlus: {
-                            trackListViewModel.importMode = .newList
-                            showImporter = true
+                    PlayerHeaderView(
+                        trackCount: playerViewModel.trackListViewModel.tracks.count,
+                        onSave: {
+                            let importedTracks = playerViewModel.trackListViewModel.tracks.map { $0.asImportedTrack() }
+                            TrackListManager.shared.createTrackList(from: importedTracks)
                         },
-                        onAddFromContextMenu: {
-                            trackListViewModel.importMode = .addToCurrent
-                            showImporter = true
+                        onExport: {
+                            isShowingExportPicker = true
                         },
-                        onToggleEditMode: {
-                            trackListViewModel.isEditing.toggle()
+                        onClear: {
+                            playerViewModel.trackListViewModel.tracks = []
                         }
                     )
                     

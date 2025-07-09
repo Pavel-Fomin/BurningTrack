@@ -17,6 +17,8 @@ struct TrackRowView: View {
     @ObservedObject var playerViewModel: PlayerViewModel
     let track: any TrackDisplayable
     let onTap: () -> Void
+    
+    var onSwipeLeft: (() -> Void)? = nil
 
     var isCurrent: Bool {
         playerViewModel.currentTrackDisplayable?.id == track.id
@@ -28,7 +30,9 @@ struct TrackRowView: View {
 
     var body: some View {
         HStack(spacing: 12) {
+            
             // MARK: - Обложка с иконкой поверх
+            
             ZStack {
                 if let image = track.artwork {
                     Image(uiImage: image)
@@ -49,9 +53,13 @@ struct TrackRowView: View {
                         .font(.system(size: 16, weight: .semibold))
                         .shadow(radius: 1)
                 }
+                
+                
             }
 
+            
             // MARK: - Текстовая информация
+            
             let artist = track.artist?
                 .trimmingCharacters(in: .whitespaces)
                 .lowercased()
@@ -88,6 +96,22 @@ struct TrackRowView: View {
                 onTap()
             } else {
                 print("❌ Трек недоступен: \(track.title ?? track.fileName)")
+            }
+        }
+        
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            if let onSwipeLeft = onSwipeLeft {
+                Button {
+                    onSwipeLeft()
+                } label: {
+                    Label {
+                        Text("Добавить в плеер")
+                            .font(.caption)
+                    } icon: {
+                        EmptyView()
+                    }
+                }
+                .tint(.accentColor)
             }
         }
         .listRowBackground(
