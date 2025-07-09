@@ -21,15 +21,16 @@ struct Track: Identifiable {
     let title: String?
     let duration: TimeInterval
     let fileName: String
-    let artwork: UIImage?
+    let artworkId: UUID?
     let isAvailable: Bool /// Флаг доступности трека
     
     
     // MARK: - Проверка доступности трека (обновление isAvailable)
     
-    /// Проверяет доступность файла вручную и возвращает новую копию трека
+    // Проверяет доступность файла вручную и возвращает новую копию трека
     func refreshAvailability() -> Track {
         var isAvailable = false
+        
 
         let accessGranted = url.startAccessingSecurityScopedResource()
         defer {
@@ -55,22 +56,23 @@ struct Track: Identifiable {
             title: self.title,
             duration: self.duration,
             fileName: self.fileName,
-            artwork: self.artwork,
+            artworkId: self.artworkId,
             isAvailable: isAvailable
         )
     }
 
     // MARK: - Загрузка трека из URL с помощью AVFoundation
     
-    /// Загружает метаданные трека через AVAsset и возвращает Track
+    // Загружает метаданные трека через AVAsset и возвращает Track
     static func load(from url: URL) async throws -> Self {
         let asset = AVURLAsset(url: url)
 
         var artist = "Неизвестен"
         var trackName = url.deletingPathExtension().lastPathComponent
         var duration: TimeInterval = 0
-        let available = FileManager.default.fileExists(atPath: url.path) //Проверка
-
+        let available = FileManager.default.fileExists(atPath: url.path)
+        
+        //Проверка
         do {
             let metadata = try await asset.load(.commonMetadata)
 
@@ -102,13 +104,13 @@ struct Track: Identifiable {
             title: trackName,
             duration: duration,
             fileName: url.lastPathComponent,
-            artwork: nil,
+            artworkId: nil,
             isAvailable: available
         )
     }
     // MARK: - Преобразование Track в ImportedTrack (для сохранения в JSON)
     
-    /// Конвертирует Track в ImportedTrack (для записи в JSON)
+    // Конвертирует Track в ImportedTrack (для записи в JSON)
     func asImportedTrack() -> ImportedTrack {
         return ImportedTrack(
             id: self.id,
@@ -120,7 +122,8 @@ struct Track: Identifiable {
             album: nil,
             duration: self.duration,
             artworkBase64: self.artwork?.pngData()?.base64EncodedString(),
-            bookmarkBase64: try? self.url.bookmarkData().base64EncodedString()
+            bookmarkBase64: try? self.url.bookmarkData().base64EncodedString(),
+            artworkId: self.artworkId
         )
     }
 }
@@ -149,8 +152,16 @@ extension Track {
             title: libraryTrack.title,
             duration: libraryTrack.duration,
             fileName: libraryTrack.fileName,
-            artwork: libraryTrack.artwork,
+            artworkId: nil,
             isAvailable: libraryTrack.isAvailable
         )
+    }
+}
+// MARK: - Вычисляемый аксессор
+
+extension Track {
+    var artwork: UIImage? {
+        guard let artworkId else { return nil }
+        return ArtworkManager.loadArtwork(id: artworkId)
     }
 }

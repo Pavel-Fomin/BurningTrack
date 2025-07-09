@@ -234,6 +234,20 @@ final class MusicLibraryManager: ObservableObject {
                     let bookmarkData = try? url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
                     let bookmarkBase64 = bookmarkData?.base64EncodedString() ?? ""
 
+                    let imported = ImportedTrack(
+                        id: UUID(),
+                        fileName: url.lastPathComponent,
+                        filePath: url.path,
+                        orderPrefix: "",
+                        title: metadata?.title,
+                        artist: metadata?.artist,
+                        album: nil,
+                        duration: metadata?.duration ?? durationSeconds ?? 0,
+                        artworkBase64: nil,
+                        bookmarkBase64: bookmarkBase64,
+                        artworkId: nil,
+                    )
+
                     return LibraryTrack(
                         url: url,
                         bookmarkBase64: bookmarkBase64,
@@ -241,7 +255,8 @@ final class MusicLibraryManager: ObservableObject {
                         artist: metadata?.artist,
                         duration: metadata?.duration ?? durationSeconds ?? 0,
                         artwork: metadata?.artworkData.flatMap { UIImage(data: $0) },
-                        addedDate: addedDate
+                        addedDate: addedDate,
+                        original: imported // 👈 обязательный аргумент
                     )
                 }
             }

@@ -19,7 +19,9 @@ private let selectedTrackListIdKey = "selectedTrackListId"
 
 @MainActor
 final class TrackListViewModel: NSObject, ObservableObject {
-    // MARK: - Состояния
+    
+    
+// MARK: - Состояния
 
     @Published var tracks: [Track] = []         /// Текущий список треков
     @Published var trackLists: [TrackList] = [] /// Все доступные треклисты (мета + треки)
@@ -33,7 +35,7 @@ final class TrackListViewModel: NSObject, ObservableObject {
 
     @Published var isEditing: Bool = false /// Режим редактирования чипсов
 
-    /// Режим импорта треков
+    // Режим импорта треков
     enum ImportMode {
         case none
         case newList
@@ -42,9 +44,13 @@ final class TrackListViewModel: NSObject, ObservableObject {
     
     @Published var importMode: ImportMode = .none
 
-    // MARK: - Инициализация
+    
+// MARK: - Инициализация
 
     override init() {
+        // Инициализация дефолтного треклиста, если ничего нет
+        TrackListManager.shared.initializeDefaultTrackListIfNeeded()
+
         let metas = TrackListManager.shared.loadTrackListMetas()
         print("📂 Все треклисты: \(metas.map { "\($0.name) (\($0.id))" })")
 
@@ -54,19 +60,24 @@ final class TrackListViewModel: NSObject, ObservableObject {
             print("🧠 Найден сохранённый ID: \(uuid)")
             self.currentListId = uuid
             TrackListManager.shared.selectTrackList(id: uuid)
+        } else if let first = metas.first {
+            print("⚠️ Сохранённый ID не найден, выбираем первый плейлист: \(first.id)")
+            self.currentListId = first.id
+            TrackListManager.shared.selectTrackList(id: first.id)
         } else {
-            print("❌ Плейлист не найден")
+            print("❌ Нет доступных треклистов — это критическая ситуация")
         }
-
+        
         super.init()
 
         loadTracks()
         refreshtrackLists()
     }
 
-    // MARK: - Треки и треклисты
+    
+// MARK: - Треки и треклисты
 
-    /// Перезагружает список всех треклистов
+    // Перезагружает список всех треклистов
     func refreshtrackLists() {
         let metas = TrackListManager.shared.loadTrackListMetas()
         trackLists = metas.reversed().map { meta in
@@ -75,14 +86,14 @@ final class TrackListViewModel: NSObject, ObservableObject {
         }
     }
 
-    /// Выбирает треклист и загружает его треки
+    // Выбирает треклист и загружает его треки
     func selectTrackList(id: UUID) {
         currentListId = id
         TrackListManager.shared.selectTrackList(id: id)
         loadTracks()
     }
 
-    /// Загружает треки для текущего треклиста
+    // Загружает треки для текущего треклиста
     func loadTracks() {
         guard let list = TrackListManager.shared.getCurrentTrackList() else {
             print("⚠️ Плейлист не выбран")
@@ -92,9 +103,10 @@ final class TrackListViewModel: NSObject, ObservableObject {
         print("✅ Загружено \(tracks.count) треков из \(list.name)")
     }
 
-    // MARK: - Импорт
+    
+// MARK: - Импорт
 
-    /// Импортирует треки в текущий треклист
+    // Импортирует треки в текущий треклист
     func importTracks(from urls: [URL]) async {
         guard let id = self.currentListId else {
             print("⚠️ Плейлист не выбран — импорт невозможен")
@@ -116,13 +128,13 @@ final class TrackListViewModel: NSObject, ObservableObject {
         }
     }
 
-    /// Старт нового импорта с созданием треклиста
+    // Старт нового импорта с созданием треклиста
     func startImportForNewTrackList() {
         print("🖋️ Вызов startImportForNewTrackList. ViewModel: \(ObjectIdentifier(self))")
         importMode = .newList
     }
 
-    /// Импорт с созданием нового плейлиста
+    // Импорт с созданием нового плейлиста
     func createNewTrackListViaImport(from urls: [URL]) async {
         await ImportManager().importTracks(from: urls, to: UUID()) { imported in
             guard !imported.isEmpty else {
@@ -141,9 +153,10 @@ final class TrackListViewModel: NSObject, ObservableObject {
         }
     }
 
-    // MARK: - Экспорт
+    
+// MARK: - Экспорт
 
-    /// Экспортирует все доступные треки текущего треклиста в выбранную папку
+    // Экспортирует все доступные треки текущего треклиста в выбранную папку
     func exportTracks(to folder: URL) {
         guard let list = TrackListManager.shared.getCurrentTrackList() else {
             print("⚠️ Плейлист не выбран")
@@ -163,9 +176,10 @@ final class TrackListViewModel: NSObject, ObservableObject {
         }
     }
 
-    // MARK: - Работа с треками в плейлисте
+    
+// MARK: - Работа с треками в плейлисте
 
-    /// Очистка треклиста (удаление всех треков и обложек)
+    // Очистка треклиста (удаление всех треков и обложек)
     func clearTrackList(id: UUID) {
         guard id == currentListId else {
             print("⚠️ Очистка невозможна: плейлист не активен")
@@ -185,7 +199,7 @@ final class TrackListViewModel: NSObject, ObservableObject {
         print("🧹 Все треки удалены из плейлиста \(id)")
     }
 
-    /// Удаляет трек по индексам
+    // Удаляет трек по индексам
     func removeTrack(at offsets: IndexSet) {
         guard let id = currentListId else { return }
         var importedTracks = TrackListManager.shared.loadTracks(for: id)
@@ -204,7 +218,7 @@ final class TrackListViewModel: NSObject, ObservableObject {
         print("🗑 Удаление завершено")
     }
 
-    /// Перемещает треки внутри плейлиста
+    // Перемещает треки внутри плейлиста
     func moveTrack(from source: IndexSet, to destination: Int) {
         guard let id = currentListId else { return }
         var tracks = TrackListManager.shared.loadTracks(for: id)
@@ -214,9 +228,10 @@ final class TrackListViewModel: NSObject, ObservableObject {
         print("🔀 Порядок треков обновлён")
     }
 
-    // MARK: - Треклисты
+    
+// MARK: - Треклисты
 
-    /// Создаёт новый пустой треклист и делает его активным
+    // Создаёт новый пустой треклист и делает его активным
     func createEmptyTrackListAndSelect() {
         let newList = TrackListManager.shared.createEmptyTrackList()
         self.currentListId = newList.id
@@ -224,7 +239,7 @@ final class TrackListViewModel: NSObject, ObservableObject {
         self.loadTracks()
     }
 
-    /// Удаляет треклист и выбирает следующий доступный
+    // Удаляет треклист и выбирает следующий доступный
     func deleteTrackList(id: UUID) {
         TrackListManager.shared.deleteTrackList(id: id)
 
@@ -249,13 +264,13 @@ final class TrackListViewModel: NSObject, ObservableObject {
         }
     }
 
-    /// Обновляет флаг доступности у каждого трека
+    // Обновляет флаг доступности у каждого трека
     func refreshTrackAvailability() {
         self.tracks = self.tracks.map { $0.refreshAvailability() }
         print("♻️ Актуализирована доступность треков")
     }
 
-    /// Проверяет, можно ли удалить треклист
+    // Проверяет, можно ли удалить треклист
     func canDeleteTrackList(id: UUID) -> Bool {
         if id == currentListId {
             let tracks = TrackListManager.shared.loadTracks(for: id)
@@ -265,6 +280,7 @@ final class TrackListViewModel: NSObject, ObservableObject {
         }
     }
 }
+
 
 // MARK: - Расширение: длительность плейлиста
 

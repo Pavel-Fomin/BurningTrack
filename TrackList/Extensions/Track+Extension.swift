@@ -13,17 +13,19 @@ import Foundation
 import UIKit
 
 extension ImportedTrack {
-    /// Преобразует ImportedTrack (данные из JSON) в Track (модель для UI/плеера)
+    
+// MARK: - Преобразует ImportedTrack (данные из JSON) в Track (модель для UI/плеера)
+    
     func asTrack() -> Track {
         let url: URL
         var isAvailable = false
 
         do {
-            /// Восстанавливаем защищённый доступ к файлу из bookmarkData
+            // Восстанавливаем защищённый доступ к файлу из bookmarkData
             url = try resolvedURL()
             let accessGranted = url.startAccessingSecurityScopedResource()
             
-            /// Проверяем, существует ли физически файл по пути
+            // Проверяем, существует ли физически файл по пути
             isAvailable = accessGranted && FileManager.default.fileExists(atPath: url.path)
             url.stopAccessingSecurityScopedResource()
         } catch {
@@ -39,8 +41,7 @@ extension ImportedTrack {
             title: title ?? fileName,
             duration: duration,
             fileName: fileName,
-            /// Загружаем изображение по ID, если оно есть
-            artwork: artworkId.flatMap { ArtworkManager.loadArtwork(id: $0) },
+            artworkId: self.artworkId,
             isAvailable: isAvailable
         )
     }

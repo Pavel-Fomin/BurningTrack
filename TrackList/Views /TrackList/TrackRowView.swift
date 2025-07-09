@@ -17,9 +17,7 @@ struct TrackRowView: View {
     @ObservedObject var playerViewModel: PlayerViewModel
     let track: any TrackDisplayable
     let onTap: () -> Void
-    
     var onSwipeLeft: (() -> Void)? = nil
-
     var isCurrent: Bool {
         playerViewModel.currentTrackDisplayable?.id == track.id
     }

@@ -49,10 +49,20 @@ struct LibraryTrackSectionView: View {
                     }
                 },
                 onSwipeLeft: {
+                    
+                    // Добавляем трек в плеер
                     let newTrack = Track(from: track)
-                    if !playerViewModel.trackListViewModel.tracks.contains(where: { $0.id == newTrack.id }) {
-                        playerViewModel.trackListViewModel.tracks.append(newTrack)
+                    var imported = track.original
+
+                    // Сохраняем обложку, если есть
+                    if let image = track.artwork {
+                        let artworkId = UUID()
+                        ArtworkManager.saveArtwork(image, id: artworkId)
+                        imported.artworkId = artworkId
                     }
+
+                    TrackListManager.shared.appendTrackToCurrentList(imported)
+                    playerViewModel.trackListViewModel.loadTracks()
 
                     toast.show(
                         message: "Добавлено в плеер",

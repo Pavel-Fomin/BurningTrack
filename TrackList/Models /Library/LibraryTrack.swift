@@ -17,6 +17,7 @@ struct LibraryTrack: Identifiable, TrackDisplayable {
     let duration: TimeInterval
     let artwork: UIImage?
     let addedDate: Date
+    let original: ImportedTrack
 
     /// Имя файла без расширения (для отображения)
     var fileName: String {

@@ -16,13 +16,39 @@ final class TrackListManager {
     static let shared = TrackListManager()  /// Singleton для централизованного доступа
     private init() {}
 
+    
     // MARK: - Пути
-
     /// Ссылка на папку /Documents
     private var documentsDirectory: URL? {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
     }
 
+    
+    // MARK: - Инициализация дефолтного треклиста
+       /// Проверяет наличие хотя бы одного треклиста и активного ID. Если нет — создаёт дефолтный треклист "Черновик"
+       func initializeDefaultTrackListIfNeeded() {
+           var metas = loadTrackListMetas()
+
+           // 1. Создаём дефолтный треклист, если ни одного не существует
+           if metas.isEmpty {
+               let id = UUID()
+               let meta = TrackListMeta(id: id, name: "Черновик", createdAt: Date())
+               metas.append(meta)
+               saveTrackListMetas(metas)
+               saveTracks([], for: id)
+               selectedTrackListId = id
+               print("📄 Создан дефолтный плейлист")
+               return
+           }
+
+           // 2. Если активный ID не выбран — выбираем первый доступный
+           if selectedTrackListId == nil {
+               selectedTrackListId = metas.first?.id
+               print("📌 Установлен выбранный плейлист: \(selectedTrackListId?.uuidString ?? "nil")")
+           }
+       }
+   
+    
     // MARK: - Метаданные (tracklists.json)
 
     /// Загружает список всех треклистов из tracklists.json
@@ -51,6 +77,7 @@ final class TrackListManager {
         return loadTrackListMetas().contains(where: { $0.id == id })
     }
 
+    
     // MARK: - Треки (tracklist_<id>.json)
 
     /// Загружает треки из файла по ID плейлиста
@@ -78,6 +105,7 @@ final class TrackListManager {
         }
     }
 
+    
     // MARK: - Управление текущим плейлистом
 
     /// ID выбранного плейлиста
@@ -111,6 +139,7 @@ final class TrackListManager {
         return TrackList(id: id, name: meta.name, createdAt: meta.createdAt, tracks: tracks)
     }
 
+    
     // MARK: - Создание треклистов
 
     /// Возвращает первый треклист или создаёт новый, если ничего нет
@@ -185,6 +214,7 @@ final class TrackListManager {
         return TrackList(id: newId, name: name, createdAt: createdAt, tracks: importedTracks)
     }
 
+    
     // MARK: - Удаление и переименование
 
     /// Удаляет треклист: удаляет JSON с треками, метаинформацию и обложки
@@ -229,6 +259,7 @@ final class TrackListManager {
         print("✏️ Название треклиста обновлено: \(newName)")
     }
 
+    
     // MARK: - Сохранение всех треклистов
 
     /// Сохраняет все треклисты (треки + мета)
@@ -243,6 +274,7 @@ final class TrackListManager {
         print("✅ Все плейлисты сохранены (отдельно треки и мета)")
     }
 
+    
     // MARK: - Отладка
 
     /// Печатает содержимое всех треклистов в консоль
@@ -256,5 +288,23 @@ final class TrackListManager {
                 print("— \(track.fileName) (\(track.artist ?? "неизвестный артист") — \(track.title ?? "неизвестный трек")), duration: \(track.duration)")
             }
         }
+    }
+    
+    func appendTrackToCurrentList(_ track: ImportedTrack) {
+        guard let id = selectedTrackListId else {
+            print("⚠️ Нет активного треклиста — не могу добавить")
+            return
+        }
+
+        var tracks = loadTracks(for: id)
+
+        guard !tracks.contains(where: { $0.id == track.id }) else {
+            print("⚠️ Трек уже в списке")
+            return
+        }
+
+        tracks.append(track)
+        saveTracks(tracks, for: id)
+        print("➕ Трек добавлен в плейлист: \(track.fileName)")
     }
 }
