@@ -26,7 +26,7 @@ struct SettingsScreen: View {
                 // Заглушка
                 HStack {
                     Spacer()
-                    Text("Настройки (в разработке)")
+                    Text("Настройки в разработке")
                         .foregroundColor(.secondary)
                     Spacer()
                 }

@@ -29,7 +29,8 @@ struct TrackListBodyView: View {
         }
     }
     
-    // MARK: - Отображение списка треков
+    
+// MARK: - Отображение списка треков
     
     private func trackListView() -> some View {
         ScrollViewReader { proxy in

@@ -20,7 +20,7 @@ struct TrackListView: View {
     var body: some View {
         List {
             
-            // MARK: - Счётчик треков
+// MARK: - Счётчик треков
             
             Group {
                 Text("\(trackListViewModel.tracks.count) треков · \(trackListViewModel.formattedTotalDuration)")
@@ -32,7 +32,9 @@ struct TrackListView: View {
             .listRowInsets(EdgeInsets())
             .listRowBackground(Color.clear)
             
-            // MARK: - Список треков
+            
+// MARK: - Список треков
+            
             Section {
                 TrackListRowsView(
                     tracks: trackListViewModel.tracks,

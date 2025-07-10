@@ -17,25 +17,34 @@ final class TrackListManager {
     private init() {}
 
     
-    // MARK: - Пути
-    /// Ссылка на папку /Documents
+// MARK: - Пути
+    
+    // Ссылка на папку /Documents
     private var documentsDirectory: URL? {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
     }
+    
+    // Возвращает URL для JSON-файла треклиста
+    private func urlForTrackList(id: UUID, isDraft: Bool = false) -> URL? {
+        guard let directory = documentsDirectory else { return nil }
+        let fileName = isDraft ? "tracklist_draft.json" : "tracklist_\(id.uuidString).json"
+        return directory.appendingPathComponent(fileName)
+    }
 
     
-    // MARK: - Инициализация дефолтного треклиста
-       /// Проверяет наличие хотя бы одного треклиста и активного ID. Если нет — создаёт дефолтный треклист "Черновик"
+// MARK: - Инициализация дефолтного треклиста
+    
+       // Проверяет наличие хотя бы одного треклиста и активного ID. Если нет — создаёт дефолтный треклист "Черновик"
        func initializeDefaultTrackListIfNeeded() {
            var metas = loadTrackListMetas()
 
            // 1. Создаём дефолтный треклист, если ни одного не существует
            if metas.isEmpty {
                let id = UUID()
-               let meta = TrackListMeta(id: id, name: "Черновик", createdAt: Date())
+               let meta = TrackListMeta(id: id, name: "Черновик", createdAt: Date(), isDraft: true)
                metas.append(meta)
                saveTrackListMetas(metas)
-               saveTracks([], for: id)
+               saveTracks([], for: id, isDraft: true)
                selectedTrackListId = id
                print("📄 Создан дефолтный плейлист")
                return
@@ -49,9 +58,9 @@ final class TrackListManager {
        }
    
     
-    // MARK: - Метаданные (tracklists.json)
+// MARK: - Метаданные (tracklists.json)
 
-    /// Загружает список всех треклистов из tracklists.json
+    // Загружает список всех треклистов из tracklists.json
     func loadTrackListMetas() -> [TrackListMeta] {
         guard let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
             .first?.appendingPathComponent("tracklists.json"),
@@ -62,7 +71,7 @@ final class TrackListManager {
         return metas
     }
 
-    /// Сохраняет список всех треклистов в tracklists.json
+    // Сохраняет список всех треклистов в tracklists.json
     func saveTrackListMetas(_ metas: [TrackListMeta]) {
         guard let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
             .first?.appendingPathComponent("tracklists.json") else { return }
@@ -72,19 +81,17 @@ final class TrackListManager {
         }
     }
 
-    /// Проверяет, существует ли плейлист с указанным ID
+    // Проверяет, существует ли плейлист с указанным ID
     func trackListExists(id: UUID) -> Bool {
         return loadTrackListMetas().contains(where: { $0.id == id })
     }
 
     
-    // MARK: - Треки (tracklist_<id>.json)
+// MARK: - Треки (tracklist_<id>.json)
 
-    /// Загружает треки из файла по ID плейлиста
-    func loadTracks(for id: UUID) -> [ImportedTrack] {
-        guard let url = FileManager.default
-            .urls(for: .documentDirectory, in: .userDomainMask)
-            .first?.appendingPathComponent("tracklist_\(id.uuidString).json"),
+    // Загружает треки из файла по ID плейлиста
+    func loadTracks(for id: UUID, isDraft: Bool = false) -> [ImportedTrack] {
+        guard let url = urlForTrackList(id: id, isDraft: isDraft),
               let data = try? Data(contentsOf: url),
               let tracks = try? JSONDecoder().decode([ImportedTrack].self, from: data) else {
             return []
@@ -92,13 +99,9 @@ final class TrackListManager {
         return tracks
     }
 
-    /// Сохраняет список треков по ID плейлиста
-    func saveTracks(_ tracks: [ImportedTrack], for id: UUID) {
-        guard let url = FileManager.default
-            .urls(for: .documentDirectory, in: .userDomainMask)
-            .first?.appendingPathComponent("tracklist_\(id.uuidString).json") else {
-            return
-        }
+    // Сохраняет список треков по ID плейлиста
+    func saveTracks(_ tracks: [ImportedTrack], for id: UUID, isDraft: Bool = false) {
+        guard let url = urlForTrackList(id: id, isDraft: isDraft) else { return }
 
         if let data = try? JSONEncoder().encode(tracks) {
             try? data.write(to: url, options: .atomic)
@@ -106,12 +109,26 @@ final class TrackListManager {
     }
 
     
-    // MARK: - Управление текущим плейлистом
+// MARK: - Возвращает треклист по его ID
+    
+    // - Parameter id: Уникальный идентификатор треклиста
+    // - Returns: Полноценный объект TrackList с метаинформацией и треками
+    // - Note: Если плейлист не найден — приложение завершится с ошибкой (fatalError)
+    func getTrackListById(_ id: UUID) -> TrackList {
+        let metas = loadTrackListMetas()
+        guard let meta = metas.first(where: { $0.id == id }) else {
+            fatalError("Плейлист не найден")
+        }
+        let tracks = loadTracks(for: id, isDraft: meta.isDraft)
+        return TrackList(id: id, name: meta.name, createdAt: meta.createdAt, tracks: tracks)
+    }
+    
+// MARK: - Управление текущим плейлистом
 
-    /// ID выбранного плейлиста
+    // ID выбранного плейлиста
     private(set) var selectedTrackListId: UUID?
 
-    /// Устанавливает активный плейлист
+    // Устанавливает активный плейлист
     func selectTrackList(id: UUID) {
         let metas = loadTrackListMetas()
         if metas.contains(where: { $0.id == id }) {
@@ -122,7 +139,7 @@ final class TrackListManager {
         }
     }
 
-    /// Получает текущий выбранный треклист (или nil, если не выбран)
+    // Получает текущий выбранный треклист (или nil, если не выбран)
     func getCurrentTrackList() -> TrackList? {
         guard let id = selectedTrackListId else {
             print("⚠️ Текущий плейлист не выбран")
@@ -135,14 +152,14 @@ final class TrackListManager {
             return nil
         }
 
-        let tracks = loadTracks(for: id)
+        let tracks = loadTracks(for: id, isDraft: meta.isDraft)
         return TrackList(id: id, name: meta.name, createdAt: meta.createdAt, tracks: tracks)
     }
 
     
-    // MARK: - Создание треклистов
+// MARK: - Создание треклистов
 
-    /// Возвращает первый треклист или создаёт новый, если ничего нет
+    // Возвращает первый треклист или создаёт новый, если ничего нет
     func getOrCreateDefaultTrackList() -> TrackList {
         let metas = loadTrackListMetas()
         if let firstMeta = metas.first {
@@ -170,7 +187,7 @@ final class TrackListManager {
         return new
     }
 
-    /// Создаёт пустой треклист и сохраняет его
+    // Создаёт пустой треклист и сохраняет его
     func createEmptyTrackList() -> TrackList {
         let formatter = DateFormatter()
         formatter.dateFormat = "dd.MM.yy, HH:mm"
@@ -182,7 +199,7 @@ final class TrackListManager {
         saveTracks([], for: newId)
 
         var metas = loadTrackListMetas()
-        let newMeta = TrackListMeta(id: newId, name: name, createdAt: createdAt)
+        let newMeta = TrackListMeta(id: newId, name: name, createdAt: createdAt, isDraft: false)
         metas.append(newMeta)
         saveTrackListMetas(metas)
 
@@ -192,7 +209,7 @@ final class TrackListManager {
         return TrackList(id: newId, name: name, createdAt: createdAt, tracks: [])
     }
 
-    /// Создаёт новый плейлист из импортированных треков
+    // Создаёт новый плейлист из импортированных треков
     @discardableResult
     func createTrackList(from importedTracks: [ImportedTrack]) -> TrackList {
         let formatter = DateFormatter()
@@ -205,8 +222,9 @@ final class TrackListManager {
         saveTracks(importedTracks, for: newId)
 
         var metas = loadTrackListMetas()
-        let newMeta = TrackListMeta(id: newId, name: name, createdAt: createdAt)
+        let newMeta = TrackListMeta(id: newId, name: name, createdAt: createdAt, isDraft: false)
         metas.append(newMeta)
+        
         saveTrackListMetas(metas)
 
         selectedTrackListId = newId
@@ -215,9 +233,9 @@ final class TrackListManager {
     }
 
     
-    // MARK: - Удаление и переименование
+// MARK: - Удаление и переименование
 
-    /// Удаляет треклист: удаляет JSON с треками, метаинформацию и обложки
+    // Удаляет треклист: удаляет JSON с треками, метаинформацию и обложки
     func deleteTrackList(id: UUID) {
         // Удаляем обложки
         let tracks = loadTracks(for: id)
@@ -245,7 +263,7 @@ final class TrackListManager {
         print("🗑️ Треклист с ID \(id) удалён")
     }
 
-    /// Переименовывает плейлист по его ID
+    // Переименовывает плейлист по его ID
     func renameTrackList(id: UUID, to newName: String) {
         var meta = loadTrackListMetas()
 
@@ -260,24 +278,25 @@ final class TrackListManager {
     }
 
     
-    // MARK: - Сохранение всех треклистов
+// MARK: - Сохранение всех треклистов
 
-    /// Сохраняет все треклисты (треки + мета)
+    // Сохраняет все треклисты (треки + мета)
     func saveTrackLists(_ trackLists: [TrackList]) {
         for list in trackLists {
             saveTracks(list.tracks, for: list.id)
         }
 
-        let metas = trackLists.map { TrackListMeta(id: $0.id, name: $0.name, createdAt: $0.createdAt) }
-        saveTrackListMetas(metas)
+        let metas = trackLists.map {
+            TrackListMeta(id: $0.id, name: $0.name, createdAt: $0.createdAt, isDraft: false)
+        }
 
         print("✅ Все плейлисты сохранены (отдельно треки и мета)")
     }
 
     
-    // MARK: - Отладка
+// MARK: - Отладка
 
-    /// Печатает содержимое всех треклистов в консоль
+    // Печатает содержимое всех треклистов в консоль
     func printTrackLists() {
         let metas = loadTrackListMetas()
         print("\n===== СОДЕРЖИМОЕ ВСЕХ ТРЕКЛИСТОВ =====")
@@ -296,7 +315,11 @@ final class TrackListManager {
             return
         }
 
-        var tracks = loadTracks(for: id)
+        let metas = loadTrackListMetas()
+        let isDraft = metas.first(where: { $0.id == id })?.isDraft ?? false
+
+        var tracks = loadTracks(for: id, isDraft: isDraft)
+
 
         guard !tracks.contains(where: { $0.id == track.id }) else {
             print("⚠️ Трек уже в списке")
@@ -304,7 +327,7 @@ final class TrackListManager {
         }
 
         tracks.append(track)
-        saveTracks(tracks, for: id)
+        saveTracks(tracks, for: id, isDraft: isDraft)
         print("➕ Трек добавлен в плейлист: \(track.fileName)")
     }
 }
