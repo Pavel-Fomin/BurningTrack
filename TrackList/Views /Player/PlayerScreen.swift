@@ -16,6 +16,7 @@ struct PlayerScreen: View {
     @State private var showImporter = false
     @State private var isShowingExportPicker = false
     
+    
     var body: some View {
         NavigationStack {
             ZStack(alignment: .bottom) {
@@ -24,23 +25,25 @@ struct PlayerScreen: View {
                 
                 VStack(spacing: 0) {
                     
-                    // MARK: - Хедер: кнопки, выбор плейлиста
+                    
+// MARK: - Хедер: кнопки, выбор плейлиста
                     
                     PlayerHeaderView(
-                        trackCount: playerViewModel.trackListViewModel.tracks.count,
+                        trackCount: trackListViewModel.tracks.count,
                         onSave: {
-                            let importedTracks = playerViewModel.trackListViewModel.tracks.map { $0.asImportedTrack() }
-                            TrackListManager.shared.createTrackList(from: importedTracks)
+                            trackListViewModel.newTrackListName = generateDefaultTrackListName()
+                            trackListViewModel.isShowingSaveSheet = true
                         },
                         onExport: {
                             isShowingExportPicker = true
                         },
                         onClear: {
-                            playerViewModel.trackListViewModel.tracks = []
+                            trackListViewModel.tracks = []
                         }
                     )
                     
-                    // MARK: - Список треков или заглушка
+                    
+// MARK: - Список треков или заглушка
                     
                     if trackListViewModel.trackLists.isEmpty {
                         Spacer()
@@ -58,7 +61,7 @@ struct PlayerScreen: View {
                 }
                 
                 
-                // MARK: - Bottom Sheet: экспорт
+// MARK: - Bottom Sheet: экспорт
                 
                 .sheet(isPresented: $isShowingExportPicker) {
                     ExportWrapper { folderURL in
@@ -69,7 +72,8 @@ struct PlayerScreen: View {
                     }
                 }
                 
-                // MARK: - FileImporter: импорт треков
+                
+// MARK: - FileImporter: импорт треков
                 
                 .fileImporter(
                     isPresented: $showImporter,
@@ -97,17 +101,19 @@ struct PlayerScreen: View {
                     }
                 }
                 
-                // MARK: - Инициализация при старте
+                
+// MARK: - Инициализация при старте
                 
                 .onAppear {
                     let startTime = Date()
                     let loadTime = Date().timeIntervalSince(startTime)
                     print("Приложение готово к работе за \(String(format: "%.2f", loadTime)) сек")
-                    trackListViewModel.refreshtrackLists()
+                    trackListViewModel.refreshTrackLists()
                     trackListViewModel.loadTracks()
                 }
                 
-                // MARK: - Навигация
+                
+// MARK: - Навигация
                 
                 .navigationBarHidden(true)
             }

@@ -2,8 +2,7 @@
 //  ToastData.swift
 //  TrackList
 //
-//  Модель данных для отображения тоста при добавлении трека.
-//  Содержит краткую информацию о треке и сообщение.
+//  МУниверсальная модель для отображения тостов
 //
 //  Created by Pavel Fomin on 08.07.2025.
 //
@@ -12,9 +11,25 @@ import Foundation
 import SwiftUI
 
 struct ToastData: Identifiable, Equatable {
-    let id: UUID = UUID()   
-    let title: String?       // Название трека
-    let artist: String?     // Исполнитель
-    let artwork: UIImage?   // Обложка
-    let message: String     // Сообщение (например, "добавлен в плеер")
+    enum Style {
+        case track(title: String, artist: String)
+        case trackList(name: String)
+    }
+
+    let id: UUID = UUID()
+    let style: Style
+    let artwork: UIImage?
+
+    var message: String {
+        switch style {
+        case .track: return "Добавлен в плеер"
+        case .trackList(let name): return "Треклист «\(name)» сохранён"
+        }
+    }
+
+    static func == (lhs: ToastData, rhs: ToastData) -> Bool {
+        lhs.style == rhs.style
+    }
 }
+
+extension ToastData.Style: Equatable {}

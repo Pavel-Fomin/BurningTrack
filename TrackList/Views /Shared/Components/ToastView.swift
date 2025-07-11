@@ -14,44 +14,50 @@ struct ToastView: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
-            // Обложка
-            if let image = data.artwork {
+
+// MARK: - Обложка (только для .track)
+            
+            if case .track = data.style, let image = data.artwork {
                 Image(uiImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
                     .frame(width: 44, height: 44)
                     .clipShape(RoundedRectangle(cornerRadius: 6))
             }
-
-            // Название, артист и сообщение
+            
+            
+// MARK: - Текстовая часть
+            
             VStack(alignment: .leading, spacing: 2) {
-                if let title = data.title {
+                switch data.style {
+                case let .track(title, artist):
                     Text(title)
                         .font(.caption)
                         .foregroundColor(.white.opacity(0.8))
                         .lineLimit(1)
-                }
 
-                if let artist = data.artist {
                     Text(artist)
                         .font(.caption)
                         .foregroundColor(.white.opacity(0.7))
                         .lineLimit(1)
+
+                case .trackList:
+                    EmptyView()
                 }
 
                 Text(data.message)
-                    .font(.caption2)
+                    .font(.caption)
                     .fontWeight(.semibold)
                     .foregroundColor(.white)
                     .lineLimit(2)
-
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading) // Сначала растягиваем содержимое
-        .padding(12)                                     // Потом паддинг
-        .background(.ultraThinMaterial)                  // Потом фон
-        .background(Color.black.opacity(0.85))           // Затем чёрная подложка
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(.ultraThinMaterial)
+        .background(Color.black.opacity(0.85))
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .padding(.horizontal, 16)                         // И последний внешний паддинг
+        .padding(.horizontal, 16)
+        .frame(minHeight: 60)
     }
 }

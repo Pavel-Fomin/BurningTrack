@@ -123,8 +123,7 @@ struct TrackListChipView: View {
                 Button("Сохранить") {
                     let trimmed = newName.trimmingCharacters(in: .whitespaces)
                     if !trimmed.isEmpty {
-                        TrackListManager.shared.renameTrackList(id: trackList.id, to: trimmed)
-                        onEdit()
+                        
                     }
                 }
                 Button("Отмена", role: .cancel) {}

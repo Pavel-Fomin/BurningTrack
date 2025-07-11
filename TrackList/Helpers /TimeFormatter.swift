@@ -9,11 +9,13 @@
 
 import Foundation
 
-/// Форматирует длительность трека в строку:
-/// до 1 часа:     "03:27"
-/// от 1 часа:     "01h:12m"
-/// от суток:      "1d:03h:12m"
-/// если значение некорректно — возвращает "–:–"
+
+// MARK: - Форматирует длительность трека в строку
+
+// до 1 часа:     "03:27"
+// от 1 часа:     "01h:12m"
+// от суток:      "1d:03h:12m"
+// если значение некорректно — возвращает "–:–"
 func formatTimeSmart(_ duration: TimeInterval) -> String {
     guard duration.isFinite && duration > 0 else { return "–:–" }
     
@@ -34,9 +36,11 @@ func formatTimeSmart(_ duration: TimeInterval) -> String {
 
  }
 
-/// Формирует подпись к треклисту на основе даты создания:
-/// В этом году: "15 июн 14:20"
-/// В прошлом году: "15 июн 2024"
+
+// MARK: - Формирует подпись к треклисту на основе даты создания
+
+// В этом году: "15 июн 14:20"
+// В прошлом году: "15 июн 2024"
 func formatTrackListLabel(from date: Date) -> String {
         let calendar = Calendar.current
         let currentYear = calendar.component(.year, from: Date())
@@ -54,3 +58,12 @@ func formatTrackListLabel(from date: Date) -> String {
         return formatter.string(from: date)
     }
 
+
+// MARK: - Возвращает название треклиста в формате: "23 июля, 12:13"
+
+func generateDefaultTrackListName() -> String {
+    let formatter = DateFormatter()
+    formatter.locale = Locale(identifier: "ru_RU")
+    formatter.dateFormat = "d MMMM, HH:mm"
+    return formatter.string(from: Date())
+}

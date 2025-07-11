@@ -13,28 +13,27 @@ final class ToastManager: ObservableObject {
     static let shared = ToastManager()
     
     @Published var data: ToastData?
+    private var dismissTask: Task<Void, Never>?
     
-    func show(
-        message: String,
-        title: String? = nil,
-        artist: String? = nil,
-        artwork: UIImage? = nil,
-        duration: TimeInterval = 5.0
-    ) {
-        let toastData = ToastData(
-            title: title,
-            artist: artist,
-            artwork: artwork,
-            message: message
-        )
+    // Показывает тост, избегая дубликатов
+    func show(_ newToast: ToastData, duration: TimeInterval = 2.0) {
+        // Отменяем предыдущий dismiss, если есть
+        dismissTask?.cancel()
         
-        print("🔥 Показать тост: \(message)")
-        self.data = toastData
+        // Если тот же самый тост — не обновляем
+        if data == newToast {
+            return
+        }
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
-            print("🧹 Очистить тост")
-            if self.data?.id == toastData.id {
-                self.data = nil
+        data = newToast
+        
+        // Планируем скрытие
+        dismissTask = Task {
+            try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))
+            await MainActor.run {
+                if self.data == newToast {
+                    self.data = nil
+                }
             }
         }
     }

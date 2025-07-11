@@ -54,14 +54,12 @@ struct ArtworkManager {
     // Возвращает UIImage или nil, если файл не найден
     static func loadArtwork(id: UUID) -> UIImage? {
         let url = artworksFolderURL.appendingPathComponent("artwork_\(id.uuidString).jpg")
-        print("📂 Ищем обложку по пути: \(url.path)")
 
         if !FileManager.default.fileExists(atPath: url.path) {
             print("❌ Файл обложки не найден")
         }
 
         if let image = UIImage(contentsOfFile: url.path) {
-            print("✅ Обложка загружена успешно")
             return image
         } else {
             print("⚠️ UIImage не удалось создать из файла")

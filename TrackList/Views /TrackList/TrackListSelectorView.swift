@@ -55,7 +55,7 @@ struct TrackListSelectorView: View {
                     
                     // Переименование — обновляем список
                     onRename: {
-                        viewModel.refreshtrackLists()
+                        viewModel.refreshTrackLists()
                     }
                 )
                 .padding(.leading, 0)

@@ -51,7 +51,6 @@ struct LibraryTrackSectionView: View {
                 onSwipeLeft: {
                     
                     // Добавляем трек в плеер
-                    let newTrack = Track(from: track)
                     var imported = track.original
 
                     // Сохраняем обложку, если есть
@@ -64,13 +63,8 @@ struct LibraryTrackSectionView: View {
                     TrackListManager.shared.appendTrackToCurrentList(imported)
                     playerViewModel.trackListViewModel.loadTracks()
 
-                    toast.show(
-                        message: "Добавлено в плеер",
-                        title: track.title,
-                        artist: track.artist,
-                        artwork: track.artwork
-                    )
-                    print("✅ Трек добавлен в плеер: \(track.title ?? track.fileName)")
+                    toast.show(ToastData(style: .track(title: track.title ?? track.fileName, artist: track.artist ?? ""), artwork: track.artwork))
+                    
                 }
             )
         }

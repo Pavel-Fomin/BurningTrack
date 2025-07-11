@@ -28,7 +28,7 @@ struct PlayerHeaderView: View {
             Spacer()
 
             Menu {
-                Button("Сохранить как треклист", action: onSave)
+                Button("Сохранить треклист", action: onSave)
                 Button("Экспортировать", action: onExport)
                 Button("Очистить треклист", role: .destructive, action: onClear)
             } label: {

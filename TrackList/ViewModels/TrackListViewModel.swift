@@ -44,6 +44,11 @@ final class TrackListViewModel: NSObject, ObservableObject {
     
     @Published var importMode: ImportMode = .none
     
+    @Published var isShowingSaveSheet = false
+    @Published var newTrackListName: String = generateDefaultTrackListName()
+    @Published var toastData: ToastData? = nil
+    private let trackToastId = UUID()
+    
     
     // MARK: - Инициализация
     
@@ -71,14 +76,14 @@ final class TrackListViewModel: NSObject, ObservableObject {
         super.init()
         
         loadTracks()
-        refreshtrackLists()
+        refreshTrackLists()
     }
     
     
     // MARK: - Треки и треклисты
     
     // Перезагружает список всех треклистов
-    func refreshtrackLists() {
+    func refreshTrackLists() {
         let metas = TrackListManager.shared.loadTrackListMetas()
         trackLists = metas.reversed().map { meta in
             let tracks = TrackListManager.shared.loadTracks(for: meta.id)
@@ -122,7 +127,7 @@ final class TrackListViewModel: NSObject, ObservableObject {
             
             DispatchQueue.main.async {
                 self.tracks = existingTracks.map { $0.asTrack() }
-                self.refreshtrackLists()
+                self.refreshTrackLists()
                 print("✅ Импорт завершён: \(imported.count) треков добавлено")
             }
         }
@@ -147,7 +152,7 @@ final class TrackListViewModel: NSObject, ObservableObject {
             DispatchQueue.main.async {
                 self.currentListId = newList.id
                 self.tracks = imported.map { $0.asTrack().refreshAvailability() }
-                self.refreshtrackLists()
+                self.refreshTrackLists()
                 print("✅ Новый треклист создан с \(imported.count) треками")
             }
         }
@@ -225,38 +230,38 @@ final class TrackListViewModel: NSObject, ObservableObject {
     // Перемещение трека
     func moveTrack(from source: IndexSet, to destination: Int) {
         guard let id = currentListId else { return }
-
+        
         let metas = TrackListManager.shared.loadTrackListMetas()
         let isDraft = metas.first(where: { $0.id == id })?.isDraft ?? false
-
+        
         var importedTracks = TrackListManager.shared.loadTracks(for: id, isDraft: isDraft)
-
+        
         importedTracks.move(fromOffsets: source, toOffset: destination)
-
+        
         TrackListManager.shared.saveTracks(importedTracks, for: id, isDraft: isDraft)
         self.tracks = importedTracks.map { $0.asTrack() }
         print("↕️ Треки перемещены и сохранены")
     }
     
     
-// MARK: - Треклисты
-
+    // MARK: - Треклисты
+    
     // Создаёт новый пустой треклист и делает его активным
     func createEmptyTrackListAndSelect() {
         let newList = TrackListManager.shared.createEmptyTrackList()
         self.currentListId = newList.id
-        self.refreshtrackLists()
+        self.refreshTrackLists()
         self.loadTracks()
     }
-
+    
     // Удаляет треклист и выбирает следующий доступный
     func deleteTrackList(id: UUID) {
         TrackListManager.shared.deleteTrackList(id: id)
-
+        
         if id == currentListId {
             let metas = TrackListManager.shared.loadTrackListMetas()
             let remaining = metas.filter { $0.id != id }
-
+            
             if let first = remaining.first {
                 selectTrackList(id: first.id)
             } else {
@@ -265,21 +270,22 @@ final class TrackListViewModel: NSObject, ObservableObject {
                 print("⚠️ Все треклисты удалены — ничего не выбрано")
             }
         }
-
-        refreshtrackLists()
-
+        
+        refreshTrackLists()
+        
         if trackLists.isEmpty {
             isEditing = false
             print("✋ Выход из режима редактирования — нет треклистов")
         }
     }
-
+    
+    
     // Обновляет флаг доступности у каждого трека
     func refreshTrackAvailability() {
         self.tracks = self.tracks.map { $0.refreshAvailability() }
         print("♻️ Актуализирована доступность треков")
     }
-
+    
     // Проверяет, можно ли удалить треклист
     func canDeleteTrackList(id: UUID) -> Bool {
         if id == currentListId {
@@ -289,62 +295,110 @@ final class TrackListViewModel: NSObject, ObservableObject {
             return true
         }
     }
-}
-
-
-// MARK: - Расширение: длительность плейлиста
-
-extension TrackListViewModel {
-    var totalDuration: TimeInterval {
-        tracks.reduce(0) { $0 + $1.duration }
+    
+    
+    // MARK: - Сохранение треклиста
+    
+    func saveCurrentTrackList(named newName: String) {
+        let tracksToSave = self.tracks.map { $0.asImportedTrack() }
+        
+        let newList = TrackListManager.shared.createTrackList(
+            from: tracksToSave,
+            withName: newName
+        )
+        
+        self.currentListId = newList.id
+        self.tracks = newList.tracks.map { Track(from: $0) }
+        self.refreshTrackLists()
+        
+        print("✅ Новый треклист сохранён: \(newName)")
+        showToast(message: "Треклист «\(newName)» сохранён")
     }
-
-    var formattedTotalDuration: String {
-        let formatter = DateComponentsFormatter()
-        formatter.zeroFormattingBehavior = .pad
-
-        if totalDuration >= 86400 {
-            formatter.allowedUnits = [.day, .hour, .minute]
-            formatter.unitsStyle = .short
-        } else if totalDuration >= 3600 {
-            formatter.allowedUnits = [.hour, .minute]
-            formatter.unitsStyle = .short
-        } else {
-            formatter.allowedUnits = [.minute, .second]
-            formatter.unitsStyle = .positional
-        }
-
-        return formatter.string(from: totalDuration) ?? "0:00"
-    }
-}
-
-// MARK: - UIDocumentPickerDelegate: экспорт в выбранную папку
-
-extension TrackListViewModel: UIDocumentPickerDelegate {
-    func documentPicker(
-        _ controller: UIDocumentPickerViewController,
-        didPickDocumentsAt urls: [URL]
+    
+    // Тост
+    func showToast(
+        message: String,
+        title: String? = nil,
+        artist: String? = nil,
+        artwork: UIImage? = nil,
+        duration: TimeInterval = 2.0
     ) {
-        Task { @MainActor in
-            guard urls.first != nil else {
-                print("⚠️ Папка не выбрана")
-                return
-            }
+        if let title = title, let artist = artist {
+            self.toastData = ToastData(
+                style: .track(title: title, artist: artist),
+                artwork: artwork
+                
+            )
+        } else {
+            self.toastData = ToastData(
+                style: .trackList(name: message),
+                artwork: nil
+            )
+        }
 
-            guard let id = currentListId else {
-                print("⚠️ Плейлист не выбран — экспорт невозможен")
-                return
-            }
-
-            let tracks = TrackListManager.shared.loadTracks(for: id)
-            let availableTracks = tracks.filter { $0.isAvailable }
-
-            if let topVC = UIApplication.topViewController() {
-                ExportManager.shared.exportViaTempAndPicker(
-                    availableTracks,
-                    presenter: topVC
-                )
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
+            withAnimation {
+                self.toastData = nil
             }
         }
     }
 }
+    
+    // MARK: - Расширение: длительность плейлиста
+    
+    extension TrackListViewModel {
+        var totalDuration: TimeInterval {
+            tracks.reduce(0) { $0 + $1.duration }
+        }
+        
+        var formattedTotalDuration: String {
+            let formatter = DateComponentsFormatter()
+            formatter.zeroFormattingBehavior = .pad
+            
+            if totalDuration >= 86400 {
+                formatter.allowedUnits = [.day, .hour, .minute]
+                formatter.unitsStyle = .short
+            } else if totalDuration >= 3600 {
+                formatter.allowedUnits = [.hour, .minute]
+                formatter.unitsStyle = .short
+            } else {
+                formatter.allowedUnits = [.minute, .second]
+                formatter.unitsStyle = .positional
+            }
+            
+            return formatter.string(from: totalDuration) ?? "0:00"
+        }
+    }
+    
+    
+    // MARK: - UIDocumentPickerDelegate: экспорт в выбранную папку
+    
+    extension TrackListViewModel: UIDocumentPickerDelegate {
+        func documentPicker(
+            _ controller: UIDocumentPickerViewController,
+            didPickDocumentsAt urls: [URL]
+        ) {
+            Task { @MainActor in
+                guard urls.first != nil else {
+                    print("⚠️ Папка не выбрана")
+                    return
+                }
+                
+                guard let id = currentListId else {
+                    print("⚠️ Плейлист не выбран — экспорт невозможен")
+                    return
+                }
+                
+                let tracks = TrackListManager.shared.loadTracks(for: id)
+                let availableTracks = tracks.filter { $0.isAvailable }
+                
+                if let topVC = UIApplication.topViewController() {
+                    ExportManager.shared.exportViaTempAndPicker(
+                        availableTracks,
+                        presenter: topVC
+                    )
+                }
+            }
+        }
+    }
+

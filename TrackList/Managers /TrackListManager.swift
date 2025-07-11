@@ -263,20 +263,25 @@ final class TrackListManager {
         print("🗑️ Треклист с ID \(id) удалён")
     }
 
-    // Переименовывает плейлист по его ID
-    func renameTrackList(id: UUID, to newName: String) {
-        var meta = loadTrackListMetas()
+    // Создает треклист
+    func createTrackList(from tracks: [ImportedTrack], withName name: String) -> TrackList {
+        let id = UUID()
+        let createdAt = Date()
+        let meta = TrackListMeta(id: id, name: name, createdAt: createdAt)
 
-        guard let index = meta.firstIndex(where: { $0.id == id }) else {
-            print("❌ Не найден треклист с id: \(id)")
-            return
-        }
+        saveTrackListMeta(meta)
+        saveTracks(tracks, for: id)
 
-        meta[index].name = newName
-        saveTrackListMetas(meta)
-        print("✏️ Название треклиста обновлено: \(newName)")
+        return TrackList(id: id, name: name, createdAt: createdAt, tracks: tracks)
     }
-
+    
+    // Сохраняет метаинформацию о треклисте в tracklists.json
+    func saveTrackListMeta(_ meta: TrackListMeta) {
+        var current = loadTrackListMetas()
+        current.append(meta)
+        saveTrackListMetas(current)
+    }
+    
     
 // MARK: - Сохранение всех треклистов
 
@@ -289,6 +294,8 @@ final class TrackListManager {
         let metas = trackLists.map {
             TrackListMeta(id: $0.id, name: $0.name, createdAt: $0.createdAt, isDraft: false)
         }
+
+        saveTrackListMetas(metas)
 
         print("✅ Все плейлисты сохранены (отдельно треки и мета)")
     }

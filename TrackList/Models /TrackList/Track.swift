@@ -165,3 +165,19 @@ extension Track {
         return ArtworkManager.loadArtwork(id: artworkId)
     }
 }
+
+
+extension Track {
+    init(from imported: ImportedTrack) {
+        self.init(
+            id: imported.id,
+            url: URL(fileURLWithPath: imported.filePath),
+            artist: imported.artist,
+            title: imported.title ?? imported.fileName,
+            duration: imported.duration,
+            fileName: imported.fileName,
+            artworkId: imported.artworkId,
+            isAvailable: true // по умолчанию true, потом можно вызвать .refreshAvailability()
+        )
+    }
+}

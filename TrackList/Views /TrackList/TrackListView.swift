@@ -18,55 +18,76 @@ struct TrackListView: View {
     @Environment(\.colorScheme) var colorScheme
     
     var body: some View {
-        List {
-            
-// MARK: - Счётчик треков
-            
-            Group {
-                Text("\(trackListViewModel.tracks.count) треков · \(trackListViewModel.formattedTotalDuration)")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .padding(.vertical, 4)
-                    .padding(.horizontal,16)
-            }
-            .listRowInsets(EdgeInsets())
-            .listRowBackground(Color.clear)
-            
-            
-// MARK: - Список треков
-            
-            Section {
-                TrackListRowsView(
-                    tracks: trackListViewModel.tracks,
-                    playerViewModel: playerViewModel,
-                    onTap: { track in
-                        if track.isAvailable {
-                            if (playerViewModel.currentTrackDisplayable as? Track)?.id == track.id {
-                                playerViewModel.togglePlayPause()
-                            } else {
-                                playerViewModel.play(track: track)
-                            }
-                        } else {
-                            print("❌ Трек недоступен: \(track.title ?? track.fileName)")
-                        }
-                    },
-                    onDelete: { indexSet in
-                        trackListViewModel.removeTrack(at: indexSet)
-                    },
-                    onMove: { indices, newOffset in
-                        trackListViewModel.moveTrack(from: indices, to: newOffset)
-                    }
-                )
+        ZStack(alignment: .bottom) {
+            List {
+                
+                
+                // MARK: - Счётчик треков
+                
+                Group {
+                    Text("\(trackListViewModel.tracks.count) треков · \(trackListViewModel.formattedTotalDuration)")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .padding(.vertical, 4)
+                        .padding(.horizontal,16)
+                }
                 .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)
+                
+                
+                // MARK: - Список треков
+                
+                Section {
+                    TrackListRowsView(
+                        tracks: trackListViewModel.tracks,
+                        playerViewModel: playerViewModel,
+                        onTap: { track in
+                            if track.isAvailable {
+                                if (playerViewModel.currentTrackDisplayable as? Track)?.id == track.id {
+                                    playerViewModel.togglePlayPause()
+                                } else {
+                                    playerViewModel.play(track: track)
+                                }
+                            } else {
+                                print("❌ Трек недоступен: \(track.title ?? track.fileName)")
+                            }
+                        },
+                        onDelete: { indexSet in
+                            trackListViewModel.removeTrack(at: indexSet)
+                        },
+                        onMove: { indices, newOffset in
+                            trackListViewModel.moveTrack(from: indices, to: newOffset)
+                        }
+                    )
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+                }
+            }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            
+            // Тост
+            if let toast = trackListViewModel.toastData {
+                ToastView(data: toast)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .padding(.bottom, 24)
             }
         }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-        .background(Color.clear)
-        .padding(.horizontal, 0) // ⬅️ ВНЕ List
-        .padding(.top, 12)
+        .animation(.easeInOut, value: trackListViewModel.toastData?.message ?? "")
+        
+        
+        .sheet(isPresented: $trackListViewModel.isShowingSaveSheet) {
+            SaveTrackListSheet(
+                isPresented: $trackListViewModel.isShowingSaveSheet,
+                name: $trackListViewModel.newTrackListName
+            ) {
+                trackListViewModel.saveCurrentTrackList(named: trackListViewModel.newTrackListName)
+            }
+        }
+        
     }
+    
+    
     private struct TrackListRowsView: View {
         let tracks: [Track]
         let playerViewModel: PlayerViewModel
@@ -91,5 +112,5 @@ struct TrackListView: View {
             .onMove(perform: onMove)
         }
     }
+    
 }
-

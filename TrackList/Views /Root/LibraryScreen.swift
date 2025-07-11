@@ -17,7 +17,7 @@ struct LibraryScreen: View {
     
     let playerViewModel: PlayerViewModel
     @EnvironmentObject var toast: ToastManager
-
+    
     var body: some View {
         NavigationStack(path: $path) {
             ZStack {
@@ -30,7 +30,7 @@ struct LibraryScreen: View {
                             }
                         )
                     }
-
+                    
                     Group {
                         if selectedTab == 0 {
                             MusicLibraryView(
@@ -43,36 +43,30 @@ struct LibraryScreen: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-
-                if let data = toast.data {
-                    ToastView(data: data)
-                        .padding(.bottom, 24)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                        .animation(.easeInOut(duration: 0.3), value: data.id)
+                
+                .navigationDestination(for: LibraryFolder.self) { folder in
+                    LibraryFolderView(
+                        folder: folder,
+                        playerViewModel: playerViewModel
+                    )
                 }
-            }
-            .navigationDestination(for: LibraryFolder.self) { folder in
-                LibraryFolderView(
-                    folder: folder,
-                    playerViewModel: playerViewModel
-                )
-            }
-            .onAppear {
-                musicLibraryManager.restoreAccess()
-            }
-            .fileImporter(
-                isPresented: $isShowingFolderPicker,
-                allowedContentTypes: [.folder],
-                allowsMultipleSelection: false
-            ) { result in
-                switch result {
-                case .success(let urls):
-                    if let folderURL = urls.first {
-                        musicLibraryManager.saveBookmark(for: folderURL)
-                        musicLibraryManager.restoreAccess()
+                .onAppear {
+                    musicLibraryManager.restoreAccess()
+                }
+                .fileImporter(
+                    isPresented: $isShowingFolderPicker,
+                    allowedContentTypes: [.folder],
+                    allowsMultipleSelection: false
+                ) { result in
+                    switch result {
+                    case .success(let urls):
+                        if let folderURL = urls.first {
+                            musicLibraryManager.saveBookmark(for: folderURL)
+                            musicLibraryManager.restoreAccess()
+                        }
+                    case .failure(let error):
+                        print("❌ Ошибка выбора папки: \(error.localizedDescription)")
                     }
-                case .failure(let error):
-                    print("❌ Ошибка выбора папки: \(error.localizedDescription)")
                 }
             }
         }
