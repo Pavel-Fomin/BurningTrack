@@ -56,13 +56,13 @@ struct ArtworkManager {
         let url = artworksFolderURL.appendingPathComponent("artwork_\(id.uuidString).jpg")
 
         if !FileManager.default.fileExists(atPath: url.path) {
-            print("❌ Файл обложки не найден")
+        
         }
 
         if let image = UIImage(contentsOfFile: url.path) {
             return image
         } else {
-            print("⚠️ UIImage не удалось создать из файла")
+    
             return nil
         }
     }

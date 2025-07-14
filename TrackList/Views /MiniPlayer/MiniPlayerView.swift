@@ -27,7 +27,7 @@ struct AVRoutePickerViewWrapper: UIViewRepresentable {
 
 struct MiniPlayerView: View {
     @ObservedObject var playerViewModel: PlayerViewModel
-    @ObservedObject var trackListViewModel: TrackListViewModel
+    var trackListViewModel: TrackListViewModel?
     @State private var dragOffsetX: CGFloat = 0
     
     var body: some View {

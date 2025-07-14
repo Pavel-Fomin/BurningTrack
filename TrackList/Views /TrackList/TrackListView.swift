@@ -3,8 +3,7 @@
 //  TrackList
 //
 //  Основная вью для отображения списка треков внутри выбранного треклиста
-//  Отвечает за вывод строк треков, их удаление, перемещение, а также
-//  визуальное выделение текущего трека в плеере.
+//  Отвечает за вывод строк треков, удаление, перемещение, выделение текущего трека в плеере
 //
 //  Created by Pavel Fomin on 29.04.2025.
 //
@@ -18,30 +17,16 @@ struct TrackListView: View {
     @Environment(\.colorScheme) var colorScheme
     
     var body: some View {
-        ZStack(alignment: .bottom) {
+        ZStack {
             List {
                 
+// MARK: - Список треков
                 
-                // MARK: - Счётчик треков
-                
-                Group {
-                    Text("\(trackListViewModel.tracks.count) треков · \(trackListViewModel.formattedTotalDuration)")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .padding(.vertical, 4)
-                        .padding(.horizontal,16)
-                }
-                .listRowInsets(EdgeInsets())
-                .listRowBackground(Color.clear)
-                
-                
-                // MARK: - Список треков
-                
-                Section {
-                    TrackListRowsView(
-                        tracks: trackListViewModel.tracks,
+                ForEach(trackListViewModel.tracks) { track in
+                    TrackRowView(
                         playerViewModel: playerViewModel,
-                        onTap: { track in
+                        track: track,
+                        onTap: {
                             if track.isAvailable {
                                 if (playerViewModel.currentTrackDisplayable as? Track)?.id == track.id {
                                     playerViewModel.togglePlayPause()
@@ -51,20 +36,16 @@ struct TrackListView: View {
                             } else {
                                 print("❌ Трек недоступен: \(track.title ?? track.fileName)")
                             }
-                        },
-                        onDelete: { indexSet in
-                            trackListViewModel.removeTrack(at: indexSet)
-                        },
-                        onMove: { indices, newOffset in
-                            trackListViewModel.moveTrack(from: indices, to: newOffset)
                         }
                     )
-                    .listRowInsets(EdgeInsets())
-                    .listRowBackground(Color.clear)
+                    .padding(.vertical, 4)
                 }
+                .onDelete(perform: trackListViewModel.removeTrack)
+                .onMove(perform: trackListViewModel.moveTrack)
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
+            
             
             // Тост
             if let toast = trackListViewModel.toastData {
@@ -73,6 +54,8 @@ struct TrackListView: View {
                     .padding(.bottom, 24)
             }
         }
+        
+        .frame(maxHeight: .infinity)
         .animation(.easeInOut, value: trackListViewModel.toastData?.message ?? "")
         
         
@@ -84,7 +67,6 @@ struct TrackListView: View {
                 trackListViewModel.saveCurrentTrackList(named: trackListViewModel.newTrackListName)
             }
         }
-        
     }
     
     
@@ -112,5 +94,6 @@ struct TrackListView: View {
             .onMove(perform: onMove)
         }
     }
+    
     
 }

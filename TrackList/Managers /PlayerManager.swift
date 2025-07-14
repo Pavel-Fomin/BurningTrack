@@ -23,6 +23,7 @@ final class PlayerManager {
     
     init() {
         configureAudioSession()
+        print("🧠 PlayerManager инициализирован")
         
         // Подписка на завершение трека
         NotificationCenter.default.addObserver(

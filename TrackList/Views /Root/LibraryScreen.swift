@@ -38,7 +38,7 @@ struct LibraryScreen: View {
                                 playerViewModel: playerViewModel
                             )
                         } else {
-                            TrackListLibraryView()
+                            TrackListLibraryView(playerViewModel: playerViewModel)
                         }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)

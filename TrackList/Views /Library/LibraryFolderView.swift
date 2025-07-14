@@ -18,7 +18,7 @@ struct LibraryFolderView: View {
     // MARK: - Вспомогательная модель секции
     
     struct TrackSection: Identifiable {
-        let id: String // ← был UUID
+        let id: String
         let title: String
         let tracks: [LibraryTrack]
     }

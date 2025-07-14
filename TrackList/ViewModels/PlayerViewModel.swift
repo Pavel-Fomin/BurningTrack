@@ -23,7 +23,7 @@ final class PlayerViewModel: ObservableObject {
     @Published var trackDuration: TimeInterval = 0.0                /// Длительность трека
 
     let playerManager = PlayerManager()                             /// Низкоуровневый контроллер плеера
-    let trackListViewModel: TrackListViewModel                      /// ViewModel со списком треков
+    var trackListViewModel: TrackListViewModel                  /// ViewModel со списком треков
     var libraryTracksContext: [LibraryTrack] = []
     
     
