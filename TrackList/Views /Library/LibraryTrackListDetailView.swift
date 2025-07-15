@@ -15,9 +15,10 @@ struct LibraryTrackListDetailView: View {
 
         List(trackList.tracks) { track in
             TrackRowView(
-                playerViewModel: PlayerViewModel(trackListViewModel: .init()), /// передаем shared, если у нас синглтон
                 track: track,
-                onTap: { /// действие при тапе
+                isCurrent: false,
+                isPlaying: false,
+                onTap: {               /// действие при тапе
                 }
             )
         }

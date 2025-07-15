@@ -39,8 +39,9 @@ struct LibraryTrackSectionView: View {
 
         var body: some View {
             TrackRowView(
-                playerViewModel: playerViewModel,
                 track: track,
+                isCurrent: track.id == playerViewModel.currentTrackDisplayable?.id,
+                isPlaying: playerViewModel.isPlaying && track.id == playerViewModel.currentTrackDisplayable?.id,
                 onTap: {
                     if let current = playerViewModel.currentTrackDisplayable as? LibraryTrack, current.id == track.id {
                         playerViewModel.togglePlayPause()
@@ -49,11 +50,10 @@ struct LibraryTrackSectionView: View {
                     }
                 },
                 onSwipeLeft: {
-                    
                     // Добавляем трек в плеер
                     var imported = track.original
-
-                    // Сохраняем обложку, если есть
+                    
+                    // Сохраняем обложку
                     if let image = track.artwork {
                         let artworkId = UUID()
                         ArtworkManager.saveArtwork(image, id: artworkId)
@@ -64,7 +64,6 @@ struct LibraryTrackSectionView: View {
                     playerViewModel.trackListViewModel.loadTracks()
 
                     toast.show(ToastData(style: .track(title: track.title ?? track.fileName, artist: track.artist ?? ""), artwork: track.artwork))
-                    
                 }
             )
         }

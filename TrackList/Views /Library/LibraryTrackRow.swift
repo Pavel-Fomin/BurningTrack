@@ -14,8 +14,9 @@ struct LibraryTrackRow: View {
 
     var body: some View {
         TrackRowView(
-            playerViewModel: playerViewModel,
             track: track,
+            isCurrent: track.id == playerViewModel.currentTrackDisplayable?.id,
+            isPlaying: playerViewModel.isPlaying && track.id == playerViewModel.currentTrackDisplayable?.id,
             onTap: onTap
         )
     }

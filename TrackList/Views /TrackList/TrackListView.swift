@@ -24,8 +24,9 @@ struct TrackListView: View {
                 
                 ForEach(trackListViewModel.tracks) { track in
                     TrackRowView(
-                        playerViewModel: playerViewModel,
                         track: track,
+                        isCurrent: track.id == playerViewModel.currentTrackDisplayable?.id,
+                        isPlaying: playerViewModel.isPlaying && track.id == playerViewModel.currentTrackDisplayable?.id,
                         onTap: {
                             if track.isAvailable {
                                 if (playerViewModel.currentTrackDisplayable as? Track)?.id == track.id {
@@ -80,10 +81,12 @@ struct TrackListView: View {
         var body: some View {
             ForEach(tracks) { track in
                 TrackRowView(
-                    playerViewModel: playerViewModel,
                     track: track,
+                    isCurrent: track.id == playerViewModel.currentTrackDisplayable?.id,
+                    isPlaying: playerViewModel.isPlaying && track.id == playerViewModel.currentTrackDisplayable?.id,
                     onTap: { onTap(track) }
                 )
+                
                 .padding(.vertical, 4)
                 .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)

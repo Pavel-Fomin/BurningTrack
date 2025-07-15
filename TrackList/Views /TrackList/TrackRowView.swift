@@ -2,7 +2,7 @@
 //  TrackRowView.swift
 //  TrackList
 //
-//  Компонент UI для отображения одного трека в списке
+//  Компонент UI для отображения трека в списке
 //
 //  Created by Pavel Fomin on 28.04.2025.
 //
@@ -10,21 +10,12 @@
 import SwiftUI
 import Foundation
 
-import SwiftUI
-import Foundation
-
 struct TrackRowView: View {
-    @ObservedObject var playerViewModel: PlayerViewModel
     let track: any TrackDisplayable
+    let isCurrent: Bool
+    let isPlaying: Bool
     let onTap: () -> Void
     var onSwipeLeft: (() -> Void)? = nil
-    var isCurrent: Bool {
-        playerViewModel.currentTrackDisplayable?.id == track.id
-    }
-
-    var isPlaying: Bool {
-        isCurrent && playerViewModel.isPlaying
-    }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -58,10 +49,10 @@ struct TrackRowView: View {
             
             // MARK: - Текстовая информация
             
-            let artist = track.artist?
-                .trimmingCharacters(in: .whitespaces)
-                .lowercased()
-            let hasArtist = artist != nil && artist != "" && artist != "неизвестен"
+            var hasArtist: Bool {
+                guard let artist = track.artist?.trimmingCharacters(in: .whitespaces).lowercased() else { return false }
+                return !artist.isEmpty && artist != "неизвестен"
+            }
 
             VStack(alignment: .leading, spacing: hasArtist ? 2 : 0) {
                 if hasArtist, let artistText = track.artist {
