@@ -16,7 +16,7 @@ struct RootView: View {
     init() {
         let trackListVM = TrackListViewModel()
         _trackListViewModel = StateObject(wrappedValue: trackListVM)
-        _playerViewModel = StateObject(wrappedValue: PlayerViewModel(trackListViewModel: trackListVM))
+        _playerViewModel = StateObject(wrappedValue: PlayerViewModel())
     }
     
     var body: some View {

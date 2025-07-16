@@ -47,18 +47,13 @@ struct TrackListBodyView: View {
                                 if isCurrent {
                                     playerViewModel.togglePlayPause()
                                 } else {
-                                    playerViewModel.play(track: track)
+                                    playerViewModel.play(track: track, context: trackListViewModel.tracks)
                                 }
                             }
                         }
                     )
                 }
-                .onDelete { indexSet in
-                    trackListViewModel.removeTrack(at: indexSet)
-                }
-                .onMove { indices, newOffset in
-                    trackListViewModel.moveTrack(from: indices, to: newOffset)
-                }
+                
             }
         }
     }

@@ -32,32 +32,6 @@ final class TrackListManager {
     }
 
     
-// MARK: - Инициализация дефолтного треклиста
-    
-       // Проверяет наличие хотя бы одного треклиста и активного ID. Если нет — создаёт дефолтный треклист "Черновик"
-       func initializeDefaultTrackListIfNeeded() {
-           var metas = loadTrackListMetas()
-
-           // 1. Создаём дефолтный треклист, если ни одного не существует
-           if metas.isEmpty {
-               let id = UUID()
-               let meta = TrackListMeta(id: id, name: "Черновик", createdAt: Date(), isDraft: true)
-               metas.append(meta)
-               saveTrackListMetas(metas)
-               saveTracks([], for: id, isDraft: true)
-               selectedTrackListId = id
-               print("📄 Создан дефолтный плейлист")
-               return
-           }
-
-           // 2. Если активный ID не выбран — выбираем первый доступный
-           if selectedTrackListId == nil {
-               selectedTrackListId = metas.first?.id
-               print("📌 Установлен выбранный плейлист: \(selectedTrackListId?.uuidString ?? "nil")")
-           }
-       }
-   
-    
 // MARK: - Метаданные (tracklists.json)
 
     // Загружает список всех треклистов из tracklists.json
@@ -123,91 +97,9 @@ final class TrackListManager {
         return TrackList(id: id, name: meta.name, createdAt: meta.createdAt, tracks: tracks)
     }
     
-// MARK: - Управление текущим плейлистом
 
-    // ID выбранного плейлиста
-    private(set) var selectedTrackListId: UUID?
-
-    // Устанавливает активный плейлист
-    func selectTrackList(id: UUID) {
-        let metas = loadTrackListMetas()
-        if metas.contains(where: { $0.id == id }) {
-            selectedTrackListId = id
-            print("✅ Выбран плейлист с id: \(id)")
-        } else {
-            print("❌ Плейлист с таким id не найден")
-        }
-    }
-
-    // Получает текущий выбранный треклист (или nil, если не выбран)
-    func getCurrentTrackList() -> TrackList? {
-        guard let id = selectedTrackListId else {
-            print("⚠️ Текущий плейлист не выбран")
-            return nil
-        }
-
-        let metas = loadTrackListMetas()
-        guard let meta = metas.first(where: { $0.id == id }) else {
-            print("❌ Метаинформация не найдена для ID: \(id)")
-            return nil
-        }
-
-        let tracks = loadTracks(for: id, isDraft: meta.isDraft)
-        return TrackList(id: id, name: meta.name, createdAt: meta.createdAt, tracks: tracks)
-    }
-
-    
 // MARK: - Создание треклистов
 
-    // Возвращает первый треклист или создаёт новый, если ничего нет
-    func getOrCreateDefaultTrackList() -> TrackList {
-        let metas = loadTrackListMetas()
-        if let firstMeta = metas.first {
-            let tracks = loadTracks(for: firstMeta.id)
-            let list = TrackList(id: firstMeta.id, name: firstMeta.name, createdAt: firstMeta.createdAt, tracks: tracks)
-            selectedTrackListId = list.id
-            return list
-        }
-
-        // Если ни одного плейлиста нет — создаём новый
-        let formatter = DateFormatter()
-        formatter.dateFormat = "dd.MM.yy, HH:mm"
-        let name = formatter.string(from: Date())
-
-        let new = TrackList(
-            id: UUID(),
-            name: name,
-            createdAt: Date(),
-            tracks: []
-        )
-
-        saveTrackLists([new])
-        selectedTrackListId = new.id
-        print("🆕 Создан новый плейлист: \(name)")
-        return new
-    }
-
-    // Создаёт пустой треклист и сохраняет его
-    func createEmptyTrackList() -> TrackList {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "dd.MM.yy, HH:mm"
-        let name = formatter.string(from: Date())
-
-        let newId = UUID()
-        let createdAt = Date()
-
-        saveTracks([], for: newId)
-
-        var metas = loadTrackListMetas()
-        let newMeta = TrackListMeta(id: newId, name: name, createdAt: createdAt, isDraft: false)
-        metas.append(newMeta)
-        saveTrackListMetas(metas)
-
-        selectedTrackListId = newId
-        print("🆕 Новый пустой плейлист создан: \(name)")
-
-        return TrackList(id: newId, name: name, createdAt: createdAt, tracks: [])
-    }
 
     // Создаёт новый плейлист из импортированных треков
     @discardableResult
@@ -227,8 +119,6 @@ final class TrackListManager {
         
         saveTrackListMetas(metas)
 
-        selectedTrackListId = newId
-
         return TrackList(id: newId, name: name, createdAt: createdAt, tracks: importedTracks)
     }
 
@@ -237,6 +127,7 @@ final class TrackListManager {
 
     // Удаляет треклист: удаляет JSON с треками, метаинформацию и обложки
     func deleteTrackList(id: UUID) {
+        
         // Удаляем обложки
         let tracks = loadTracks(for: id)
         for track in tracks {
@@ -299,6 +190,16 @@ final class TrackListManager {
 
         print("✅ Все плейлисты сохранены (отдельно треки и мета)")
     }
+    
+    
+    // MARK: - Переименование
+    func renameTrackList(id: UUID, to newName: String) {
+        var metas = loadTrackListMetas()
+        guard let index = metas.firstIndex(where: { $0.id == id }) else { return }
+
+        metas[index].name = newName
+        saveTrackListMetas(metas)
+    }
 
     
 // MARK: - Отладка
@@ -316,25 +217,5 @@ final class TrackListManager {
         }
     }
     
-    func appendTrackToCurrentList(_ track: ImportedTrack) {
-        guard let id = selectedTrackListId else {
-            print("⚠️ Нет активного треклиста — не могу добавить")
-            return
-        }
-
-        let metas = loadTrackListMetas()
-        let isDraft = metas.first(where: { $0.id == id })?.isDraft ?? false
-
-        var tracks = loadTracks(for: id, isDraft: isDraft)
-
-
-        guard !tracks.contains(where: { $0.id == track.id }) else {
-            print("⚠️ Трек уже в списке")
-            return
-        }
-
-        tracks.append(track)
-        saveTracks(tracks, for: id, isDraft: isDraft)
-        print("➕ Трек добавлен в плейлист: \(track.fileName)")
-    }
 }
+

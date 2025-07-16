@@ -15,7 +15,7 @@ import AVFoundation
 
 final class PlayerViewModel: ObservableObject {
     
-    // MARK: - Состояние воспроизведения
+// MARK: - Состояние воспроизведения
     
     @Published var currentTrackDisplayable: (any TrackDisplayable)? /// Текущий воспроизводимый трек
     @Published var isPlaying: Bool = false                          /// Воспроизводится ли в данный момент
@@ -23,59 +23,59 @@ final class PlayerViewModel: ObservableObject {
     @Published var trackDuration: TimeInterval = 0.0                /// Длительность трека
 
     let playerManager = PlayerManager()                             /// Низкоуровневый контроллер плеера
-    var trackListViewModel: TrackListViewModel                  /// ViewModel со списком треков
+    
     var libraryTracksContext: [LibraryTrack] = []
     
+    private var trackListContext: [Track] = []
     
-    // MARK: - Инициализация и подписка на события
+    
+// MARK: - Инициализация и подписка на события
        
-       init(trackListViewModel: TrackListViewModel) {
-           self.trackListViewModel = trackListViewModel
-           
-           NotificationCenter.default.addObserver(
-               forName: .trackDurationUpdated,
-               object: nil,
-               queue: .main
-           ) { [weak self] notification in
-               if let duration = notification.userInfo?["duration"] as? TimeInterval {
-                   self?.trackDuration = duration
-               }
-           }
-           
-           NotificationCenter.default.addObserver(
-               forName: .trackDidFinish,
-               object: nil,
-               queue: .main
-           ) { [weak self] _ in
-               Task { await self?.playNextTrack() }
-           }
+    init() {
+        NotificationCenter.default.addObserver(
+            forName: .trackDurationUpdated,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            if let duration = notification.userInfo?["duration"] as? TimeInterval {
+                self?.trackDuration = duration
+            }
+        }
 
-           playerManager.setupRemoteCommandCenter(
-               onPlay: { [weak self] in
-                   DispatchQueue.main.async {
-                       self?.togglePlayPause()
-                   }
-               },
-               onPause: { [weak self] in
-                   DispatchQueue.main.async {
-                       self?.togglePlayPause()
-                   }
-               },
-               onNext: { [weak self] in
-                   DispatchQueue.main.async {
-                       self?.playNextTrack()
-                   }
-               },
-               onPrevious: { [weak self] in
-                   DispatchQueue.main.async {
-                       self?.playPreviousTrack()
-                   }
-               }
-           )
-       }
+        NotificationCenter.default.addObserver(
+            forName: .trackDidFinish,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { await self?.playNextTrack() }
+        }
+
+        playerManager.setupRemoteCommandCenter(
+            onPlay: { [weak self] in
+                DispatchQueue.main.async {
+                    self?.togglePlayPause()
+                }
+            },
+            onPause: { [weak self] in
+                DispatchQueue.main.async {
+                    self?.togglePlayPause()
+                }
+            },
+            onNext: { [weak self] in
+                DispatchQueue.main.async {
+                    self?.playNextTrack()
+                }
+            },
+            onPrevious: { [weak self] in
+                DispatchQueue.main.async {
+                    self?.playPreviousTrack()
+                }
+            }
+        )
+    }
 
        
-       // MARK: - Воспроизведение трека
+// MARK: - Воспроизведение трека
        
     func play(track: any TrackDisplayable, context: [any TrackDisplayable] = []) {
         print("🧠 PlayerViewModel: play(track:) вызван с", track.fileName)
@@ -89,7 +89,9 @@ final class PlayerViewModel: ObservableObject {
 
             if track is LibraryTrack {
                 self.libraryTracksContext = context.compactMap { $0 as? LibraryTrack }
-            } else {
+                self.trackListContext = []
+            } else if track is Track {
+                self.trackListContext = context.compactMap { $0 as? Track }
                 self.libraryTracksContext = []
             }
 
@@ -124,7 +126,7 @@ final class PlayerViewModel: ObservableObject {
     }
 
        
-       // MARK: - Управление воспроизведением
+// MARK: - Управление воспроизведением
        
        func togglePlayPause() {
            if isPlaying {
@@ -142,7 +144,7 @@ final class PlayerViewModel: ObservableObject {
        }
        
        
-       // MARK: - Переход между треками
+// MARK: - Переход между треками
 
     @MainActor
     
@@ -164,17 +166,17 @@ final class PlayerViewModel: ObservableObject {
             }
 
         } else if let track = current as? Track {
-            let tracks = trackListViewModel.tracks
-            guard let index = tracks.firstIndex(of: track),
-                  index + 1 < tracks.count else {
+            guard let index = trackListContext.firstIndex(of: track),
+                  index + 1 < trackListContext.count else {
                 print("⏭ Следующего трека нет в треклисте")
                 return
             }
 
-            play(track: tracks[index + 1])
+            play(track: trackListContext[index + 1], context: trackListContext)
         }
     }
-       
+     
+    
     @MainActor
     
     // Предыдущий трек
@@ -195,19 +197,18 @@ final class PlayerViewModel: ObservableObject {
             }
 
         } else if let track = current as? Track {
-            let tracks = trackListViewModel.tracks
-            guard let index = tracks.firstIndex(of: track),
+            guard let index = trackListContext.firstIndex(of: track),
                   index - 1 >= 0 else {
                 print("⏮ Предыдущего трека нет в треклисте")
                 return
             }
 
-            play(track: tracks[index - 1])
+            play(track: trackListContext[index - 1], context: trackListContext)
         }
     }
        
     
-       // MARK: - Очистка ресурсов
+// MARK: - Очистка ресурсов
        
        deinit {
            playerManager.removeTimeObserver()

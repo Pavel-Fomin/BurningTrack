@@ -1,6 +1,6 @@
 //
-//  PlayerView.swift
-//  TrackList
+// PlayerView.swift
+// TrackList
 //
 // Экран плеера со списком треков
 //
@@ -25,8 +25,14 @@ struct PlayerView: View {
                     isPlaying: track.id == currentTrack?.id && isPlaying,
                     onTap: {
                         onTrackTap(track)
-                    }
-                )
+                    },
+                        onSwipeLeft: {
+                            if let index = tracks.firstIndex(where: { $0.id == track.id }) {
+                                PlaylistManager.shared.tracks.remove(at: index)
+                                PlaylistManager.shared.saveToDisk()
+                            }
+                        }
+                    )
                 
                 .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                 .background(

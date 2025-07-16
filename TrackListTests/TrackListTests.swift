@@ -31,7 +31,7 @@ struct ContentView: View {
                         ForEach(tracks) { track in
                             Button(action: {
                                 print("Tapped track: \(track.title)")
-                                play(track: track)
+                                playerViewModel.play(track: track, context: viewModel.tracks)
                             }) {
                                 HStack {
                                     if let image = track.artwork {

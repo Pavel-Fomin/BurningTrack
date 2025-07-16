@@ -19,34 +19,30 @@ struct TrackListView: View {
     var body: some View {
         ZStack {
             List {
-                
-// MARK: - Список треков
-                
-                ForEach(trackListViewModel.tracks) { track in
-                    TrackRowView(
-                        track: track,
-                        isCurrent: track.id == playerViewModel.currentTrackDisplayable?.id,
-                        isPlaying: playerViewModel.isPlaying && track.id == playerViewModel.currentTrackDisplayable?.id,
-                        onTap: {
-                            if track.isAvailable {
-                                if (playerViewModel.currentTrackDisplayable as? Track)?.id == track.id {
-                                    playerViewModel.togglePlayPause()
-                                } else {
-                                    playerViewModel.play(track: track)
-                                }
+                TrackListRowsView(
+                    tracks: trackListViewModel.tracks,
+                    playerViewModel: playerViewModel,
+                    onTap: { track in
+                        if track.isAvailable {
+                            if (playerViewModel.currentTrackDisplayable as? Track)?.id == track.id {
+                                playerViewModel.togglePlayPause()
                             } else {
-                                print("❌ Трек недоступен: \(track.title ?? track.fileName)")
+                                playerViewModel.play(track: track, context: trackListViewModel.tracks)
                             }
+                        } else {
+                            print("❌ Трек недоступен: \(track.title ?? track.fileName)")
                         }
-                    )
-                    .padding(.vertical, 4)
-                }
-                .onDelete(perform: trackListViewModel.removeTrack)
-                .onMove(perform: trackListViewModel.moveTrack)
+                    },
+                    onDelete: { indexSet in
+                        trackListViewModel.removeTrack(at: indexSet)
+                    },
+                    onMove: { source, destination in
+                        trackListViewModel.moveTrack(from: source, to: destination)
+                    }
+                )
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
-            
             
             // Тост
             if let toast = trackListViewModel.toastData {
@@ -55,21 +51,21 @@ struct TrackListView: View {
                     .padding(.bottom, 24)
             }
         }
-        
         .frame(maxHeight: .infinity)
         .animation(.easeInOut, value: trackListViewModel.toastData?.message ?? "")
-        
-        
         .sheet(isPresented: $trackListViewModel.isShowingSaveSheet) {
             SaveTrackListSheet(
                 isPresented: $trackListViewModel.isShowingSaveSheet,
                 name: $trackListViewModel.newTrackListName
             ) {
-                trackListViewModel.saveCurrentTrackList(named: trackListViewModel.newTrackListName)
+                if let id = trackListViewModel.currentListId {
+                    TrackListManager.shared.renameTrackList(id: id, to: trackListViewModel.newTrackListName)
+                }
             }
         }
     }
     
+    // MARK: - Компонент строк треков
     
     private struct TrackListRowsView: View {
         let tracks: [Track]
@@ -86,7 +82,6 @@ struct TrackListView: View {
                     isPlaying: playerViewModel.isPlaying && track.id == playerViewModel.currentTrackDisplayable?.id,
                     onTap: { onTap(track) }
                 )
-                
                 .padding(.vertical, 4)
                 .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)
@@ -97,6 +92,4 @@ struct TrackListView: View {
             .onMove(perform: onMove)
         }
     }
-    
-    
 }

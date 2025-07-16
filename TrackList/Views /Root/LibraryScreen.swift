@@ -16,6 +16,7 @@ struct LibraryScreen: View {
     @State private var path: [LibraryFolder] = []
     
     let playerViewModel: PlayerViewModel
+    let trackListViewModel: TrackListViewModel
     @EnvironmentObject var toast: ToastManager
     
     var body: some View {
@@ -47,9 +48,11 @@ struct LibraryScreen: View {
                 .navigationDestination(for: LibraryFolder.self) { folder in
                     LibraryFolderView(
                         folder: folder,
+                        trackListViewModel: trackListViewModel,
                         playerViewModel: playerViewModel
                     )
                 }
+                
                 .onAppear {
                     musicLibraryManager.restoreAccess()
                 }

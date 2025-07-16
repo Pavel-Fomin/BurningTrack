@@ -2,7 +2,7 @@
 //  ContentView.swift
 //  TrackList
 //
-// 
+//  Основное view приложения
 //
 //  Created by Pavel Fomin on 28.04.2025.
 //
@@ -36,7 +36,10 @@ struct ContentView: View {
                     .tag(0)
                     
 // MARK: - Фонотека
-                    LibraryScreen(playerViewModel: playerViewModel)
+                    LibraryScreen(
+                        playerViewModel: playerViewModel,
+                        trackListViewModel: trackListViewModel
+                    )
                         .tabItem {
                             Label("Фонотека", systemImage: "music.note.list")
                         }

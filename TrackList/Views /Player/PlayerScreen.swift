@@ -26,7 +26,7 @@ struct PlayerScreen: View {
                 VStack(spacing: 0) {
                     
                     
-// MARK: - Хедер: кнопки, выбор плейлиста
+// MARK: - Хедер
                     
                     PlayerHeaderView(
                         trackCount: trackListViewModel.tracks.count,
@@ -39,41 +39,28 @@ struct PlayerScreen: View {
                         },
                         onClear: {
                             trackListViewModel.tracks = []
-                        }
+                            PlaylistManager.shared.tracks = []
+                            PlaylistManager.shared.saveToDisk()
+                       }
                     )
                     
                     
-// MARK: - Список треков или заглушка
+// MARK: - Список треков
                     
-                    if trackListViewModel.trackLists.isEmpty {
-                        Spacer()
-                        Text("Добавьте треки")
-                            .font(.title3)
-                            .foregroundColor(.secondary)
-                            .padding(.top, 32)
-                        Spacer()
-                    } else {
-                        TrackListView(
-                            trackListViewModel: trackListViewModel,
-                            playerViewModel: playerViewModel
-                        )
-                    }
+                    PlayerPlaylistView(playerViewModel: playerViewModel)
                 }
                 
                 
-// MARK: - Bottom Sheet: экспорт
+// MARK: - Экспорт треков
                 
                 .sheet(isPresented: $isShowingExportPicker) {
                     ExportWrapper { folderURL in
-                        if let id = trackListViewModel.currentListId {
-                            TrackListManager.shared.selectTrackList(id: id)
-                        }
-                        trackListViewModel.exportTracks(to: folderURL)
+                        PlaylistManager.shared.exportCurrentTracks(to: folderURL)
                     }
                 }
                 
                 
-// MARK: - FileImporter: импорт треков
+// MARK: - Импорт треков
                 
                 .fileImporter(
                     isPresented: $showImporter,
@@ -83,21 +70,11 @@ struct PlayerScreen: View {
                     Task {
                         switch result {
                         case .success(let urls):
-                            switch trackListViewModel.importMode {
-                            case .newList:
-                                await trackListViewModel.createNewTrackListViaImport(from: urls)
-                            case .addToCurrent:
-                                await trackListViewModel.importTracks(from: urls)
-                            case .none:
-                                break
-                            }
-                            
+                            await PlaylistManager.shared.importTracks(from: urls)
+
                         case .failure(let error):
-                            print("❌ Ошибка при импорте файлов: \(error.localizedDescription)")
+                            print("❌ Ошибка при импорте треков в плеер: \(error.localizedDescription)")
                         }
-                        
-                        // Завершение импорта
-                        trackListViewModel.importMode = .none
                     }
                 }
                 
@@ -108,8 +85,7 @@ struct PlayerScreen: View {
                     let startTime = Date()
                     let loadTime = Date().timeIntervalSince(startTime)
                     print("Приложение готово к работе за \(String(format: "%.2f", loadTime)) сек")
-                    trackListViewModel.refreshTrackLists()
-                    trackListViewModel.loadTracks()
+                    
                 }
                 
                 

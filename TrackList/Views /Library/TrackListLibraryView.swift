@@ -37,7 +37,6 @@ struct TrackListLibraryView: View {
                             playerViewModel: playerViewModel
                         )
                         .onAppear {
-                            playerViewModel.trackListViewModel = viewModel
                             viewModel.selectTrackList(id: meta.id)
                         }
                     } else {

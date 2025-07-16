@@ -2,7 +2,7 @@
 //  LibraryTrackSectionView.swift
 //  TrackList
 //
-//  Отображает секцию треков с заголовком по дате (например, "Сегодня").
+//  Отображает секцию треков с разделителем
 //
 //  Created by Pavel Fomin on 07.07.2025.
 //
@@ -14,6 +14,7 @@ struct LibraryTrackSectionView: View {
     let tracks: [LibraryTrack]
     let allTracks: [LibraryTrack]
     let playerViewModel: PlayerViewModel
+    let trackListViewModel: TrackListViewModel
     @EnvironmentObject var toast: ToastManager
 
     var body: some View {
@@ -22,19 +23,21 @@ struct LibraryTrackSectionView: View {
                 LibraryTrackRow(
                     track: track,
                     allTracks: allTracks,
-                    playerViewModel: playerViewModel
+                    playerViewModel: playerViewModel,
+                    trackListViewModel: trackListViewModel
                 )
             }
         }
     }
 
     
-    // MARK: - Вынесенная строка трека для упрощения компиляции
+// MARK: - Вынесенная строка трека для упрощения компиляции
     
     private struct LibraryTrackRow: View {
         let track: LibraryTrack
         let allTracks: [LibraryTrack]
         let playerViewModel: PlayerViewModel
+        let trackListViewModel: TrackListViewModel
         @EnvironmentObject var toast: ToastManager
 
         var body: some View {
@@ -50,20 +53,35 @@ struct LibraryTrackSectionView: View {
                     }
                 },
                 onSwipeLeft: {
-                    // Добавляем трек в плеер
                     var imported = track.original
-                    
-                    // Сохраняем обложку
+
+                    // Сохраняем обложку (если есть)
                     if let image = track.artwork {
                         let artworkId = UUID()
                         ArtworkManager.saveArtwork(image, id: artworkId)
                         imported.artworkId = artworkId
                     }
 
-                    TrackListManager.shared.appendTrackToCurrentList(imported)
-                    playerViewModel.trackListViewModel.loadTracks()
+                    // Добавляем трек в PlaylistManager
+                    let newTrack = Track(
+                        id: imported.id,
+                        url: track.url,
+                        artist: imported.artist,
+                        title: imported.title,
+                        duration: imported.duration,
+                        fileName: imported.fileName,
+                        artworkId: imported.artworkId,
+                        isAvailable: true
+                    )
 
-                    toast.show(ToastData(style: .track(title: track.title ?? track.fileName, artist: track.artist ?? ""), artwork: track.artwork))
+                    PlaylistManager.shared.tracks.append(newTrack)
+                    PlaylistManager.shared.saveToDisk()
+
+                    // Показываем тост
+                    toast.show(ToastData(
+                        style: .track(title: track.title ?? track.fileName, artist: track.artist ?? ""),
+                        artwork: track.artwork
+                    ))
                 }
             )
         }

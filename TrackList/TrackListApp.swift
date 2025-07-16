@@ -22,7 +22,7 @@ struct TrackListApp: App {
     init() {
         let trackListVM = TrackListViewModel()
         self.trackListViewModel = trackListVM
-        self.playerViewModel = PlayerViewModel(trackListViewModel: trackListVM)
+        self.playerViewModel = PlayerViewModel() // без аргументов
     }
 
     var body: some Scene {

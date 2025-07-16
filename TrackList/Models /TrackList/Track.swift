@@ -25,7 +25,7 @@ struct Track: Identifiable {
     let isAvailable: Bool /// Флаг доступности трека
     
     
-    // MARK: - Проверка доступности трека (обновление isAvailable)
+// MARK: - Проверка доступности трека (обновление isAvailable)
     
     // Проверяет доступность файла вручную и возвращает новую копию трека
     func refreshAvailability() -> Track {
@@ -61,7 +61,7 @@ struct Track: Identifiable {
         )
     }
 
-    // MARK: - Загрузка трека из URL с помощью AVFoundation
+// MARK: - Загрузка трека из URL с помощью AVFoundation
     
     // Загружает метаданные трека через AVAsset и возвращает Track
     static func load(from url: URL) async throws -> Self {
@@ -108,7 +108,7 @@ struct Track: Identifiable {
             isAvailable: available
         )
     }
-    // MARK: - Преобразование Track в ImportedTrack (для сохранения в JSON)
+// MARK: - Преобразование Track в ImportedTrack (для сохранения в JSON)
     
     // Конвертирует Track в ImportedTrack (для записи в JSON)
     func asImportedTrack() -> ImportedTrack {
@@ -167,17 +167,31 @@ extension Track {
 }
 
 
+// MARK: -  Инициализация из ImportedTrack
+
 extension Track {
-    init(from imported: ImportedTrack) {
+    
+    // Инициализирует трек из модели `ImportedTrack`, восстанавливая доступ к файлу по `bookmarkBase64`.
+    // Используется при загрузке плейлиста из `player.json`.
+    // - Параметр imported: сохранённая модель трека, полученная при импорте.
+    // - Возвращает `nil`, если не удалось восстановить доступ к файлу (например, bookmark повреждён или устарел).
+    init?(from imported: ImportedTrack) {
+        
+        // Пытаемся восстановить доступ к файлу через bookmark
+        guard let url = try? imported.resolvedURL() else {
+            print("❌ Не удалось восстановить доступ к \(imported.fileName)")
+            return nil
+        }
+
         self.init(
             id: imported.id,
-            url: URL(fileURLWithPath: imported.filePath),
+            url: url,
             artist: imported.artist,
             title: imported.title ?? imported.fileName,
             duration: imported.duration,
             fileName: imported.fileName,
             artworkId: imported.artworkId,
-            isAvailable: true // по умолчанию true, потом можно вызвать .refreshAvailability()
+            isAvailable: FileManager.default.fileExists(atPath: url.path)
         )
     }
 }

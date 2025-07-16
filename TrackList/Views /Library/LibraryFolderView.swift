@@ -9,6 +9,7 @@ import SwiftUI
 
 struct LibraryFolderView: View {
     let folder: LibraryFolder
+    let trackListViewModel: TrackListViewModel
     @ObservedObject var playerViewModel: PlayerViewModel
     private var allVisibleTracks: [LibraryTrack] {
         trackSections.flatMap { $0.tracks }
@@ -56,7 +57,7 @@ struct LibraryFolderView: View {
             let current = trackSections.flatMap { $0.tracks.map(\.id) }
             let new = grouped.flatMap { $0.tracks.map(\.id) }
 
-            guard current != new else { return } // если ничего не изменилось — не обновляем
+            guard current != new else { return }
 
             trackSections = grouped
         
@@ -100,8 +101,10 @@ struct LibraryFolderView: View {
                         NavigationLink(
                             destination: LibraryFolderView(
                                 folder: subfolder,
+                                trackListViewModel: trackListViewModel,
                                 playerViewModel: playerViewModel
                             )
+                            
                         ) {
                             HStack(spacing: 12) {
                                 Image(systemName: "folder")
@@ -128,7 +131,8 @@ struct LibraryFolderView: View {
                     title: section.title,
                     tracks: section.tracks,
                     allTracks: allVisibleTracks,
-                    playerViewModel: playerViewModel
+                    playerViewModel: playerViewModel,
+                    trackListViewModel: trackListViewModel
                 )
             }
         }
