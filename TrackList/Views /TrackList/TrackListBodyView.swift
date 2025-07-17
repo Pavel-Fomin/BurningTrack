@@ -38,7 +38,6 @@ struct TrackListBodyView: View {
                 ForEach(Array(trackListViewModel.tracks.enumerated()), id: \.element.id) { index, track in
                     let isCurrent = (playerViewModel.currentTrackDisplayable as? Track)?.id == track.id
                     
-                    
                     RowWrapper(
                         track: track,
                         playerViewModel: playerViewModel,

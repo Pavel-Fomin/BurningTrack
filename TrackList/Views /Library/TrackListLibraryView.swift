@@ -11,6 +11,7 @@ struct TrackListLibraryView: View {
     let playerViewModel: PlayerViewModel 
     @State private var trackLists: [TrackListMeta] = []
     @State private var path: [UUID] = []
+    @State private var trackListToDelete: TrackListMeta?
     
     var body: some View {
         NavigationStack(path: $path) {
@@ -25,6 +26,33 @@ struct TrackListLibraryView: View {
                                 .foregroundColor(.secondary)
                         }
                     }
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                        Button(role: .destructive) {
+                                            trackListToDelete = meta
+                                        } label: {
+                                            Label("Удалить", systemImage: "trash")
+                                        }
+                                    }
+                                }
+                            }
+                            .confirmationDialog(
+                                "Удалить треклист \"\(trackListToDelete?.name ?? "")\"?",
+                                isPresented: Binding(
+                                    get: { trackListToDelete != nil },
+                                    set: { if !$0 { trackListToDelete = nil } }
+                                ),
+                                titleVisibility: .visible
+                            ) {
+                                Button("Удалить", role: .destructive) {
+                                    if let toDelete = trackListToDelete {
+                                        TrackListManager.shared.deleteTrackList(id: toDelete.id)
+                                        trackLists.removeAll { $0.id == toDelete.id }
+                                        trackListToDelete = nil
+                                    }
+                                }
+                                Button("Отмена", role: .cancel) {
+                                    trackListToDelete = nil
+                                
                 }
             }
             .navigationDestination(for: UUID.self) { id in

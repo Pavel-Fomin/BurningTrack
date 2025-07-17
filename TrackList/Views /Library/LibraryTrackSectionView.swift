@@ -16,7 +16,7 @@ struct LibraryTrackSectionView: View {
     let playerViewModel: PlayerViewModel
     let trackListViewModel: TrackListViewModel
     @EnvironmentObject var toast: ToastManager
-
+    
     var body: some View {
         Section(header: Text(title).font(.headline)) {
             ForEach(tracks, id: \.id) { track in
@@ -29,9 +29,9 @@ struct LibraryTrackSectionView: View {
             }
         }
     }
-
     
-// MARK: - Вынесенная строка трека для упрощения компиляции
+    
+    // MARK: - Вынесенная строка трека для упрощения компиляции
     
     private struct LibraryTrackRow: View {
         let track: LibraryTrack
@@ -39,7 +39,7 @@ struct LibraryTrackSectionView: View {
         let playerViewModel: PlayerViewModel
         let trackListViewModel: TrackListViewModel
         @EnvironmentObject var toast: ToastManager
-
+        
         var body: some View {
             TrackRowView(
                 track: track,
@@ -52,37 +52,46 @@ struct LibraryTrackSectionView: View {
                         playerViewModel.play(track: track, context: allTracks)
                     }
                 },
-                onSwipeLeft: {
-                    var imported = track.original
-
-                    // Сохраняем обложку (если есть)
-                    if let image = track.artwork {
-                        let artworkId = UUID()
-                        ArtworkManager.saveArtwork(image, id: artworkId)
-                        imported.artworkId = artworkId
-                    }
-
-                    // Добавляем трек в PlaylistManager
-                    let newTrack = Track(
-                        id: imported.id,
-                        url: track.url,
-                        artist: imported.artist,
-                        title: imported.title,
-                        duration: imported.duration,
-                        fileName: imported.fileName,
-                        artworkId: imported.artworkId,
-                        isAvailable: true
+                swipeActionsLeft: [
+                    CustomSwipeAction(
+                        label: "В плеер",
+                        systemImage: "square.and.arrow.down",
+                        role: .none,
+                        tint: .blue,
+                        handler: {
+                            var imported = track.original
+                            
+                            if let image = track.artwork {
+                                let artworkId = UUID()
+                                ArtworkManager.saveArtwork(image, id: artworkId)
+                                imported.artworkId = artworkId
+                            }
+                            
+                            // Добавляем трек в PlaylistManager
+                            let newTrack = Track(
+                                id: imported.id,
+                                url: track.url,
+                                artist: imported.artist,
+                                title: imported.title,
+                                duration: imported.duration,
+                                fileName: imported.fileName,
+                                artworkId: imported.artworkId,
+                                isAvailable: true
+                            )
+                            
+                            
+                            PlaylistManager.shared.tracks.append(newTrack)
+                            PlaylistManager.shared.saveToDisk()
+                            
+                            // Показываем тост
+                            toast.show(ToastData(
+                                style: .track(title: track.title ?? track.fileName, artist: track.artist ?? ""),
+                                artwork: track.artwork
+                            ))
+                        },
+                        labelType: .textOnly
                     )
-
-                    PlaylistManager.shared.tracks.append(newTrack)
-                    PlaylistManager.shared.saveToDisk()
-
-                    // Показываем тост
-                    toast.show(ToastData(
-                        style: .track(title: track.title ?? track.fileName, artist: track.artist ?? ""),
-                        artwork: track.artwork
-                    ))
-                }
+                ]
             )
         }
     }

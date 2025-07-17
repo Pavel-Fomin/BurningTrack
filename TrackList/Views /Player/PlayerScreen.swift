@@ -22,7 +22,6 @@ struct PlayerScreen: View {
             ZStack(alignment: .bottom) {
                 Color(.systemBackground)
                     .ignoresSafeArea()
-                
                 VStack(spacing: 0) {
                     
                     
