@@ -10,7 +10,7 @@
 import SwiftUI
 
 struct PlayerScreen: View {
-    @ObservedObject var trackListViewModel: TrackListViewModel
+    
     @ObservedObject var playerViewModel: PlayerViewModel
     
     @State private var showImporter = false
@@ -28,16 +28,14 @@ struct PlayerScreen: View {
 // MARK: - Хедер
                     
                     PlayerHeaderView(
-                        trackCount: trackListViewModel.tracks.count,
+                        trackCount: PlaylistManager.shared.tracks.count,
                         onSave: {
-                            trackListViewModel.newTrackListName = generateDefaultTrackListName()
-                            trackListViewModel.isShowingSaveSheet = true
+                            PlaylistManager.shared.saveToDisk()
                         },
                         onExport: {
                             isShowingExportPicker = true
                         },
                         onClear: {
-                            trackListViewModel.tracks = []
                             PlaylistManager.shared.tracks = []
                             PlaylistManager.shared.saveToDisk()
                        }

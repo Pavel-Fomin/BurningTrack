@@ -22,41 +22,11 @@ struct ContentView: View {
             trackListViewModel: trackListViewModel
         ) {
             ZStack(alignment: .bottom) {
-                TabView(selection: $selectedTab) {
-                    
-                    
-// MARK: - Плеер
-                    PlayerScreen(
-                        trackListViewModel: trackListViewModel,
-                        playerViewModel: playerViewModel
-                    )
-                    .tabItem {
-                        Label("Плеер", systemImage: "play.circle.fill")
-                    }
-                    .tag(0)
-                    
-// MARK: - Фонотека
-                    LibraryScreen(
-                        playerViewModel: playerViewModel,
-                        trackListViewModel: trackListViewModel
-                    )
-                        .tabItem {
-                            Label("Фонотека", systemImage: "music.note.list")
-                        }
-                        .tag(1)
-                    
-// MARK: - Настройки
-                    SettingsScreen()
-                        .tabItem {
-                            Label("Настройки", systemImage: "gearshape")
-                        }
-                        .tag(2)
-                }
-                .onPreferenceChange(MiniPlayerHeightPreferenceKey.self) { value in
-                    miniPlayerHeight = value
-                }
-                
-// MARK: - Toast поверх всех вкладок
+                MainTabView(
+                    trackListViewModel: trackListViewModel,
+                    playerViewModel: playerViewModel
+                )
+
                 if let data = toast.data {
                     VStack(spacing: 8) {
                         ToastView(data: data)
@@ -72,6 +42,7 @@ struct ContentView: View {
     
     
 // MARK: - Тост
+    
     private var toastBottomPadding: CGFloat {
         let hasMiniPlayer = playerViewModel.currentTrackDisplayable != nil && selectedTab != 2
         let miniPlayerHeight: CGFloat = hasMiniPlayer ? 88 : 0

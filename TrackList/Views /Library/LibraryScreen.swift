@@ -10,7 +10,6 @@
 import SwiftUI
 
 struct LibraryScreen: View {
-    @State private var selectedTab = 0
     @State private var isShowingFolderPicker = false
     private let musicLibraryManager = MusicLibraryManager.shared
     @State private var path: [LibraryFolder] = []
@@ -18,33 +17,24 @@ struct LibraryScreen: View {
     let playerViewModel: PlayerViewModel
     let trackListViewModel: TrackListViewModel
     @EnvironmentObject var toast: ToastManager
-    
+
     var body: some View {
         NavigationStack(path: $path) {
             ZStack {
                 VStack(spacing: 12) {
                     if path.isEmpty {
-                        LibraryHeaderView(
-                            selectedTab: $selectedTab,
-                            onAddFolder: {
-                                isShowingFolderPicker = true
-                            }
-                        )
-                    }
-                    
-                    Group {
-                        if selectedTab == 0 {
-                            MusicLibraryView(
-                                path: $path,
-                                playerViewModel: playerViewModel
-                            )
-                        } else {
-                            TrackListLibraryView(playerViewModel: playerViewModel)
+                        LibraryHeaderView {
+                            isShowingFolderPicker = true
                         }
                     }
+
+                    MusicLibraryView(
+                        path: $path,
+                        playerViewModel: playerViewModel
+                    )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                
+
                 .navigationDestination(for: LibraryFolder.self) { folder in
                     LibraryFolderView(
                         folder: folder,
@@ -52,10 +42,11 @@ struct LibraryScreen: View {
                         playerViewModel: playerViewModel
                     )
                 }
-                
+
                 .onAppear {
                     musicLibraryManager.restoreAccess()
                 }
+
                 .fileImporter(
                     isPresented: $isShowingFolderPicker,
                     allowedContentTypes: [.folder],

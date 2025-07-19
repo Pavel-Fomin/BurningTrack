@@ -29,6 +29,8 @@ final class TrackListViewModel: NSObject, ObservableObject {
     @Published var isShowingSaveSheet = false
     @Published var newTrackListName: String = generateDefaultTrackListName()
     @Published var toastData: ToastData? = nil
+    @Published var isEditing: Bool = false
+
     
     // Режим импорта треков
     enum ImportMode {
@@ -217,6 +219,21 @@ final class TrackListViewModel: NSObject, ObservableObject {
             } else {
                 return true
             }
+        }
+    
+        // Переключение режима редактирования списка треклистов
+        func toggleEditMode() {
+        isEditing.toggle()
+        }
+    
+        // Запуск импорта нового треклиста
+        func startImport() {
+        importMode = .newList
+        }
+    
+        func deleteTrackList(id: UUID) {
+        TrackListManager.shared.deleteTrackList(id: id)
+        refreshTrackLists()
         }
     
         

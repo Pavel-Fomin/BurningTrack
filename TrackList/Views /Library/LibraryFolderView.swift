@@ -16,7 +16,7 @@ struct LibraryFolderView: View {
     }
     
     
-    // MARK: - Вспомогательная модель секции
+// MARK: - Вспомогательная модель секции
     
     struct TrackSection: Identifiable {
         let id: String
@@ -43,7 +43,7 @@ struct LibraryFolderView: View {
         
     }
     
-    // MARK: - Загрузка треков
+// MARK: - Загрузка треков
     
     private func loadTracksIfNeeded() async {
         guard trackSections.isEmpty else { return }
@@ -64,7 +64,7 @@ struct LibraryFolderView: View {
         }
     }
         
-        // MARK: - Группировка по дате
+// MARK: - Группировка по дате
         
         private func groupTracksByDate(_ tracks: [LibraryTrack]) -> [TrackSection] {
             let calendar = Calendar.current
@@ -91,7 +91,7 @@ struct LibraryFolderView: View {
         }
         
         
-        // MARK: - Секция подпапок
+// MARK: - Секция подпапок
         
         @ViewBuilder
         private func folderSectionView() -> some View {
@@ -122,7 +122,7 @@ struct LibraryFolderView: View {
         }
         
         
-        // MARK: - Секция треков
+// MARK: - Секция треков
         
         @ViewBuilder
         private func trackSectionsView() -> some View {
