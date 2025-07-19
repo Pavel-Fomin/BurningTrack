@@ -19,16 +19,13 @@ struct PlayerHeaderView: View {
         ScreenHeaderView(title: "Плеер") {
             EmptyView()
         } trailing: {
-            HStack(spacing: 12) {
-                Button(action: onSave) {
-                    Image(systemName: "square.and.arrow.down")
-                }
-                Button(action: onExport) {
-                    Image(systemName: "square.and.arrow.up")
-                }
-                Button(action: onClear) {
-                    Image(systemName: "trash")
-                }
+            Menu {
+                Button("Сохранить треклист", action: {})
+                Button("Записать треклист", action: {})
+                Button("Очистить треклист", role: .destructive, action: {})
+            } label: {
+                Image(systemName: "ellipsis.circle")
+                    .headerIconStyle()
             }
         }
     }

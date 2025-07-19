@@ -21,7 +21,7 @@ struct LibraryScreen: View {
     var body: some View {
         NavigationStack(path: $path) {
             ZStack {
-                VStack(spacing: 12) {
+                VStack(spacing: 0) {
                     if path.isEmpty {
                         LibraryHeaderView {
                             isShowingFolderPicker = true
@@ -30,7 +30,10 @@ struct LibraryScreen: View {
 
                     MusicLibraryView(
                         path: $path,
-                        playerViewModel: playerViewModel
+                        playerViewModel: playerViewModel,
+                        onAddFolder: {
+                            isShowingFolderPicker = true
+                        }
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
@@ -45,6 +48,7 @@ struct LibraryScreen: View {
 
                 .onAppear {
                     musicLibraryManager.restoreAccess()
+                    
                 }
 
                 .fileImporter(
@@ -63,6 +67,7 @@ struct LibraryScreen: View {
                     }
                 }
             }
+            
         }
     }
 }

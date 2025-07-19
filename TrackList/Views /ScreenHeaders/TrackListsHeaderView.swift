@@ -18,19 +18,12 @@ struct TrackListHeaderView: View {
         ScreenHeaderView(title: "Треклисты") {
             EmptyView()
         } trailing: {
-            HStack(spacing: 12) {
-                Button(action: onAdd) {
-                    Image(systemName: "plus")
-                }
-
-                Button(action: onEditToggle) {
-                    if isEditing {
-                        Text("Готово")
-                            .font(.system(size: 14, weight: .semibold))
-                    } else {
-                        Image(systemName: "slider.horizontal.3")
-                    }
-                }
+            Menu {
+                Button("Новый треклист", action: {})
+                Button("Удалить несколько", action: {})
+            } label: {
+                Image(systemName: "ellipsis.circle")
+                    .headerIconStyle()
             }
         }
     }

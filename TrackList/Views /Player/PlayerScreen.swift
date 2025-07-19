@@ -84,11 +84,6 @@ struct PlayerScreen: View {
                     print("Приложение готово к работе за \(String(format: "%.2f", loadTime)) сек")
                     
                 }
-                
-                
-// MARK: - Навигация
-                
-                .navigationBarHidden(true)
             }
         }
     }

@@ -15,5 +15,8 @@ struct SettingsView: View {
         Text("Настройки в разработке")
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .foregroundColor(.secondary)
+        
     }
+    
+    
 }

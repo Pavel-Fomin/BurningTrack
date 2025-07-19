@@ -20,6 +20,7 @@ struct LibraryHeaderView: View {
         } trailing: {
             Button(action: onAddFolder) {
                 Image(systemName: "plus")
+                    .headerIconStyle()
             }
         }
     }

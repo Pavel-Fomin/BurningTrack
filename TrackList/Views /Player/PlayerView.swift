@@ -47,5 +47,8 @@ struct PlayerView: View {
                 
             }
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        
     }
 }

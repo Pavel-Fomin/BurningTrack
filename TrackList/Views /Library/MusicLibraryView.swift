@@ -12,7 +12,8 @@ struct MusicLibraryView: View {
     @Binding var path: [LibraryFolder]
     @StateObject private var manager = MusicLibraryManager.shared
     let playerViewModel: PlayerViewModel
-
+    let onAddFolder: () -> Void
+    
     var body: some View {
         if manager.attachedFolders.isEmpty {
             VStack {
@@ -30,7 +31,7 @@ struct MusicLibraryView: View {
                         path.append(folder)
                     } label: {
                         HStack(spacing: 12) {
-                            Image(systemName: "folder")
+                            Image(systemName: "folder.fill")
                                 .foregroundColor(.blue)
                                 .frame(width: 24)
                             Text(folder.name)
@@ -45,6 +46,15 @@ struct MusicLibraryView: View {
                             Label("Открепить", systemImage: "trash")
                         }
                     }
+                }
+                Button(action: onAddFolder) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "folder.fill.badge.plus")
+                            .foregroundColor(.blue)
+                            .frame(width: 24)
+                        Text("Добавить папку")
+                    }
+                    .padding(.vertical, 4)
                 }
             }
         }

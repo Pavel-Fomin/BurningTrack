@@ -24,7 +24,7 @@ struct TrackListsListView: View {
             viewModel.refreshTrackLists()
         
         }
-        .listStyle(.plain)
+        .listStyle(.insetGrouped)
     }
 
     @ViewBuilder
@@ -45,6 +45,7 @@ struct TrackListsListView: View {
                 Spacer()
             }
             .contentShape(Rectangle())
+            .navigationBarHidden(true)
         }
         .swipeActions(edge: .trailing) {
             Button(role: .destructive) {

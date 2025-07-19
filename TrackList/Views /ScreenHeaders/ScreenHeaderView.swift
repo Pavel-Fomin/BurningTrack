@@ -26,21 +26,27 @@ struct ScreenHeaderView<Leading: View, Trailing: View>: View {
     }
 
     var body: some View {
-        HStack {
-            leading()
-                .frame(width: 32, alignment: .leading)
+            ZStack {
+                Text(title)
+                    .font(.title3.bold())
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
 
-            Text(title)
-                .font(.title3.bold())
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .center)
+                HStack {
+                    leading()
+                        .frame(width: 32, height: 44, alignment: .leading)
 
-            trailing()
-                .frame(width: 32, alignment: .trailing)
+                    Spacer()
+
+                    trailing()
+                        .frame(width: 32,height: 44, alignment: .trailing)
+                }
+            }
+            .frame(height: 44)
+            .padding(.horizontal, 16)
+            .background(Color(.systemBackground))
+        
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(Color(.systemBackground))
     }
-}

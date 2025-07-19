@@ -16,7 +16,7 @@ struct TrackListsScreen: View {
     
     var body: some View {
         NavigationStack {
-            VStack(spacing: 12) {
+            VStack(spacing: 0) {
                 TrackListHeaderView(
                     isEditing: trackListViewModel.isEditing,
                     onAdd: {
@@ -32,7 +32,7 @@ struct TrackListsScreen: View {
                     playerViewModel: playerViewModel
                 )
             }
-            .padding(.horizontal, 16)
+            .background(Color(.systemGroupedBackground))
         }
     }
 }
