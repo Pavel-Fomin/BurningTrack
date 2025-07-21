@@ -10,9 +10,7 @@
 import SwiftUI
 
 struct PlayerScreen: View {
-    
     @ObservedObject var playerViewModel: PlayerViewModel
-    
     @State private var showImporter = false
     @State private var isShowingExportPicker = false
     

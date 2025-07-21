@@ -132,7 +132,7 @@ struct LibraryFolderView: View {
                     tracks: section.tracks,
                     allTracks: allVisibleTracks,
                     playerViewModel: playerViewModel,
-                    trackListViewModel: trackListViewModel
+                    trackListViewModel: trackListViewModel,
                 )
             }
         }

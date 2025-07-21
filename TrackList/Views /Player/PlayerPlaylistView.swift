@@ -21,8 +21,16 @@ struct PlayerPlaylistView: View {
             currentTrack: playerViewModel.currentTrackDisplayable as? Track,
             isPlaying: playerViewModel.isPlaying,
             onTrackTap: { track in
-                playerViewModel.play(track: track)
+                            if let current = playerViewModel.currentTrackDisplayable as? Track,
+                               current.id == track.id {
+                                playerViewModel.togglePlayPause()
+                            } else {
+                                playerViewModel.play(
+                                                track: track,
+                                                context: manager.tracks
+                              )
+                            }
+                        }
+                    )
+                }
             }
-        )
-    }
-}

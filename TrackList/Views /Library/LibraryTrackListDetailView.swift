@@ -18,7 +18,7 @@ struct LibraryTrackListDetailView: View {
                 track: track,
                 isCurrent: false,
                 isPlaying: false,
-                onTap: {               /// действие при тапе
+                onTap: {               
                 }
             )
         }

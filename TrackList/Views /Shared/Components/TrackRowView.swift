@@ -31,6 +31,7 @@ struct TrackRowView: View {
         .onTapGesture {
             if track.isAvailable {
                 onTap()
+                print("📌 Tap на \(track.title ?? track.fileName)")
             } else {
                 print("❌ Трек недоступен: \(track.title ?? track.fileName)")
             }

@@ -8,26 +8,32 @@
 //
 
 import SwiftUI
+import Foundation
 
 struct LibraryTrackView: View {
     let tracks: [LibraryTrack]
     let allTracks: [LibraryTrack]
-    let playerViewModel: PlayerViewModel
+    @ObservedObject var playerViewModel: PlayerViewModel
     
     var body: some View {
         ForEach(tracks) { track in
+            let currentTrack = playerViewModel.currentTrackDisplayable as? LibraryTrack
+            let isCurrent = currentTrack?.url.path == track.url.path
+            
+            
             LibraryTrackRow(
                 track: track,
-                playerViewModel: playerViewModel,
+                isCurrent: isCurrent,
+                isPlaying: isCurrent && playerViewModel.isPlaying,
                 onTap: {
-                    if track.isAvailable {
-                        if playerViewModel.currentTrackDisplayable?.id == track.id {
-                            playerViewModel.togglePlayPause()
-                        } else {
-                            playerViewModel.play(track: track, context: allTracks)
-                        }
+                    guard track.isAvailable else { return }
+                    
+                    if isCurrent {
+                        print("⏯ Повторный тап — togglePlayPause()")
+                        playerViewModel.togglePlayPause()
                     } else {
-                        print("❌ Трек недоступен: \(track.title ?? track.fileName)")
+                        print("▶️ Новый трек — play()")
+                        playerViewModel.play(track: track, context: allTracks)
                     }
                 }
             )
