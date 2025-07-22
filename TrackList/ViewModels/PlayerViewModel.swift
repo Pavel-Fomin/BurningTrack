@@ -79,6 +79,7 @@ final class PlayerViewModel: ObservableObject {
        
     func play(track: any TrackDisplayable, context: [any TrackDisplayable] = []) {
         print("🧠 PlayerViewModel: play(track:) вызван с", track.fileName)
+        print("🧩 currentTrackDisplayable ID: \(track.id)")
 
         if let current = currentTrackDisplayable,
            current.fileName == track.fileName {

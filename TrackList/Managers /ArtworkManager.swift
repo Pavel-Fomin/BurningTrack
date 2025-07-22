@@ -3,7 +3,7 @@
 //  TrackList
 //
 //  Менеджер обложек треков: сохранение, загрузка и удаление JPEG-файлов.
-//  Используется для хранения изображений треков в папке /Documents/artworks
+//  Путь: /Documents/artworks/artwork_<id>.jpg
 //
 //  Created by Pavel Fomin on 18.05.2025.
 //
@@ -12,8 +12,11 @@ import UIKit
 
 struct ArtworkManager {
     
-    // URL до папки /Documents/artworks
-    // Создаётся при первом обращении, если ещё не существует
+    
+// MARK: - Путь к папке с обложками
+
+    /// URL до папки /Documents/artworks
+    /// Создаётся при первом обращении, если ещё не существует
     static let artworksFolderURL: URL = {
         let fileManager = FileManager.default
         let documents = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
@@ -31,12 +34,17 @@ struct ArtworkManager {
         return artworkFolder
     }()
     
-    // Сохраняет изображение в формате JPEG с ID (используется UUID трека)
-    // - Путь: /Documents/artworks/artwork_<id>.jpg
+    
+// MARK: - Сохранение
+
+      /// Сохраняет изображение в формате JPEG с заданным ID (обычно UUID трека)
+      /// - Parameters:
+      ///  - image: Изображение обложки (UIImage)
+      ///  - id: Уникальный идентификатор трека
     static func saveArtwork(_ image: UIImage, id: UUID) {
         let url = artworksFolderURL.appendingPathComponent("artwork_\(id.uuidString).jpg")
         
-        // Сжимаем изображение до JPEG
+        // Конвертация в JPEG сжатие 0.7
         guard let data = image.jpegData(compressionQuality: 0.7) else {
             print("⚠️ Не удалось сжать JPEG")
             return
@@ -50,8 +58,12 @@ struct ArtworkManager {
         }
     }
 
-    // Загружает изображение по ID
-    // Возвращает UIImage или nil, если файл не найден
+    
+// MARK: - Загрузка
+
+    /// Загружает изображение обложки по ID
+    /// - Parameter id: Уникальный идентификатор трека
+    /// - Returns: UIImage или nil, если файл не найден или не читается
     static func loadArtwork(id: UUID) -> UIImage? {
         let url = artworksFolderURL.appendingPathComponent("artwork_\(id.uuidString).jpg")
 
@@ -67,7 +79,11 @@ struct ArtworkManager {
         }
     }
     
-    // Удаляет изображение по ID (если оно существует)
+    
+// MARK: - Удаление
+
+    /// Удаляет файл обложки по ID, если он существует
+    /// - Parameter id: Уникальный идентификатор трека
     static func deleteArtwork(id: UUID) {
         let url = artworksFolderURL.appendingPathComponent("artwork_\(id.uuidString).jpg")
         try? FileManager.default.removeItem(at: url)

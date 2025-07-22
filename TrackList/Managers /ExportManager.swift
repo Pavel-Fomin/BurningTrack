@@ -12,10 +12,17 @@ import Foundation
 import UniformTypeIdentifiers
 
 final class ExportManager {
+    
+    /// Синглтон-экземпляр
     static let shared = ExportManager()
     
-    /// Экспортирует список треков через промежуточную папку ExportTemp:
-    /// копирует файлы по сохранённым bookmark-ссылкам и передаёт их в UIDocumentPicker для сохранения пользователем
+    
+// MARK: - Экспорт через временную папку ExportTemp
+
+    /// Копирует треки в временную папку и открывает системный UIDocumentPicker для выбора места сохранения
+    /// - Parameters:
+    /// - tracks: Список треков для экспорта
+    /// - presenter: UIViewController, на котором будет представлен UIDocumentPicker
     func exportViaTempAndPicker(_ tracks: [ImportedTrack], presenter: UIViewController) {
         
         // Временная директория для экспорта
@@ -28,7 +35,7 @@ final class ExportManager {
         
         var copiedFiles: [URL] = []
         
-        // 2. Копируем каждый трек во временную папку
+        // 2. Копируем по порядку каждый трек во временную папку
         for (index, track) in tracks.enumerated() {
             do {
                 // Восстанавливаем URL из bookmark
@@ -41,19 +48,19 @@ final class ExportManager {
                     bookmarkDataIsStale: &isStale
                 )
                 
-                // Запрашиваем доступ к ресурсу
+                // Запрашиваем доступ к ресурсу (обязательно start/stop)
                 guard sourceURL.startAccessingSecurityScopedResource() else {
                     print("Не удалось открыть security scope для \(track.fileName)")
                     continue
                 }
                 defer { sourceURL.stopAccessingSecurityScopedResource() }
 
-                // Имя файла с порядковым префиксом
+                // Префикс с порядком (например, "01 filename.flac")
                 let prefix = String(format: "%02d", index + 1)
                 let exportName = "\(prefix) \(track.fileName)"
                 let dstURL = tempDir.appendingPathComponent(exportName)
                 
-                // Копируем файл
+                // Копируем файл в ExportTemp
                 try FileManager.default.copyItem(at: sourceURL, to: dstURL)
                 copiedFiles.append(dstURL)
                 print("Подготовлен к экспорту: \(exportName)")

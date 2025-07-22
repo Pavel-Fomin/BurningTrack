@@ -9,7 +9,7 @@ import Foundation
 import UIKit
 
 struct LibraryTrack: Identifiable, TrackDisplayable {
-    let id = UUID()
+    var id: UUID { original.id }
     let url: URL                /// оставим для fallback
     let bookmarkBase64: String  /// добавляем
     var title: String?

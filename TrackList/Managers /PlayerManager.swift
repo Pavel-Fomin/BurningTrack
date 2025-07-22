@@ -9,17 +9,18 @@
 //
 
 import Foundation
-@preconcurrency import AVFoundation
 import Combine
 import MediaPlayer
+@preconcurrency import AVFoundation
 
+/// Контроллер нижнего уровня для управления AVPlayer
 final class PlayerManager {
-    private let player = AVPlayer()
-    private var timeObserverToken: Any?
-    private var currentAccessedURL: URL?
+    private let player = AVPlayer()       /// Основной AVPlayer
+    private var timeObserverToken: Any?   /// Токен наблюдения за прогрессом
+    private var currentAccessedURL: URL?  /// URL, к которому был открыт доступ (для stopAccessing)
     
     
-    // MARK: - Инициализация плеера
+// MARK: - Инициализация плеера
     
     init() {
         configureAudioSession()
@@ -34,26 +35,30 @@ final class PlayerManager {
         )
     }
     
-    // Уведомление о завершении трека (для перехода к следующему)
+    /// Обработка завершения текущего трека — пересылаем событие наверх
     @objc private func trackDidFinishPlaying() {
         NotificationCenter.default.post(name: .trackDidFinish, object: nil)
     }
     
+    
     // MARK: - Настройка аудиосессии (для воспроизведения в фоне)
     
+    /// Включает режим фонового воспроизведения
     private func configureAudioSession() {
         do {
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
             try AVAudioSession.sharedInstance().setActive(true)
             print("🔊 [Init] Аудиосессия активирована")
         } catch {
-            print("❌ [Init] Ошибка активации аудиосессии: \(error)")
+            
         }
     }
     
     
-    // MARK: - Универсальный метод воспроизведения трека любого типа
+// MARK: - Универсальный метод воспроизведения трека любого типа
     
+    /// Запускает воспроизведение трека — поддерживаются все типы (Imported, Library, Track)
+    /// - Parameter track: Трек, соответствующий протоколу TrackDisplayable
     func play(track: any TrackDisplayable) {
         Task {
             do {
@@ -61,30 +66,31 @@ final class PlayerManager {
                 
                 if let libraryTrack = track as? LibraryTrack {
                     print("📀 Это LibraryTrack")
+                    
+                    // Запрашиваем доступ к защищённому ресурсу
                     guard let resolved = libraryTrack.startAccessingIfNeeded() else {
-                        print("⛔️ Не удалось открыть доступ к LibraryTrack")
                         return
                     }
                     resolvedURL = resolved
-                    print("🌐 resolvedURL.scheme:", resolvedURL.scheme ?? "nil")
-                    print("📁 resolvedURL (LibraryTrack):", resolvedURL.path)
-                    print("📂 fileExists:", FileManager.default.fileExists(atPath: resolvedURL.path))
                 
                 } else if let importedTrack = track as? ImportedTrack {
                     print("📥 Это ImportedTrack")
+                    
+                    // Запрашиваем доступ по bookmark'у
                     guard importedTrack.startAccessingIfNeeded() else {
-                        print("⛔️ Не удалось открыть доступ к ImportedTrack")
                         return
                     }
                     resolvedURL = try importedTrack.resolvedURL()
+                    
                 } else if let savedTrack = track as? Track {
                     print("💾 Это Track")
+                    
                     resolvedURL = savedTrack.url
                 } else {
-                    print("❓ Неизвестный тип трека: \(type(of: track))")
                     return
                 }
                 
+                // Упрощённый доступ — обычный URL
                 if resolvedURL == currentAccessedURL {
                     player.play()
                     return
@@ -93,32 +99,33 @@ final class PlayerManager {
                 try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
                 try AVAudioSession.sharedInstance().setActive(true)
                 
+                // Закрываем доступ к предыдущему треку
                 stopAccessingCurrentTrack()
                 currentAccessedURL = resolvedURL
-                print("🔓 Доступ получен к \(resolvedURL.lastPathComponent)")
                 
+                // Создаём AVPlayerItem
                 let playerItem = AVPlayerItem(url: resolvedURL)
-                print("📦 AVPlayerItem создан. Статус: \(playerItem.status.rawValue)")
-
-                let isPlayable = try await playerItem.asset.load(.isPlayable)
-                print("📺 isPlayable:", isPlayable)
                 
+                // Проверка, доступно ли воспроизведение
+                _ = try await playerItem.asset.load(.isPlayable)
+                
+                
+                // Устанавливаем item и запускаем плеер
                 player.replaceCurrentItem(with: playerItem)
                 NotificationCenter.default.addObserver(
                     forName: .AVPlayerItemFailedToPlayToEndTime,
                     object: playerItem,
                     queue: .main
                 ) { notification in
-                    if let error = notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error {
-                        print("❌ Ошибка воспроизведения до конца: \(error)")
+                    if notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] != nil {
+                        
                     } else {
-                        print("❌ Неизвестная ошибка воспроизведения")
+                        
                     }
                 }
                 player.play()
-                print("▶️ Попытка воспроизведения трека: \(resolvedURL.lastPathComponent)")
                 
-                // Загрузка длительности
+                // Загрузка длительности через разные источники
                 let asset = await playerItem.asset
                 let duration = try await asset.load(.duration)
                 let audioTracks = try await asset.loadTracks(withMediaType: .audio)
@@ -128,11 +135,13 @@ final class PlayerManager {
                 let fromAsset = duration.seconds
                 let fromPlayer = playerItem.duration.seconds
                 
+                // Выбираем максимальное валидное значение
                 let bestDuration = [fromTrack, fromPlayer, fromAsset]
                     .compactMap { $0 }
                     .filter { $0.isFinite && $0 > 0 }
                     .max() ?? 0
                 
+                // Уведомляем об обновлении длительности
                 await MainActor.run {
                     NotificationCenter.default.post(
                         name: .trackDurationUpdated,
@@ -141,34 +150,40 @@ final class PlayerManager {
                     )
                 }
                 
-                // Отладка (опционально)
+                // (Опционально) Повторная проверка длительности через 2 сек
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                     Task {
                         do {
                             let duration = try await asset.load(.duration)
-                            let trueDuration = playerItem.duration.seconds
-                            let assetDuration = duration.seconds
-                            print("🕵️ trueDuration:", trueDuration, "| assetDuration:", assetDuration)
+                            _ = playerItem.duration.seconds
+                            _ = duration.seconds
+                            /// Можно сравнить значения
+                            
                         } catch {
-                            print("❌ Ошибка при загрузке asset.duration:", error)
+                            
                         }
                     }
                 }
                 
             } catch {
-                print("❌ Ошибка воспроизведения: \(error.localizedDescription)")
+                
             }
         }
     }
     
-    // MARK: - Освобождение доступа к предыдущему файлу
     
+// MARK: - Освобождение доступа к текущему треку
+    
+    /// Закрывает доступ к текущему файлу, если он был открыт через securityScoped
     func stopAccessingCurrentTrack() {
         if let url = currentAccessedURL {
             url.stopAccessingSecurityScopedResource()
             currentAccessedURL = nil
         }
     }
+    
+    
+// MARK: - Управление воспроизведением
     
     // Пауза текущего трека
     func pause() {
@@ -186,7 +201,11 @@ final class PlayerManager {
         player.play()
     }
     
-    // Подписка на обновление прогресса воспроизведения
+    
+// MARK: - Подписка на прогресс плеера
+    
+    /// Подписка на обновление времени воспроизведения
+    /// - Parameter update: Замыкание с текущим временем (в секундах)
     func observeProgress(update: @escaping (TimeInterval) -> Void) {
         removeTimeObserver() /// чтобы не дублировать
         
@@ -196,7 +215,7 @@ final class PlayerManager {
         }
     }
     
-    // Удаляет наблюдатель за прогрессом
+    /// Удаляет наблюдатель прогресса (если он есть)
     func removeTimeObserver() {
         if let token = timeObserverToken {
             player.removeTimeObserver(token)
@@ -204,8 +223,10 @@ final class PlayerManager {
         }
     }
     
-    // MARK: - Обновляет информацию Now Playing (для Control Center / экран блокировки)
     
+// MARK: - Now Playing Info (для Control Center и блокировки экрана)
+    
+    /// Обновляет отображение информации о треке
     func updateNowPlayingInfo(track: any TrackDisplayable, currentTime: TimeInterval, duration: TimeInterval) {
         var nowPlayingInfo = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
         
@@ -223,8 +244,16 @@ final class PlayerManager {
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
     }
     
-    // MARK: - Обработка кнопок: Play/Pause/Next Previous
+    /// Обновляет только прогресс и статус воспроизведения
+    func updatePlaybackTimeOnly(currentTime: TimeInterval, isPlaying: Bool) {
+        MPNowPlayingInfoCenter.default().nowPlayingInfo?[MPNowPlayingInfoPropertyElapsedPlaybackTime] = currentTime
+        MPNowPlayingInfoCenter.default().nowPlayingInfo?[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1.0 : 0.0
+    }
     
+    
+// MARK: - Команды с экрана блокировки
+    
+    /// Настраивает обработку команд: Play, Pause, Next, Previous, Seek
     func setupRemoteCommandCenter(
         onPlay: @escaping () -> Void,
         onPause: @escaping () -> Void,
@@ -266,27 +295,21 @@ final class PlayerManager {
                 return .commandFailed
             }
             
-            print("⏩ Перемотка через центр управления: \(event.positionTime) сек")
             self.seek(to: event.positionTime)
             return .success
         }
     }
-    
-    // MARK: - Обновляет только текущее время и статус воспроизведения в NowPlayingInfo
-    
-    func updatePlaybackTimeOnly(currentTime: TimeInterval, isPlaying: Bool) {
-        MPNowPlayingInfoCenter.default().nowPlayingInfo?[MPNowPlayingInfoPropertyElapsedPlaybackTime] = currentTime
-        MPNowPlayingInfoCenter.default().nowPlayingInfo?[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1.0 : 0.0
-    }
 }
-    // MARK: - Расширение для NotificationCenter
+
+
+// MARK: - Расширение для NotificationCenter
     
     extension Notification.Name {
         
-        // Уведомление о том, что длительность трека была обновлена
+        /// Уведомление о том, что длительность трека обновлена (используется для ViewModel'ов)
         static let trackDurationUpdated = Notification.Name("trackDurationUpdated")
         
-        // Уведомление о завершении текущего трека
+        /// Уведомление о завершении воспроизведения трека
         static let trackDidFinish = Notification.Name("trackDidFinish")
     }
 

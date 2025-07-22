@@ -23,6 +23,7 @@ struct TrackRowView: View {
         HStack(spacing: 12) {
             artworkView
             trackInfoView
+            
         }
         .padding(.vertical, 0)
         .padding(.horizontal, 4)

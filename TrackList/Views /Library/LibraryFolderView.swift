@@ -131,8 +131,8 @@ struct LibraryFolderView: View {
                     title: section.title,
                     tracks: section.tracks,
                     allTracks: allVisibleTracks,
-                    playerViewModel: playerViewModel,
                     trackListViewModel: trackListViewModel,
+                    playerViewModel: playerViewModel,
                 )
             }
         }

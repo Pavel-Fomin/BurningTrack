@@ -13,16 +13,16 @@ import UIKit
 import AVFoundation
 
 
-// MARK: - Менеджер импорта треков в приложение
+// MARK: - Менеджер импорта треков
 
 final class ImportManager {
     
     /// Импортирует список треков из URL-ов, парсит метаданные,
     /// сохраняет обложки и возвращает список ImportedTrack через completion
     /// - Parameters:
-    ///   - urls: массив URL-ов, полученных через fileImporter
-    ///   - listId: ID треклиста, в который производится импорт
-    ///   - completion: замыкание с массивом ImportedTrack
+    /// - urls: массив URL-ов, полученных через fileImporter
+    /// - listId: ID треклиста, в который производится импорт
+    /// - completion: замыкание с массивом ImportedTrack
     func importTracks(from urls: [URL], to listId: UUID, completion: @escaping ([ImportedTrack]) -> Void) async {
         var importedTracks: [ImportedTrack] = []
 
@@ -39,16 +39,16 @@ final class ImportManager {
                 let bookmarkData = try url.bookmarkData()
                 let bookmarkBase64 = bookmarkData.base64EncodedString()
 
-                // Парсим метаданные (исполнитель, название, обложка, длительность)
+                // Парсим метаданные: title, artist, album, duration, artwork
                 let metadata = try await MetadataParser.parseMetadata(from: url)
 
-                // Создаём ID для трека (он же ID обложки)
+                // Генерируем уникальный ID для трека (он же id для artwork)
                 let trackId = UUID()
 
-                // Название по умолчанию, если не найдено
+                // Название по умолчанию, если не найдено в тегах
                 let fallbackTitle = url.deletingPathExtension().lastPathComponent
 
-                // Сохраняем обложку, если есть
+                // Если есть обложка — сохраняем её через ArtworkManager
                 if let imageData = metadata.artworkData,
                    let image = UIImage(data: imageData) {
                     ArtworkManager.saveArtwork(image, id: trackId)
@@ -68,7 +68,8 @@ final class ImportManager {
                     bookmarkBase64: bookmarkBase64,
                     artworkId: metadata.artworkData != nil ? trackId : nil
                 )
-
+                
+                // Добавляем в итоговый список
                 importedTracks.append(newTrack)
 
             } catch {
@@ -77,13 +78,14 @@ final class ImportManager {
         }
 
         print("Импортировано треков: \(importedTracks.count)")
-        for t in importedTracks {
-            print("– \(t.title ?? "без названия")")
+        for t in importedTracks {print("– \(t.title ?? "без названия")")
         }
-       
+        
+        // Отдаём результат через completion
         completion(importedTracks)
     }
 }
+
 
 // MARK: - Работа с JSON
 

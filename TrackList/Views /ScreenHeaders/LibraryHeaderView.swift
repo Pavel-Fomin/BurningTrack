@@ -15,13 +15,9 @@ struct LibraryHeaderView: View {
     var onAddFolder: () -> Void
 
     var body: some View {
-        ScreenHeaderView(title: "Фонотека") {
+        ScreenHeaderView(title: "Фонотека", trailing:  {
             EmptyView()
-        } trailing: {
-            Button(action: onAddFolder) {
-                Image(systemName: "plus")
-                    .headerIconStyle()
-            }
-        }
+            
+        })
     }
 }

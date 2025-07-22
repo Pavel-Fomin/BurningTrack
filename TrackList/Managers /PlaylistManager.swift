@@ -13,12 +13,16 @@ import SwiftUI
 @MainActor
 final class PlaylistManager: ObservableObject {
     
+    /// Синглтон
     static let shared = PlaylistManager()
     
+    /// Текущий плейлист плеера (из player.json)
     @Published var tracks: [Track] = []
     
+    /// Имя JSON-файла, в котором хранится плейлист плеера
     private let fileName = "player.json"
     
+    /// Инициализация — загружаем треки с диска
     private init() {
         loadFromDisk()
     }
@@ -26,12 +30,13 @@ final class PlaylistManager: ObservableObject {
     
 // MARK: - Загружает треки из файла player.json
     
+    /// Загружает список треков из player.json в /Documents
     func loadFromDisk() {
         guard let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent(fileName) else {
-            print("❌ Не удалось получить путь к player.json")
             return
         }
         
+        // Если файл не существует — создаём пустой плейлист
         guard FileManager.default.fileExists(atPath: url.path) else {
             print("📄 player.json не найден — создаём пустой плейлист")
             self.tracks = []
@@ -59,6 +64,7 @@ final class PlaylistManager: ObservableObject {
     
 // MARK: - Сохраняет треки в player.json
     
+    /// Сохраняет текущий список треков в player.json в формате [ImportedTrack]
     func saveToDisk() {
         let importedTracks = tracks.map { $0.asImportedTrack() }
         
@@ -75,6 +81,8 @@ final class PlaylistManager: ObservableObject {
     
 // MARK: - Импорт треков в плеер
     
+    /// Импортирует список треков по URL-ам: парсит теги и добавляет в tracks
+    /// - Parameter urls: Список локальных путей к файлам
     func importTracks(from urls: [URL]) async {
         let newTracks: [Track] = await withTaskGroup(of: Track?.self) { group in
             for url in urls {
@@ -92,7 +100,7 @@ final class PlaylistManager: ObservableObject {
                             isAvailable: true
                         )
                     } catch {
-                        print("⚠️ Ошибка парсинга: \(error.localizedDescription)")
+                
                         return nil
                     }
                 }
@@ -107,31 +115,34 @@ final class PlaylistManager: ObservableObject {
             return results
         }
         
-        // ВНЕ taskGroup
+        // Обновляем треки и сохраняем
         self.tracks.append(contentsOf: newTracks)
         saveToDisk()
     }
     
-    // MARK: - Экспорт треков
     
+// MARK: - Экспорт треков
+    
+    /// Экспортирует все доступные треки (isAvailable == true) через ExportManager
+    /// - Parameter folder: Папка — параметр зарезервирован, но не используется (в текущей реализации UIDocumentPicker сам запрашивает)
     func exportTracks(to folder: URL) {
         let availableTracks = tracks
             .filter { $0.isAvailable }
             .map { $0.asImportedTrack() }
 
         if availableTracks.isEmpty {
-            print("⚠️ Нет доступных треков для экспорта")
+            
             return
         }
 
         if let topVC = UIApplication.topViewController() {
             ExportManager.shared.exportViaTempAndPicker(availableTracks, presenter: topVC)
         } else {
-            print("❌ Не удалось найти topViewController")
+            
         }
     }
     
-    
+    /// Дублирующий метод экспорта (используется для отдельных вызовов или context menu)
     func exportCurrentTracks(to folder: URL) {
         let availableTracks = tracks
             .filter { $0.isAvailable }
