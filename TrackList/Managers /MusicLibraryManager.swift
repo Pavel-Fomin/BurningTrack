@@ -24,6 +24,9 @@ final class MusicLibraryManager: ObservableObject {
         restoreAccess()
     }
     
+    /// Очередь для потокобезопасного доступа к importedTrackCache
+    private let cacheQueue = DispatchQueue(label: "importedTrackCache.queue")
+    
     
     // MARK: - Bookmark и кэш
     
@@ -285,8 +288,14 @@ final class MusicLibraryManager: ObservableObject {
                     // Проверка кэша
                     let imported: ImportedTrack
                     let filePath = url.path
-                    if let cached = importedTrackCache[filePath] {
+                    
+                    let cached: ImportedTrack? = cacheQueue.sync {
+                        importedTrackCache[filePath]
+                    }
+                    
+                    if let cached {
                         imported = cached
+                    
                     } else {
                         let newTrack = ImportedTrack(
                             id: UUID(uuidString: url.lastPathComponent) ?? UUID(),
@@ -301,7 +310,9 @@ final class MusicLibraryManager: ObservableObject {
                             bookmarkBase64: bookmarkBase64,
                             artworkId: nil
                         )
-                        self.importedTrackCache[filePath] = newTrack
+                        cacheQueue.sync {
+                            importedTrackCache[filePath] = newTrack
+                        }
                             imported = newTrack
                     }
 
