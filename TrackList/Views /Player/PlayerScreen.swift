@@ -31,7 +31,8 @@ struct PlayerScreen: View {
                             PlaylistManager.shared.saveToDisk()
                         },
                         onExport: {
-                            isShowingExportPicker = true
+                            PlaylistManager.shared.exportCurrentTracks(to: URL(fileURLWithPath: "/"))
+                    
                         },
                         onClear: {
                             PlaylistManager.shared.tracks = []
@@ -43,34 +44,6 @@ struct PlayerScreen: View {
 // MARK: - Список треков
                     
                     PlayerPlaylistView(playerViewModel: playerViewModel)
-                }
-                
-                
-// MARK: - Экспорт треков
-                
-                .sheet(isPresented: $isShowingExportPicker) {
-                    ExportWrapper { folderURL in
-                        PlaylistManager.shared.exportCurrentTracks(to: folderURL)
-                    }
-                }
-                
-                
-// MARK: - Импорт треков
-                
-                .fileImporter(
-                    isPresented: $showImporter,
-                    allowedContentTypes: [.audio],
-                    allowsMultipleSelection: true
-                ) { result in
-                    Task {
-                        switch result {
-                        case .success(let urls):
-                            await PlaylistManager.shared.importTracks(from: urls)
-
-                        case .failure(let error):
-                            print("❌ Ошибка при импорте треков в плеер: \(error.localizedDescription)")
-                        }
-                    }
                 }
                 
                 

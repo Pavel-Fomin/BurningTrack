@@ -7,8 +7,6 @@
 
 import SwiftUI
 
-import SwiftUI
-
 struct PlayerHeaderView: View {
     var trackCount: Int
     var onSave: () -> Void
@@ -21,7 +19,7 @@ struct PlayerHeaderView: View {
         } trailing: {
             Menu {
                 Button("Сохранить треклист", action: {})
-                Button("Записать треклист", action: {})
+                Button("Записать треклист", action: onExport)
                 Button("Очистить треклист", role: .destructive, action: {})
             } label: {
                 Image(systemName: "ellipsis.circle")
