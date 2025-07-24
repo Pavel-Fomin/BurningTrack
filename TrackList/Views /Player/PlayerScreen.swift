@@ -35,8 +35,7 @@ struct PlayerScreen: View {
                     
                         },
                         onClear: {
-                            PlaylistManager.shared.tracks = []
-                            PlaylistManager.shared.saveToDisk()
+                            PlaylistManager.shared.clear()
                        }
                     )
                     

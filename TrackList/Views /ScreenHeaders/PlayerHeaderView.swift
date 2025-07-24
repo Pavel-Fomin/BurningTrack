@@ -20,7 +20,7 @@ struct PlayerHeaderView: View {
             Menu {
                 Button("Сохранить треклист", action: {})
                 Button("Записать треклист", action: onExport)
-                Button("Очистить треклист", role: .destructive, action: {})
+                Button("Очистить треклист", role: .destructive, action: onClear)
             } label: {
                 Image(systemName: "ellipsis.circle")
                     .headerIconStyle()

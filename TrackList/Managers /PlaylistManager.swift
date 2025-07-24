@@ -157,4 +157,14 @@ final class PlaylistManager: ObservableObject {
             ExportManager.shared.exportViaTempAndPicker(availableTracks, presenter: topVC)
         }
     }
+    
+    
+    // MARK: - Очистка плеера
+
+    /// Очищает плейлист плеера и обновляет player.json
+    func clear() {
+        tracks = []
+        saveToDisk()
+        print("🗑️ Плеер очищен")
+    }
 }
