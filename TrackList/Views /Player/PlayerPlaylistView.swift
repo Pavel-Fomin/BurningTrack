@@ -30,7 +30,8 @@ struct PlayerPlaylistView: View {
                                                 context: manager.tracks
                               )
                             }
-                        }
-                    )
+            
                 }
-            }
+            )
+        }
+    }
