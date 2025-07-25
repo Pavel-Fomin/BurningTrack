@@ -69,7 +69,8 @@ final class PlaylistManager: ObservableObject {
         let importedTracks = tracks.map { $0.asImportedTrack() }
         
         do {
-            let data = try JSONEncoder().encode(importedTracks)
+            let encoder = makePrettyJSONEncoder()
+            let data = try encoder.encode(importedTracks)
             let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent(fileName)
             try data.write(to: url, options: .atomic)
             print("💾 Сохранено \(tracks.count) треков в player.json")

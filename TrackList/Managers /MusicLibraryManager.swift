@@ -72,8 +72,9 @@ final class MusicLibraryManager: ObservableObject {
         
         // Перезаписываем файл
         do {
-            let encoded = try JSONEncoder().encode(existingDataArray)
-            try encoded.write(to: url)
+            let encoder = makePrettyJSONEncoder()
+            let newData = try encoder.encode(existingDataArray)
+            try newData.write(to: url)
             print("💾 Сохранили \(existingDataArray.count) папок в bookmarks.json")
         } catch {
             print("❌ Не удалось сохранить bookmarkData: \(error)")

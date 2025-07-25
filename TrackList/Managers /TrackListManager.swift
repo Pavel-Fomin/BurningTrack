@@ -55,7 +55,8 @@ final class TrackListManager {
         guard let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
             .first?.appendingPathComponent("tracklists.json") else { return }
 
-        if let data = try? JSONEncoder().encode(metas) {
+        let encoder = makePrettyJSONEncoder()
+        if let data = try? encoder.encode(metas) {
             try? data.write(to: url, options: .atomic)
         }
     }
@@ -86,7 +87,8 @@ final class TrackListManager {
     func saveTracks(_ tracks: [ImportedTrack], for id: UUID, isDraft: Bool = false) {
         guard let url = urlForTrackList(id: id, isDraft: isDraft) else { return }
 
-        if let data = try? JSONEncoder().encode(tracks) {
+        let encoder = makePrettyJSONEncoder()
+        if let data = try? encoder.encode(tracks) {
             try? data.write(to: url, options: .atomic)
         }
     }
