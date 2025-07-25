@@ -64,7 +64,6 @@ final class ImportManager {
                     artist: metadata.artist,
                     album: metadata.album,
                     duration: metadata.duration ?? 0,
-                    artworkBase64: nil,
                     bookmarkBase64: bookmarkBase64,
                     artworkId: metadata.artworkData != nil ? trackId : nil
                 )

@@ -306,7 +306,6 @@ final class MusicLibraryManager: ObservableObject {
                             artist: metadata?.artist,
                             album: nil,
                             duration: metadata?.duration ?? durationSeconds ?? 0,
-                            artworkBase64: nil,
                             bookmarkBase64: bookmarkBase64,
                             artworkId: nil
                         )

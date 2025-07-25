@@ -18,13 +18,10 @@ struct ImportedTrack: Codable, Identifiable {
     let fileName: String        /// Имя файла (например, "track1.mp3")
     let filePath: String        /// Путь к файлу (может быть устаревшим, используется fallback)
     var orderPrefix: String     /// Префикс порядка (например, "01")
-    
     let title: String?          /// Название трека (если найдено в тегах)
     let artist: String?         /// Исполнитель
     let album: String?          /// Альбом
-    
     let duration: Double        /// Длительность в секундах
-    let artworkBase64: String?  /// (Не используется) Базовая обложка в base64
     let bookmarkBase64: String? /// Сохранённый bookmark для доступа к файлу
     var artworkId: UUID?        /// ID сохранённой обложки в папке artworks
     

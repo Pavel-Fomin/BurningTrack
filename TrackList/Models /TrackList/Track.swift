@@ -121,7 +121,6 @@ struct Track: Identifiable {
             artist: self.artist,
             album: nil,
             duration: self.duration,
-            artworkBase64: self.artwork?.pngData()?.base64EncodedString(),
             bookmarkBase64: try? self.url.bookmarkData().base64EncodedString(),
             artworkId: self.artworkId
         )
