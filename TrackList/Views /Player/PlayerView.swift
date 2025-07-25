@@ -28,8 +28,7 @@ struct PlayerView: View {
                             tint: .red,
                             handler: {
                                 if let index = PlaylistManager.shared.tracks.firstIndex(where: { $0.id == track.id }) {
-                                    PlaylistManager.shared.tracks.remove(at: index)
-                                    PlaylistManager.shared.saveToDisk()
+                                    PlaylistManager.shared.remove(at: index)
                                 }
                             },
                             labelType: .iconOnly

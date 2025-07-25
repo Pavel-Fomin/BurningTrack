@@ -160,12 +160,36 @@ final class PlaylistManager: ObservableObject {
     }
     
     
-    // MARK: - Очистка плеера
+// MARK: - Очистка плеера
 
     /// Очищает плейлист плеера и обновляет player.json
     func clear() {
+        for track in tracks {
+            if let artworkId = track.artworkId {
+                ArtworkManager.deleteArtwork(id: artworkId)
+            }
+        }
+
         tracks = []
         saveToDisk()
         print("🗑️ Плеер очищен")
+    }
+    
+    
+// MARK: - Удаление трека
+    
+    /// Удаляет трек и обновляет player.json
+    func remove(at index: Int) {
+        guard index >= 0 && index < tracks.count else { return }
+        let removedTrack = tracks[index]
+        
+        tracks.remove(at: index)
+        saveToDisk()
+
+        if let artworkId = removedTrack.artworkId {
+            ArtworkManager.deleteArtwork(id: artworkId)
+        } else {
+            
+        }
     }
 }

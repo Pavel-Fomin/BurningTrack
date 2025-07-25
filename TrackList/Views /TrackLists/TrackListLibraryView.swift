@@ -76,7 +76,7 @@ struct TrackListLibraryView: View {
             .onAppear {
                 let metas = TrackListManager.shared.loadTrackListMetas()
                 print("📂 Загрузка треклистов: \(metas.count) найдено")
-                for meta in metas {
+                for _ in metas {
                 }
                 trackLists = metas
             }
