@@ -30,9 +30,9 @@ final class TrackListManager {
     /// - Parameters:
     /// - id: UUID треклиста
     /// - isDraft: true — если это черновик (draft)
-    private func urlForTrackList(id: UUID, isDraft: Bool = false) -> URL? {
+    private func urlForTrackList(id: UUID) -> URL? {
         guard let directory = documentsDirectory else { return nil }
-        let fileName = isDraft ? "tracklist_draft.json" : "tracklist_\(id.uuidString).json"
+        let fileName = "tracklist_\(id.uuidString).json"
         return directory.appendingPathComponent(fileName)
     }
 
@@ -74,18 +74,20 @@ final class TrackListManager {
     /// - id: ID плейлиста
     /// - isDraft: Если true — используется файл черновика
     /// - Returns: Массив импортированных треков
-    func loadTracks(for id: UUID, isDraft: Bool = false) -> [ImportedTrack] {
-        guard let url = urlForTrackList(id: id, isDraft: isDraft),
-              let data = try? Data(contentsOf: url),
-              let tracks = try? JSONDecoder().decode([ImportedTrack].self, from: data) else {
+    func loadTracks(for id: UUID) -> [ImportedTrack] {
+        guard
+            let url = urlForTrackList(id: id),
+            let data = try? Data(contentsOf: url),
+            let tracks = try? JSONDecoder().decode([ImportedTrack].self, from: data)
+        else {
             return []
         }
         return tracks
     }
 
     /// Сохраняет треки по ID треклиста (включая draft)
-    func saveTracks(_ tracks: [ImportedTrack], for id: UUID, isDraft: Bool = false) {
-        guard let url = urlForTrackList(id: id, isDraft: isDraft) else { return }
+    func saveTracks(_ tracks: [ImportedTrack], for id: UUID) {
+        guard let url = urlForTrackList(id: id) else { return }
 
         let encoder = makePrettyJSONEncoder()
         if let data = try? encoder.encode(tracks) {
@@ -104,7 +106,7 @@ final class TrackListManager {
         guard let meta = metas.first(where: { $0.id == id }) else {
             fatalError("Плейлист не найден")
         }
-        let tracks = loadTracks(for: id, isDraft: meta.isDraft)
+        let tracks = loadTracks(for: id)
         return TrackList(id: id, name: meta.name, createdAt: meta.createdAt, tracks: tracks)
     }
     
@@ -124,7 +126,7 @@ final class TrackListManager {
         saveTracks(importedTracks, for: newId)
 
         var metas = loadTrackListMetas()
-        let newMeta = TrackListMeta(id: newId, name: name, createdAt: createdAt, isDraft: false)
+        let newMeta = TrackListMeta(id: newId, name: name, createdAt: createdAt)
         metas.append(newMeta)
         
         saveTrackListMetas(metas)
@@ -201,7 +203,7 @@ final class TrackListManager {
         }
 
         let metas = trackLists.map {
-            TrackListMeta(id: $0.id, name: $0.name, createdAt: $0.createdAt, isDraft: false)
+            TrackListMeta(id: $0.id, name: $0.name, createdAt: $0.createdAt)
         }
 
         saveTrackListMetas(metas)

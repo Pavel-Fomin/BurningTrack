@@ -23,5 +23,4 @@ struct TrackListMeta: Codable, Identifiable {
     let id: UUID               // Уникальный идентификатор плейлиста
     var name: String           // Название, заданное пользователем
     let createdAt: Date        // Дата создания плейлиста
-    var isDraft: Bool = false  // Флаг 
 }
