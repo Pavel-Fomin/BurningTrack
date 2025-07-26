@@ -15,7 +15,7 @@ struct TrackListScreen: View {
     @ObservedObject var playerViewModel: PlayerViewModel
     
     @StateObject private var viewModel: TrackListViewModel
-
+    
     init(trackList: TrackList, playerViewModel: PlayerViewModel) {
         self.trackList = trackList
         self.playerViewModel = playerViewModel
@@ -29,7 +29,30 @@ struct TrackListScreen: View {
         )
         .navigationTitle(trackList.name)
         .navigationBarTitleDisplayMode(.inline)
-        
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Menu {
+                    Button("Экспортировать треки", action: handleExport)
+                    
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
+            }
         }
     }
-
+    
+    private func handleExport() {
+        let importedTracks = viewModel.tracks.map { $0.asImportedTrack() }
+        
+        guard !importedTracks.isEmpty else {
+            print("❌ Нет треков для экспорта")
+            return
+        }
+        
+        if let topVC = UIApplication.topViewController() {
+            ExportManager.shared.exportViaTempAndPicker(importedTracks, presenter: topVC)
+        } else {
+            print("❌ Не удалось получить topViewController")
+        }
+    }
+}
