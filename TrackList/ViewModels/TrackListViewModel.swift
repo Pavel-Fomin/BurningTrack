@@ -30,7 +30,15 @@ final class TrackListViewModel: NSObject, ObservableObject {
     @Published var newTrackListName: String = generateDefaultTrackListName()
     @Published var toastData: ToastData? = nil
     @Published var isEditing: Bool = false
-
+    
+    init(trackList: TrackList) {
+        self.tracks = trackList.tracks.map { $0.asTrack() }
+    }
+    
+    override init() {
+        super.init()
+        self.tracks = []
+    }
     
     // Режим импорта треков
     enum ImportMode {

@@ -14,14 +14,19 @@ struct TrackListScreen: View {
     let trackList: TrackList
     @ObservedObject var playerViewModel: PlayerViewModel
     
-    @StateObject private var viewModel = TrackListViewModel()
+    @StateObject private var viewModel: TrackListViewModel
+
+    init(trackList: TrackList, playerViewModel: PlayerViewModel) {
+        self.trackList = trackList
+        self.playerViewModel = playerViewModel
+        _viewModel = StateObject(wrappedValue: TrackListViewModel(trackList: trackList))
+    }
     
     var body: some View {
         TrackListView(
             trackListViewModel: viewModel,
             playerViewModel: playerViewModel
         )
-        .padding(.horizontal, 16)
         .navigationTitle(trackList.name)
         .navigationBarTitleDisplayMode(.inline)
         
