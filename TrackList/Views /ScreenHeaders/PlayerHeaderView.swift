@@ -12,13 +12,14 @@ struct PlayerHeaderView: View {
     var onSave: () -> Void
     var onExport: () -> Void
     var onClear: () -> Void
+    var onSaveTrackList: () -> Void
 
     var body: some View {
         ScreenHeaderView(title: "Плеер") {
             EmptyView()
         } trailing: {
             Menu {
-                Button("Сохранить треклист", action: {})
+                Button("Сохранить треклист", action: onSaveTrackList)
                 Button("Записать треклист", action: onExport)
                 Button("Очистить треклист", role: .destructive, action: onClear)
             } label: {
