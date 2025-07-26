@@ -74,7 +74,7 @@ struct TrackListView: View {
         let onMove: (IndexSet, Int) -> Void
         
         var body: some View {
-            ForEach(tracks) { track in
+            ForEach(Array(tracks.enumerated()), id: \.element.id) { index, track in
                 TrackRowView(
                     track: track,
                     isCurrent: track.id == playerViewModel.currentTrackDisplayable?.id,
@@ -86,8 +86,14 @@ struct TrackListView: View {
                 .listRowBackground(Color.clear)
                 .padding(.vertical, 8)
                 .padding(.horizontal, 16)
+                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    Button(role: .destructive) {
+                        onDelete(IndexSet(integer: index))
+                    } label: {
+                        Label("Удалить", systemImage: "trash")
+                    }
+                }
             }
-            .onDelete(perform: onDelete)
             .onMove(perform: onMove)
         }
     }

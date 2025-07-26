@@ -33,6 +33,7 @@ final class TrackListViewModel: NSObject, ObservableObject {
     
     init(trackList: TrackList) {
         self.tracks = trackList.tracks.map { $0.asTrack() }
+        self.currentListId = trackList.id
     }
     
     override init() {
@@ -206,8 +207,6 @@ final class TrackListViewModel: NSObject, ObservableObject {
             // Сохраняем изменения
             TrackListManager.shared.saveTracks(imported, for: id)
 
-            // Показываем тост
-            showToast(message: "Трек удалён")
         }
         
         
