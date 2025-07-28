@@ -322,7 +322,9 @@ final class MusicLibraryManager: ObservableObject {
                         title: metadata?.title,
                         artist: metadata?.artist,
                         duration: metadata?.duration ?? durationSeconds ?? 0,
-                        artwork: metadata?.artworkData.flatMap { UIImage(data: $0) },
+                        artwork: metadata?.artworkData
+                            .flatMap { UIImage(data: $0) }
+                            .map { normalize($0) },
                         addedDate: addedDate,
                         original: imported // обязательный аргумент
                     )

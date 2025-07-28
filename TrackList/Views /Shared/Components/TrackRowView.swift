@@ -18,6 +18,7 @@ struct TrackRowView: View {
     let onTap: () -> Void
     var swipeActionsLeft: [CustomSwipeAction] = []
     var swipeActionsRight: [CustomSwipeAction] = []
+    var trackListNames: [String]? = nil
 
     var body: some View {
         HStack(spacing: 12) {
@@ -54,8 +55,8 @@ struct TrackRowView: View {
                 Image(uiImage: image)
                     .resizable()
                     .aspectRatio(1, contentMode: .fill)
-                    .frame(width: 44, height: 44)
-                    .cornerRadius(6)
+                    .frame(width: 48, height: 48)
+                    .cornerRadius(48)
             } else {
                 Rectangle()
                     .fill(Color.gray.opacity(0.3))
@@ -99,7 +100,17 @@ struct TrackRowView: View {
                 Text(formatTimeSmart(track.duration))
                     .font(.footnote)
                     .foregroundColor(.secondary)
+                
             }
+            
+            if let trackListNames, !trackListNames.isEmpty {
+                Text("В треклисте: \(trackListNames.joined(separator: ", "))")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+                    .padding(.top, 4)
+            }
+          }
         }
     }
-}
+

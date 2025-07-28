@@ -50,8 +50,9 @@ final class ImportManager {
 
                 // Если есть обложка — сохраняем её через ArtworkManager
                 if let imageData = metadata.artworkData,
-                   let image = UIImage(data: imageData) {
-                    ArtworkManager.saveArtwork(image, id: trackId)
+                   let uiImage = UIImage(data: imageData) {
+                    let normalizedImage = normalize(uiImage)
+                    ArtworkManager.saveArtwork(normalizedImage, id: trackId)
                 }
 
                 // Формируем объект трека

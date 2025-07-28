@@ -15,17 +15,20 @@ struct LibraryTrackSectionView: View {
     let tracks: [LibraryTrack]
     let allTracks: [LibraryTrack]
     let trackListViewModel: TrackListViewModel
+    let trackListNamesByURL: [URL: [String]]
     
     @ObservedObject var playerViewModel: PlayerViewModel
     @EnvironmentObject var toast: ToastManager
-
+    
     var body: some View {
+        
         Section(header: Text(title).font(.headline)) {
-            
             ForEach(tracks, id: \.id) { track in
                 let isCurrent = playerViewModel.currentTrackDisplayable?.id == track.id
                 let isPlaying = isCurrent && playerViewModel.isPlaying
-
+                
+                let trackListNames = trackListNamesByURL[track.url] ?? []
+                
                 TrackRowView(
                     track: track,
                     isCurrent: isCurrent,
@@ -47,13 +50,13 @@ struct LibraryTrackSectionView: View {
                             tint: .blue,
                             handler: {
                                 var imported = track.original
-
+                                
                                 if let image = track.artwork {
                                     let artworkId = UUID()
                                     ArtworkManager.saveArtwork(image, id: artworkId)
                                     imported.artworkId = artworkId
                                 }
-
+                                
                                 let newTrack = Track(
                                     id: imported.id,
                                     url: track.url,
@@ -64,10 +67,10 @@ struct LibraryTrackSectionView: View {
                                     artworkId: imported.artworkId,
                                     isAvailable: true
                                 )
-
+                                
                                 PlaylistManager.shared.tracks.append(newTrack)
                                 PlaylistManager.shared.saveToDisk()
-
+                                
                                 toast.show(ToastData(
                                     style: .track(title: track.title ?? track.fileName, artist: track.artist ?? ""),
                                     artwork: track.artwork
@@ -75,7 +78,8 @@ struct LibraryTrackSectionView: View {
                             },
                             labelType: .textOnly
                         )
-                    ]
+                    ],
+                    trackListNames: trackListNames
                 )
                 .environmentObject(toast)
             }

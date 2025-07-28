@@ -14,9 +14,9 @@ struct LibraryFolderView: View {
     private var allVisibleTracks: [LibraryTrack] {
         trackSections.flatMap { $0.tracks }
     }
+    @State private var trackListNamesByURL: [URL: [String]] = [:]
     
-    
-// MARK: - Вспомогательная модель секции
+    // MARK: - Вспомогательная модель секции
     
     struct TrackSection: Identifiable {
         let id: String
@@ -41,22 +41,24 @@ struct LibraryFolderView: View {
             .navigationTitle(folder.name)
             .task {
                 await loadTracksIfNeeded()
+                loadTrackListNamesByURL()
+            
             }
         }
         
     }
     
     
-// MARK: - Загрузка треков
+    // MARK: - Загрузка треков
     
     private func loadTracksIfNeeded() async {
         guard trackSections.isEmpty else { return }
         await refresh()
         
-        }
+    }
     
     
-// MARK: - Группировка по дате
+    // MARK: - Группировка по дате
     
     private func groupTracksByDate(_ tracks: [LibraryTrack]) -> [TrackSection] {
         let calendar = Calendar.current
@@ -83,7 +85,7 @@ struct LibraryFolderView: View {
     }
     
     
-// MARK: - Секция подпапок
+    // MARK: - Секция подпапок
     
     @ViewBuilder
     private func folderSectionView() -> some View {
@@ -114,7 +116,7 @@ struct LibraryFolderView: View {
     }
     
     
-// MARK: - Секция треков
+    // MARK: - Секция треков
     
     @ViewBuilder
     private func trackSectionsView() -> some View {
@@ -124,13 +126,14 @@ struct LibraryFolderView: View {
                 tracks: section.tracks,
                 allTracks: allVisibleTracks,
                 trackListViewModel: trackListViewModel,
+                trackListNamesByURL: trackListNamesByURL,
                 playerViewModel: playerViewModel,
             )
         }
     }
     
     
-// MARK: - Обновление списка треков
+    // MARK: - Обновление списка треков
     
     @MainActor
     private func refresh() async {
@@ -140,5 +143,21 @@ struct LibraryFolderView: View {
         
         trackSections = grouped
         
+    }
+    
+    
+    @MainActor
+    private func loadTrackListNamesByURL() {
+        var result: [URL: [String]] = [:]
+        let metas = TrackListManager.shared.loadTrackListMetas()
+        
+        for meta in metas {
+            let trackList = TrackListManager.shared.getTrackListById(meta.id)
+            for track in trackList.tracks {
+                result[track.url, default: []].append(meta.name)
+            }
+        }
+        
+        trackListNamesByURL = result
     }
 }
