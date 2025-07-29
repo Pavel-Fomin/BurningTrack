@@ -18,33 +18,40 @@ struct AddToTrackListSheet: View {
     private let trackLists = TrackListManager.shared.loadTrackListMetas()
     
     var body: some View {
-        
-        // Здесь размещай содержимое sheet'а
         List(trackLists) { meta in
-            Button(meta.name) {
-                
+            Button {
                 // Добавление трека в треклист
                 var imported = track.original
-
+                
                 if let image = track.artwork {
                     let artworkId = UUID()
                     ArtworkManager.saveArtwork(image, id: artworkId)
                     imported.artworkId = artworkId
                 }
-
+                
                 var list = TrackListManager.shared.getTrackListById(meta.id)
                 list.tracks.append(imported)
                 TrackListManager.shared.saveTracks(list.tracks, for: list.id)
+                
                 toast.show(ToastData(
                     style: .track(title: track.title ?? track.fileName, artist: track.artist ?? ""),
                     artwork: track.artwork
                 ))
-
+                
                 onComplete()
+            } label: {
+                HStack {
+                    Text(meta.name)
+                        .lineLimit(1)
+                    Spacer()
+                    let trackCount = TrackListManager.shared.getTrackListById(meta.id).tracks.count
+                            Text("\(trackCount) трек\(trackCount == 1 ? "" : trackCount % 10 == 1 && trackCount % 100 != 11 ? "" : trackCount % 10 >= 2 && trackCount % 10 <= 4 && !(trackCount % 100 >= 12 && trackCount % 100 <= 14) ? "а" : "ов")")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
             }
         }
         .navigationTitle("Добавить в треклист")
         .navigationBarTitleDisplayMode(.inline)
-        .padding(.top, -28)
     }
 }
