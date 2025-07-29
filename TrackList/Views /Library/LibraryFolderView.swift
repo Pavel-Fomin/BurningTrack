@@ -15,6 +15,7 @@ struct LibraryFolderView: View {
         trackSections.flatMap { $0.tracks }
     }
     @State private var trackListNamesByURL: [URL: [String]] = [:]
+    @EnvironmentObject var sheetManager: SheetManager
     
     // MARK: - Вспомогательная модель секции
     
@@ -42,11 +43,23 @@ struct LibraryFolderView: View {
             .task {
                 await loadTracksIfNeeded()
                 loadTrackListNamesByURL()
-            
+                
             }
         }
-        
-    }
+
+    
+        .sheet(item: $sheetManager.trackToAdd) { track in
+                NavigationStack {
+                    AddToTrackListSheet(
+                        track: track,
+                        onComplete: {
+                            sheetManager.close()
+                        }
+                    )
+                    .presentationDetents([.fraction(0.5)])
+                }
+            }
+        }
     
     
     // MARK: - Загрузка треков

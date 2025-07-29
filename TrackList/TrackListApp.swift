@@ -32,6 +32,7 @@ struct TrackListApp: App {
                 trackListViewModel: trackListViewModel
             )
             .environmentObject(toast)
+            .environmentObject(SheetManager.shared)
         }
     }
 }

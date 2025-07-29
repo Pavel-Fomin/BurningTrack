@@ -19,6 +19,7 @@ struct TrackRowView: View {
     var swipeActionsLeft: [CustomSwipeAction] = []
     var swipeActionsRight: [CustomSwipeAction] = []
     var trackListNames: [String]? = nil
+    var useNativeSwipeActions: Bool = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -37,10 +38,31 @@ struct TrackRowView: View {
                 print("❌ Трек недоступен: \(track.title ?? track.fileName)")
             }
         }
-        .customSwipeActions(
-            swipeActionsLeft: swipeActionsLeft,
-            swipeActionsRight: swipeActionsRight
-        )
+        .if(!useNativeSwipeActions) { view in
+            view.customSwipeActions(
+                swipeActionsLeft: swipeActionsLeft,
+                swipeActionsRight: swipeActionsRight
+            )
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            if useNativeSwipeActions {
+                ForEach(swipeActionsRight) { action in
+                    Button(role: action.role) {
+                        action.handler()
+                    } label: {
+                        switch action.labelType {
+                        case .iconOnly:
+                            Image(systemName: action.systemImage)
+                        case .textOnly:
+                            Text(action.label)
+                        case .iconAndText:
+                            Label(action.label, systemImage: action.systemImage)
+                        }
+                    }
+                    .tint(action.tint)
+                }
+            }
+        }
         
         .listRowBackground(
             isCurrent ? Color.accentColor.opacity(0.12) : Color.clear
@@ -104,7 +126,7 @@ struct TrackRowView: View {
             }
             
             if let trackListNames, !trackListNames.isEmpty {
-                Text("В треклисте: \(trackListNames.joined(separator: ", "))")
+                Text("в треклисте: \(trackListNames.joined(separator: ", "))")
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .lineLimit(1)
