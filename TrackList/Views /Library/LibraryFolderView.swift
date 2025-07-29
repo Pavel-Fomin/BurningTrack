@@ -167,7 +167,9 @@ struct LibraryFolderView: View {
         for meta in metas {
             let trackList = TrackListManager.shared.getTrackListById(meta.id)
             for track in trackList.tracks {
-                result[track.url, default: []].append(meta.name)
+                if !result[track.url, default: []].contains(meta.name) {
+                    result[track.url, default: []].append(meta.name)
+                }
             }
         }
         
