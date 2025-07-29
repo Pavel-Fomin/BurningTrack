@@ -54,6 +54,7 @@ struct LibraryFolderView: View {
                         track: track,
                         onComplete: {
                             sheetManager.close()
+                            loadTrackListNamesByURL()
                         }
                     )
                     .presentationDetents([.fraction(0.5)])
@@ -160,7 +161,7 @@ struct LibraryFolderView: View {
     
     
     @MainActor
-    private func loadTrackListNamesByURL() {
+    func loadTrackListNamesByURL() {
         var result: [URL: [String]] = [:]
         let metas = TrackListManager.shared.loadTrackListMetas()
         
