@@ -21,7 +21,6 @@ struct Track: Identifiable {
     let title: String?
     let duration: TimeInterval
     let fileName: String
-    let artworkId: UUID?
     let isAvailable: Bool /// Флаг доступности трека
     
     
@@ -56,7 +55,6 @@ struct Track: Identifiable {
             title: self.title,
             duration: self.duration,
             fileName: self.fileName,
-            artworkId: self.artworkId,
             isAvailable: isAvailable
         )
     }
@@ -104,7 +102,6 @@ struct Track: Identifiable {
             title: trackName,
             duration: duration,
             fileName: url.lastPathComponent,
-            artworkId: nil,
             isAvailable: available
         )
     }
@@ -122,7 +119,6 @@ struct Track: Identifiable {
             album: nil,
             duration: self.duration,
             bookmarkBase64: try? self.url.bookmarkData().base64EncodedString(),
-            artworkId: self.artworkId
         )
     }
 }
@@ -137,8 +133,9 @@ extension Track: Equatable {
 
 // MARK: - Соответствие TrackDisplayable
 
-extension Track: TrackDisplayable { }
-
+extension Track: TrackDisplayable {
+    var artwork: UIImage? { nil } // Возвращаем nil, т.к. обложка не используется
+}
 
 // MARK: - Инициализатор
 
@@ -151,17 +148,8 @@ extension Track {
             title: libraryTrack.title,
             duration: libraryTrack.duration,
             fileName: libraryTrack.fileName,
-            artworkId: nil,
             isAvailable: libraryTrack.isAvailable
         )
-    }
-}
-// MARK: - Вычисляемый аксессор
-
-extension Track {
-    var artwork: UIImage? {
-        guard let artworkId else { return nil }
-        return ArtworkManager.loadArtwork(id: artworkId)
     }
 }
 
@@ -189,7 +177,6 @@ extension Track {
             title: imported.title ?? imported.fileName,
             duration: imported.duration,
             fileName: imported.fileName,
-            artworkId: imported.artworkId,
             isAvailable: FileManager.default.fileExists(atPath: url.path)
         )
     }

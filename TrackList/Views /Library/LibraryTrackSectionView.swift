@@ -53,13 +53,7 @@ struct LibraryTrackSectionView: View {
                 )
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                     Button {
-                        var imported = track.original
-                        
-                        if let image = track.artwork {
-                            let artworkId = UUID()
-                            ArtworkManager.saveArtwork(image, id: artworkId)
-                            imported.artworkId = artworkId
-                        }
+                        let imported = track.original
                         
                         let newTrack = Track(
                             id: imported.id,
@@ -68,7 +62,6 @@ struct LibraryTrackSectionView: View {
                             title: imported.title,
                             duration: imported.duration,
                             fileName: imported.fileName,
-                            artworkId: imported.artworkId,
                             isAvailable: true
                         )
                         

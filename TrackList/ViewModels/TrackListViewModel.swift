@@ -163,14 +163,6 @@ final class TrackListViewModel: NSObject, ObservableObject {
                 return
             }
             
-            let tracksToClear = TrackListManager.shared.loadTracks(for: id)
-            for track in tracksToClear {
-                if let artworkId = track.artworkId {
-                    ArtworkManager.deleteArtwork(id: artworkId)
-                    print("🗑️ Удалена обложка: artwork_\(artworkId).jpg")
-                }
-            }
-            
             TrackListManager.shared.saveTracks([], for: id)
             self.tracks = []
             print("🧹 Все треки удалены из плейлиста \(id)")

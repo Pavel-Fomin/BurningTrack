@@ -308,7 +308,6 @@ final class MusicLibraryManager: ObservableObject {
                             album: nil,
                             duration: metadata?.duration ?? durationSeconds ?? 0,
                             bookmarkBase64: bookmarkBase64,
-                            artworkId: nil
                         )
                         cacheQueue.sync {
                             importedTrackCache[filePath] = newTrack

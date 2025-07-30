@@ -21,13 +21,7 @@ struct AddToTrackListSheet: View {
         List(trackLists) { meta in
             Button {
                 // Добавление трека в треклист
-                var imported = track.original
-                
-                if let image = track.artwork {
-                    let artworkId = UUID()
-                    ArtworkManager.saveArtwork(image, id: artworkId)
-                    imported.artworkId = artworkId
-                }
+                let imported = track.original
                 
                 var list = TrackListManager.shared.getTrackListById(meta.id)
                 list.tracks.append(imported)

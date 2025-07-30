@@ -23,7 +23,7 @@ struct ImportedTrack: Codable, Identifiable {
     let album: String?          /// Альбом
     let duration: Double        /// Длительность в секундах
     let bookmarkBase64: String? /// Сохранённый bookmark для доступа к файлу
-    var artworkId: UUID?        /// ID сохранённой обложки в папке artworks
+    
     
     /// Проверяет, доступен ли файл по bookmark
     var isAvailable: Bool {
@@ -87,9 +87,7 @@ extension ImportedTrack: TrackDisplayable {
     }
 
     var artwork: UIImage? {
-        if let artworkId = artworkId {
-            return ArtworkManager.loadArtwork(id: artworkId)
-        }
-        return nil
+        // Предупреждение: async-функцию вызвать здесь нельзя
+        nil
     }
 }

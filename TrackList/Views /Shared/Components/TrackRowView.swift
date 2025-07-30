@@ -82,8 +82,8 @@ struct TrackRowView: View {
             } else {
                 Rectangle()
                     .fill(Color.gray.opacity(0.3))
-                    .frame(width: 44, height: 44)
-                    .cornerRadius(6)
+                    .frame(width: 48, height: 48)
+                    .cornerRadius(48)
             }
 
             if isCurrent {

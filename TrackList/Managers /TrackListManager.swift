@@ -159,20 +159,12 @@ final class TrackListManager {
 
     /// Удаляет плейлист по ID: треки, мета, обложки
     func deleteTrackList(id: UUID) {
-        
-        // Удаляем обложки
-        let tracks = loadTracks(for: id)
-        for track in tracks {
-            if let artworkId = track.artworkId {
-                ArtworkManager.deleteArtwork(id: artworkId)
-            }
-        }
 
         // Удаляем JSON-файл с треками
         if let fileURL = documentsDirectory?.appendingPathComponent("tracklist_\(id.uuidString).json") {
             do {
                 try FileManager.default.removeItem(at: fileURL)
-                print("✅ Удалён файл: \(fileURL.lastPathComponent)")
+                
             } catch {
                 print("❌ Не удалось удалить файл: \(error)")
             }
@@ -182,7 +174,7 @@ final class TrackListManager {
         var metas = loadTrackListMetas()
         metas.removeAll { $0.id == id }
         saveTrackListMetas(metas)
-        print("🗑️ Треклист с ID \(id) удалён")
+        print("🗑️ Треклист \(id) удалён")
     }
 
     /// Переименовывает треклист по ID

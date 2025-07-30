@@ -28,7 +28,7 @@ final class PlaylistManager: ObservableObject {
     }
     
     
-// MARK: - Загружает треки из файла player.json
+    // MARK: - Загружает треки из файла player.json
     
     /// Загружает список треков из player.json в /Documents
     func loadFromDisk() {
@@ -62,7 +62,7 @@ final class PlaylistManager: ObservableObject {
     }
     
     
-// MARK: - Сохраняет треки в player.json
+    // MARK: - Сохраняет треки в player.json
     
     /// Сохраняет текущий список треков в player.json в формате [ImportedTrack]
     func saveToDisk() {
@@ -80,7 +80,7 @@ final class PlaylistManager: ObservableObject {
     }
     
     
-// MARK: - Импорт треков в плеер
+    // MARK: - Импорт треков в плеер
     
     /// Импортирует список треков по URL-ам: парсит теги и добавляет в tracks
     /// - Parameter urls: Список локальных путей к файлам
@@ -97,16 +97,15 @@ final class PlaylistManager: ObservableObject {
                             title: metadata.title ?? url.deletingPathExtension().lastPathComponent,
                             duration: metadata.duration ?? 0,
                             fileName: url.lastPathComponent,
-                            artworkId: nil,
                             isAvailable: true
                         )
                     } catch {
-                
+                        
                         return nil
                     }
                 }
             }
-           
+            
             var results: [Track] = []
             for await result in group {
                 if let track = result {
@@ -122,7 +121,7 @@ final class PlaylistManager: ObservableObject {
     }
     
     
-// MARK: - Экспорт треков
+    // MARK: - Экспорт треков
     
     /// Экспортирует все доступные треки (isAvailable == true) через ExportManager
     /// - Parameter folder: Папка — параметр зарезервирован, но не используется (в текущей реализации UIDocumentPicker сам запрашивает)
@@ -130,12 +129,12 @@ final class PlaylistManager: ObservableObject {
         let availableTracks = tracks
             .filter { $0.isAvailable }
             .map { $0.asImportedTrack() }
-
+        
         if availableTracks.isEmpty {
             
             return
         }
-
+        
         if let topVC = UIApplication.topViewController() {
             ExportManager.shared.exportViaTempAndPicker(availableTracks, presenter: topVC)
         } else {
@@ -148,48 +147,37 @@ final class PlaylistManager: ObservableObject {
         let availableTracks = tracks
             .filter { $0.isAvailable }
             .map { $0.asImportedTrack() }
-
+        
         guard !availableTracks.isEmpty else {
             print("⚠️ Нет доступных треков для экспорта")
             return
         }
-
+        
         if let topVC = UIApplication.topViewController() {
             ExportManager.shared.exportViaTempAndPicker(availableTracks, presenter: topVC)
         }
     }
     
     
-// MARK: - Очистка плеера
-
+    // MARK: - Очистка плеера
+    
     /// Очищает плейлист плеера и обновляет player.json
     func clear() {
-        for track in tracks {
-            if let artworkId = track.artworkId {
-                ArtworkManager.deleteArtwork(id: artworkId)
-            }
-        }
-
         tracks = []
         saveToDisk()
         print("🗑️ Плеер очищен")
     }
     
     
-// MARK: - Удаление трека
+    // MARK: - Удаление трека
     
     /// Удаляет трек и обновляет player.json
     func remove(at index: Int) {
         guard index >= 0 && index < tracks.count else { return }
-        let removedTrack = tracks[index]
         
         tracks.remove(at: index)
         saveToDisk()
-
-        if let artworkId = removedTrack.artworkId {
-            ArtworkManager.deleteArtwork(id: artworkId)
-        } else {
-            
-        }
     }
 }
+    
+

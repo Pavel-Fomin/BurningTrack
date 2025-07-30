@@ -41,7 +41,6 @@ extension ImportedTrack {
             title: title ?? fileName,
             duration: duration,
             fileName: fileName,
-            artworkId: self.artworkId,
             isAvailable: isAvailable
         )
     }

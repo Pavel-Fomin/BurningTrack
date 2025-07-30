@@ -47,14 +47,7 @@ final class ImportManager {
 
                 // Название по умолчанию, если не найдено в тегах
                 let fallbackTitle = url.deletingPathExtension().lastPathComponent
-
-                // Если есть обложка — сохраняем её через ArtworkManager
-                if let imageData = metadata.artworkData,
-                   let uiImage = UIImage(data: imageData) {
-                    let normalizedImage = normalize(uiImage)
-                    ArtworkManager.saveArtwork(normalizedImage, id: trackId)
-                }
-
+                
                 // Формируем объект трека
                 let newTrack = ImportedTrack(
                     id: trackId,
@@ -66,7 +59,7 @@ final class ImportManager {
                     album: metadata.album,
                     duration: metadata.duration ?? 0,
                     bookmarkBase64: bookmarkBase64,
-                    artworkId: metadata.artworkData != nil ? trackId : nil
+                    
                 )
                 
                 // Добавляем в итоговый список
@@ -95,7 +88,6 @@ extension ImportManager {
     /// - Parameter name: имя JSON-файла (без расширения)
     /// - Returns: массив ImportedTrack, если файл успешно прочитан
     static func loadTrackList(named name: String) throws -> [ImportedTrack] {
-        print("Чтение треклиста: \(name)")
         let decoder = JSONDecoder()
         
         // Путь к /Documents/TrackLists/<name>.json
