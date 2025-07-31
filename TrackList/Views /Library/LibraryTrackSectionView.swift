@@ -16,6 +16,8 @@ struct LibraryTrackSectionView: View {
     let allTracks: [LibraryTrack]
     let trackListViewModel: TrackListViewModel
     let trackListNamesByURL: [URL: [String]]
+    let artworkProvider: ArtworkProvider
+    let artworkByURL: [URL: UIImage]
     
     @ObservedObject var playerViewModel: PlayerViewModel
     @EnvironmentObject var toast: ToastManager
@@ -29,7 +31,7 @@ struct LibraryTrackSectionView: View {
         }
     }
             
-            // MARK: - Вью обёртка для одного трека
+// MARK: - Вью обёртка для одного трека
             
             @ViewBuilder
             private func TrackRowWrapper(track: LibraryTrack) -> some View {
@@ -41,6 +43,7 @@ struct LibraryTrackSectionView: View {
                     track: track,
                     isCurrent: isCurrent,
                     isPlaying: isPlaying,
+                    artwork: artworkProvider.artwork(for: track.url),
                     onTap: {
                         if let current = playerViewModel.currentTrackDisplayable as? LibraryTrack,
                            current.id == track.id {

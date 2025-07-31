@@ -14,8 +14,9 @@ struct TrackRowView: View {
     let track: any TrackDisplayable
     let isCurrent: Bool
     let isPlaying: Bool
-    
+    let artwork: UIImage?
     let onTap: () -> Void
+    
     var swipeActionsLeft: [CustomSwipeAction] = []
     var swipeActionsRight: [CustomSwipeAction] = []
     var trackListNames: [String]? = nil
@@ -69,11 +70,12 @@ struct TrackRowView: View {
         )
     }
 
+    
 // MARK: - Обложка
     
     private var artworkView: some View {
         ZStack {
-            if let image = track.artwork {
+            if let image = artwork {
                 Image(uiImage: image)
                     .resizable()
                     .aspectRatio(1, contentMode: .fill)
@@ -94,7 +96,8 @@ struct TrackRowView: View {
             }
         }
     }
-
+    
+    
 // MARK: - Информациия о треке
     
     private var trackInfoView: some View {

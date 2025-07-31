@@ -30,6 +30,7 @@ final class TrackListViewModel: NSObject, ObservableObject {
     @Published var newTrackListName: String = generateDefaultTrackListName()
     @Published var toastData: ToastData? = nil
     @Published var isEditing: Bool = false
+    @Published var artworkByURL: [URL: UIImage] = [:]
     
     init(trackList: TrackList) {
         self.tracks = trackList.tracks.map { $0.asTrack() }

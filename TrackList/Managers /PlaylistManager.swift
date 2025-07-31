@@ -19,6 +19,8 @@ final class PlaylistManager: ObservableObject {
     /// Текущий плейлист плеера (из player.json)
     @Published var tracks: [Track] = []
     
+    @Published var artworkByURL: [URL: UIImage] = [:]
+    
     /// Имя JSON-файла, в котором хранится плейлист плеера
     private let fileName = "player.json"
     
@@ -48,7 +50,11 @@ final class PlaylistManager: ObservableObject {
             if FileManager.default.fileExists(atPath: url.path) {
                 let data = try Data(contentsOf: url)
                 let importedTracks = try JSONDecoder().decode([ImportedTrack].self, from: data)
-                self.tracks = importedTracks.compactMap { Track(from: $0) }
+                self.tracks = importedTracks.compactMap { imported in
+                    let track = Track(from: imported)
+                
+                    return track
+                }
                 print("📥 Загружено \(tracks.count) треков из player.json")
             } else {
                 print("📄 player.json не найден — создаём новый пустой")
@@ -90,6 +96,15 @@ final class PlaylistManager: ObservableObject {
                 group.addTask {
                     do {
                         let metadata = try await MetadataParser.parseMetadata(from: url)
+
+                        if let data = metadata.artworkData,
+                           let image = UIImage(data: data) {
+                            let artworkBase64 = metadata.artworkData?.base64EncodedString()
+                            await MainActor.run {
+                                self.artworkByURL[url] = image
+                            }
+                        }
+                        
                         return Track(
                             id: UUID(),
                             url: url,

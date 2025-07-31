@@ -11,13 +11,16 @@ struct LibraryFolderView: View {
     let folder: LibraryFolder
     let trackListViewModel: TrackListViewModel
     @ObservedObject var playerViewModel: PlayerViewModel
-    private var allVisibleTracks: [LibraryTrack] {
-        trackSections.flatMap { $0.tracks }
-    }
+    @StateObject private var artworkProvider = ArtworkProvider()
     @State private var trackListNamesByURL: [URL: [String]] = [:]
     @EnvironmentObject var sheetManager: SheetManager
     
-    // MARK: - Вспомогательная модель секции
+    private var allVisibleTracks: [LibraryTrack] {
+        trackSections.flatMap { $0.tracks }
+    }
+    
+    
+// MARK: - Вспомогательная модель секции
     
     struct TrackSection: Identifiable {
         let id: String
@@ -63,7 +66,7 @@ struct LibraryFolderView: View {
         }
     
     
-    // MARK: - Загрузка треков
+// MARK: - Загрузка треков
     
     private func loadTracksIfNeeded() async {
         guard trackSections.isEmpty else { return }
@@ -72,7 +75,7 @@ struct LibraryFolderView: View {
     }
     
     
-    // MARK: - Группировка по дате
+// MARK: - Группировка по дате
     
     private func groupTracksByDate(_ tracks: [LibraryTrack]) -> [TrackSection] {
         let calendar = Calendar.current
@@ -99,7 +102,7 @@ struct LibraryFolderView: View {
     }
     
     
-    // MARK: - Секция подпапок
+// MARK: - Секция подпапок
     
     @ViewBuilder
     private func folderSectionView() -> some View {
@@ -130,7 +133,7 @@ struct LibraryFolderView: View {
     }
     
     
-    // MARK: - Секция треков
+// MARK: - Секция треков
     
     @ViewBuilder
     private func trackSectionsView() -> some View {
@@ -141,13 +144,15 @@ struct LibraryFolderView: View {
                 allTracks: allVisibleTracks,
                 trackListViewModel: trackListViewModel,
                 trackListNamesByURL: trackListNamesByURL,
-                playerViewModel: playerViewModel,
+                artworkProvider: artworkProvider,
+                artworkByURL: artworkProvider.artworkByURL,
+                playerViewModel: playerViewModel
             )
         }
     }
     
     
-    // MARK: - Обновление списка треков
+// MARK: - Обновление списка треков
     
     @MainActor
     private func refresh() async {
@@ -157,6 +162,10 @@ struct LibraryFolderView: View {
         
         trackSections = grouped
         
+        // Загрузка обложек (обязательно после trackSections, чтобы allVisibleTracks был актуален)
+           for track in allVisibleTracks {
+               artworkProvider.loadArtworkIfNeeded(for: track.url)
+           }
     }
     
     

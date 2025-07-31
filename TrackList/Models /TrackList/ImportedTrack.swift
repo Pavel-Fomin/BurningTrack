@@ -24,7 +24,6 @@ struct ImportedTrack: Codable, Identifiable {
     let duration: Double        /// Длительность в секундах
     let bookmarkBase64: String? /// Сохранённый bookmark для доступа к файлу
     
-    
     /// Проверяет, доступен ли файл по bookmark
     var isAvailable: Bool {
         guard let url = try? resolvedURL() else {

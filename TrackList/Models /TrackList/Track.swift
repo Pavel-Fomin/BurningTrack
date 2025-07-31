@@ -134,7 +134,9 @@ extension Track: Equatable {
 // MARK: - Соответствие TrackDisplayable
 
 extension Track: TrackDisplayable {
-    var artwork: UIImage? { nil } // Возвращаем nil, т.к. обложка не используется
+    var artwork: UIImage? {
+        ArtworkCacheManager.shared.cachedImage(for: url)
+    }
 }
 
 // MARK: - Инициализатор

@@ -47,4 +47,12 @@ final class MetadataParser {
         // Парсим остальные теги через обёртку TLTagLibFile (TagLib)
         return TLTagLibFile(fileURL: url).readMetadata(duration: durationSeconds)
     }
+    
+    /// Извлекает только обложку из аудиофайла
+    /// Использует TagLib и возвращает UIImage или nil
+    static func extractArtwork(from url: URL) -> UIImage? {
+        let metadata = TLTagLibFile(fileURL: url).readMetadata(duration: nil)
+        guard let data = metadata.artworkData else { return nil }
+        return UIImage(data: data)
+    }
 }

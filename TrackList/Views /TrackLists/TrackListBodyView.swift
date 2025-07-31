@@ -30,7 +30,7 @@ struct TrackListBodyView: View {
     }
     
     
-// MARK: - Отображение треков выбранного треклиста
+    // MARK: - Отображение треков выбранного треклиста
     
     private func trackListView() -> some View {
         ScrollViewReader { proxy in
@@ -41,6 +41,7 @@ struct TrackListBodyView: View {
                     RowWrapper(
                         track: track,
                         playerViewModel: playerViewModel,
+                        trackListViewModel: trackListViewModel,
                         onTap: {
                             if track.isAvailable {
                                 if isCurrent {
@@ -60,6 +61,7 @@ struct TrackListBodyView: View {
     private struct RowWrapper: View {
         let track: Track
         let playerViewModel: PlayerViewModel
+        let trackListViewModel: TrackListViewModel
         let onTap: () -> Void
         
         var body: some View {
@@ -67,7 +69,12 @@ struct TrackListBodyView: View {
                 track: track,
                 isCurrent: track.id == playerViewModel.currentTrackDisplayable?.id,
                 isPlaying: playerViewModel.isPlaying && track.id == playerViewModel.currentTrackDisplayable?.id,
-                onTap: onTap
+                artwork: trackListViewModel.artworkByURL[track.url],
+                onTap: onTap,
+                swipeActionsLeft: [],
+                swipeActionsRight: [],
+                trackListNames: [],
+                useNativeSwipeActions: false
             )
         }
     }

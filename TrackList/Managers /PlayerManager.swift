@@ -41,7 +41,7 @@ final class PlayerManager {
     }
     
     
-    // MARK: - Настройка аудиосессии (для воспроизведения в фоне)
+// MARK: - Настройка аудиосессии (для воспроизведения в фоне)
     
     /// Включает режим фонового воспроизведения
     private func configureAudioSession() {
@@ -262,30 +262,31 @@ final class PlayerManager {
     ) {
         let commandCenter = MPRemoteCommandCenter.shared()
         
+        /// Play
         commandCenter.playCommand.isEnabled = true
         commandCenter.playCommand.addTarget { _ in
             onPlay()
             return .success
         }
-        
+        /// Pause
         commandCenter.pauseCommand.isEnabled = true
         commandCenter.pauseCommand.addTarget { _ in
             onPause()
             return .success
         }
-        
+        /// Next
         commandCenter.nextTrackCommand.isEnabled = true
         commandCenter.nextTrackCommand.addTarget { _ in
             onNext()
             return .success
         }
-        
+        /// Previous
         commandCenter.previousTrackCommand.isEnabled = true
         commandCenter.previousTrackCommand.addTarget { _ in
             onPrevious()
             return .success
         }
-        
+        /// Seek
         commandCenter.changePlaybackPositionCommand.isEnabled = true
         commandCenter.changePlaybackPositionCommand.addTarget { [weak self] event in
             guard

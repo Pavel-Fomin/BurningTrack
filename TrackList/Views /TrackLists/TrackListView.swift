@@ -14,6 +14,7 @@ struct TrackListView: View {
     @ObservedObject var trackListViewModel: TrackListViewModel
     @ObservedObject var playerViewModel: PlayerViewModel
     @Environment(\.colorScheme) var colorScheme
+    @StateObject private var artworkProvider = ArtworkProvider()
     
     var body: some View {
         ZStack {
@@ -37,64 +38,77 @@ struct TrackListView: View {
                     },
                     onMove: { source, destination in
                         trackListViewModel.moveTrack(from: source, to: destination)
-                    }
+                    },
+                    artworkProvider: artworkProvider
+                    
                 )
             }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
             
-            // Тост
-            if let toast = trackListViewModel.toastData {
-                ToastView(data: toast)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .padding(.bottom, 24)
-            }
-        }
-        .frame(maxHeight: .infinity)
-        .animation(.easeInOut, value: trackListViewModel.toastData?.message ?? "")
-        .sheet(isPresented: $trackListViewModel.isShowingSaveSheet) {
-            SaveTrackListSheet(
-                isPresented: $trackListViewModel.isShowingSaveSheet,
-                name: $trackListViewModel.newTrackListName
-            ) {
-                if let id = trackListViewModel.currentListId {
-                    TrackListManager.shared.renameTrackList(id: id, to: trackListViewModel.newTrackListName)
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                
+                // Тост
+                if let toast = trackListViewModel.toastData {
+                    ToastView(data: toast)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .padding(.bottom, 24)
                 }
             }
-        }
-    }
-    
-    // MARK: - Компонент строк треков
-    
-    private struct TrackListRowsView: View {
-        let tracks: [Track]
-        let playerViewModel: PlayerViewModel
-        let onTap: (Track) -> Void
-        let onDelete: (IndexSet) -> Void
-        let onMove: (IndexSet, Int) -> Void
-        
-        var body: some View {
-            ForEach(Array(tracks.enumerated()), id: \.element.id) { index, track in
-                TrackRowView(
-                    track: track,
-                    isCurrent: track.id == playerViewModel.currentTrackDisplayable?.id,
-                    isPlaying: playerViewModel.isPlaying && track.id == playerViewModel.currentTrackDisplayable?.id,
-                    onTap: { onTap(track) }
-                )
-                .padding(.vertical, 4)
-                .listRowInsets(EdgeInsets())
-                .listRowBackground(Color.clear)
-                .padding(.vertical, 8)
-                .padding(.horizontal, 16)
-                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                    Button(role: .destructive) {
-                        onDelete(IndexSet(integer: index))
-                    } label: {
-                        Label("Удалить", systemImage: "trash")
+            .frame(maxHeight: .infinity)
+            .animation(.easeInOut, value: trackListViewModel.toastData?.message ?? "")
+            .sheet(isPresented: $trackListViewModel.isShowingSaveSheet) {
+                SaveTrackListSheet(
+                    isPresented: $trackListViewModel.isShowingSaveSheet,
+                    name: $trackListViewModel.newTrackListName
+                ) {
+                    if let id = trackListViewModel.currentListId {
+                        TrackListManager.shared.renameTrackList(id: id, to: trackListViewModel.newTrackListName)
                     }
                 }
             }
-            .onMove(perform: onMove)
         }
     }
-}
+
+
+// MARK: - Компонент строк треков
+        
+        private struct TrackListRowsView: View {
+            let tracks: [Track]
+            let playerViewModel: PlayerViewModel
+            let onTap: (Track) -> Void
+            let onDelete: (IndexSet) -> Void
+            let onMove: (IndexSet, Int) -> Void
+            let artworkProvider: ArtworkProvider
+            
+            var body: some View {
+                ForEach(Array(tracks.enumerated()), id: \.element.id) { index, track in
+                    TrackRowView(
+                        track: track,
+                        isCurrent: track.id == playerViewModel.currentTrackDisplayable?.id,
+                        isPlaying: playerViewModel.isPlaying && track.id == playerViewModel.currentTrackDisplayable?.id,
+                        artwork: artworkProvider.artwork(for: track.url),
+                        onTap: { onTap(track) }
+                    )
+                    .onAppear {
+                        artworkProvider.loadArtworkIfNeeded(for: track.url)
+                    }
+                    
+                    .padding(.vertical, 4)
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 16)
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button(role: .destructive) {
+                            onDelete(IndexSet(integer: index))
+                        } label: {
+                            Label("Удалить", systemImage: "trash")
+                        }
+                    }
+                }
+                .onMove(perform: onMove)
+            }
+        }
+
+    
+

@@ -26,12 +26,12 @@ struct PlayerPlaylistView: View {
                                 playerViewModel.togglePlayPause()
                             } else {
                                 playerViewModel.play(
-                                                track: track,
-                                                context: manager.tracks
-                              )
+                                    track: track,
+                                    context: manager.tracks
+                                )
                             }
-            
-                }
+                },artworkProvider: ArtworkProvider.shared
+
             )
         }
     }

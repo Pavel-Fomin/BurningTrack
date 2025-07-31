@@ -13,6 +13,7 @@
 import Foundation
 import AVFoundation
 
+@MainActor
 final class PlayerViewModel: ObservableObject {
     
 // MARK: - Состояние воспроизведения
@@ -27,6 +28,7 @@ final class PlayerViewModel: ObservableObject {
     var libraryTracksContext: [LibraryTrack] = []
     
     private var trackListContext: [Track] = []
+    private let artworkProvider = ArtworkProvider()
     
     
 // MARK: - Инициализация и подписка на события
@@ -38,7 +40,9 @@ final class PlayerViewModel: ObservableObject {
             queue: .main
         ) { [weak self] notification in
             if let duration = notification.userInfo?["duration"] as? TimeInterval {
-                self?.trackDuration = duration
+                Task { @MainActor in
+                    self?.trackDuration = duration
+                }
             }
         }
 
@@ -78,8 +82,6 @@ final class PlayerViewModel: ObservableObject {
 // MARK: - Воспроизведение трека
        
     func play(track: any TrackDisplayable, context: [any TrackDisplayable] = []) {
-        print("🧠 PlayerViewModel: play(track:) вызван с", track.fileName)
-        print("🧩 currentTrackDisplayable ID: \(track.id)")
 
         if let current = currentTrackDisplayable,
            current.fileName == track.fileName {
@@ -155,7 +157,7 @@ final class PlayerViewModel: ObservableObject {
 
         if let libTrack = current as? LibraryTrack {
             guard let index = libraryTracksContext.firstIndex(where: { $0.fileName == libTrack.fileName }) else {
-                print("⏭ Не найден текущий трек в списке libraryTracksContext")
+
                 return
             }
 
@@ -163,13 +165,13 @@ final class PlayerViewModel: ObservableObject {
             if nextIndex < libraryTracksContext.count {
                 play(track: libraryTracksContext[nextIndex], context: libraryTracksContext)
             } else {
-                print("⏭ Следующего трека нет в фонотеке")
+                
             }
 
         } else if let track = current as? Track {
             guard let index = trackListContext.firstIndex(of: track),
                   index + 1 < trackListContext.count else {
-                print("⏭ Следующего трека нет в треклисте")
+                
                 return
             }
 
@@ -186,7 +188,7 @@ final class PlayerViewModel: ObservableObject {
 
         if let libTrack = current as? LibraryTrack {
             guard let index = libraryTracksContext.firstIndex(where: { $0.fileName == libTrack.fileName }) else {
-                print("⏮ Не найден текущий трек в списке libraryTracksContext")
+                
                 return
             }
 
@@ -194,13 +196,13 @@ final class PlayerViewModel: ObservableObject {
             if prevIndex >= 0 {
                 play(track: libraryTracksContext[prevIndex], context: libraryTracksContext)
             } else {
-                print("⏮ Предыдущего трека нет в фонотеке")
+                
             }
 
         } else if let track = current as? Track {
             guard let index = trackListContext.firstIndex(of: track),
                   index - 1 >= 0 else {
-                print("⏮ Предыдущего трека нет в треклисте")
+                
                 return
             }
 
