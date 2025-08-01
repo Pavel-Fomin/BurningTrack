@@ -16,10 +16,16 @@ final class ArtworkCacheManager {
     private let queue = DispatchQueue(label: "artwork.loader", qos: .userInitiated)
 
     private init() {
-        
-        // Опционально: ограничить размер кэша
         cache.countLimit = 100
         cache.totalCostLimit = 30 * 1024 * 1024 // 30 MB
+
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.didReceiveMemoryWarningNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.cache.removeAllObjects()
+        }
     }
 
     /// Возвращает обложку из кэша или загружает её из файла
@@ -40,12 +46,20 @@ final class ArtworkCacheManager {
         queue.async { [weak self] in
             defer { self?.activeRequests.remove(url) }
 
-            guard let image = MetadataParser.extractArtwork(from: url) else {
+            guard var image = MetadataParser.extractArtwork(from: url) else {
                 completion(nil)
                 return
             }
 
-            self?.cache.setObject(image, forKey: nsURL)
+            image = image.resized(to: 48)
+
+            if let cgImage = image.cgImage {
+                let bytesPerPixel = 4
+                let cost = cgImage.width * cgImage.height * bytesPerPixel
+                self?.cache.setObject(image, forKey: nsURL, cost: cost)
+            } else {
+                self?.cache.setObject(image, forKey: nsURL)
+            }
             completion(image)
         }
     }
