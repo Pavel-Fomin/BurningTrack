@@ -318,9 +318,14 @@ final class MusicLibraryManager: ObservableObject {
                         }
                             imported = newTrack
                     }
+                    
+                    let resolvedURL = SecurityScopedBookmarkHelper.resolveURL(from: bookmarkBase64) ?? url
+                    let isAvailable = FileManager.default.fileExists(atPath: resolvedURL.path)
 
                     return LibraryTrack(
                         url: url,
+                        resolvedURL: resolvedURL,
+                        isAvailable: isAvailable,
                         bookmarkBase64: bookmarkBase64,
                         title: metadata?.title,
                         artist: metadata?.artist,
@@ -329,7 +334,7 @@ final class MusicLibraryManager: ObservableObject {
                             .flatMap { UIImage(data: $0) }
                             .map { normalize($0) },
                         addedDate: addedDate,
-                        original: imported // обязательный аргумент
+                        original: imported
                     )
                 }
             }
