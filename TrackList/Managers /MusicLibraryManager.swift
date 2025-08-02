@@ -287,9 +287,6 @@ final class MusicLibraryManager: ObservableObject {
                     // Парсим теги
                     let metadata = try? await MetadataParser.parseMetadata(from: url)
                     
-                    // Парсим обложку
-                    let artworkBase64 = metadata?.artworkData?.base64EncodedString()
-
                     
                     // Bookmark для доступа к файлу
                     let bookmarkData = try? url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)

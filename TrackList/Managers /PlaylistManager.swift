@@ -99,7 +99,6 @@ final class PlaylistManager: ObservableObject {
 
                         if let data = metadata.artworkData,
                            let image = UIImage(data: data) {
-                            let artworkBase64 = metadata.artworkData?.base64EncodedString()
                             await MainActor.run {
                                 self.artworkByURL[url] = image
                             }

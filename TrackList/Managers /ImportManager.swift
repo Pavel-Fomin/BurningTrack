@@ -41,7 +41,6 @@ final class ImportManager {
 
                 // Парсим метаданные: title, artist, album, duration, artwork
                 let metadata = try await MetadataParser.parseMetadata(from: url)
-                let artworkBase64 = metadata.artworkData?.base64EncodedString()
 
                 // Генерируем уникальный ID для трека (он же id для artwork)
                 let trackId = UUID()

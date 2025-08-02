@@ -38,7 +38,6 @@ struct LibraryTrackSectionView: View {
             
             @ViewBuilder
             private func TrackRowWrapper(track: LibraryTrack) -> some View {
-                let metadata = metadataByURL[track.resolvedURL]
                 let isCurrent = playerViewModel.currentTrackDisplayable?.id == track.id
                 let isPlaying = isCurrent && playerViewModel.isPlaying
                 let trackListNames = trackListNamesByURL[track.url] ?? []

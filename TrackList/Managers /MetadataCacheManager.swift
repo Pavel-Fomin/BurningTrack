@@ -2,7 +2,8 @@
 //  MetadataCacheManager.swift
 //  TrackList
 //
-//  Кэш для хранения метаданных и обложек треков
+//  //  Оптимизированный кэш метаданных с NSCache и защитой доступа
+
 //
 //  Created by Pavel Fomin on 02.08.2025.
 //
