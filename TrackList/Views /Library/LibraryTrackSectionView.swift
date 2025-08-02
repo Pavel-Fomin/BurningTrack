@@ -18,10 +18,13 @@ struct LibraryTrackSectionView: View {
     let trackListNamesByURL: [URL: [String]]
     let artworkProvider: ArtworkProvider
     let artworkByURL: [URL: UIImage]
+    let playerViewModel: PlayerViewModel
+    let metadataByURL: [URL: TrackMetadataCacheManager.CachedMetadata]
     
-    @ObservedObject var playerViewModel: PlayerViewModel
+    
     @EnvironmentObject var toast: ToastManager
     @EnvironmentObject var sheetManager: SheetManager
+    
     
     var body: some View {
         Section(header: Text(title).font(.headline)) {
@@ -35,6 +38,7 @@ struct LibraryTrackSectionView: View {
             
             @ViewBuilder
             private func TrackRowWrapper(track: LibraryTrack) -> some View {
+                let metadata = metadataByURL[track.resolvedURL]
                 let isCurrent = playerViewModel.currentTrackDisplayable?.id == track.id
                 let isPlaying = isCurrent && playerViewModel.isPlaying
                 let trackListNames = trackListNamesByURL[track.url] ?? []
@@ -44,6 +48,8 @@ struct LibraryTrackSectionView: View {
                     isCurrent: isCurrent,
                     isPlaying: isPlaying,
                     artwork: artworkProvider.artwork(for: track.url),
+                    title: metadataByURL[track.resolvedURL]?.title ?? track.original.title,
+                    artist: metadataByURL[track.resolvedURL]?.artist ?? track.original.artist,
                     onTap: {
                         if let current = playerViewModel.currentTrackDisplayable as? LibraryTrack,
                            current.id == track.id {

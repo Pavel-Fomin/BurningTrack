@@ -1,5 +1,5 @@
 //
-//  JSONEncoder+Pretty.swift
+//  JSONEncoder.swift
 //  TrackList
 //
 //  Утилита для человекочитаемого формата json

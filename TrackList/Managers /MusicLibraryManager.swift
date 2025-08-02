@@ -269,7 +269,12 @@ final class MusicLibraryManager: ObservableObject {
         await withTaskGroup(of: LibraryTrack?.self) { group in
             for url in urls {
                 group.addTask { [self] in
-                    
+                    let accessed = url.startAccessingSecurityScopedResource()
+                    defer {
+                        if accessed {
+                            url.stopAccessingSecurityScopedResource()
+                        }
+                    }
                     // Получаем длительность через AVAsset
                     let asset = AVURLAsset(url: url)
                     let duration = try? await asset.load(.duration)

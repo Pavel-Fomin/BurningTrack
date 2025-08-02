@@ -15,6 +15,8 @@ struct TrackRowView: View {
     let isCurrent: Bool
     let isPlaying: Bool
     let artwork: UIImage?
+    let title: String?
+    let artist: String?
     let onTap: () -> Void
     
     var swipeActionsLeft: [CustomSwipeAction] = []
@@ -102,12 +104,12 @@ struct TrackRowView: View {
     
     private var trackInfoView: some View {
         let hasArtist: Bool = {
-            guard let artist = track.artist?.trimmingCharacters(in: .whitespaces).lowercased() else { return false }
+            guard let artist = artist?.trimmingCharacters(in: .whitespaces).lowercased() else { return false }
             return !artist.isEmpty && artist != "неизвестен"
         }()
 
         return VStack(alignment: .leading, spacing: hasArtist ? 2 : 0) {
-            if hasArtist, let artistText = track.artist {
+            if hasArtist, let artistText = artist {
                 Text(artistText)
                     .font(.subheadline)
                     .foregroundColor(.primary)
@@ -115,7 +117,7 @@ struct TrackRowView: View {
             }
 
             HStack {
-                Text(track.title ?? track.fileName)
+                Text(title ?? track.fileName)
                     .font(hasArtist ? .footnote : .subheadline)
                     .foregroundColor(hasArtist ? .secondary : .primary)
                     .lineLimit(1)

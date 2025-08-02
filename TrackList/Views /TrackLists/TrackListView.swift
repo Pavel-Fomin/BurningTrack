@@ -87,6 +87,8 @@ struct TrackListView: View {
                         isCurrent: track.id == playerViewModel.currentTrackDisplayable?.id,
                         isPlaying: playerViewModel.isPlaying && track.id == playerViewModel.currentTrackDisplayable?.id,
                         artwork: artworkProvider.artwork(for: track.url),
+                        title: track.title ?? track.fileName,
+                        artist: track.artist ?? "",
                         onTap: { onTap(track) }
                     )
                     .onAppear {

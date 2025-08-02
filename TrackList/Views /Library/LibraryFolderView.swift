@@ -13,7 +13,9 @@ struct LibraryFolderView: View {
     @ObservedObject var playerViewModel: PlayerViewModel
     @StateObject private var artworkProvider = ArtworkProvider()
     @State private var trackListNamesByURL: [URL: [String]] = [:]
+    @State private var metadataByURL: [URL: TrackMetadataCacheManager.CachedMetadata] = [:]
     @EnvironmentObject var sheetManager: SheetManager
+    
     
     private var allVisibleTracks: [LibraryTrack] {
         trackSections.flatMap { $0.tracks }
@@ -49,8 +51,7 @@ struct LibraryFolderView: View {
                 
             }
         }
-
-    
+        
         .sheet(item: $sheetManager.trackToAdd) { track in
                 NavigationStack {
                     AddToTrackListSheet(
@@ -146,7 +147,8 @@ struct LibraryFolderView: View {
                 trackListNamesByURL: trackListNamesByURL,
                 artworkProvider: artworkProvider,
                 artworkByURL: artworkProvider.artworkByURL,
-                playerViewModel: playerViewModel
+                playerViewModel: playerViewModel,
+                metadataByURL: metadataByURL,
             )
         }
     }
@@ -162,7 +164,20 @@ struct LibraryFolderView: View {
         
         trackSections = grouped
         
-        // Загрузка обложек (обязательно после trackSections, чтобы allVisibleTracks был актуален)
+        // Загрузка метаданных
+        for track in allVisibleTracks {
+            if metadataByURL[track.resolvedURL] == nil {
+                Task {
+                    if let metadata = await TrackMetadataCacheManager.shared.loadMetadata(for: track.resolvedURL) {
+                        await MainActor.run {
+                            metadataByURL[track.resolvedURL] = metadata
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Загрузка обложек
            for track in allVisibleTracks {
                artworkProvider.loadArtworkIfNeeded(for: track.url)
            }

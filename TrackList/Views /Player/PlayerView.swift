@@ -41,6 +41,8 @@ struct PlayerView: View {
                     isCurrent: track.id == currentTrack?.id,
                     isPlaying: track.id == currentTrack?.id && isPlaying,
                     artwork: artworkProvider.artwork(for: track.url),
+                    title: track.title ?? track.fileName,
+                    artist: track.artist ?? "",
                     onTap: {
                         onTrackTap(track)
                     },

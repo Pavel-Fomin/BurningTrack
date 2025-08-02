@@ -9,53 +9,113 @@
 
 import Foundation
 import UIKit
+import AVFoundation
 
-
-final class TrackMetadataCacheManager {
+@MainActor
+final class TrackMetadataCacheManager: @unchecked Sendable {
     static let shared = TrackMetadataCacheManager()
 
-    /// Внутренний кэш
     private let cache = NSCache<NSURL, CachedMetadata>()
-
-    /// Активные задачи загрузки — чтобы не дублировать
-    private var activeRequests = [URL: Task<CachedMetadata?, Never>]()
+    private var activeRequests: [URL: Task<TrackMetadata?, Never>] = [:]
+    private let semaphore = AsyncSemaphore(value: 4)
 
     private init() {
         cache.countLimit = 100
+        cache.totalCostLimit = 30 * 1024 * 1024 // 30 MB
     }
 
-    /// Возвращает кэшированные данные или запускает фоновую загрузку
     func loadMetadata(for url: URL) async -> CachedMetadata? {
         let nsurl = url as NSURL
 
+        // Если есть в кэше — отдать
         if let cached = cache.object(forKey: nsurl) {
             return cached
         }
 
-        // Если задача уже активна — подождать её
-        if let existingTask = activeRequests[url] {
-            return await existingTask.value
+        // Если уже идёт задача — дождаться
+        if let existing = activeRequests[url] {
+            if let result = await existing.value {
+                let converted = convert(result)
+                cache.setObject(converted, forKey: nsurl)
+                return converted
+            }
+            return nil
         }
 
-        // Создаём и сохраняем новую задачу
-        let task = Task {
-            let metadata = try? await MetadataParser.parseMetadata(from: url)
+        // Новая задача
+        let task = Task<TrackMetadata?, Never> {
+            await semaphore.wait()
+            defer { Task { await semaphore.signal() } }
 
-            let result = CachedMetadata(
-                title: metadata?.title,
-                artist: metadata?.artist,
-                artwork: metadata?.artworkData.flatMap { UIImage(data: $0) }
-            )
-
-            if let result = result {
-                cache.setObject(result, forKey: nsurl)
+            let accessed = url.startAccessingSecurityScopedResource()
+            defer {
+                if accessed {
+                    url.stopAccessingSecurityScopedResource()
+                }
             }
 
-            activeRequests[url] = nil
-            return result
+            return try? await MetadataParser.parseMetadata(from: url)
         }
 
         activeRequests[url] = task
-        return await task.value
+
+        let result = await task.value
+        activeRequests[url] = nil
+
+        if let result {
+            let converted = convert(result)
+            cache.setObject(converted, forKey: nsurl)
+            return converted
+        }
+
+        return nil
+    }
+
+    private func convert(_ result: TrackMetadata) -> CachedMetadata {
+        let image = result.artworkData.flatMap { UIImage(data: $0) }
+        return CachedMetadata(title: result.title, artist: result.artist, artwork: image)
+    }
+
+    final class CachedMetadata: NSObject, @unchecked Sendable {
+        let title: String?
+        let artist: String?
+        let artwork: UIImage?
+
+        init(title: String?, artist: String?, artwork: UIImage?) {
+            self.title = title
+            self.artist = artist
+            self.artwork = artwork
+        }
+    }
+}
+
+// MARK: - AsyncSemaphore
+
+actor AsyncSemaphore {
+    private var value: Int
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    init(value: Int) {
+        self.value = value
+    }
+
+    func wait() async {
+        if value > 0 {
+            value -= 1
+            return
+        }
+
+        await withCheckedContinuation { continuation in
+            waiters.append(continuation)
+        }
+    }
+
+    func signal() async {
+        if let first = waiters.first {
+            waiters.removeFirst()
+            first.resume()
+        } else {
+            value += 1
+        }
     }
 }

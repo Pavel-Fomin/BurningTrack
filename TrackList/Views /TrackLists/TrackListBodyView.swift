@@ -70,6 +70,8 @@ struct TrackListBodyView: View {
                 isCurrent: track.id == playerViewModel.currentTrackDisplayable?.id,
                 isPlaying: playerViewModel.isPlaying && track.id == playerViewModel.currentTrackDisplayable?.id,
                 artwork: trackListViewModel.artworkByURL[track.url],
+                title: track.title ?? track.fileName,
+                artist: track.artist ?? "",
                 onTap: onTap,
                 swipeActionsLeft: [],
                 swipeActionsRight: [],
