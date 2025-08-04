@@ -108,10 +108,10 @@ final class TrackMetadataCacheManager: @unchecked Sendable {
     /// Обработка и кэширование результата парсинга
     private func convertAndCache(_ metadata: TrackMetadata, for nsurl: NSURL) -> CachedMetadata {
         if let original = metadata.artworkData.flatMap({ UIImage(data: $0) }) {
-            let resized = original.resized(to: 48)
+            let resized = normalize(original).resized(to: 48)
             let converted = convert(from: resized, metadata: metadata)
 
-            // Оценка стоимости изображения в байтах (ширина × высота × 4 байта на пиксель)
+            // Оценка стоимости изображения в байтах (ш × в × 4 байта/px)
             let pixelWidth = Int(resized.size.width * resized.scale)
             let pixelHeight = Int(resized.size.height * resized.scale)
             let cost = pixelWidth * pixelHeight * 4
