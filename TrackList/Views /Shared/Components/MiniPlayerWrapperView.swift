@@ -32,8 +32,8 @@ struct MiniPlayerWrapperView<Content: View>: View {
             
             if playerViewModel.currentTrackDisplayable != nil {
                 MiniPlayerView(
-                    playerViewModel: playerViewModel,
-                    trackListViewModel: trackListViewModel
+                    trackListViewModel: trackListViewModel,
+                    playerViewModel: playerViewModel
                 )
                 .padding(.horizontal, 8)
                 .padding(.bottom, 56)

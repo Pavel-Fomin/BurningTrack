@@ -16,7 +16,6 @@ struct LibraryTrackSectionView: View {
     let allTracks: [LibraryTrack]
     let trackListViewModel: TrackListViewModel
     let trackListNamesByURL: [URL: [String]]
-    let artworkProvider: ArtworkProvider
     let artworkByURL: [URL: UIImage]
     let playerViewModel: PlayerViewModel
     let metadataByURL: [URL: TrackMetadataCacheManager.CachedMetadata]
@@ -36,7 +35,6 @@ struct LibraryTrackSectionView: View {
                     allTracks: allTracks,
                     trackListViewModel: trackListViewModel,
                     trackListNamesByURL: trackListNamesByURL,
-                    artworkProvider: artworkProvider,
                     metadata: metadataByURL[track.resolvedURL],
                     playerViewModel: playerViewModel
                 )

@@ -2,8 +2,7 @@
 //  MetadataCacheManager.swift
 //  TrackList
 //
-//  //  Оптимизированный кэш метаданных с NSCache и защитой доступа
-
+//  Оптимизированный кэш метаданных с NSCache и защитой доступа
 //
 //  Created by Pavel Fomin on 02.08.2025.
 //
@@ -15,35 +14,62 @@ import AVFoundation
 @MainActor
 final class TrackMetadataCacheManager: @unchecked Sendable {
     static let shared = TrackMetadataCacheManager()
-
+    
+    // Основной кэш для хранения метаданных (NSCache для автоматического сброса при нехватке памяти)
     private let cache = NSCache<NSURL, CachedMetadata>()
+    
+    // Активные задачи загрузки метаданных, чтобы не дублировать запросы
     private var activeRequests: [URL: Task<TrackMetadata?, Never>] = [:]
+    
+    // Семафор для ограничения одновременных запросов (например, до 4 задач параллельно)
     private let semaphore = AsyncSemaphore(value: 4)
-
+    
     private init() {
         cache.countLimit = 100
         cache.totalCostLimit = 30 * 1024 * 1024 // 30 MB
     }
+    
+    
+// MARK: - Загрузка обложек
+    
+    /// Возвращает UIImage для заданного URL, либо из кэша, либо запрашивает метаданные
+    func loadArtwork(for url: URL) async -> UIImage? {
+        let nsurl = url as NSURL
 
+        // Если уже есть в кэше — достаём CGImage и оборачиваем в UIImage
+        if let cached = cache.object(forKey: nsurl), let cgImage = cached.artwork {
+            return UIImage(cgImage: cgImage)
+        }
+
+        // Иначе пробуем загрузить метаданные, в том числе artwork
+        if let metadata = await loadMetadata(for: url), let cgImage = metadata.artwork {
+            return UIImage(cgImage: cgImage)
+        }
+
+        return nil
+    }
+    
+    
+// MARK: - Загрузка тегов
+    
+    /// Загружает и кэширует метаданные (теги и обложку)
     func loadMetadata(for url: URL) async -> CachedMetadata? {
         let nsurl = url as NSURL
 
-        // Если есть в кэше — отдать
+        // Уже закэшировано
         if let cached = cache.object(forKey: nsurl) {
             return cached
         }
 
-        // Если уже идёт задача — дождаться
+        // Если задача уже выполняется — дожидаемся результата
         if let existing = activeRequests[url] {
             if let result = await existing.value {
-                let converted = convert(result)
-                cache.setObject(converted, forKey: nsurl)
-                return converted
+                return convertAndCache(result, for: nsurl)
             }
             return nil
         }
 
-        // Новая задача
+        // Новая задача загрузки
         let task = Task<TrackMetadata?, Never> {
             await semaphore.wait()
             defer { Task { await semaphore.signal() } }
@@ -59,64 +85,92 @@ final class TrackMetadataCacheManager: @unchecked Sendable {
         }
 
         activeRequests[url] = task
-
         let result = await task.value
         activeRequests[url] = nil
 
         if let result {
-            let converted = convert(result)
-            cache.setObject(converted, forKey: nsurl)
-            return converted
+            return convertAndCache(result, for: nsurl)
+        }
+        return nil
+        
         }
 
-        return nil
-    }
+    /// Преобразует UIImage в CGImage и упаковывает в CachedMetadata
+    private func convert(from image: UIImage, metadata: TrackMetadata) -> CachedMetadata {
+        if let cgImage = image.cgImage {
+    
+            return CachedMetadata(title: metadata.title, artist: metadata.artist, artwork: cgImage)
+        }
 
-    private func convert(_ result: TrackMetadata) -> CachedMetadata {
-        let image = result.artworkData.flatMap { UIImage(data: $0) }
-        return CachedMetadata(title: result.title, artist: result.artist, artwork: image)
+        return CachedMetadata(title: metadata.title, artist: metadata.artist, artwork: nil)
     }
+    
+    /// Обработка и кэширование результата парсинга
+    private func convertAndCache(_ metadata: TrackMetadata, for nsurl: NSURL) -> CachedMetadata {
+        if let original = metadata.artworkData.flatMap({ UIImage(data: $0) }) {
+            let resized = original.resized(to: 48)
+            let converted = convert(from: resized, metadata: metadata)
 
+            // Оценка стоимости изображения в байтах (ширина × высота × 4 байта на пиксель)
+            let pixelWidth = Int(resized.size.width * resized.scale)
+            let pixelHeight = Int(resized.size.height * resized.scale)
+            let cost = pixelWidth * pixelHeight * 4
+
+            cache.setObject(converted, forKey: nsurl, cost: cost)
+            return converted
+        } else {
+            let fallback = CachedMetadata(title: metadata.title, artist: metadata.artist, artwork: nil)
+            cache.setObject(fallback, forKey: nsurl, cost: 1)
+            return fallback
+        }
+    }
+    
+    
+    // MARK: - Внутренний тип, представляющий закэшированные метаданные
+    
     final class CachedMetadata: NSObject, @unchecked Sendable {
         let title: String?
         let artist: String?
-        let artwork: UIImage?
+        let artwork: CGImage?
 
-        init(title: String?, artist: String?, artwork: UIImage?) {
+        init(title: String?, artist: String?, artwork: CGImage?) {
             self.title = title
             self.artist = artist
             self.artwork = artwork
         }
     }
-}
+    
 
-// MARK: - AsyncSemaphore
 
-actor AsyncSemaphore {
-    private var value: Int
-    private var waiters: [CheckedContinuation<Void, Never>] = []
+// MARK: - Асинхронный семафор для ограничения количества параллельных задач
 
-    init(value: Int) {
-        self.value = value
-    }
-
-    func wait() async {
-        if value > 0 {
-            value -= 1
-            return
+    actor AsyncSemaphore {
+        private var value: Int
+        private var waiters: [CheckedContinuation<Void, Never>] = []
+        
+        init(value: Int) {
+            self.value = value
         }
-
-        await withCheckedContinuation { continuation in
-            waiters.append(continuation)
+        
+        func wait() async {
+            if value > 0 {
+                value -= 1
+                return
+            }
+            
+            await withCheckedContinuation { continuation in
+                waiters.append(continuation)
+            }
         }
-    }
-
-    func signal() async {
-        if let first = waiters.first {
-            waiters.removeFirst()
-            first.resume()
-        } else {
-            value += 1
+        
+        func signal() async {
+            if let first = waiters.first {
+                waiters.removeFirst()
+                first.resume()
+            } else {
+                value += 1
+            }
         }
+        
     }
 }

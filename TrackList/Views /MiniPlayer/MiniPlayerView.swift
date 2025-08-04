@@ -2,7 +2,7 @@
 //  MiniPlayerView.swift
 //  TrackList
 //
-//  Мини-плеер: отображает текущий трек, обложку, название, прогресс и кнопки управления
+//  Отображает текущий трек, обложку, название, прогресс и кнопки управления
 //
 //  Created by Pavel Fomin on 28.04.2025.
 //
@@ -26,16 +26,19 @@ struct AVRoutePickerViewWrapper: UIViewRepresentable {
 
 
 struct MiniPlayerView: View {
-    @ObservedObject var playerViewModel: PlayerViewModel
     var trackListViewModel: TrackListViewModel?
+    
+    @ObservedObject var playerViewModel: PlayerViewModel
     @State private var dragOffsetX: CGFloat = 0
+    @State private var artwork: UIImage? = nil
+    
     
     var body: some View {
         if let track = playerViewModel.currentTrackDisplayable {
             VStack {
                 
                 
-                // MARK: - Верхняя часть: обложка + информация + кнопки
+// MARK: - Верхняя часть: обложка + информация + кнопки
                 
                 HStack(spacing: 12) {
                     
@@ -43,7 +46,7 @@ struct MiniPlayerView: View {
                     HStack(spacing: 12) {
                         
                         // Обложка
-                        if let artwork = track.artwork {
+                        if let artwork = artwork {
                             Image(uiImage: artwork)
                                 .resizable()
                                 .aspectRatio(1, contentMode: .fill)
@@ -98,9 +101,10 @@ struct MiniPlayerView: View {
                             withAnimation(.spring()) { dragOffsetX = 0 }
                         }
                 )
+                
                
                 
-                // MARK: - Прогресс трека
+// MARK: - Прогресс трека
                 
                 HStack(alignment: .center, spacing: 12) {
                     
@@ -150,8 +154,19 @@ struct MiniPlayerView: View {
             .background(.ultraThinMaterial)
             .cornerRadius(12)
             .shadow(radius: 4)
+            .id(track.id)
+            .task(id: track.url) {
+                if let cgImage = await TrackMetadataCacheManager.shared
+                    .loadMetadata(for: track.url)?
+                    .artwork {
+                    artwork = UIImage(cgImage: cgImage)
+                }
+    
+            }
             .padding(.horizontal, 16)
             .padding(.bottom, 0) /// отступ между плеером и меню
         }
+        
     }
+    
 }

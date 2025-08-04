@@ -14,7 +14,7 @@ struct TrackRowView: View {
     let track: any TrackDisplayable
     let isCurrent: Bool
     let isPlaying: Bool
-    let artwork: UIImage?
+    let artwork: CGImage?
     let title: String?
     let artist: String?
     let onTap: () -> Void
@@ -77,12 +77,12 @@ struct TrackRowView: View {
     
     private var artworkView: some View {
         ZStack {
-            if let image = artwork {
-                Image(uiImage: image)
+            if let artwork = artwork {
+                Image(decorative: artwork, scale: 1.0, orientation: .up)
                     .resizable()
-                    .aspectRatio(1, contentMode: .fill)
                     .frame(width: 48, height: 48)
                     .cornerRadius(48)
+                
             } else {
                 Rectangle()
                     .fill(Color.gray.opacity(0.3))

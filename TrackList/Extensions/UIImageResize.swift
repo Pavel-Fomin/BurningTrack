@@ -11,13 +11,35 @@ import UIKit
 
 extension UIImage {
     func resized(to maxSize: CGFloat) -> UIImage {
-        let aspectRatio = size.width / size.height
-        let targetWidth = aspectRatio > 1 ? maxSize : maxSize * aspectRatio
-        let targetHeight = aspectRatio > 1 ? maxSize / aspectRatio : maxSize
+        guard let cgImage = self.cgImage else { return self }
 
-        let renderer = UIGraphicsImageRenderer(size: CGSize(width: targetWidth, height: targetHeight))
-        return renderer.image { _ in
-            self.draw(in: CGRect(origin: .zero, size: CGSize(width: targetWidth, height: targetHeight)))
+        let width = cgImage.width
+        let height = cgImage.height
+
+        let scale = maxSize / CGFloat(max(width, height))
+        let newWidth = Int(CGFloat(width) * scale)
+        let newHeight = Int(CGFloat(height) * scale)
+
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        guard let context = CGContext(
+            data: nil,
+            width: newWidth,
+            height: newHeight,
+            bitsPerComponent: 8,
+            bytesPerRow: newWidth * 4,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else {
+            return self
         }
+
+        context.interpolationQuality = .low
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: newWidth, height: newHeight))
+
+        if let scaledImage = context.makeImage() {
+            return UIImage(cgImage: scaledImage)
+        }
+
+        return self
     }
 }

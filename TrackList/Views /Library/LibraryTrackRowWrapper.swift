@@ -15,8 +15,9 @@ struct LibraryTrackRowWrapper: View {
     let allTracks: [LibraryTrack]
     let trackListViewModel: TrackListViewModel
     let trackListNamesByURL: [URL: [String]]
-    let artworkProvider: ArtworkProvider
     let metadata: TrackMetadataCacheManager.CachedMetadata?
+    
+    @State private var artwork: CGImage? = nil
     
     @ObservedObject var playerViewModel: PlayerViewModel
     @EnvironmentObject var toast: ToastManager
@@ -31,7 +32,7 @@ struct LibraryTrackRowWrapper: View {
             track: track,
             isCurrent: isCurrent,
             isPlaying: isPlaying,
-            artwork: artworkProvider.artwork(for: track.url),
+            artwork: artwork,
             title: metadata?.title ?? track.original.title,
             artist: metadata?.artist ?? track.original.artist,
             onTap: {
@@ -44,6 +45,13 @@ struct LibraryTrackRowWrapper: View {
             },
             trackListNames: trackListNames
         )
+        .task {
+            artwork = await TrackMetadataCacheManager.shared
+                .loadMetadata(for: track.url)?
+                .artwork
+            
+
+        }
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             Button {
                 let imported = track.original
@@ -65,6 +73,7 @@ struct LibraryTrackRowWrapper: View {
                     style: .track(title: track.title ?? track.fileName, artist: track.artist ?? ""),
                     artwork: track.artwork
                 ))
+                
             } label: {
                 Text("В плеер")
             }

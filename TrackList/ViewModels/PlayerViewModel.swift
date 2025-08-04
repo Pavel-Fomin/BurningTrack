@@ -28,7 +28,7 @@ final class PlayerViewModel: ObservableObject {
     var libraryTracksContext: [LibraryTrack] = []
     
     private var trackListContext: [Track] = []
-    private let artworkProvider = ArtworkProvider()
+
     
     
 // MARK: - Инициализация и подписка на события

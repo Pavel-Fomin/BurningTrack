@@ -135,7 +135,7 @@ extension Track: Equatable {
 
 extension Track: TrackDisplayable {
     var artwork: UIImage? {
-        ArtworkCacheManager.shared.cachedImage(for: url)
+        nil
     }
 }
 

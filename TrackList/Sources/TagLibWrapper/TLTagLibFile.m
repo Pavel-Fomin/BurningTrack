@@ -61,20 +61,20 @@ TLTagLibFileResult *_readMetadata(NSString *filePath) {
     // Получаем картинку из complex property "PICTURE"
     TagLib_Complex_Property_Attribute ***props = taglib_complex_property_get(file, "PICTURE");
     if (props) {
-        
-        // Подготовка структуры для хранения данных обложки
         TagLib_Complex_Property_Picture_Data picture = {0};
         
-        // Извлекаем данные обложки
         taglib_picture_from_complex_property(props, &picture);
         
-        // Если данные валидны — сохраняем в result
         if (picture.data && picture.size > 0) {
-            NSData *imageData = [NSData dataWithBytes:picture.data length:picture.size];
-            result.artworkData = imageData;
+            void *copy = malloc(picture.size);
+            if (copy) {
+                memcpy(copy, picture.data, picture.size);
+                NSData *imageData = [NSData dataWithBytesNoCopy:copy length:picture.size freeWhenDone:YES];
+                result.artworkData = imageData;
+            }
         }
-        // Освобождаем ресурсы, связанные с обложкой
-        taglib_complex_property_free(props); // освобождаем
+        
+        taglib_complex_property_free(props);
     }
     
     // MARK: - Очистка ресурсов

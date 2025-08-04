@@ -11,7 +11,6 @@ struct LibraryFolderView: View {
     let folder: LibraryFolder
     let trackListViewModel: TrackListViewModel
     @ObservedObject var playerViewModel: PlayerViewModel
-    @StateObject private var artworkProvider = ArtworkProvider()
     @State private var trackListNamesByURL: [URL: [String]] = [:]
     @State private var metadataByURL: [URL: TrackMetadataCacheManager.CachedMetadata] = [:]
     @EnvironmentObject var sheetManager: SheetManager
@@ -145,10 +144,9 @@ struct LibraryFolderView: View {
                 allTracks: allVisibleTracks,
                 trackListViewModel: trackListViewModel,
                 trackListNamesByURL: trackListNamesByURL,
-                artworkProvider: artworkProvider,
-                artworkByURL: artworkProvider.artworkByURL,
+                artworkByURL: [:],
                 playerViewModel: playerViewModel,
-                metadataByURL: metadataByURL,
+                metadataByURL: metadataByURL
             )
         }
     }
@@ -177,10 +175,6 @@ struct LibraryFolderView: View {
             }
         }
         
-        // Загрузка обложек
-           for track in allVisibleTracks {
-               artworkProvider.loadArtworkIfNeeded(for: track.url)
-           }
     }
     
     
