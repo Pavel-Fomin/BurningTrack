@@ -45,13 +45,13 @@ struct LibraryTrackRowWrapper: View {
             },
             trackListNames: trackListNames
         )
-        .task {
-            artwork = await TrackMetadataCacheManager.shared
-                .loadMetadata(for: track.url)?
-                .artwork
-            
-
-        }
+        
+            // Ленивая загрузка обложки, только если ещё не загружена
+            .task(id: track.url) {
+                artwork = await ArtworkLoader.loadIfNeeded(current: artwork, url: track.url)
+            }
+        
+        
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             Button {
                 let imported = track.original

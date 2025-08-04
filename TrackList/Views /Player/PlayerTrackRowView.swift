@@ -43,10 +43,8 @@ struct PlayerTrackRowView: View {
             trackListNames: [],
             useNativeSwipeActions: false
         )
-        .task {
-            artwork = await TrackMetadataCacheManager.shared
-                .loadMetadata(for: track.url)?
-                .artwork
+        .task(id: track.url) {
+            artwork = await ArtworkLoader.loadIfNeeded(current: artwork, url: track.url)
         }
         
         }
