@@ -16,7 +16,7 @@ struct MainTabView: View {
         TabView {
             PlayerScreen(playerViewModel: playerViewModel)
                 .tabItem {
-                    Label("Плеер", systemImage: "play.circle")
+                    Label("Плеер", systemImage: "waveform")
                 }
 
             LibraryScreen(
@@ -24,7 +24,7 @@ struct MainTabView: View {
                 trackListViewModel: trackListViewModel
             )
                 .tabItem {
-                    Label("Фонотека", systemImage: "music.note.list")
+                    Label("Фонотека", systemImage: "play.square.stack")
                 }
 
             TrackListsScreen(
@@ -32,7 +32,7 @@ struct MainTabView: View {
                 playerViewModel: playerViewModel
             )
                 .tabItem {
-                    Label("Треклисты", systemImage: "list.bullet")
+                    Label("Треклисты", systemImage: "list.star")
                 }
 
             SettingsScreen()
