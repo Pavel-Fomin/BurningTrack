@@ -89,36 +89,40 @@ final class PlaylistManager: ObservableObject {
     /// Импортирует список треков по URL-ам: парсит теги и добавляет в tracks
     /// - Parameter urls: Список локальных путей к файлам
     func importTracks(from urls: [URL]) async {
-        let newTracks: [Track] = await withTaskGroup(of: Track?.self) { group in
+        let newTracks: [PlayerTrack] = await withTaskGroup(of: PlayerTrack?.self) { group in
             for url in urls {
                 group.addTask {
                     do {
+                        guard let bookmarkData = try? url.bookmarkData() else {
+                            return nil}
+
+                        let bookmarkBase64 = bookmarkData.base64EncodedString()
                         let metadata = try await MetadataParser.parseMetadata(from: url)
-                        
+
                         if let data = metadata.artworkData,
                            let image = UIImage(data: data) {
                             await MainActor.run {
                                 self.artworkByURL[url] = image
                             }
                         }
-                        
-                        return Track(
+
+                        return PlayerTrack(
                             id: UUID(),
                             url: url,
                             artist: metadata.artist,
                             title: metadata.title ?? url.deletingPathExtension().lastPathComponent,
                             duration: metadata.duration ?? 0,
                             fileName: url.lastPathComponent,
-                            isAvailable: true
+                            isAvailable: true,
+                            bookmarkBase64: bookmarkBase64
                         )
                     } catch {
-                        
                         return nil
                     }
                 }
             }
-            
-            var results: [Track] = []
+
+            var results: [PlayerTrack] = []
             for await result in group {
                 if let track = result {
                     results.append(track)
@@ -128,7 +132,7 @@ final class PlaylistManager: ObservableObject {
         }
         
         // Обновляем треки и сохраняем
-        let playerTracks: [PlayerTrack] = tracks.compactMap { track in
+        let playerTracks: [PlayerTrack] = newTracks.compactMap { track in
             PlayerTrack(
                 id: track.id,
                 url: track.url,

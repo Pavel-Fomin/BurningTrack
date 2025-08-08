@@ -66,10 +66,6 @@ struct LibraryTrackRowWrapper: View {
                     ))
                 }
 
-                toast.show(ToastData(
-                    style: .track(title: track.title ?? track.fileName, artist: track.artist ?? ""),
-                    artwork: track.artwork
-                ))
                 
             } label: {
                 Text("В плеер")
