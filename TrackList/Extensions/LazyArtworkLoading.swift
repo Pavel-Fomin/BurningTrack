@@ -16,8 +16,6 @@ enum ArtworkLoader {
             return current
         }
         
-        print("🎨 Обложка для \(url.lastPathComponent)")
-        
         return await TrackMetadataCacheManager.shared
             .loadMetadata(for: url)?
             .artwork

@@ -9,7 +9,7 @@ import Foundation
 import SwiftUI
 
 struct PlayerTrackRowView: View {
-    let track: Track
+    let track: any TrackDisplayable
     let isCurrent: Bool
     let isPlaying: Bool
     let onTap: () -> Void

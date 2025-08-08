@@ -17,7 +17,7 @@ final class PlaylistManager: ObservableObject {
     static let shared = PlaylistManager()
     
     /// Текущий плейлист плеера (из player.json)
-    @Published var tracks: [Track] = []
+    @Published var tracks: [PlayerTrack] = []
     
     @Published var artworkByURL: [URL: UIImage] = [:]
     
@@ -50,11 +50,9 @@ final class PlaylistManager: ObservableObject {
             if FileManager.default.fileExists(atPath: url.path) {
                 let data = try Data(contentsOf: url)
                 let importedTracks = try JSONDecoder().decode([ImportedTrack].self, from: data)
-                self.tracks = importedTracks.compactMap { imported in
-                    let track = Track(from: imported)
                 
-                    return track
-                }
+                self.tracks = importedTracks.compactMap { PlayerTrack(from: $0) }
+                
                 print("📥 Загружено \(tracks.count) треков из player.json")
             } else {
                 print("📄 player.json не найден — создаём новый пустой")
@@ -96,7 +94,7 @@ final class PlaylistManager: ObservableObject {
                 group.addTask {
                     do {
                         let metadata = try await MetadataParser.parseMetadata(from: url)
-
+                        
                         if let data = metadata.artworkData,
                            let image = UIImage(data: data) {
                             await MainActor.run {
@@ -130,68 +128,104 @@ final class PlaylistManager: ObservableObject {
         }
         
         // Обновляем треки и сохраняем
-        self.tracks.append(contentsOf: newTracks)
+        let playerTracks: [PlayerTrack] = tracks.compactMap { track in
+            PlayerTrack(
+                id: track.id,
+                url: track.url,
+                artist: track.artist,
+                title: track.title,
+                duration: track.duration,
+                fileName: track.fileName,
+                isAvailable: track.isAvailable,
+                bookmarkBase64: track.bookmarkBase64
+            )
+        }
+        
+        self.tracks = playerTracks
         saveToDisk()
     }
-    
-    
-    // MARK: - Экспорт треков
-    
-    /// Экспортирует все доступные треки (isAvailable == true) через ExportManager
-    /// - Parameter folder: Папка — параметр зарезервирован, но не используется (в текущей реализации UIDocumentPicker сам запрашивает)
-    func exportTracks(to folder: URL) {
-        let availableTracks = tracks
-            .filter { $0.isAvailable }
-            .map { $0.asImportedTrack() }
         
-        if availableTracks.isEmpty {
+        // MARK: - Экспорт треков
+        
+        /// Экспортирует все доступные треки (isAvailable == true) через ExportManager
+        /// - Parameter folder: Папка — параметр зарезервирован, но не используется (в текущей реализации UIDocumentPicker сам запрашивает)
+        func exportTracks(to folder: URL) {
+            let availableTracks = tracks
+                .filter { $0.isAvailable }
+                .map { $0.asImportedTrack() }
             
-            return
-        }
-        
-        if let topVC = UIApplication.topViewController() {
-            ExportManager.shared.exportViaTempAndPicker(availableTracks, presenter: topVC)
-        } else {
+            if availableTracks.isEmpty {
+                
+                return
+            }
             
-        }
-    }
-    
-    /// Дублирующий метод экспорта (используется для отдельных вызовов или context menu)
-    func exportCurrentTracks(to folder: URL) {
-        let availableTracks = tracks
-            .filter { $0.isAvailable }
-            .map { $0.asImportedTrack() }
-        
-        guard !availableTracks.isEmpty else {
-            print("⚠️ Нет доступных треков для экспорта")
-            return
+            if let topVC = UIApplication.topViewController() {
+                ExportManager.shared.exportViaTempAndPicker(availableTracks, presenter: topVC)
+            } else {
+                
+            }
         }
         
-        if let topVC = UIApplication.topViewController() {
-            ExportManager.shared.exportViaTempAndPicker(availableTracks, presenter: topVC)
+        /// Дублирующий метод экспорта (используется для отдельных вызовов или context menu)
+        func exportCurrentTracks(to folder: URL) {
+            let availableTracks = tracks
+                .filter { $0.isAvailable }
+                .map { $0.asImportedTrack() }
+            
+            guard !availableTracks.isEmpty else {
+                print("⚠️ Нет доступных треков для экспорта")
+                return
+            }
+            
+            if let topVC = UIApplication.topViewController() {
+                ExportManager.shared.exportViaTempAndPicker(availableTracks, presenter: topVC)
+            }
+        }
+        
+        
+        // MARK: - Очистка плеера
+        
+        /// Очищает плейлист плеера и обновляет player.json
+        func clear() {
+            tracks = []
+            saveToDisk()
+            print("🗑️ Плеер очищен")
+        }
+        
+        
+        // MARK: - Удаление трека
+        
+        /// Удаляет трек и обновляет player.json
+        func remove(at index: Int) {
+            guard index >= 0 && index < tracks.count else { return }
+            
+            tracks.remove(at: index)
+            saveToDisk()
         }
     }
-    
-    
-    // MARK: - Очистка плеера
-    
-    /// Очищает плейлист плеера и обновляет player.json
-    func clear() {
-        tracks = []
-        saveToDisk()
-        print("🗑️ Плеер очищен")
-    }
-    
-    
-    // MARK: - Удаление трека
-    
-    /// Удаляет трек и обновляет player.json
-    func remove(at index: Int) {
-        guard index >= 0 && index < tracks.count else { return }
-        
-        tracks.remove(at: index)
-        saveToDisk()
-    }
-}
     
 
+extension PlayerTrack {
+    init?(from imported: ImportedTrack) {
+        guard let bookmarkBase64 = imported.bookmarkBase64,
+              let bookmarkData = Data(base64Encoded: bookmarkBase64) else {
+            return nil
+        }
+
+        var isStale = false
+        guard let url = try? URL(resolvingBookmarkData: bookmarkData, options: [.withoutUI, .withoutMounting], relativeTo: nil, bookmarkDataIsStale: &isStale), !isStale else {
+            return nil
+        }
+
+        self.init(
+            id: imported.id,
+            url: url,
+            artist: imported.artist,
+            title: imported.title,
+            duration: imported.duration,
+            fileName: imported.fileName,
+            isAvailable: true,
+            bookmarkBase64: bookmarkBase64
+        )
+    }
+}

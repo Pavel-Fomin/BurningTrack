@@ -63,34 +63,30 @@ final class PlayerManager {
         Task {
             do {
                 let resolvedURL: URL
-                
+
                 if let libraryTrack = track as? LibraryTrack {
                     print("📀 Это LibraryTrack")
-                    
-                    // Запрашиваем доступ к защищённому ресурсу
-                    guard let resolved = libraryTrack.startAccessingIfNeeded() else {
-                        return
-                    }
+                    guard let resolved = libraryTrack.startAccessingIfNeeded() else { return }
                     resolvedURL = resolved
-                
+
                 } else if let importedTrack = track as? ImportedTrack {
                     print("📥 Это ImportedTrack")
-                    
-                    // Запрашиваем доступ по bookmark'у
-                    guard importedTrack.startAccessingIfNeeded() else {
-                        return
-                    }
+                    guard importedTrack.startAccessingIfNeeded() else { return }
                     resolvedURL = try importedTrack.resolvedURL()
-                    
+
                 } else if let savedTrack = track as? Track {
                     print("💾 Это Track")
-                    
                     resolvedURL = savedTrack.url
+
+                } else if let playerTrack = track as? PlayerTrack {
+                    print("🎧 Это PlayerTrack")
+                    resolvedURL = playerTrack.url
+
                 } else {
+                    print("❌ Неизвестный тип трека: \(type(of: track))")
                     return
                 }
-                
-                // Упрощённый доступ — обычный URL
+
                 if resolvedURL == currentAccessedURL {
                     player.play()
                     return

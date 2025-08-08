@@ -17,28 +17,27 @@ struct TrackListView: View {
     
     
     var body: some View {
-        ZStack {
-            List {
-                TrackListRowsView(
-                    tracks: trackListViewModel.tracks,
-                    playerViewModel: playerViewModel,
-                    onTap: { track in
-                        if track.isAvailable {
-                            if (playerViewModel.currentTrackDisplayable as? Track)?.id == track.id {
-                                playerViewModel.togglePlayPause()
-                            } else {
-                                playerViewModel.play(track: track, context: trackListViewModel.tracks)
-                            }
-                        } else {
-                            print("❌ Трек недоступен: \(track.title ?? track.fileName)")
+            ZStack {
+                List {
+                    TrackListRowsView(
+                        tracks: trackListViewModel.tracks,
+                        playerViewModel: playerViewModel,
+                        onTap: { track in
+                            if track.isAvailable {
+                                if (playerViewModel.currentTrackDisplayable as? Track)?.id == track.id {
+                                    playerViewModel.togglePlayPause()
+                                } else {
+                                    playerViewModel.play(track: track, context: trackListViewModel.tracks)
+                                }
+                            } else {print("❌ Трек недоступен: \(track.title ?? track.fileName)")}
+                        },
+                        onDelete: { indexSet in
+                            trackListViewModel.removeTrack(at: indexSet)
+                        },
+                        onMove: { source, destination in
+                            trackListViewModel.moveTrack(from: source, to: destination)
                         }
-                    },
-                    onDelete: { indexSet in
-                        trackListViewModel.removeTrack(at: indexSet)
-                    },
-                    onMove: { source, destination in
-                        trackListViewModel.moveTrack(from: source, to: destination)
-                    }
+
                     
                 )
             }
@@ -80,14 +79,17 @@ private struct TrackListRowsView: View {
     
     var body: some View {
         ForEach(Array(tracks.enumerated()), id: \.element.id) { index, track in
+            let isCurrent = playerViewModel.isCurrent(track, in: .trackList)
+            let isPlaying = isCurrent && playerViewModel.isPlaying
+
             TrackListRowView(
                 track: track,
-                isCurrent: track.id == playerViewModel.currentTrackDisplayable?.id,
-                isPlaying: playerViewModel.isPlaying && track.id == playerViewModel.currentTrackDisplayable?.id,
+                isCurrent: isCurrent,
+                isPlaying: isPlaying,
                 onTap: { onTap(track) },
                 onDelete: { onDelete(IndexSet(integer: index)) }
             )
+            }
+            .onMove(perform: onMove)
         }
-        .onMove(perform: onMove)
     }
-}

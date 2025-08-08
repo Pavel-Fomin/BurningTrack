@@ -14,24 +14,12 @@ import SwiftUI
 struct PlayerPlaylistView: View {
     @ObservedObject private var manager = PlaylistManager.shared
     @ObservedObject var playerViewModel: PlayerViewModel
-
+    
     var body: some View {
         PlayerView(
-            tracks: manager.tracks,
-            currentTrack: playerViewModel.currentTrackDisplayable as? Track,
-            isPlaying: playerViewModel.isPlaying,
-            onTrackTap: { track in
-                            if let current = playerViewModel.currentTrackDisplayable as? Track,
-                               current.id == track.id {
-                                playerViewModel.togglePlayPause()
-                            } else {
-                                playerViewModel.play(
-                                    track: track,
-                                    context: manager.tracks
-                                )
-                            }
-                },
+            tracks: manager.tracks.map { $0 as any TrackDisplayable },
+            playerViewModel: playerViewModel
+        )
+                }
+            }
 
-            )
-        }
-    }

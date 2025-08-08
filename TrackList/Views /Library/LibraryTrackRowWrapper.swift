@@ -24,10 +24,10 @@ struct LibraryTrackRowWrapper: View {
     @EnvironmentObject var sheetManager: SheetManager
 
     var body: some View {
-        let isCurrent = playerViewModel.currentTrackDisplayable?.id == track.id
-        let isPlaying = isCurrent && playerViewModel.isPlaying
-        let trackListNames = trackListNamesByURL[track.url] ?? []
-
+        let isCurrent = playerViewModel.isCurrent(track, in: .library)
+            let isPlaying = isCurrent && playerViewModel.isPlaying
+            let trackListNames = trackListNamesByURL[track.url] ?? []
+        
         TrackRowView(
             track: track,
             isCurrent: isCurrent,
@@ -36,11 +36,11 @@ struct LibraryTrackRowWrapper: View {
             title: metadata?.title ?? track.original.title,
             artist: metadata?.artist ?? track.original.artist,
             onTap: {
-                if let current = playerViewModel.currentTrackDisplayable as? LibraryTrack,
-                   current.id == track.id {
+                if playerViewModel.isCurrent(track, in: .library) {
                     playerViewModel.togglePlayPause()
                 } else {
                     playerViewModel.play(track: track, context: allTracks)
+
                 }
             },
             trackListNames: trackListNames
@@ -56,18 +56,15 @@ struct LibraryTrackRowWrapper: View {
             Button {
                 let imported = track.original
 
-                let newTrack = Track(
-                    id: imported.id,
-                    url: track.url,
-                    artist: imported.artist,
-                    title: imported.title,
-                    duration: imported.duration,
-                    fileName: imported.fileName,
-                    isAvailable: true
-                )
+                if let playerTrack = PlayerTrack(from: imported) {
+                    PlaylistManager.shared.tracks.append(playerTrack)
+                    PlaylistManager.shared.saveToDisk()
 
-                PlaylistManager.shared.tracks.append(newTrack)
-                PlaylistManager.shared.saveToDisk()
+                    toast.show(ToastData(
+                        style: .track(title: track.title ?? track.fileName, artist: track.artist ?? ""),
+                        artwork: track.artwork
+                    ))
+                }
 
                 toast.show(ToastData(
                     style: .track(title: track.title ?? track.fileName, artist: track.artist ?? ""),

@@ -1,5 +1,5 @@
 //
-//  Track.swift
+//  TracListTrack.swift
 //  TrackList
 //
 //  Модель трека для воспроизведения и отображения.
