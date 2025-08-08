@@ -15,6 +15,7 @@ struct LibraryFolderView: View {
     @State private var metadataByURL: [URL: TrackMetadataCacheManager.CachedMetadata] = [:]
     @EnvironmentObject var sheetManager: SheetManager
     
+    @State private var isLoading: Bool = false
     
     private var allVisibleTracks: [LibraryTrack] {
         trackSections.flatMap { $0.tracks }
@@ -33,37 +34,49 @@ struct LibraryFolderView: View {
     
     var body: some View {
         ZStack {
-            List {
-                folderSectionView()
-                trackSectionsView()
-            }
-            .refreshable {
-                await refresh()
-            }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
-            .background(Color.clear)
-            .navigationTitle(folder.name)
-            .task {
-                await loadTracksIfNeeded()
-                loadTrackListNamesByURL()
-                
-            }
-        }
-        
-        .sheet(item: $sheetManager.trackToAdd) { track in
-                NavigationStack {
-                    AddToTrackListSheet(
-                        track: track,
-                        onComplete: {
-                            sheetManager.close()
-                            loadTrackListNamesByURL()
-                        }
-                    )
-                    .presentationDetents([.fraction(0.5)])
+            if isLoading {
+                VStack {
+                    Spacer()
+                    ProgressView("Загружаю треки")
+                        .progressViewStyle(CircularProgressViewStyle())
+                        .font(.headline)
+                        .padding()
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(.systemBackground))
+            } else {
+                List {
+                    folderSectionView()
+                    trackSectionsView()
+                }
+                .refreshable {
+                    await refresh()
+                }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .background(Color.clear)
+                .task {
+                    await loadTracksIfNeeded()
+                    loadTrackListNamesByURL()
                 }
             }
         }
+        .navigationTitle(folder.name) // теперь заголовок всегда показывается
+        .sheet(item: $sheetManager.trackToAdd) { track in
+            NavigationStack {
+                AddToTrackListSheet(
+                    track: track,
+                    onComplete: {
+                        sheetManager.close()
+                        loadTrackListNamesByURL()
+                    }
+                )
+                .presentationDetents([.fraction(0.5)])
+            }
+        }
+    }
+    
     
     
 // MARK: - Загрузка треков
@@ -156,13 +169,14 @@ struct LibraryFolderView: View {
     
     @MainActor
     private func refresh() async {
+        isLoading = true
+
         let urls = folder.audioFiles
         let libraryTracks = await MusicLibraryManager.shared.generateLibraryTracks(from: urls)
         let grouped = groupTracksByDate(libraryTracks)
-        
+
         trackSections = grouped
-        
-        // Загрузка метаданных
+
         for track in allVisibleTracks {
             if metadataByURL[track.resolvedURL] == nil {
                 Task {
@@ -174,7 +188,8 @@ struct LibraryFolderView: View {
                 }
             }
         }
-        
+
+        isLoading = false
     }
     
     
