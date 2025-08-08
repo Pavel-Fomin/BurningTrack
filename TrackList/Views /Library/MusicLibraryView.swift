@@ -16,14 +16,22 @@ struct MusicLibraryView: View {
     
     var body: some View {
         if manager.attachedFolders.isEmpty {
-            VStack {
+            VStack(spacing: 16) {
                 Spacer()
-                Text("Папка фонотеки не выбрана")
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity)
-                Spacer()
-            }
+                Button {
+                    onAddFolder()
+                } label: {
+                    Text("Выбрать папку")
+                        .fontWeight(.semibold)
+                        .padding(.horizontal, 0) // Ширина кнопки
+                        .padding(.vertical,0)     // Высота кнопки
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+            
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        
         } else {
             List {
                 ForEach(manager.attachedFolders) { folder in
