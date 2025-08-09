@@ -15,43 +15,27 @@ import UIKit
 
 
 final class MusicLibraryManager: ObservableObject {
+    static let shared = MusicLibraryManager()  /// Синглтон
     
-    /// Синглтон
-    static let shared = MusicLibraryManager()
+    init() {restoreAccess()} /// Восстанавливает доступ к сохранённым папкам
     
-    /// При инициализации сразу восстанавливает доступ к сохранённым папкам
-    init() {
-        restoreAccess()
-    }
-    
-    /// Очередь для потокобезопасного доступа к importedTrackCache
-    private let cacheQueue = DispatchQueue(label: "importedTrackCache.queue")
+    private let cacheQueue = DispatchQueue(label: "importedTrackCache.queue") /// Очередь для потокобезопасного доступа к importedTrackCache
     
     
     // MARK: - Bookmark и кэш
     
-    /// Ключ для UserDefaults (не используется, остался от старой реализации?)
-    private let bookmarkKey = "musicLibraryBookmark"
-    
-    /// Флаг, чтобы не дублировать startAccessing
-    private var isAccessing = false
-    
-    /// Абсолютный путь к директории приложения /Documents
-    private var appDirectory: URL? {
-        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
-    }
-    
-    /// Кэш импортированных треков по абсолютному пути (используется при повторном сканировании)
-    private var importedTrackCache: [String: ImportedTrack] = [:]
+    private let bookmarkKey = "musicLibraryBookmark"  /// Ключ для UserDefaults (не используется, остался от старой реализации?)
+    private var isAccessing = false                   /// Флаг, чтобы не дублировать startAccessing
+    private var appDirectory: URL? {FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first}  /// Абсолютный путь к директории приложения /Documents
+    private var importedTrackCache: [String: ImportedTrack] = [:]    /// Кэш импортированных треков по абсолютному пути (используется при повторном сканировании)
     
     /// Путь к JSON-файлу, в котором сохраняются bookmarkData всех прикреплённых папок
     private static var bookmarksFileURL: URL {
         let folder = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        return folder.appendingPathComponent("music_bookmarks.json")
-    }
+        return folder.appendingPathComponent("music_bookmarks.json")}
     
     
-// MARK: - Сохранение bookmarkData в файл
+    // MARK: - Сохранение bookmarkData в файл
     
     /// Сохраняет новый bookmark в общий bookmarks.json, избегая дублирования
     func saveBookmarkDataToFile(_ newData: Data) {
@@ -82,7 +66,7 @@ final class MusicLibraryManager: ObservableObject {
     }
     
     
-// MARK: - Публичные состояния
+    // MARK: - Публичные состояния
     
     @Published var folderURL: URL?                       /// Текущая активная папка (если одна)
     @Published var tracks: [URL] = []                    /// Все найденные треки (плоский список)
@@ -90,7 +74,7 @@ final class MusicLibraryManager: ObservableObject {
     @Published var attachedFolders: [LibraryFolder] = [] /// Прикреплённые папки с поддеревьями
     
     
-// MARK: -  Рекурсивный обход папки с вложенностью
+    // MARK: -  Рекурсивный обход папки с вложенностью
     
     /// Строит дерево LibraryFolder на основе структуры вложенных директорий
     /// - Parameter folderURL: Абсолютный путь к папке
@@ -124,7 +108,7 @@ final class MusicLibraryManager: ObservableObject {
     }
     
     
-// MARK: - Сохраняет bookmark
+    // MARK: - Сохраняет bookmark
     
     /// Сохраняет bookmark для выбранной папки и строит по ней дерево
     func saveBookmark(for url: URL) {
@@ -140,7 +124,6 @@ final class MusicLibraryManager: ObservableObject {
                 DispatchQueue.main.async {
                     self.folderURL = url
                     self.tracks = [] /// очищаем список треков, если он использовался
-                    self.rootFolder = self.buildFolderTree(from: url)
                 }
             } catch {
                 print("❌ Не удалось создать bookmarkData: \(error)")
@@ -151,7 +134,7 @@ final class MusicLibraryManager: ObservableObject {
     }
     
     
-// MARK: - Загрузка массива bookmarkData из файла
+    // MARK: - Загрузка массива bookmarkData из файла
     
     /// Загружает сохранённый массив bookmarkData из JSON
     private func loadBookmarkDataFromFile() -> [Data]? {
@@ -171,15 +154,22 @@ final class MusicLibraryManager: ObservableObject {
         }
     }
     
+    // MARK: - Хелпер
     
-// MARK: - Восстанавливает доступ к ранее прикреплённым папкам
-
+    private func liteFolder(from url: URL) -> LibraryFolder {
+        LibraryFolder(
+            name: url.lastPathComponent,
+            url: url,
+            subfolders: [],   // подпапки — лениво
+            audioFiles: []    // файлы — лениво
+        )
+    }
+    
+    
+    // MARK: - Восстанавливает доступ к ранее прикреплённым папкам
+    
     /// Восстанавливает доступ к прикреплённым папкам при запуске
     func restoreAccess() {
-        
-        // Очистим предыдущие данные
-            attachedFolders = []
-            tracks = []
         
         guard let dataArray = loadBookmarkDataFromFile() else {
             print("ℹ️ Bookmarks не найдены")
@@ -209,28 +199,24 @@ final class MusicLibraryManager: ObservableObject {
             }
         }
         
-        // Создаём дерево для каждой папки
-        for url in urls {
-            DispatchQueue.main.async {
-                let newFolder = self.buildFolderTree(from: url)
-                self.attachedFolders.append(newFolder)
-                self.tracks.append(contentsOf: newFolder.audioFiles)
-            }
+        DispatchQueue.main.async {
+            self.attachedFolders = urls.map { self.liteFolder(from: $0) }
         }
+        
     }
     
-// MARK: - Удаление bookmarkData по URL
+    // MARK: - Удаление bookmarkData по URL
     
     /// Удаляет сохранённый bookmark и обновляет список папок в UI
     func removeBookmark(for folderURL: URL) {
         let url = Self.bookmarksFileURL
-
+        
         guard let data = try? Data(contentsOf: url),
               var existing = try? JSONDecoder().decode([Data].self, from: data) else {
             print("⚠️ Не удалось загрузить bookmarkData для удаления")
             return
         }
-
+        
         // Удаляем совпадающий bookmark по url
         existing.removeAll { data in
             var isStale = false
@@ -253,7 +239,7 @@ final class MusicLibraryManager: ObservableObject {
         } catch {
             print("❌ Не удалось сохранить обновлённый список bookmarks")
         }
-
+        
         // Обновим список в UI
         DispatchQueue.main.async {
             self.attachedFolders.removeAll { $0.url == folderURL }
@@ -261,8 +247,26 @@ final class MusicLibraryManager: ObservableObject {
         }
     }
     
+    // MARK: - Загрузка подпапок для папки (ленивая)
     
-// MARK: - Генерация LibraryTrack объектов для отображения
+    func loadSubfolders(for folderURL: URL) -> [LibraryFolder] {
+        let fileManager = FileManager.default
+        var result: [LibraryFolder] = []
+        
+        if let contents = try? fileManager.contentsOfDirectory(at: folderURL, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles]) {
+            for item in contents {
+                var isDirectory: ObjCBool = false
+                if fileManager.fileExists(atPath: item.path, isDirectory: &isDirectory), isDirectory.boolValue {
+                    result.append(liteFolder(from: item))
+                }
+            }
+        }
+        return result
+    }
+    
+    
+    
+    // MARK: - Генерация LibraryTrack объектов для отображения
     
     /// Асинхронно преобразует массив URL-ов в массив LibraryTrack, включая парсинг тегов и создание bookmark
     func generateLibraryTracks(from urls: [URL]) async -> [LibraryTrack] {
@@ -291,7 +295,7 @@ final class MusicLibraryManager: ObservableObject {
                     // Bookmark для доступа к файлу
                     let bookmarkData = try? url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
                     let bookmarkBase64 = bookmarkData?.base64EncodedString() ?? ""
-
+                    
                     // Проверка кэша
                     let imported: ImportedTrack
                     let filePath = url.path
@@ -302,7 +306,7 @@ final class MusicLibraryManager: ObservableObject {
                     
                     if let cached {
                         imported = cached
-                    
+                        
                     } else {
                         let newTrack = ImportedTrack(
                             id: UUID(uuidString: url.lastPathComponent) ?? UUID(),
@@ -318,12 +322,12 @@ final class MusicLibraryManager: ObservableObject {
                         cacheQueue.sync {
                             importedTrackCache[filePath] = newTrack
                         }
-                            imported = newTrack
+                        imported = newTrack
                     }
                     
                     let resolvedURL = SecurityScopedBookmarkHelper.resolveURL(from: bookmarkBase64) ?? url
                     let isAvailable = FileManager.default.fileExists(atPath: resolvedURL.path)
-
+                    
                     return LibraryTrack(
                         url: url,
                         resolvedURL: resolvedURL,
@@ -340,7 +344,7 @@ final class MusicLibraryManager: ObservableObject {
                     )
                 }
             }
-
+            
             var results: [LibraryTrack] = []
             for await result in group {
                 if let track = result {
@@ -350,4 +354,5 @@ final class MusicLibraryManager: ObservableObject {
             return results
         }
     }
+    
 }

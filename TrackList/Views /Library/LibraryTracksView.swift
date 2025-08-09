@@ -12,10 +12,11 @@ import SwiftUI
 struct LibraryTracksView: View {
     let folder: LibraryFolder                                  // Папка, из которой отображаются треки
     let trackListViewModel: TrackListViewModel                 // Треклист для свайпов/добавлений
+    
     @ObservedObject var playerViewModel: PlayerViewModel       // Плеер
     @StateObject private var viewModel: LibraryFolderViewModel // ViewModel для загрузки треков
-    @EnvironmentObject var sheetManager: SheetManager          // Для отображения шита "Добавить в треклист"
-    
+    @EnvironmentObject var sheetManager: SheetManager          // Sheet "Добавить в треклист"
+    @StateObject private var scrollSpeed = ScrollSpeedModel(thresholdPtPerSec: 1500, debounceMs: 180) // Скорость скролла
     
     // MARK: - Инициализация с передачей зависимостей и созданием viewModel
     
@@ -30,7 +31,7 @@ struct LibraryTracksView: View {
     
     var body: some View {
         ZStack {
-            // Список показываем всегда…
+            // Список показываем всегда
             List {
                 LibraryTrackSectionsListView(
                     sections: viewModel.trackSections,
@@ -38,15 +39,17 @@ struct LibraryTracksView: View {
                     trackListViewModel: trackListViewModel,
                     trackListNamesByURL: viewModel.trackListNamesByURL,
                     metadataByURL: viewModel.metadataByURL,
-                    playerViewModel: playerViewModel
+                    playerViewModel: playerViewModel,
+                    isScrollingFast: scrollSpeed.isFast
                 )
             }
             .transaction { $0.animation = nil }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
             .background(Color.clear)
+            .overlay(ScrollSpeedObserver(model: scrollSpeed))
             
-            // …а фуллскрин-лоадер — только на самой первой загрузке
+            // Фуллскрин-лоадер — только на самой первой загрузке
             if viewModel.isLoading && viewModel.trackSections.isEmpty {
                 VStack {
                     Spacer()
@@ -64,15 +67,16 @@ struct LibraryTracksView: View {
         /// pull-to-refresh — без фуллскрина
         .refreshable {
             await viewModel.refresh()
-            viewModel.loadTrackListNamesByURL()
+            viewModel.loadTrackListNamesIfNeeded()
         }
         
         /// триггерим первую загрузку
         .task(id: folder.url) {
             await viewModel.loadTracksIfNeeded()
-            viewModel.loadTrackListNamesByURL()
-
+            viewModel.loadTrackListNamesIfNeeded()
         }
+        
+        
         .navigationTitle(folder.name)
         .sheet(item: $sheetManager.trackToAdd) { track in
             NavigationStack {

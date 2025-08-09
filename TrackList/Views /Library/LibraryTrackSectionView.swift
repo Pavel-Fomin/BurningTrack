@@ -19,7 +19,7 @@ struct LibraryTrackSectionView: View {
     let artworkByURL: [URL: UIImage]
     let playerViewModel: PlayerViewModel
     let metadataByURL: [URL: TrackMetadataCacheManager.CachedMetadata]
-    
+    let isScrollingFast: Bool
     
     @EnvironmentObject var toast: ToastManager
     @EnvironmentObject var sheetManager: SheetManager
@@ -36,7 +36,8 @@ struct LibraryTrackSectionView: View {
                     trackListViewModel: trackListViewModel,
                     trackListNamesByURL: trackListNamesByURL,
                     metadata: metadataByURL[track.resolvedURL],
-                    playerViewModel: playerViewModel
+                    isScrollingFast: isScrollingFast,
+                    playerViewModel: playerViewModel          
                 )
                 .environmentObject(toast)
                 .environmentObject(sheetManager)

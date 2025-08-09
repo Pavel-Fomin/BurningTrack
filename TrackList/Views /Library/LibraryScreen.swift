@@ -13,7 +13,7 @@ struct LibraryScreen: View {
     @State private var isShowingFolderPicker = false
     private let musicLibraryManager = MusicLibraryManager.shared
     @State private var path: [LibraryFolder] = []
-    @State private var didRestoreAccess = false
+    @State private var didWarmUp = false
     
     let playerViewModel: PlayerViewModel
     let trackListViewModel: TrackListViewModel
@@ -48,12 +48,6 @@ struct LibraryScreen: View {
                     )
                 }
 
-                .onAppear {
-                    guard !didRestoreAccess else { return }
-                    musicLibraryManager.restoreAccess()
-                    didRestoreAccess = true
-                }
-
                 .fileImporter(
                     isPresented: $isShowingFolderPicker,
                     allowedContentTypes: [.folder],
@@ -69,6 +63,15 @@ struct LibraryScreen: View {
                         print("❌ Ошибка выбора папки: \(error.localizedDescription)")
                     }
                 }
+            }
+            .task(id: didWarmUp) {
+                guard !didWarmUp else { return }
+                didWarmUp = true
+
+                // всё тяжёлое — строго не на main
+                await Task.detached(priority: .utility) {
+                    MusicLibraryManager.shared.restoreAccess()
+                }.value
             }
             
         }

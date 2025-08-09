@@ -10,7 +10,6 @@
 
 import SwiftUI
 
-
 /// Экран конкретной папки фонотеки.
 /// Отвечает ТОЛЬКО за навигацию по подпапкам.
 /// Если подпапок нет — рендерит экран треков (LibraryTracksView).
@@ -32,25 +31,22 @@ struct LibraryFolderView: View {
 
     var body: some View {
         Group {
-            if viewModel.folder.subfolders.isEmpty {
-                
-                // Нет подпапок → показываем экран треков этой папки
+            if viewModel.subfolders.isEmpty {
+                // Нет подпапок → экран треков
                 LibraryTracksView(
-                        folder: viewModel.folder,
-                        trackListViewModel: trackListViewModel,
-                        playerViewModel: playerViewModel
+                    folder: viewModel.folder,
+                    trackListViewModel: trackListViewModel,
+                    playerViewModel: playerViewModel
                 )
             } else {
-                
-                // Есть подпапки → показываем только их
-                List {
-                    folderSectionView()
-                }
-                .listStyle(.insetGrouped)
-                .scrollContentBackground(.hidden)
-                .background(Color.clear)
-                .navigationTitle(folder.name)
+                // Есть подпапки → показываем их
+                List { folderSectionView() }
+                    .listStyle(.insetGrouped)
+                    .navigationTitle(viewModel.folder.name)
             }
+        }
+        .task(id: viewModel.folder.url) { 
+            viewModel.loadSubfoldersIfNeeded()
         }
     }
 
@@ -60,7 +56,7 @@ struct LibraryFolderView: View {
     @ViewBuilder
     private func folderSectionView() -> some View {
         Section {
-            ForEach(folder.subfolders) { subfolder in
+            ForEach(viewModel.subfolders) { subfolder in
                 NavigationLink(
                     destination: LibraryFolderView(
                         folder: subfolder,
@@ -72,11 +68,9 @@ struct LibraryFolderView: View {
                         Image(systemName: "folder.fill")
                             .foregroundColor(.blue)
                             .frame(width: 24)
-                        Text(subfolder.name)
-                            .lineLimit(1)
+                        Text(subfolder.name).lineLimit(1)
                     }
                     .padding(.vertical, 4)
-                    
                 }
             }
         }

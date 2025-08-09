@@ -12,6 +12,15 @@
 #import "TLTagLibFile.h"
 #import <tag_c/tag_c.h>
 
+
+static inline void TLTagLibSetup(void) {
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        taglib_set_string_management_enabled(false);
+    });
+}
+
+
 // MARK: - Реализация класса результата
 
 @implementation TLTagLibFileResult
@@ -19,11 +28,14 @@
 
 @end
 
+
 // MARK: - Главная функция чтения тегов
 
 // Читает метаданные из указанного аудиофайла с помощью TagLib
 // Возвращает объект TLTagLibFileResult или nil при ошибке
 TLTagLibFileResult *_readMetadata(NSString *filePath) {
+    
+    TLTagLibSetup();
     
     const char *cPath = [filePath fileSystemRepresentation];
     TagLib_File *file = taglib_file_new(cPath);
@@ -67,7 +79,7 @@ TLTagLibFileResult *_readMetadata(NSString *filePath) {
     }
 
     // Очистка
-    taglib_tag_free_strings();
+    // taglib_tag_free_strings(); // больше не вызываем
     taglib_file_free(file);
 
     return result;

@@ -16,6 +16,7 @@ struct LibraryTrackRowWrapper: View {
     let trackListViewModel: TrackListViewModel
     let trackListNamesByURL: [URL: [String]]
     let metadata: TrackMetadataCacheManager.CachedMetadata?
+    let isScrollingFast: Bool
     
     @State private var artwork: CGImage? = nil
     
@@ -46,10 +47,42 @@ struct LibraryTrackRowWrapper: View {
             trackListNames: trackListNames
         )
         
-            // Ленивая загрузка обложки, только если ещё не загружена
-            .task(id: track.url) {
-                artwork = await ArtworkLoader.loadIfNeeded(current: artwork, url: track.url)
+        // Ленивая загрузка обложки, только если ещё не загружена
+        .task(id: track.url) {
+            if isScrollingFast { return } // при «полёте» не грузим
+
+            // грузим вне main, потом обновляем стейт на main
+            let img = await Task.detached(priority: .utility) {
+                await ArtworkLoader.loadIfNeeded(current: artwork, url: track.url)
+            }.value
+            if let img { await MainActor.run { artwork = img } }
+
+            // теги подтягиваем, если их нет (чтобы не зависеть от VM-префетча)
+            if metadata == nil {
+                _ = await TrackMetadataCacheManager.shared.loadMetadata(for: track.url)
+                // UI сам подхватит из кэша через твои биндинги/перерисовку
             }
+        }
+        
+        
+        .onChange(of: isScrollingFast) { _, nowFast in
+            guard nowFast == false else { return }  // закончился «полёт» — догружаем
+            Task {
+                let img = await Task.detached(priority: .utility) {
+                    await ArtworkLoader.loadIfNeeded(current: artwork, url: track.url)
+                }.value
+                if let img { await MainActor.run { artwork = img } }
+
+                if metadata == nil {
+                    _ = await TrackMetadataCacheManager.shared.loadMetadata(for: track.url)
+                }
+            }
+        }
+        
+        // .onDisappear {
+        //     // отменяем/чистим, если есть поддержка отмены в лоадере
+        //     // ArtworkLoader.cancelLoad(for: track.url)
+        // }
         
         
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {

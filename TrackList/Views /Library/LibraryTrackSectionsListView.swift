@@ -16,6 +16,7 @@ struct LibraryTrackSectionsListView: View {
     let trackListNamesByURL: [URL: [String]]
     let metadataByURL: [URL: TrackMetadataCacheManager.CachedMetadata]
     let playerViewModel: PlayerViewModel
+    let isScrollingFast: Bool
 
     var body: some View {
         ForEach(sections, id: \.id) { section in
@@ -27,7 +28,8 @@ struct LibraryTrackSectionsListView: View {
                 trackListNamesByURL: trackListNamesByURL,
                 artworkByURL: [:],
                 playerViewModel: playerViewModel,
-                metadataByURL: metadataByURL
+                metadataByURL: metadataByURL,
+                isScrollingFast: isScrollingFast
             )
         }
     }
