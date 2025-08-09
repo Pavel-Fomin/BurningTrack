@@ -13,6 +13,7 @@ struct LibraryScreen: View {
     @State private var isShowingFolderPicker = false
     private let musicLibraryManager = MusicLibraryManager.shared
     @State private var path: [LibraryFolder] = []
+    @State private var didRestoreAccess = false
     
     let playerViewModel: PlayerViewModel
     let trackListViewModel: TrackListViewModel
@@ -30,6 +31,7 @@ struct LibraryScreen: View {
 
                     MusicLibraryView(
                         path: $path,
+                        trackListViewModel: trackListViewModel,
                         playerViewModel: playerViewModel,
                         onAddFolder: {
                             isShowingFolderPicker = true
@@ -47,8 +49,9 @@ struct LibraryScreen: View {
                 }
 
                 .onAppear {
+                    guard !didRestoreAccess else { return }
                     musicLibraryManager.restoreAccess()
-                    
+                    didRestoreAccess = true
                 }
 
                 .fileImporter(

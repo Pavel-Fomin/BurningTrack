@@ -2,6 +2,9 @@
 //  MusicLibraryView.swift
 //  TrackList
 //
+//  Главный экран фонотеки. Показывает корневые папки (attachedFolders)
+//  При клике — переходит в LibraryFolderView
+//
 //  Created by Pavel Fomin on 22.06.2025.
 //
 
@@ -11,33 +14,27 @@ import UniformTypeIdentifiers
 struct MusicLibraryView: View {
     @Binding var path: [LibraryFolder]
     @StateObject private var manager = MusicLibraryManager.shared
+    
+    let trackListViewModel: TrackListViewModel
     let playerViewModel: PlayerViewModel
     let onAddFolder: () -> Void
     
+    
     var body: some View {
         if manager.attachedFolders.isEmpty {
-            VStack(spacing: 16) {
+            VStack {
                 Spacer()
-                Button {
-                    onAddFolder()
-                } label: {
-                    Text("Выбрать папку")
-                        .fontWeight(.semibold)
-                        .padding(.horizontal, 0) // Ширина кнопки
-                        .padding(.vertical,0)     // Высота кнопки
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
+                Button("Выбрать папку", action: onAddFolder)
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                Spacer()
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-        
         } else {
             List {
                 ForEach(manager.attachedFolders) { folder in
-                    Button {
-                        path.append(folder)
-                    } label: {
+                    NavigationLink(value: folder) {
                         HStack(spacing: 12) {
                             Image(systemName: "folder.fill")
                                 .foregroundColor(.blue)
@@ -46,6 +43,7 @@ struct MusicLibraryView: View {
                                 .lineLimit(1)
                         }
                         .padding(.vertical, 4)
+                        
                     }
                     .swipeActions(edge: .trailing) {
                         Button(role: .destructive) {
@@ -55,6 +53,7 @@ struct MusicLibraryView: View {
                         }
                     }
                 }
+
                 Button(action: onAddFolder) {
                     HStack(spacing: 12) {
                         Image(systemName: "folder.fill.badge.plus")
@@ -65,6 +64,9 @@ struct MusicLibraryView: View {
                     .padding(.vertical, 4)
                 }
             }
+            
         }
+        
     }
+    
 }
