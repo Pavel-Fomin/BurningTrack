@@ -8,6 +8,7 @@
 //
 
 import SwiftUI
+import UIKit
 import Foundation
 
 struct TrackRowView: View {
@@ -78,23 +79,82 @@ struct TrackRowView: View {
     private var artworkView: some View {
         ZStack {
             if let artwork = artwork {
-                Image(decorative: artwork, scale: 1.0, orientation: .up)
-                    .resizable()
-                    .frame(width: 48, height: 48)
-                    .cornerRadius(48)
-                
+                RotatingArtworkLayerView(
+                    image: UIImage(cgImage: artwork),
+                    isActive: isCurrent,
+                    isPlaying: isPlaying,
+                    size: 48,
+                    rpm: 10 // скорость ~10 оборотов/мин (≈60°/сек)
+                )
+                .frame(width: 48, height: 48)
             } else {
-                Rectangle()
+                Circle()
                     .fill(Color.gray.opacity(0.3))
                     .frame(width: 48, height: 48)
-                    .cornerRadius(48)
+                
+                // Иконка показывается ТОЛЬКО у плейсхолдера
+                if isCurrent {
+                    Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                        .foregroundColor(.accentColor)
+                        .font(.system(size: 16, weight: .semibold))
+                        .shadow(radius: 1)
+                }
             }
+        }
+    }
+    
+    
+// MARK: - Вращение обложки
+    
+    private struct RotatingIfActive: ViewModifier {
+        let isActive: Bool
+        let isPlaying: Bool
+        let speed: Double = 30 // градусов/сек
 
-            if isCurrent {
-                Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                    .foregroundColor(.accentColor)
-                    .font(.system(size: 16, weight: .semibold))
-                    .shadow(radius: 1)
+        @State private var pausedAngle: Double = 0
+        @State private var playStartDate: Date? = nil
+
+        func body(content: Content) -> some View {
+            TimelineView(.periodic(from: .now, by: 1.0 / 60.0)) { timeline in
+                let now = timeline.date
+                let angle: Double = {
+                    guard isActive else { return 0 } // неактивные — без поворота
+                    if let start = playStartDate {
+                        let delta = now.timeIntervalSince(start) * speed
+                        return fmod(pausedAngle + delta, 360)
+                    } else {
+                        return pausedAngle
+                    }
+                }()
+
+                content
+                    .rotationEffect(.degrees(angle), anchor: .center)
+                    // без .animation — дерганье уходит
+            }
+            .onAppear {
+                if isActive && isPlaying { playStartDate = Date() }
+            }
+            .onChange(of: isPlaying) { _, newValue in
+                guard isActive else { return }
+                if newValue {
+                    playStartDate = Date()
+                } else {
+                    if let start = playStartDate {
+                        let delta = Date().timeIntervalSince(start) * speed
+                        pausedAngle = fmod(pausedAngle + delta, 360)
+                    }
+                    playStartDate = nil
+                }
+            }
+            .onChange(of: isActive) { _, active in
+                // при смене активной строки — сброс старой и старт новой
+                if active {
+                    pausedAngle = 0
+                    playStartDate = isPlaying ? Date() : nil
+                } else {
+                    pausedAngle = 0
+                    playStartDate = nil
+                }
             }
         }
     }
