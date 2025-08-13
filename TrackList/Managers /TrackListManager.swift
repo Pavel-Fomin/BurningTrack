@@ -222,3 +222,6 @@ final class TrackListManager {
     
 }
 
+extension Notification.Name {
+    static let trackListsDidChange = Notification.Name("trackListsDidChange")
+}

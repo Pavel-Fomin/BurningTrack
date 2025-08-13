@@ -48,41 +48,20 @@ struct LibraryTrackRowWrapper: View {
         )
         
         // Ленивая загрузка обложки, только если ещё не загружена
-        .task(id: track.url) {
-            if isScrollingFast { return } // при «полёте» не грузим
+        // СТАЛО — один вызов, без Task.detached
+        .task(id: track.url.absoluteString + "|" + (isScrollingFast ? "1" : "0")) {
+            if isScrollingFast { return }
+            if artwork != nil { return }
 
-            // грузим вне main, потом обновляем стейт на main
-            let img = await Task.detached(priority: .utility) {
-                await ArtworkLoader.loadIfNeeded(current: artwork, url: track.url)
-            }.value
+            try? await Task.sleep(nanoseconds: 60_000_000)
+
+            let img = await ArtworkLoader.loadIfNeeded(current: artwork, url: track.url)
             if let img { await MainActor.run { artwork = img } }
 
-            // теги подтягиваем, если их нет (чтобы не зависеть от VM-префетча)
             if metadata == nil {
                 _ = await TrackMetadataCacheManager.shared.loadMetadata(for: track.url)
-                // UI сам подхватит из кэша через твои биндинги/перерисовку
             }
         }
-        
-        
-        .onChange(of: isScrollingFast) { _, nowFast in
-            guard nowFast == false else { return }  // закончился «полёт» — догружаем
-            Task {
-                let img = await Task.detached(priority: .utility) {
-                    await ArtworkLoader.loadIfNeeded(current: artwork, url: track.url)
-                }.value
-                if let img { await MainActor.run { artwork = img } }
-
-                if metadata == nil {
-                    _ = await TrackMetadataCacheManager.shared.loadMetadata(for: track.url)
-                }
-            }
-        }
-        
-        // .onDisappear {
-        //     // отменяем/чистим, если есть поддержка отмены в лоадере
-        //     // ArtworkLoader.cancelLoad(for: track.url)
-        // }
         
         
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {

@@ -16,6 +16,7 @@ final class LibraryFolderViewModel: ObservableObject {
     private let allowedAudioExts: Set<String> = ["mp3","flac","wav","aiff","aac","m4a","ogg"]
     private let initialParseCount = 20   // подберём позже (20–40)
     
+    
     @Published var trackSections: [TrackSection] = []          /// Группы треков по дате
     @Published var trackListNamesByURL: [URL: [String]] = [:]  /// Соответствие: URL → [названия треклистов, в которых есть трек]
     @Published var metadataByURL: [URL: TrackMetadataCacheManager.CachedMetadata] = [:]  /// Кеш метаданных (artist, title, duration и др.)
@@ -23,269 +24,243 @@ final class LibraryFolderViewModel: ObservableObject {
     @Published private(set) var didLoad: Bool = false
     @Published private(set) var didLoadTrackListNames = false
     @Published var subfolders: [LibraryFolder] = []
+    
+    // Сохраняем список файлов последнего скана — чтобы считать tail без повторного сканирования
+    private var lastScannedURLs: [URL] = []
 
+    // Управление хвостовой подгрузкой
+    @Published private(set) var didStartTailWarmup = false
+    private var tailWarmupTask: Task<Void, Never>?
+
+    // Для удобства в UI
+    var headCount: Int { min(initialParseCount, trackSections.flatMap { $0.tracks }.count) }
+    
     func loadSubfoldersIfNeeded() {
         guard subfolders.isEmpty else { return }
         subfolders = MusicLibraryManager.shared.loadSubfolders(for: folder.url)
     }
     
-    init(folder: LibraryFolder) {self.folder = folder}
+    private var trackListsObserver: NSObjectProtocol?
+        
+    init(folder: LibraryFolder) {
+        self.folder = folder
+        trackListsObserver = NotificationCenter.default.addObserver(
+            forName: .trackListsDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            // замыкание синхронное → внутри создаём async‑задачу на MainActor
+            Task { @MainActor [weak self] in
+                self?.loadTrackListNamesByURL()
+            }
+        }
+    }
     
     
-// MARK: - Префетч артов с лимитом параллельных задач
-    private func prefetchArtwork(urls: [URL], limit: Int = 6) {
+    // MARK: - Префетч артов с лимитом параллельных задач
+    
+    private func prefetchArtwork(urls: [URL], limit: Int = 1) {
         guard !urls.isEmpty else { return }
         Task.detached(priority: .userInitiated) {
-            var active = 0
-            await withTaskGroup(of: Void.self) { group in
-                for u in urls {
-                    while active >= limit { await Task.yield() }
-                    active += 1
-                    group.addTask {
-                        _ = await ArtworkLoader.loadIfNeeded(current: nil, url: u)
-                        active -= 1
+            var i = 0
+            while i < urls.count {
+                let end = min(i + limit, urls.count)
+                let chunk = Array(urls[i..<end])
+                await withTaskGroup(of: Void.self) { group in
+                    for u in chunk {
+                        group.addTask { _ = await ArtworkLoader.loadIfNeeded(current: nil, url: u) }
                     }
                 }
+                i = end
             }
         }
     }
     
     
-// MARK: - Загружает треки из папки и группирует по дате
+    // MARK: - Загружает треки из папки и группирует по дате
     
     func refresh() async {
-        isLoading = true
-
-        // 1) сканируем текущую папку (без рекурсии)
-        let urls = scanFolderURLs(recursive: false)
-
-        // 2) быстрые "лёгкие" модели — без AVAsset/MetadataParser
-        //    только базовые поля, чтобы мгновенно показать список
-        var shallow: [LibraryTrack] = []
-        shallow.reserveCapacity(urls.count)
-
-        for url in urls {
-            let accessed = url.startAccessingSecurityScopedResource()
-            defer { if accessed { url.stopAccessingSecurityScopedResource() } }
-
-            let rv = try? url.resourceValues(forKeys: [.creationDateKey, .contentModificationDateKey])
-            let addedDate = rv?.creationDate ?? rv?.contentModificationDate ?? Date()
-
-            // Минимально корректные поля для UI/плеера
-            let bookmarkData = try? url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
-            let bookmarkBase64 = bookmarkData?.base64EncodedString() ?? ""
-            let resolvedURL = SecurityScopedBookmarkHelper.resolveURL(from: bookmarkBase64) ?? url
-            let isAvailable = FileManager.default.fileExists(atPath: resolvedURL.path)
-
-            let titleFromFile = url.deletingPathExtension().lastPathComponent
-
-            let imported = ImportedTrack(
-                id: UUID(uuidString: url.lastPathComponent) ?? UUID(),
-                fileName: url.lastPathComponent,
-                filePath: url.path,
-                orderPrefix: "",
-                title: titleFromFile,
-                artist: nil,
-                album: nil,
-                duration: 0,
-                bookmarkBase64: bookmarkBase64
-            )
-
-            shallow.append(
-                LibraryTrack(
-                    url: url,
-                    resolvedURL: resolvedURL,
-                    isAvailable: isAvailable,
-                    bookmarkBase64: bookmarkBase64,
-                    title: titleFromFile,
-                    artist: nil,
-                    duration: 0,
-                    artwork: nil,
-                    addedDate: addedDate,
-                    original: imported
-                )
-            )
-        }
-
-        // 3) публикуем список сразу — убираем фуллскрин-лоадер
-        withAnimation(nil) {
-            self.trackSections = Self.groupTracksByDate(shallow)
-            self.isLoading = false
-        }
-        
-        // Префетч мини-артов для первых ~2–4 экранов
-        prefetchArtwork(urls: Array(self.trackSections.flatMap { $0.tracks }.prefix(20).map { $0.url }))
-        
-        // 4) префетч первых N треков — метаданные + мини-арт (в фоне, с нашими лимитами)
-        let head = Array(urls.prefix(initialParseCount))
-        Task(priority: .utility) { [weak self] in
-            guard let self else { return }
-            await withTaskGroup(of: Void.self) { group in
-                let limit = 6
-                var active = 0
-                
-                for u in head {
-                    while active >= limit {
-                        await Task.yield()
-                    }
-                    active += 1
-                    
-                    group.addTask {
-                        if let meta = await TrackMetadataCacheManager.shared.loadMetadata(for: u) {
-                            await MainActor.run { self.metadataByURL[u] = meta }
-                        }
-                        _ = await ArtworkLoader.loadIfNeeded(current: nil, url: u)
-                        active -= 1
-                    }
-                }
-            }
-        }
+        await refreshFastStart(firstCount: initialParseCount)
     }
     
     
-// MARK: -  Быстрый старт: парсим первые N треков, фоном — остальное
-    
+    // MARK: - Быстрый старт: сначала первые N, потом остальное, со стабильным порядком
     func refreshFastStart(firstCount: Int) async {
         isLoading = true
 
-        // 1) локально сканим папку (без рекурсии)
         let urls = scanFolderURLs(recursive: false)
+        let orderMap: [URL:Int] = Dictionary(uniqueKeysWithValues:
+            urls.enumerated().map { ($0.element, $0.offset) }
+        )
+        self.lastScannedURLs = urls
+
         let head = Array(urls.prefix(firstCount))
         let tail = Array(urls.dropFirst(firstCount))
 
-        // 2) первые N — сразу
-        let firstSections: [TrackSection] = await Task.detached(priority: .userInitiated) { [head] in
+        // ранний префетч обложек для head
+        //prefetchArtwork(urls: head, limit: 6)
+
+        // показываем первые N
+        let firstSections: [TrackSection] = await Task.detached(priority: .userInitiated) { [head, orderMap] in
             let tracks = await MusicLibraryManager.shared.generateLibraryTracks(from: head)
-            return Self.groupTracksByDate(tracks)
+            return Self.groupTracksByDate(tracks, order: orderMap)
         }.value
 
-        withAnimation(nil) { self.trackSections = firstSections }
-        self.isLoading = false
+        withAnimation(nil) {
+            self.trackSections = firstSections
+            self.isLoading = false
+        }
 
-        // 2.1) Префетч мини-артов для первых ~2–4 экранов (параллельно)
-        prefetchArtwork(urls: Array(self.trackSections.flatMap { $0.tracks }.prefix(20).map { $0.url }))
-
-        // 3) хвост — в фоне, потом одним присвоением
-        let restSections: [TrackSection] = await Task.detached(priority: .utility) { [tail] in
+       
+        // грузим tail (треки)
+        let restTracks: [LibraryTrack] = await Task.detached(priority: .utility) { [tail] in
             guard !tail.isEmpty else { return [] }
-            let restTracks = await MusicLibraryManager.shared.generateLibraryTracks(from: tail)
-            return Self.groupTracksByDate(restTracks)
+            return await MusicLibraryManager.shared.generateLibraryTracks(from: tail)
         }.value
 
-        // склеиваем: пересчитываем из объединённого массива
-        let allTracks = firstSections.flatMap { $0.tracks } + restSections.flatMap { $0.tracks }
-        let grouped = Self.groupTracksByDate(allTracks)
-        await MainActor.run {
-            withAnimation(nil) { self.trackSections = grouped }
+        // дождались head-метаданных — пересчитываем плашки ОДИН РАЗ
+        _ = headCount
+        await MainActor.run { self.loadTrackListNamesByURL() }
+
+        guard !restTracks.isEmpty else { return }
+
+        let allTracks = firstSections.flatMap { $0.tracks } + restTracks
+        let grouped = Self.groupTracksByDate(allTracks, order: orderMap)
+        await MainActor.run { withAnimation(nil) { self.trackSections = grouped } }
+
+        // ПРОГРЕВ МЕТАДАННЫХ ДЛЯ TAIL -> ещё один пересчёт плашек
+        Task.detached { [weak self] in
+            guard let self else { return }
+            await MainActor.run { self.loadTrackListNamesByURL() }
         }
     }
     
-// MARK: - Загружает названия треклистов, в которых встречаются треки из этой папки
+    // MARK: - Загружает названия треклистов, в которых встречаются треки из этой папки
     
     func loadTrackListNamesByURL() {
-        var result: [URL: [String]] = [:]
+        // какие URL сейчас на экране
+        let urlsInView = trackSections.flatMap { $0.tracks.map { $0.url } }
+
+        // 1) карты соответствий
+        var namesByURL:   [URL: Set<String>] = [:]   // прямое совпадение по URL
+        var namesByStrong: [String: Set<String>] = [:] // title|artist|duration
+        var namesBySoft:   [String: Set<String>] = [:] // title|artist
+        var namesByStem:   [String: Set<String>] = [:] // имя файла без расширения (fallback)
+
+        // 2) обойдём все треклисты и заполним карты
         let metas = TrackListManager.shared.loadTrackListMetas()
-        
         for meta in metas {
-            let trackList = TrackListManager.shared.getTrackListById(meta.id)
-            for track in trackList.tracks {
-                if !result[track.url, default: []].contains(meta.name) {
-                    result[track.url, default: []].append(meta.name)
-                }
+            let list = TrackListManager.shared.getTrackListById(meta.id)
+            for t in list.tracks {
+                namesByURL[t.url, default: []].insert(meta.name)
+
+                let k = identityKeys(title: t.title, artist: t.artist, duration: t.duration)
+                if !k.strong.isEmpty { namesByStrong[k.strong, default: []].insert(meta.name) }
+                if !k.soft.isEmpty   { namesBySoft[k.soft,   default: []].insert(meta.name) }
+
+                let stem = fileStem(t.url)
+                if !stem.isEmpty     { namesByStem[stem,     default: []].insert(meta.name) }
             }
         }
-        
+
+        // 3) собираем результат для текущих URL
+        var result: [URL: [String]] = [:]
+        result.reserveCapacity(urlsInView.count)
+
+        for url in urlsInView {
+            var names = namesByURL[url] ?? []
+
+            // берём теги если уже есть; иначе будем падать на stem
+            let meta = metadataByURL[url]
+            let title = meta?.title
+            let artist = meta?.artist
+            let duration = meta?.duration ?? 0
+            let k = identityKeys(title: title, artist: artist, duration: duration)
+
+            if let s = namesByStrong[k.strong] { names.formUnion(s) }
+            if names.isEmpty, let s2 = namesBySoft[k.soft] { names.formUnion(s2) }
+
+            // fallback: имя файла — работает до загрузки тегов
+            let stem = fileStem(url)
+            if names.isEmpty, let s3 = namesByStem[stem] { names.formUnion(s3) }
+
+            result[url] = Array(names).sorted()
+        }
+
         trackListNamesByURL = result
     }
     
     
-// MARK: - Ленивая загрузка треков, если ещё не были загружены
+    // MARK: - Ленивая загрузка треков, если ещё не были загружены
     
     func loadTracksIfNeeded() async {
         guard !didLoad else { return }
         didLoad = true
-        await refreshFastStart(firstCount: 20)
+        await refresh()
     }
     
     
-// MARK: - Внутренние методы
+    // MARK: - Внутренние методы
     
     /// Группирует треки по дате (используется для создания секций)
-    nonisolated private static func groupTracksByDate(_ tracks: [LibraryTrack]) -> [TrackSection] {
+    nonisolated private static func groupTracksByDate(
+        _ tracks: [LibraryTrack],
+        order: [URL:Int]? = nil
+    ) -> [TrackSection] {
         let calendar = Calendar.current
-        let dayGroups = Dictionary(grouping: tracks) { track in
+        
+        let grouped = Dictionary(grouping: tracks) { track in
             calendar.startOfDay(for: track.addedDate)
         }
-        .sorted { $0.key > $1.key } // новые даты выше
-
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateStyle = .medium
-        dateFormatter.timeStyle = .none
-        dateFormatter.locale = .current
-
-        return dayGroups.map { (day, items) in
+        
+        let days = grouped.keys.sorted(by: >)
+        
+        return days.map { day in
+            var items = grouped[day] ?? []
+            
+            items.sort { a, b in
+                // 1) по позиции из скана — самый стабильный вариант
+                if let oa = order?[a.url], let ob = order?[b.url], oa != ob {
+                    return oa < ob
+                }
+                // 2) иначе по дате (новее выше)
+                if a.addedDate != b.addedDate { return a.addedDate > b.addedDate }
+                // 3) и, на всякий, по имени файла
+                return a.url.lastPathComponent.localizedCaseInsensitiveCompare(
+                    b.url.lastPathComponent
+                ) == .orderedAscending
+            }
+            
             let title: String = {
                 if calendar.isDateInToday(day) { return "Сегодня" }
                 if calendar.isDateInYesterday(day) { return "Вчера" }
-                return dateFormatter.string(from: day)
+                let df = DateFormatter(); df.dateStyle = .medium; df.timeStyle = .none
+                return df.string(from: day)
             }()
-            return TrackSection(id: ISO8601DateFormatter().string(from: day), title: title, tracks: items)
+            
+            return TrackSection(
+                id: ISO8601DateFormatter().string(from: day),
+                title: title,
+                tracks: items
+            )
         }
     }
     
     
-// MARK: - Локальный скан файлов ТОЛЬКО этой папки (по умолчанию без рекурсии)
+    // MARK: - Сканирование папки (одна реализация + рекурсия)
     
     private func scanFolderURLs(recursive: Bool = false, maxDepth: Int = 1) -> [URL] {
-        var result: [URL] = []
-
-        let url = folder.url
-        let accessed = url.startAccessingSecurityScopedResource()
-        defer { if accessed { url.stopAccessingSecurityScopedResource() } }
-
-        do {
-            let fm = FileManager.default
-            let contents = try fm.contentsOfDirectory(
-                at: url,
-                includingPropertiesForKeys: [.isDirectoryKey],
-                options: [.skipsHiddenFiles]
-            )
-
-            var subfolders: [URL] = []
-
-            for item in contents {
-                let values = try? item.resourceValues(forKeys: [.isDirectoryKey])
-                if values?.isDirectory == true {
-                    if recursive && maxDepth > 0 { subfolders.append(item) }
-                } else {
-                    let ext = item.pathExtension.lowercased()
-                    if allowedAudioExts.contains(ext) {
-                        result.append(item)
-                    }
-                }
-            }
-
-            if recursive && maxDepth > 0 {
-                for sub in subfolders {
-                    // контролируем глубину
-                    result.append(contentsOf: scanFolderURLs(at: sub, recursive: true, depth: maxDepth - 1))
-                }
-            }
-        } catch {
-            print("❌ scanFolderURLs error:", error)
-        }
-
-        return result
+        
+        // основной вход: сканируем текущую папку viewModel'а
+        return scanFolderURLs(at: folder.url, maxDepth: maxDepth, recursive: recursive)
     }
     
-
-    // MARK: - Вспомогательный приватный скан для рекурсии
-    
-    private func scanFolderURLs(at root: URL, recursive: Bool, depth: Int) -> [URL] {
+    private func scanFolderURLs(at root: URL, maxDepth: Int, recursive: Bool) -> [URL] {
         var result: [URL] = []
+        
         let accessed = root.startAccessingSecurityScopedResource()
         defer { if accessed { root.stopAccessingSecurityScopedResource() } }
-
+        
         do {
             let fm = FileManager.default
             let contents = try fm.contentsOfDirectory(
@@ -293,13 +268,16 @@ final class LibraryFolderViewModel: ObservableObject {
                 includingPropertiesForKeys: [.isDirectoryKey],
                 options: [.skipsHiddenFiles]
             )
-
+            
             var subfolders: [URL] = []
-
+            
             for item in contents {
-                let values = try? item.resourceValues(forKeys: [.isDirectoryKey])
-                if values?.isDirectory == true {
-                    if recursive && depth > 0 { subfolders.append(item) }
+                let isDir = (try? item.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
+                
+                if isDir {
+                    if recursive && maxDepth > 0 {
+                        subfolders.append(item)
+                    }
                 } else {
                     let ext = item.pathExtension.lowercased()
                     if allowedAudioExts.contains(ext) {
@@ -307,25 +285,63 @@ final class LibraryFolderViewModel: ObservableObject {
                     }
                 }
             }
-
-            if recursive && depth > 0 {
+            
+            // Уходим в подкаталоги, если рекурсия включена
+            if recursive && maxDepth > 0 {
                 for sub in subfolders {
-                    result.append(contentsOf: scanFolderURLs(at: sub, recursive: true, depth: depth - 1))
+                    result.append(
+                        contentsOf: scanFolderURLs(at: sub, maxDepth: maxDepth - 1, recursive: true)
+                    )
                 }
             }
         } catch {
-            print("❌ scanFolderURLs(depth) error:", error)
+            print("❌ scanFolderURLs error:", error)
         }
-
+        
         return result
     }
     
     
-// MARK: - Названия треклистов
+    // MARK: - Названия треклистов
     
     func loadTrackListNamesIfNeeded() {
         guard !didLoadTrackListNames else { return }
         didLoadTrackListNames = true
         loadTrackListNamesByURL()
     }
+    
+    // MARK: - Хелперы принадлежности к треклисту
+    
+    private func norm(_ s: String?) -> String {
+        guard var t = s?.lowercased().trimmingCharacters(in: .whitespacesAndNewlines), !t.isEmpty else { return "" }
+        // убираем лишние пробелы и пунктуацию
+        t = t.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+        t = t.replacingOccurrences(of: "[\\p{Punct}]+", with: "", options: .regularExpression)
+        return t
+    }
+    
+    // вернём два ключа: строгий (с длительностью) и мягкий (без длительности)
+    private func identityKeys(title: String?, artist: String?, duration: Double?) -> (strong: String, soft: String) {
+        let nt = norm(title), na = norm(artist)
+        let soft = (nt.isEmpty && na.isEmpty) ? "" : "\(nt)|\(na)"
+        let d = Int((duration ?? 0).rounded())
+        let strong = soft.isEmpty ? "" : "\(soft)|\(d)"
+        return (strong, soft)
+    }
+    
+    private func fileStem(_ url: URL) -> String {
+        norm(url.deletingPathExtension().lastPathComponent)
+    }
+    
+    func setMetadata(_ meta: TrackMetadataCacheManager.CachedMetadata, for url: URL) {
+        metadataByURL[url] = meta
+        loadTrackListNamesByURL()   // теги появились → пересчитываем плашки
+    }
+    
+    deinit {
+        if let o = trackListsObserver {
+            NotificationCenter.default.removeObserver(o)
+        }
+    }
 }
+

@@ -61,40 +61,19 @@ final class TrackMetadataCacheManager: @unchecked Sendable {
     // MARK: - Загрузка тегов
     
     /// Загружает и кэширует метаданные (теги и обложку)
-    func loadMetadata(for url: URL) async -> CachedMetadata? {
+    func loadMetadata(for url: URL, includeArtwork: Bool = true) async -> CachedMetadata? {
         let nsurl = url as NSURL
-        
-        // Уже закэшировано
+
+        // Если уже есть в кэше — просто вернём (не декодируем заново)
         if let cached = cache.object(forKey: nsurl) {
             return cached
         }
-        
-        // Если задача уже выполняется — дожидаемся результата
-        if let existing = await activeRequests.get(url) {
-            if let result = await existing.value {
-                return convertAndCache(result, for: nsurl)
-            }
-            return nil
-        }
 
-        let task = Task<TrackMetadata?, Never> {
-            await semaphore.wait()
-            defer { Task { await semaphore.signal() } }
-            
-            let accessed = url.startAccessingSecurityScopedResource()
-            defer { if accessed { url.stopAccessingSecurityScopedResource() } }
-            
-            return try? await MetadataParser.parseMetadata(from: url)
-        }
+        // Парсим теги (TagLib). Здесь НЕТ декодирования арта.
+        guard let metadata = try? await MetadataParser.parseMetadata(from: url) else { return nil }
 
-        await activeRequests.set(url, task: task)
-        let result = await task.value
-        await activeRequests.clear(url)
-        
-        if let result {
-            return convertAndCache(result, for: nsurl)
-        }
-        return nil
+        return convertAndCache(metadata, for: nsurl, includeArtwork: includeArtwork)
+    
         
     }
     
@@ -115,54 +94,43 @@ final class TrackMetadataCacheManager: @unchecked Sendable {
 
     // MARK: - Обработка и кэширование результата парсинга (с duration)
     
-    private func convertAndCache(_ metadata: TrackMetadata, for nsurl: NSURL) -> CachedMetadata {
-        if let data = metadata.artworkData {
-            let maxPixel = Int(ceil(48 * UIScreen.main.scale))
+    private func convertAndCache(_ metadata: TrackMetadata,
+                                 for nsurl: NSURL,
+                                 includeArtwork: Bool) -> CachedMetadata {
+        let maxPixel = Int(ceil(48 * UIScreen.main.scale))
 
-            // 1) основной путь — быстрый даунсемплинг
-            if let cg = downsampleArtwork(data, maxPixel: maxPixel) {
-                let converted = CachedMetadata(title: metadata.title,
-                                               artist: metadata.artist,
-                                               duration: metadata.duration,
-                                               artwork: cg)
-                cache.setObject(converted, forKey: nsurl, cost: maxPixel * maxPixel * 4)
-                return converted
-            }
-
-            // 2) fallback: обычный UIImage + normalize (если всё-таки декодируется)
-            if let ui = UIImage(data: data) {
-                let fixed = normalize(ui)
-                if let cg = fixed.cgImage {
-                    let converted = CachedMetadata(title: metadata.title,
-                                                   artist: metadata.artist,
-                                                   duration: metadata.duration,
-                                                   artwork: cg)
-                    cache.setObject(converted, forKey: nsurl, cost: maxPixel * maxPixel * 4)
-                    return converted
-                }
-            }
+        // 1) Если просили арт и он есть — даунсемплим
+        if includeArtwork, let data = metadata.artworkData,
+           let cg = downsampleArtwork(data, maxPixel: maxPixel) {
+            let converted = CachedMetadata(title: metadata.title,
+                                           artist: metadata.artist,
+                                           duration: metadata.duration,
+                                           artwork: cg)
+            cache.setObject(converted, forKey: nsurl, cost: maxPixel * maxPixel * 4)
+            return converted
         }
 
-        // 3) отрицательный кэш: запоминаем, что арта нет/битый → не дёргать снова
-        let fallback = CachedMetadata(title: metadata.title,
-                                      artist: metadata.artist,
-                                      duration: metadata.duration,
-                                      artwork: nil)
-        cache.setObject(fallback, forKey: nsurl, cost: 1)
-        return fallback
+        // 2) Без арта: кладём лёгкий объект (artwork = nil), никакого декодирования
+        let light = CachedMetadata(title: metadata.title,
+                                   artist: metadata.artist,
+                                   duration: metadata.duration,
+                                   artwork: nil)
+        cache.setObject(light, forKey: nsurl, cost: 1)
+        return light
     }
     
     
     // MARK: -   Быстрое даунсемплирование арта
-    
+
     private func downsampleArtwork(_ data: Data, maxPixel: Int) -> CGImage? {
         let cfData = data as CFData
         guard let src = CGImageSourceCreateWithData(cfData, nil) else { return nil }
         let opts: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixel,
             kCGImageSourceCreateThumbnailWithTransform: true,
-            kCGImageSourceThumbnailMaxPixelSize: maxPixel
+            kCGImageSourceShouldCache: false,
+            kCGImageSourceShouldCacheImmediately: false
         ]
         return CGImageSourceCreateThumbnailAtIndex(src, 0, opts as CFDictionary)
     }

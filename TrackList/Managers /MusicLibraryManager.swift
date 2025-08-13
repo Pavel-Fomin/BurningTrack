@@ -275,22 +275,15 @@ final class MusicLibraryManager: ObservableObject {
                 group.addTask { [self] in
                     let accessed = url.startAccessingSecurityScopedResource()
                     defer {
-                        if accessed {
-                            url.stopAccessingSecurityScopedResource()
-                        }
+                        if accessed { url.stopAccessingSecurityScopedResource() }
                     }
-                    // Получаем длительность через AVAsset
-                    let asset = AVURLAsset(url: url)
-                    let duration = try? await asset.load(.duration)
-                    let durationSeconds = duration.map(CMTimeGetSeconds)
                     
                     // Дата создания или модификации
                     let resourceValues = try? url.resourceValues(forKeys: [.creationDateKey, .contentModificationDateKey])
                     let addedDate = resourceValues?.creationDate ?? resourceValues?.contentModificationDate ?? Date()
                     
-                    // Парсим теги
+                    // Парсим теги (TagLib)
                     let metadata = try? await MetadataParser.parseMetadata(from: url)
-                    
                     
                     // Bookmark для доступа к файлу
                     let bookmarkData = try? url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
@@ -306,7 +299,6 @@ final class MusicLibraryManager: ObservableObject {
                     
                     if let cached {
                         imported = cached
-                        
                     } else {
                         let newTrack = ImportedTrack(
                             id: UUID(uuidString: url.lastPathComponent) ?? UUID(),
@@ -315,9 +307,9 @@ final class MusicLibraryManager: ObservableObject {
                             orderPrefix: "",
                             title: metadata?.title,
                             artist: metadata?.artist,
-                            album: nil,
-                            duration: metadata?.duration ?? durationSeconds ?? 0,
-                            bookmarkBase64: bookmarkBase64,
+                            album: metadata?.album,
+                            duration: metadata?.duration ?? 0,
+                            bookmarkBase64: bookmarkBase64
                         )
                         cacheQueue.sync {
                             importedTrackCache[filePath] = newTrack
@@ -333,12 +325,10 @@ final class MusicLibraryManager: ObservableObject {
                         resolvedURL: resolvedURL,
                         isAvailable: isAvailable,
                         bookmarkBase64: bookmarkBase64,
-                        title: metadata?.title,
+                        title: metadata?.title ?? url.deletingPathExtension().lastPathComponent,
                         artist: metadata?.artist,
-                        duration: metadata?.duration ?? durationSeconds ?? 0,
-                        artwork: metadata?.artworkData
-                            .flatMap { UIImage(data: $0) }
-                            .map { normalize($0) },
+                        duration: metadata?.duration ?? 0,
+                        artwork: nil,
                         addedDate: addedDate,
                         original: imported
                     )
@@ -354,5 +344,4 @@ final class MusicLibraryManager: ObservableObject {
             return results
         }
     }
-    
 }
