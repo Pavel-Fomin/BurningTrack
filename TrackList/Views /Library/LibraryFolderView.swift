@@ -16,63 +16,74 @@ import SwiftUI
 struct LibraryFolderView: View {
     let folder: LibraryFolder
     let trackListViewModel: TrackListViewModel
+    
+    @State private var showDeleteAlert = false
     @ObservedObject var playerViewModel: PlayerViewModel
-    @StateObject private var viewModel: LibraryFolderViewModel
-
+    @ObservedObject var viewModel: LibraryFolderViewModel
+    @EnvironmentObject private var sheetManager: SheetManager
+    @State private var showDeleteDialog = false
     
-// MARK: - Инициализация зависимостей
+    // MARK: - Инициализация зависимостей
     
-    init(folder: LibraryFolder, trackListViewModel: TrackListViewModel, playerViewModel: PlayerViewModel) {
-        self.folder = folder                               // ← ЭТОГО НЕ ХВАТАЛО
+    init(folder: LibraryFolder,
+        trackListViewModel: TrackListViewModel,
+        playerViewModel: PlayerViewModel,
+        viewModel: LibraryFolderViewModel) {
+        self.folder = folder
         self.trackListViewModel = trackListViewModel
         self._playerViewModel = ObservedObject(wrappedValue: playerViewModel)
-        self._viewModel = StateObject(wrappedValue: LibraryFolderViewModel(folder: folder))
+        self.viewModel = viewModel
     }
-
+    
     var body: some View {
-        Group {
+            mainContent
+                .task(id: viewModel.folder.url) {
+                    viewModel.loadSubfoldersIfNeeded()
+                }
+                .confirmationDialog(
+                    "Удалить папку с iPhone?",
+                    isPresented: $showDeleteDialog,
+                    titleVisibility: .visible
+                ) {
+                    Button("Удалить", role: .destructive) {
+                        if let url = viewModel.pendingDeleteURL {
+                            MusicLibraryManager.shared.removeFolderAndBookmark(url: url)
+                            viewModel.pendingDeleteURL = nil
+                        }
+                    }
+                    
+                    Button("Отмена", role: .cancel) {
+                        viewModel.pendingDeleteURL = nil
+                    }
+                } message: {
+                    Text("Это удалит папку из память Iphone без возможности восстановления")
+                }
+                .onChange(of: viewModel.pendingDeleteURL) {
+                    showDeleteDialog = viewModel.pendingDeleteURL != nil
+                }
+        }
+
+        // MARK: - Основной контент (если подпапок нет — треки, иначе — список папок)
+        
+        @ViewBuilder
+        private var mainContent: some View {
             if viewModel.subfolders.isEmpty {
-                // Нет подпапок → экран треков
                 LibraryTracksView(
                     folder: viewModel.folder,
                     trackListViewModel: trackListViewModel,
                     playerViewModel: playerViewModel
                 )
             } else {
-                // Есть подпапки → показываем их
-                List { folderSectionView() }
-                    .listStyle(.insetGrouped)
-                    .navigationTitle(viewModel.folder.name)
-            }
-        }
-        .task(id: viewModel.folder.url) { 
-            viewModel.loadSubfoldersIfNeeded()
-        }
-    }
-
-    
-// MARK: - Секция подпапок
-    
-    @ViewBuilder
-    private func folderSectionView() -> some View {
-        Section {
-            ForEach(viewModel.subfolders) { subfolder in
-                NavigationLink(
-                    destination: LibraryFolderView(
-                        folder: subfolder,
+                List {
+                    FolderListView(
+                        subfolders: viewModel.subfolders,
                         trackListViewModel: trackListViewModel,
-                        playerViewModel: playerViewModel
+                        playerViewModel: playerViewModel,
+                        viewModel: viewModel
                     )
-                ) {
-                    HStack(spacing: 12) {
-                        Image(systemName: "folder.fill")
-                            .foregroundColor(.blue)
-                            .frame(width: 24)
-                        Text(subfolder.name).lineLimit(1)
-                    }
-                    .padding(.vertical, 4)
                 }
+                .listStyle(.insetGrouped)
+                .navigationTitle(viewModel.folder.name)
             }
         }
     }
-}

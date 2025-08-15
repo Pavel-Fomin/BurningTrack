@@ -18,7 +18,8 @@ struct LibraryScreen: View {
     let playerViewModel: PlayerViewModel
     let trackListViewModel: TrackListViewModel
     @EnvironmentObject var toast: ToastManager
-
+    @EnvironmentObject var sheetManager: SheetManager
+    
     var body: some View {
         NavigationStack(path: $path) {
             ZStack {
@@ -28,7 +29,7 @@ struct LibraryScreen: View {
                             isShowingFolderPicker = true
                         }
                     }
-
+                    
                     MusicLibraryView(
                         path: $path,
                         trackListViewModel: trackListViewModel,
@@ -39,41 +40,42 @@ struct LibraryScreen: View {
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-
+                
                 .navigationDestination(for: LibraryFolder.self) { folder in
                     LibraryFolderView(
                         folder: folder,
                         trackListViewModel: trackListViewModel,
-                        playerViewModel: playerViewModel
+                        playerViewModel: playerViewModel,
+                        viewModel: LibraryFolderViewModel(folder: folder)
                     )
+                    .environmentObject(sheetManager)
                 }
-
+                
                 .fileImporter(
                     isPresented: $isShowingFolderPicker,
                     allowedContentTypes: [.folder],
                     allowsMultipleSelection: false
-                ) { result in
+                ) { result in Task {
                     switch result {
                     case .success(let urls):
                         if let folderURL = urls.first {
                             musicLibraryManager.saveBookmark(for: folderURL)
-                            musicLibraryManager.restoreAccess()
+                            await MusicLibraryManager.shared.restoreAccess()
                         }
                     case .failure(let error):
                         print("❌ Ошибка выбора папки: \(error.localizedDescription)")
                     }
                 }
+                }
+                .task(id: didWarmUp) {
+                    guard !didWarmUp else { return }
+                    didWarmUp = true
+                    
+                    // всё тяжёлое — строго не на main
+                    Task { @MainActor in
+                        await MusicLibraryManager.shared.restoreAccess()}
+                    }
+                }
             }
-            .task(id: didWarmUp) {
-                guard !didWarmUp else { return }
-                didWarmUp = true
-
-                // всё тяжёлое — строго не на main
-                await Task.detached(priority: .utility) {
-                    MusicLibraryManager.shared.restoreAccess()
-                }.value
-            }
-            
         }
     }
-}

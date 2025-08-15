@@ -12,11 +12,12 @@ import SwiftUI
 
 @MainActor
 final class LibraryFolderViewModel: ObservableObject {
-    let folder: LibraryFolder
     private let allowedAudioExts: Set<String> = ["mp3","flac","wav","aiff","aac","m4a","ogg"]
     private let initialParseCount = 20   // подберём позже (20–40)
+    private var lastScannedURLs: [URL] = [] // Сохраняем список файлов последнего скана — чтобы считать tail без повторного сканирования
+    private var attachedFoldersObserver: NSObjectProtocol?
     
-    
+    @Published var pendingDeleteURL: URL?
     @Published var trackSections: [TrackSection] = []          /// Группы треков по дате
     @Published var trackListNamesByURL: [URL: [String]] = [:]  /// Соответствие: URL → [названия треклистов, в которых есть трек]
     @Published var metadataByURL: [URL: TrackMetadataCacheManager.CachedMetadata] = [:]  /// Кеш метаданных (artist, title, duration и др.)
@@ -24,16 +25,11 @@ final class LibraryFolderViewModel: ObservableObject {
     @Published private(set) var didLoad: Bool = false
     @Published private(set) var didLoadTrackListNames = false
     @Published var subfolders: [LibraryFolder] = []
-    
-    // Сохраняем список файлов последнего скана — чтобы считать tail без повторного сканирования
-    private var lastScannedURLs: [URL] = []
-
-    // Управление хвостовой подгрузкой
-    @Published private(set) var didStartTailWarmup = false
+    @Published var folder: LibraryFolder {didSet {Task { @MainActor in await self.refresh()}}}
+    @Published private(set) var didStartTailWarmup = false // Управление хвостовой подгрузкой
     private var tailWarmupTask: Task<Void, Never>?
 
-    // Для удобства в UI
-    var headCount: Int { min(initialParseCount, trackSections.flatMap { $0.tracks }.count) }
+    var headCount: Int { min(initialParseCount, trackSections.flatMap { $0.tracks }.count) } // Для удобства в UI
     
     func loadSubfoldersIfNeeded() {
         guard subfolders.isEmpty else { return }
@@ -44,20 +40,32 @@ final class LibraryFolderViewModel: ObservableObject {
         
     init(folder: LibraryFolder) {
         self.folder = folder
+        
+        // Observer: если изменились треклисты — обновляем плашки в UI
         trackListsObserver = NotificationCenter.default.addObserver(
             forName: .trackListsDidChange,
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            // замыкание синхронное → внутри создаём async‑задачу на MainActor
             Task { @MainActor [weak self] in
                 self?.loadTrackListNamesByURL()
             }
         }
+        
+        // Observer: если изменилась структура прикреплённых папок — обновляем подпапки
+        attachedFoldersObserver = NotificationCenter.default.addObserver(
+            forName: .attachedFoldersDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                self.subfolders = MusicLibraryManager.shared.loadSubfolders(for: self.folder.url)
+            }
+        }
     }
     
-    
-    // MARK: - Префетч артов с лимитом параллельных задач
+// MARK: - Префетч артов с лимитом параллельных задач
     
     private func prefetchArtwork(urls: [URL], limit: Int = 1) {
         guard !urls.isEmpty else { return }
@@ -77,14 +85,14 @@ final class LibraryFolderViewModel: ObservableObject {
     }
     
     
-    // MARK: - Загружает треки из папки и группирует по дате
+// MARK: - Загружает треки из папки и группирует по дате
     
     func refresh() async {
         await refreshFastStart(firstCount: initialParseCount)
     }
     
     
-    // MARK: - Быстрый старт: сначала первые N, потом остальное, со стабильным порядком
+// MARK: - Быстрый старт: сначала первые N, потом остальное, со стабильным порядком
     func refreshFastStart(firstCount: Int) async {
         isLoading = true
 
@@ -135,7 +143,7 @@ final class LibraryFolderViewModel: ObservableObject {
         }
     }
     
-    // MARK: - Загружает названия треклистов, в которых встречаются треки из этой папки
+// MARK: - Загружает названия треклистов, в которых встречаются треки из этой папки
     
     func loadTrackListNamesByURL() {
         // какие URL сейчас на экране
@@ -191,7 +199,7 @@ final class LibraryFolderViewModel: ObservableObject {
     }
     
     
-    // MARK: - Ленивая загрузка треков, если ещё не были загружены
+// MARK: - Ленивая загрузка треков, если ещё не были загружены
     
     func loadTracksIfNeeded() async {
         guard !didLoad else { return }
@@ -200,7 +208,7 @@ final class LibraryFolderViewModel: ObservableObject {
     }
     
     
-    // MARK: - Внутренние методы
+// MARK: - Внутренние методы
     
     /// Группирует треки по дате (используется для создания секций)
     nonisolated private static func groupTracksByDate(
@@ -247,7 +255,7 @@ final class LibraryFolderViewModel: ObservableObject {
     }
     
     
-    // MARK: - Сканирование папки (одна реализация + рекурсия)
+// MARK: - Сканирование папки (одна реализация + рекурсия)
     
     private func scanFolderURLs(recursive: Bool = false, maxDepth: Int = 1) -> [URL] {
         
@@ -302,7 +310,7 @@ final class LibraryFolderViewModel: ObservableObject {
     }
     
     
-    // MARK: - Названия треклистов
+// MARK: - Названия треклистов
     
     func loadTrackListNamesIfNeeded() {
         guard !didLoadTrackListNames else { return }
@@ -340,6 +348,9 @@ final class LibraryFolderViewModel: ObservableObject {
     
     deinit {
         if let o = trackListsObserver {
+            NotificationCenter.default.removeObserver(o)
+        }
+        if let o = attachedFoldersObserver {
             NotificationCenter.default.removeObserver(o)
         }
     }

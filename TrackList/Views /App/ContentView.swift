@@ -14,6 +14,7 @@ struct ContentView: View {
     let trackListViewModel: TrackListViewModel
     @State private var selectedTab: Int = 0
     @EnvironmentObject var toast: ToastManager
+    @EnvironmentObject var sheetManager: SheetManager
     @State private var miniPlayerHeight: CGFloat = 0
     
     var body: some View {

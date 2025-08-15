@@ -17,3 +17,11 @@ extension Notification.Name {
     /// Сигнал, что треклист был переименован (используется для обновления UI)
     static let trackListDidRename = Notification.Name("trackListDidRename")
 }
+
+extension Notification.Name {
+    static let attachedFoldersDidChange = Notification.Name("attachedFoldersDidChange")
+}
+
+extension Notification.Name {
+    static let attachedFoldersDidRequestDelete = Notification.Name("attachedFoldersDidRequestDelete")
+}

@@ -13,60 +13,77 @@ import UniformTypeIdentifiers
 
 struct MusicLibraryView: View {
     @Binding var path: [LibraryFolder]
-    @StateObject private var manager = MusicLibraryManager.shared
     
+    @EnvironmentObject private var sheetManager: SheetManager
+    @ObservedObject private var manager = MusicLibraryManager.shared
     let trackListViewModel: TrackListViewModel
     let playerViewModel: PlayerViewModel
     let onAddFolder: () -> Void
     
     
     var body: some View {
-        if manager.attachedFolders.isEmpty {
-            VStack {
-                Spacer()
-                Button("Выбрать папку", action: onAddFolder)
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                Spacer()
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            
-        } else {
-            List {
-                ForEach(manager.attachedFolders) { folder in
-                    NavigationLink(value: folder) {
+            if manager.attachedFolders.isEmpty {
+                VStack {
+                    Spacer()
+                    Button("Прикрепить папку", action: onAddFolder)
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                List {
+                    ForEach(manager.attachedFolders, id: \.self) { folder in
+                        NavigationLink(value: folder) {
+                            HStack(spacing: 12) {
+                                Image(systemName: "folder.fill")
+                                    .foregroundColor(.blue)
+                                    .frame(width: 24)
+                                Text(folder.name)
+                                    .lineLimit(1)
+                            }
+                            .padding(.vertical, 4)
+                        }
+                        .rootFolderContextMenu(for: folder, manager: manager)
+                    }
+                    
+                    Button(action: onAddFolder) {
                         HStack(spacing: 12) {
-                            Image(systemName: "folder.fill")
+                            Image(systemName: "folder.fill.badge.plus")
                                 .foregroundColor(.blue)
                                 .frame(width: 24)
-                            Text(folder.name)
-                                .lineLimit(1)
+                            Text("Прикрепить папку")
                         }
                         .padding(.vertical, 4)
-                        
                     }
-                    .swipeActions(edge: .trailing) {
-                        Button(role: .destructive) {
-                            manager.removeBookmark(for: folder.url)
-                        } label: {
-                            Label("Открепить", systemImage: "trash")
+                }
+                .confirmationDialog(
+                    "Удалить папку с iPhone?",
+                    isPresented: Binding(
+                        get: { manager.pendingDeleteURL != nil },
+                        set: { newValue in
+                            if !newValue {
+                                manager.pendingDeleteURL = nil
+                            }
+                        }
+                    ),
+                    titleVisibility: .visible
+                ) {
+                    Button("Удалить", role: .destructive) {
+                        if let url = manager.pendingDeleteURL {
+                            manager.removeFolderAndBookmark(url: url)
                         }
                     }
+                    Button("Отмена", role: .cancel) {}
+                } message: {
+                    Text("Это удалит папку из память iPhone без возможности восстановления")
                 }
-
-                Button(action: onAddFolder) {
-                    HStack(spacing: 12) {
-                        Image(systemName: "folder.fill.badge.plus")
-                            .foregroundColor(.blue)
-                            .frame(width: 24)
-                        Text("Добавить папку")
+                .onAppear {
+                    if !manager.isAccessReady {
+                        Task { await manager.restoreAccess() }
                     }
-                    .padding(.vertical, 4)
                 }
             }
-            
-        }
         
+        }
     }
-    
-}
