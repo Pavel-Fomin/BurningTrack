@@ -8,11 +8,24 @@
 import Foundation
 import SwiftUI
 
+struct TrackActionsSheetData: Identifiable, Equatable {
+    let id = UUID()
+    let track: any TrackDisplayable
+    let context: TrackContext
+    
+    static func == (lhs: TrackActionsSheetData, rhs: TrackActionsSheetData) -> Bool {
+        lhs.id == rhs.id
+    }
+}
+
 @MainActor
 final class SheetManager: ObservableObject {
     static let shared = SheetManager()
 
     @Published var trackToAdd: LibraryTrack?
+    @Published var trackActionsSheet: TrackActionsSheetData?
+    @Published var highlightedTrackID: UUID?
+    
     private var presentationTask: Task<Void, Never>?
 
     private init() {}
@@ -38,5 +51,12 @@ final class SheetManager: ObservableObject {
     func close() {
         presentationTask?.cancel()
         trackToAdd = nil
+        trackActionsSheet = nil
+        highlightedTrackID = nil
+    }
+    
+    func presentTrackActions(track: any TrackDisplayable, context: TrackContext) {
+        highlightedTrackID = track.id
+        trackActionsSheet = TrackActionsSheetData(track: track, context: context)
     }
 }

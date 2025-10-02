@@ -15,6 +15,7 @@ struct TrackRowView: View {
     let track: any TrackDisplayable
     let isCurrent: Bool
     let isPlaying: Bool
+    let isHighlighted: Bool
     let artwork: CGImage?
     let title: String?
     let artist: String?
@@ -63,14 +64,10 @@ struct TrackRowView: View {
                             Label(action.label, systemImage: action.systemImage)
                         }
                     }
-                    .tint(action.tint)
+                   
                 }
             }
         }
-        
-        .listRowBackground(
-            isCurrent ? Color.accentColor.opacity(0.12) : Color.clear
-        )
     }
 
     

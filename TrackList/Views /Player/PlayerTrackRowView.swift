@@ -21,6 +21,7 @@ struct PlayerTrackRowView: View {
             track: track,
             isCurrent: isCurrent,
             isPlaying: isPlaying,
+            isHighlighted: false,
             artwork: artwork,
             title: track.title ?? track.fileName,
             artist: track.artist ?? "",
