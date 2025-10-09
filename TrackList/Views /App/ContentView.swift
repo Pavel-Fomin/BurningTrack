@@ -10,11 +10,12 @@
 import SwiftUI
 
 struct ContentView: View {
+    @StateObject private var sheetManager = SheetManager.shared
     @ObservedObject var playerViewModel: PlayerViewModel
-    let trackListViewModel: TrackListViewModel
-    @State private var selectedTab: Int = 0
     @EnvironmentObject var toast: ToastManager
+    @State private var selectedTab: Int = 0
     @State private var miniPlayerHeight: CGFloat = 0
+    let trackListViewModel: TrackListViewModel
     
     var body: some View {
         MiniPlayerWrapperView(
@@ -26,7 +27,7 @@ struct ContentView: View {
                     trackListViewModel: trackListViewModel,
                     playerViewModel: playerViewModel
                 )
-
+                
                 if let data = toast.data {
                     VStack(spacing: 8) {
                         ToastView(data: data)
@@ -39,8 +40,28 @@ struct ContentView: View {
             }
         }
         .onAppear { Haptics.shared.warmup() }
+        
+        .sheet(item: $sheetManager.trackActionsSheet, onDismiss: {
+            sheetManager.highlightedTrackID = nil
+        }) { data in
+            // базовый расчёт высоты
+            let base = CGFloat(data.actions.count) * 56 + 8
+            // добавляем «воздух» сверху, если кнопок мало
+            let adjusted = data.actions.count <= 2 ? base + 28 : base
+
+            TrackActionSheet(
+                track: data.track,
+                context: data.context,
+                actions: data.actions,
+                onAction: { action in
+                    // Обработчик выбранного действия
+                    print("Выбрано действие: \(action)")
+                }
+            )
+            .presentationDetents([.height(adjusted)])
+            
+        }
     }
-    
     
 // MARK: - Тост
     

@@ -84,21 +84,7 @@ struct LibraryTracksView: View {
                     .presentationDetents([.fraction(0.5)])
             }
         }
-        .sheet(item: $sheetManager.trackActionsSheet) { sheet in
-            NavigationStack {
-                TrackActionSheet(
-                    track: sheet.track,
-                    context: sheet.context,
-                    actions: actions(for: sheet.context),
-                    onAction: { action in
-                        print("⚡️ Выбрано действие: \(action)")
-                        sheetManager.trackActionsSheet = nil
-                    }
-                )
-                .presentationDetents([.fraction(0.24)])
-            }
-        }
-     }
+    }
 
             private func actions(for context: TrackContext) -> [TrackAction] {
                 switch context {

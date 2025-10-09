@@ -15,13 +15,14 @@ struct PlayerTrackRowView: View {
     let onTap: () -> Void
 
     @State private var artwork: CGImage? = nil
+    @EnvironmentObject var sheetManager: SheetManager
 
     var body: some View {
         TrackRowView(
             track: track,
             isCurrent: isCurrent,
             isPlaying: isPlaying,
-            isHighlighted: false,
+            isHighlighted: sheetManager.highlightedTrackID == track.id,
             artwork: artwork,
             title: track.title ?? track.fileName,
             artist: track.artist ?? "",
@@ -38,7 +39,17 @@ struct PlayerTrackRowView: View {
                         }
                     },
                     labelType: .iconOnly
-                )
+                ),
+                   CustomSwipeAction(
+                       label: "Ещё",
+                       systemImage: "ellipsis",
+                       role: .none,
+                       tint: .gray,
+                       handler: {
+                       SheetManager.shared.presentTrackActions(track: track, context: .player)
+                },
+                labelType: .iconOnly
+              )
             ],
             swipeActionsRight: [],
             trackListNames: [],

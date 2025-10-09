@@ -16,29 +16,29 @@ struct LibraryTrackRowWrapper: View {
     let trackListNamesByURL: [URL: [String]]
     let metadata: TrackMetadataCacheManager.CachedMetadata?
     let isScrollingFast: Bool
-
+    
     @State private var artwork: CGImage? = nil
-
+    
     @ObservedObject var playerViewModel: PlayerViewModel
     @EnvironmentObject var toast: ToastManager
     @EnvironmentObject var sheetManager: SheetManager
-
+    
     private var isCurrent: Bool {
         playerViewModel.isCurrent(track, in: .library)
     }
-
+    
     private var isPlaying: Bool {
         isCurrent && playerViewModel.isPlaying
     }
-
+    
     private var trackListNames: [String] {
         trackListNamesByURL[track.url] ?? []
     }
-
+    
     private var isHighlighted: Bool {
         sheetManager.highlightedTrackID == track.id
     }
-
+    
     var body: some View {
         TrackRowView(
             track: track,
@@ -59,14 +59,14 @@ struct LibraryTrackRowWrapper: View {
         )
         .task(id: track.url.absoluteString + "|" + (isScrollingFast ? "1" : "0")) {
             if isScrollingFast || artwork != nil { return }
-
+            
             try? await Task.sleep(nanoseconds: 60_000_000)
-
+            
             let img = await ArtworkLoader.loadIfNeeded(current: artwork, url: track.url)
             if let img {
                 await MainActor.run { artwork = img }
             }
-
+            
             if metadata == nil {
                 _ = await TrackMetadataCacheManager.shared.loadMetadata(for: track.url)
             }
@@ -77,7 +77,7 @@ struct LibraryTrackRowWrapper: View {
                 if let playerTrack = PlayerTrack(from: imported) {
                     PlaylistManager.shared.tracks.append(playerTrack)
                     PlaylistManager.shared.saveToDisk()
-
+                    
                     toast.show(ToastData(
                         style: .track(title: track.title ?? track.fileName, artist: track.artist ?? ""),
                         artwork: track.artwork
@@ -87,14 +87,14 @@ struct LibraryTrackRowWrapper: View {
                 Text("В плеер")
             }
             .tint(.blue)
-
+            
             Button {
                 sheetManager.open(track: track)
             } label: {
                 Text("В треклист")
             }
             .tint(.green)
-
+            
             Button {
                 sheetManager.highlightedTrackID = track.id
                 sheetManager.presentTrackActions(track: track, context: .library)
@@ -102,16 +102,6 @@ struct LibraryTrackRowWrapper: View {
                 Image(systemName: "ellipsis")
             }
             .tint(.gray)
-        }
-        .listRowBackground(rowBackgroundColor)
-    }
-    private var rowBackgroundColor: Color {
-        if isHighlighted {
-            return Color.gray.opacity(0.12)
-        } else if isCurrent {
-            return Color.accentColor.opacity(0.12)
-        } else {
-            return Color.clear
         }
     }
 }

@@ -25,7 +25,7 @@ struct TrackRowView: View {
     var swipeActionsRight: [CustomSwipeAction] = []
     var trackListNames: [String]? = nil
     var useNativeSwipeActions: Bool = false
-
+    
     var body: some View {
         HStack(spacing: 12) {
             artworkView
@@ -43,6 +43,8 @@ struct TrackRowView: View {
                 print("❌ Трек недоступен: \(track.title ?? track.fileName)")
             }
         }
+        .listRowBackground(rowHighlightColor)
+        
         .if(!useNativeSwipeActions) { view in
             view.customSwipeActions(
                 swipeActionsLeft: swipeActionsLeft,
@@ -64,14 +66,14 @@ struct TrackRowView: View {
                             Label(action.label, systemImage: action.systemImage)
                         }
                     }
-                   
+                    
                 }
             }
         }
     }
-
     
-// MARK: - Обложка
+    
+    // MARK: - Обложка
     
     private var artworkView: some View {
         ZStack {
@@ -99,15 +101,15 @@ struct TrackRowView: View {
         }
     }
     
-
-// MARK: - Информациия о треке
+    
+    // MARK: - Информациия о треке
     
     private var trackInfoView: some View {
         let hasArtist: Bool = {
             guard let artist = artist?.trimmingCharacters(in: .whitespaces).lowercased() else { return false }
             return !artist.isEmpty && artist != "неизвестен"
         }()
-
+        
         return VStack(alignment: .leading, spacing: hasArtist ? 2 : 0) {
             if hasArtist, let artistText = artist {
                 Text(artistText)
@@ -115,15 +117,15 @@ struct TrackRowView: View {
                     .foregroundColor(.primary)
                     .lineLimit(1)
             }
-
+            
             HStack {
                 Text(title ?? track.fileName)
                     .font(hasArtist ? .footnote : .subheadline)
                     .foregroundColor(hasArtist ? .secondary : .primary)
                     .lineLimit(1)
-
+                
                 Spacer()
-
+                
                 Text(formatTimeSmart(track.duration))
                     .font(.footnote)
                     .foregroundColor(.secondary)
@@ -137,7 +139,17 @@ struct TrackRowView: View {
                     .lineLimit(1)
                     .padding(.top, 4)
             }
-          }
         }
     }
+    
+    private var rowHighlightColor: Color {
+        if isHighlighted {
+            return Color.gray.opacity(0.12)      // временная подсветка при открытом шите
+        } else if isCurrent {
+            return Color.accentColor.opacity(0.12) // активный трек
+        } else {
+            return Color.clear
+        }
+    }
+}
 

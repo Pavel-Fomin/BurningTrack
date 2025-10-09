@@ -13,6 +13,18 @@ struct TrackActionsSheetData: Identifiable, Equatable {
     let track: any TrackDisplayable
     let context: TrackContext
     
+    /// Доступные действия для текущего контекста
+    var actions: [TrackAction] {
+        switch context {
+        case .library:
+            return [.moveToFolder, .showInfo]   // без "показать в фонотеке"
+        case .player:
+            return [.showInLibrary, .moveToFolder, .showInfo]
+        case .tracklist:
+            return [.showInLibrary, .moveToFolder, .showInfo]
+        }
+    }
+    
     static func == (lhs: TrackActionsSheetData, rhs: TrackActionsSheetData) -> Bool {
         lhs.id == rhs.id
     }

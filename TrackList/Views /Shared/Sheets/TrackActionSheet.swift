@@ -31,20 +31,17 @@ struct TrackActionSheet: View {
                             .font(.system(size: 17))
                         Spacer()
                     }
-                    .padding(.horizontal)
+                    .padding(.horizontal, 20)
                     .padding(.vertical, 12)
                 }
             }
         }
+        .padding(.vertical, 0)
         .onDisappear {
-            /// Сброс подсветки при закрытии sheet
             SheetManager.shared.highlightedTrackID = nil
         }
-        .frame(maxWidth: .infinity)
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 24))
-        .padding()
     }
+    
 
     private func title(for action: TrackAction) -> String {
         switch action {
