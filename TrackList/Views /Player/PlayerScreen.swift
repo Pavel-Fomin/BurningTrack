@@ -82,7 +82,7 @@ struct PlayerScreen: View {
 }
 
 
-        // MARK: - Вспомогательная функция (вне body)
+// MARK: - Вспомогательная функция (вне body)
 
         func defaultTrackListName() -> String {
             let formatter = DateFormatter()

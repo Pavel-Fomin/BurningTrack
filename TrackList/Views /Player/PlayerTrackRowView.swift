@@ -13,10 +13,10 @@ struct PlayerTrackRowView: View {
     let isCurrent: Bool
     let isPlaying: Bool
     let onTap: () -> Void
-
+    
     @State private var artwork: CGImage? = nil
     @EnvironmentObject var sheetManager: SheetManager
-
+    
     var body: some View {
         TrackRowView(
             track: track,
@@ -26,39 +26,26 @@ struct PlayerTrackRowView: View {
             artwork: artwork,
             title: track.title ?? track.fileName,
             artist: track.artist ?? "",
-            onTap: onTap,
-            swipeActionsLeft: [
-                CustomSwipeAction(
-                    label: "Удалить",
-                    systemImage: "trash",
-                    role: .destructive,
-                    tint: .red,
-                    handler: {
-                        if let index = PlaylistManager.shared.tracks.firstIndex(where: { $0.id == track.id }) {
-                            PlaylistManager.shared.remove(at: index)
-                        }
-                    },
-                    labelType: .iconOnly
-                ),
-                   CustomSwipeAction(
-                       label: "Ещё",
-                       systemImage: "ellipsis",
-                       role: .none,
-                       tint: .gray,
-                       handler: {
-                       SheetManager.shared.presentTrackActions(track: track, context: .player)
-                },
-                labelType: .iconOnly
-              )
-            ],
-            swipeActionsRight: [],
-            trackListNames: [],
-            useNativeSwipeActions: false
+            onTap: onTap
         )
         .task(id: track.url) {
             artwork = await ArtworkLoader.loadIfNeeded(current: artwork, url: track.url)
         }
-        
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            Button(role: .destructive) {
+                if let index = PlaylistManager.shared.tracks.firstIndex(where: { $0.id == track.id }) {
+                    PlaylistManager.shared.remove(at: index)
+                }
+            } label: {
+                Label("Удалить", systemImage: "trash")
+            }
+            
+            Button {
+                SheetManager.shared.presentTrackActions(track: track, context: .player)
+            } label: {
+                Label("Ещё", systemImage: "ellipsis")
+            }
+            .tint(.gray)
         }
     }
-
+}

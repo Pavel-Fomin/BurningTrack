@@ -17,13 +17,14 @@ struct TrackListRowView: View {
     let onDelete: () -> Void
     
     @State private var artwork: CGImage? = nil
+    @ObservedObject private var sheetManager = SheetManager.shared
     
     var body: some View {
         TrackRowView(
             track: track,
             isCurrent: isCurrent,
             isPlaying: isPlaying,
-            isHighlighted: false,
+            isHighlighted: sheetManager.highlightedTrackID == track.id,
             artwork: artwork,
             title: track.title ?? track.fileName,
             artist: track.artist ?? "",
@@ -39,12 +40,19 @@ struct TrackListRowView: View {
         .listRowBackground(Color.clear)
         .padding(.vertical, 8)
         .padding(.horizontal, 16)
-        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             Button(role: .destructive) {
                 onDelete()
             } label: {
                 Label("Удалить", systemImage: "trash")
             }
+
+            Button {
+                SheetManager.shared.presentTrackActions(track: track, context: .tracklist)
+            } label: {
+                Label("Ещё", systemImage: "ellipsis")
+            }
+            .tint(.gray)
         }
     }
 }
