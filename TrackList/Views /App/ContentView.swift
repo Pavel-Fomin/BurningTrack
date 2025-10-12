@@ -47,7 +47,6 @@ struct ContentView: View {
             }
         }
 
-        .onAppear { Haptics.shared.warmup() }
         .sheet(item: $sheetManager.trackActionsSheet, onDismiss: {
             sheetManager.highlightedTrackID = nil
         }) { data in

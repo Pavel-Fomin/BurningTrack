@@ -50,16 +50,6 @@ struct PlayerScreen: View {
                     
                     PlayerPlaylistView(playerViewModel: playerViewModel)
                 }
-                
-                
-// MARK: - Инициализация при старте
-                
-                .onAppear {
-                    let startTime = Date()
-                    let loadTime = Date().timeIntervalSince(startTime)
-                    print("Приложение готово к работе за \(String(format: "%.2f", loadTime)) сек")
-                    
-                }
             }
         }
         

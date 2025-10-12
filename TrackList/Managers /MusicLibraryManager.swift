@@ -17,7 +17,12 @@ import UIKit
 final class MusicLibraryManager: ObservableObject {
     static let shared = MusicLibraryManager()  /// Синглтон
     
-    init() {restoreAccess()} /// Восстанавливает доступ к сохранённым папкам
+    init() {
+        // Восстановление доступа выполняем в фоне, чтобы не блокировать main thread
+        Task.detached(priority: .background) { [weak self] in
+            await self?.restoreAccessAsync()
+        }
+    }
     
     private let cacheQueue = DispatchQueue(label: "importedTrackCache.queue") /// Очередь для потокобезопасного доступа к importedTrackCache
     
@@ -169,179 +174,213 @@ final class MusicLibraryManager: ObservableObject {
     // MARK: - Восстанавливает доступ к ранее прикреплённым папкам
     
     /// Восстанавливает доступ к прикреплённым папкам при запуске
-    func restoreAccess() {
-        
-        guard let dataArray = loadBookmarkDataFromFile() else {
+    func restoreAccessAsync() async {
+        print("🔁 Начало восстановления доступа")
+        guard let dataArray = loadBookmarkDataFromFile(), !dataArray.isEmpty else {
             print("ℹ️ Bookmarks не найдены")
+            await MainActor.run { self.attachedFolders = [] }
             return
         }
         
         var urls: [URL] = []
+        urls.reserveCapacity(dataArray.count)
         
         for data in dataArray {
-            var isStale = false
             do {
+                var isStale = false
                 let url = try URL(
                     resolvingBookmarkData: data,
-                    options: [.withoutUI], ///убрали .withSecurityScope — он не работает на iOS
+                    options: [.withoutUI],
                     relativeTo: nil,
                     bookmarkDataIsStale: &isStale
                 )
                 
+                if isStale {
+                    if let newData = try? url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil) {
+                        replaceBookmarkData(old: data, with: newData)
+                        print("♻️ Обновили протухший bookmark для: \(url.lastPathComponent)")
+                    }
+                }
+                
                 if url.startAccessingSecurityScopedResource() {
-                    print("✅ Доступ к папке восстановлен: \(url.lastPathComponent)")
                     urls.append(url)
+                    print("✅ Доступ к папке восстановлен: \(url.lastPathComponent)")
                 } else {
-                    print("❌ Не удалось начать доступ к папке: \(url.lastPathComponent)")
+                    print("⚠️ Не удалось начать доступ к папке: \(url.lastPathComponent)")
                 }
             } catch {
                 print("❌ Ошибка восстановления доступа: \(error)")
             }
         }
         
-        DispatchQueue.main.async {
-            self.attachedFolders = urls.map { self.liteFolder(from: $0) }
+        // создаём независимую константу — это снимает предупреждение Swift 6
+        let resolvedURLs = urls.map { $0 }
+        
+        await MainActor.run {
+            self.attachedFolders = resolvedURLs.map { self.liteFolder(from: $0) }
         }
+        print("✅ Завершено восстановление доступа")
         
     }
     
-    // MARK: - Удаление bookmarkData по URL
     
-    /// Удаляет сохранённый bookmark и обновляет список папок в UI
-    func removeBookmark(for folderURL: URL) {
+// MARK: - Заменяет старую запись bookmarkData на новую в music_bookmarks.json
+    
+    private func replaceBookmarkData(old: Data, with new: Data) {
         let url = Self.bookmarksFileURL
+        guard
+            let data = try? Data(contentsOf: url),
+            var array = try? JSONDecoder().decode([Data].self, from: data)
+        else { return }
         
-        guard let data = try? Data(contentsOf: url),
-              var existing = try? JSONDecoder().decode([Data].self, from: data) else {
-            print("⚠️ Не удалось загрузить bookmarkData для удаления")
-            return
-        }
+        if let idx = array.firstIndex(of: old) { array[idx] = new }
+        else if !array.contains(new) { array.append(new) }
         
-        // Удаляем совпадающий bookmark по url
-        existing.removeAll { data in
-            var isStale = false
-            if let resolved = try? URL(
-                resolvingBookmarkData: data,
-                options: [.withoutUI],
-                relativeTo: nil,
-                bookmarkDataIsStale: &isStale
-            ) {
-                return resolved == folderURL
-            }
-            return false
-        }
-        
-        // Сохраняем обновлённый список
-        do {
-            let newData = try JSONEncoder().encode(existing)
-            try newData.write(to: url)
-            print("🗑️ Удалили папку из bookmarks: \(folderURL.lastPathComponent)")
-        } catch {
-            print("❌ Не удалось сохранить обновлённый список bookmarks")
-        }
-        
-        // Обновим список в UI
-        DispatchQueue.main.async {
-            self.attachedFolders.removeAll { $0.url == folderURL }
-            self.tracks = self.attachedFolders.flatMap { $0.audioFiles }
+        if let encoded = try? JSONEncoder().encode(array) {
+            try? encoded.write(to: url)
         }
     }
-    
-    // MARK: - Загрузка подпапок для папки (ленивая)
-    
-    func loadSubfolders(for folderURL: URL) -> [LibraryFolder] {
-        let fileManager = FileManager.default
-        var result: [LibraryFolder] = []
         
-        if let contents = try? fileManager.contentsOfDirectory(at: folderURL, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles]) {
-            for item in contents {
-                var isDirectory: ObjCBool = false
-                if fileManager.fileExists(atPath: item.path, isDirectory: &isDirectory), isDirectory.boolValue {
-                    result.append(liteFolder(from: item))
-                }
-            }
-        }
-        return result
-    }
-    
-    
-    
-    // MARK: - Генерация LibraryTrack объектов для отображения
-    
-    /// Асинхронно преобразует массив URL-ов в массив LibraryTrack, включая парсинг тегов и создание bookmark
-    func generateLibraryTracks(from urls: [URL]) async -> [LibraryTrack] {
-        await withTaskGroup(of: LibraryTrack?.self) { group in
-            for url in urls {
-                group.addTask { [self] in
-                    let accessed = url.startAccessingSecurityScopedResource()
-                    defer {
-                        if accessed { url.stopAccessingSecurityScopedResource() }
-                    }
-                    
-                    // Дата создания или модификации
-                    let resourceValues = try? url.resourceValues(forKeys: [.creationDateKey, .contentModificationDateKey])
-                    let addedDate = resourceValues?.creationDate ?? resourceValues?.contentModificationDate ?? Date()
-                    
-                    // Парсим теги (TagLib)
-                    let metadata = try? await MetadataParser.parseMetadata(from: url)
-                    
-                    // Bookmark для доступа к файлу
-                    let bookmarkData = try? url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
-                    let bookmarkBase64 = bookmarkData?.base64EncodedString() ?? ""
-                    
-                    // Проверка кэша
-                    let imported: ImportedTrack
-                    let filePath = url.path
-                    
-                    let cached: ImportedTrack? = cacheQueue.sync {
-                        importedTrackCache[filePath]
-                    }
-                    
-                    if let cached {
-                        imported = cached
-                    } else {
-                        let newTrack = ImportedTrack(
-                            id: UUID(uuidString: url.lastPathComponent) ?? UUID(),
-                            fileName: url.lastPathComponent,
-                            filePath: filePath,
-                            orderPrefix: "",
-                            title: metadata?.title,
-                            artist: metadata?.artist,
-                            album: metadata?.album,
-                            duration: metadata?.duration ?? 0,
-                            bookmarkBase64: bookmarkBase64
-                        )
-                        cacheQueue.sync {
-                            importedTrackCache[filePath] = newTrack
-                        }
-                        imported = newTrack
-                    }
-                    
-                    let resolvedURL = SecurityScopedBookmarkHelper.resolveURL(from: bookmarkBase64) ?? url
-                    let isAvailable = FileManager.default.fileExists(atPath: resolvedURL.path)
-                    
-                    return LibraryTrack(
-                        url: url,
-                        resolvedURL: resolvedURL,
-                        isAvailable: isAvailable,
-                        bookmarkBase64: bookmarkBase64,
-                        title: metadata?.title ?? url.deletingPathExtension().lastPathComponent,
-                        artist: metadata?.artist,
-                        duration: metadata?.duration ?? 0,
-                        artwork: nil,
-                        addedDate: addedDate,
-                        original: imported
-                    )
-                }
+        
+        
+        // MARK: - Удаление bookmarkData по URL
+        
+        /// Удаляет сохранённый bookmark и обновляет список папок в UI
+        func removeBookmark(for folderURL: URL) {
+            let url = Self.bookmarksFileURL
+            
+            guard let data = try? Data(contentsOf: url),
+                  var existing = try? JSONDecoder().decode([Data].self, from: data) else {
+                print("⚠️ Не удалось загрузить bookmarkData для удаления")
+                return
             }
             
-            var results: [LibraryTrack] = []
-            for await result in group {
-                if let track = result {
-                    results.append(track)
+            // Удаляем совпадающий bookmark по url
+            existing.removeAll { data in
+                var isStale = false
+                if let resolved = try? URL(
+                    resolvingBookmarkData: data,
+                    options: [.withoutUI],
+                    relativeTo: nil,
+                    bookmarkDataIsStale: &isStale
+                ) {
+                    return resolved == folderURL
+                }
+                return false
+            }
+            
+            // Сохраняем обновлённый список
+            do {
+                let newData = try JSONEncoder().encode(existing)
+                try newData.write(to: url)
+                print("🗑️ Удалили папку из bookmarks: \(folderURL.lastPathComponent)")
+            } catch {
+                print("❌ Не удалось сохранить обновлённый список bookmarks")
+            }
+            
+            // Обновим список в UI
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.attachedFolders.removeAll { $0.url == folderURL }
+                self.tracks = self.attachedFolders.flatMap { $0.audioFiles }
+            }
+        }
+        
+        // MARK: - Загрузка подпапок для папки (ленивая)
+        
+        func loadSubfolders(for folderURL: URL) -> [LibraryFolder] {
+            let fileManager = FileManager.default
+            var result: [LibraryFolder] = []
+            
+            if let contents = try? fileManager.contentsOfDirectory(at: folderURL, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles]) {
+                for item in contents {
+                    var isDirectory: ObjCBool = false
+                    if fileManager.fileExists(atPath: item.path, isDirectory: &isDirectory), isDirectory.boolValue {
+                        result.append(liteFolder(from: item))
+                    }
                 }
             }
-            return results
+            return result
+        }
+        
+        
+        // MARK: - Генерация LibraryTrack объектов для отображения
+        
+        /// Асинхронно преобразует массив URL-ов в массив LibraryTrack, включая парсинг тегов и создание bookmark
+        func generateLibraryTracks(from urls: [URL]) async -> [LibraryTrack] {
+            await withTaskGroup(of: LibraryTrack?.self) { group in
+                for url in urls {
+                    group.addTask { [self] in
+                        let accessed = url.startAccessingSecurityScopedResource()
+                        defer {
+                            if accessed { url.stopAccessingSecurityScopedResource() }
+                        }
+                        
+                        // Дата создания или модификации
+                        let resourceValues = try? url.resourceValues(forKeys: [.creationDateKey, .contentModificationDateKey])
+                        let addedDate = resourceValues?.creationDate ?? resourceValues?.contentModificationDate ?? Date()
+                        
+                        // Парсим теги (TagLib)
+                        let metadata = try? await MetadataParser.parseMetadata(from: url)
+                        
+                        // Bookmark для доступа к файлу
+                        let bookmarkData = try? url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
+                        let bookmarkBase64 = bookmarkData?.base64EncodedString() ?? ""
+                        
+                        // Проверка кэша
+                        let imported: ImportedTrack
+                        let filePath = url.path
+                        
+                        let cached: ImportedTrack? = cacheQueue.sync {
+                            importedTrackCache[filePath]
+                        }
+                        
+                        if let cached {
+                            imported = cached
+                        } else {
+                            let newTrack = ImportedTrack(
+                                id: UUID(uuidString: url.lastPathComponent) ?? UUID(),
+                                fileName: url.lastPathComponent,
+                                filePath: filePath,
+                                orderPrefix: "",
+                                title: metadata?.title,
+                                artist: metadata?.artist,
+                                album: metadata?.album,
+                                duration: metadata?.duration ?? 0,
+                                bookmarkBase64: bookmarkBase64
+                            )
+                            cacheQueue.sync {
+                                importedTrackCache[filePath] = newTrack
+                            }
+                            imported = newTrack
+                        }
+                        
+                        let resolvedURL = SecurityScopedBookmarkHelper.resolveURL(from: bookmarkBase64) ?? url
+                        let isAvailable = FileManager.default.fileExists(atPath: resolvedURL.path)
+                        
+                        return LibraryTrack(
+                            url: url,
+                            resolvedURL: resolvedURL,
+                            isAvailable: isAvailable,
+                            bookmarkBase64: bookmarkBase64,
+                            title: metadata?.title ?? url.deletingPathExtension().lastPathComponent,
+                            artist: metadata?.artist,
+                            duration: metadata?.duration ?? 0,
+                            artwork: nil,
+                            addedDate: addedDate,
+                            original: imported
+                        )
+                    }
+                }
+                
+                var results: [LibraryTrack] = []
+                for await result in group {
+                    if let track = result {
+                        results.append(track)
+                    }
+                }
+                return results
+            }
         }
     }
-}
+

@@ -57,7 +57,9 @@ struct LibraryScreen: View {
                     case .success(let urls):
                         if let folderURL = urls.first {
                             musicLibraryManager.saveBookmark(for: folderURL)
-                            musicLibraryManager.restoreAccess()
+                            Task {
+                                await musicLibraryManager.restoreAccessAsync()
+                            }
                         }
                     case .failure(let error):
                         print("❌ Ошибка выбора папки: \(error.localizedDescription)")
@@ -68,10 +70,6 @@ struct LibraryScreen: View {
                 guard !didWarmUp else { return }
                 didWarmUp = true
 
-                // всё тяжёлое — строго не на main
-                await Task.detached(priority: .utility) {
-                    MusicLibraryManager.shared.restoreAccess()
-                }.value
             }
             
         }
