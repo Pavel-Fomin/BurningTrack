@@ -8,7 +8,6 @@
 import SwiftUI
 import Foundation
 
-
 struct TrackListRowView: View {
     let track: Track
     let isCurrent: Bool

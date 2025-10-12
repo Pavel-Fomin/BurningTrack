@@ -11,26 +11,26 @@ import Foundation
 import SwiftUI
 
 struct PlayerView: View {
-    let tracks: [any TrackDisplayable]
+    let tracks: [PlayerTrack]
     @ObservedObject var playerViewModel: PlayerViewModel
 
     var body: some View {
-            ZStack {
-                List {
-                    PlayerRowsView(
-                        tracks: tracks,
-                        playerViewModel: playerViewModel
-                    )
-                }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
-            }
+        List {
+            PlayerRowsView(
+                tracks: tracks,
+                playerViewModel: playerViewModel
+            )
         }
+        .safeAreaInset(edge: .bottom) {
+            Color.clear.frame(height: 88)
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(Color(.systemBackground))
+        
     }
 
-
     // MARK: - Компонент строк плеера
-
     private struct PlayerRowsView: View {
         let tracks: [any TrackDisplayable]
         let playerViewModel: PlayerViewModel
@@ -52,6 +52,7 @@ struct PlayerView: View {
                         }
                     }
                 )
+                
             }
             .onMove { from, to in
                 PlaylistManager.shared.tracks.move(fromOffsets: from, toOffset: to)
@@ -59,3 +60,4 @@ struct PlayerView: View {
             }
         }
     }
+}

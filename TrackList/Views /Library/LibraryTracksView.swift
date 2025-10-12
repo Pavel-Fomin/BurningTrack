@@ -48,6 +48,9 @@ struct LibraryTracksView: View {
             .scrollContentBackground(.hidden)
             .background(Color.clear)
             .overlay(ScrollSpeedObserver(model: scrollSpeed))
+            .safeAreaInset(edge: .bottom) {
+                Color.clear.frame(height: 88)
+            }
             
             // Фуллскрин-лоадер — только на самой первой загрузке
             if viewModel.isLoading && viewModel.trackSections.isEmpty {

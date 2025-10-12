@@ -84,14 +84,14 @@ struct LibraryTrackRowWrapper: View {
                     ))
                 }
             } label: {
-                Text("В плеер")
+                Label("В плеер", systemImage: "waveform")
             }
             .tint(.blue)
             
             Button {
                 sheetManager.open(track: track)
             } label: {
-                Text("В треклист")
+                Label("В треклист", systemImage: "list.star")
             }
             .tint(.green)
             
@@ -99,7 +99,7 @@ struct LibraryTrackRowWrapper: View {
                 sheetManager.highlightedTrackID = track.id
                 sheetManager.presentTrackActions(track: track, context: .library)
             } label: {
-                Image(systemName: "ellipsis")
+                Label("Ещё", systemImage: "ellipsis")
             }
             .tint(.gray)
         }

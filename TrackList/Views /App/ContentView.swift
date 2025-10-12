@@ -14,39 +14,44 @@ struct ContentView: View {
     @ObservedObject var playerViewModel: PlayerViewModel
     @EnvironmentObject var toast: ToastManager
     @State private var selectedTab: Int = 0
-    @State private var miniPlayerHeight: CGFloat = 0
     let trackListViewModel: TrackListViewModel
     
     var body: some View {
-        MiniPlayerWrapperView(
-            playerViewModel: playerViewModel,
-            trackListViewModel: trackListViewModel
-        ) {
-            ZStack(alignment: .bottom) {
-                MainTabView(
+        ZStack(alignment: .bottom) {
+            // Основные вкладки
+            MainTabView(
+                trackListViewModel: trackListViewModel,
+                playerViewModel: playerViewModel
+            )
+
+            // Мини-плеер
+            if playerViewModel.currentTrackDisplayable != nil {
+                MiniPlayerView(
                     trackListViewModel: trackListViewModel,
                     playerViewModel: playerViewModel
                 )
-                
-                if let data = toast.data {
-                    VStack(spacing: 8) {
-                        ToastView(data: data)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, toastBottomPadding)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .animation(.easeInOut(duration: 0.3), value: data.id)
+                .padding(.horizontal, 8)
+                .padding(.bottom, safeTabBarInset)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+
+            // Тост-уведомления
+            if let data = toast.data {
+                VStack(spacing: 8) {
+                    ToastView(data: data)
                 }
+                .padding(.horizontal, 16)
+                .padding(.bottom, toastBottomPadding)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .animation(.easeInOut(duration: 0.3), value: data.id)
             }
         }
+
         .onAppear { Haptics.shared.warmup() }
-        
         .sheet(item: $sheetManager.trackActionsSheet, onDismiss: {
             sheetManager.highlightedTrackID = nil
         }) { data in
-            // базовый расчёт высоты
             let base = CGFloat(data.actions.count) * 56 + 8
-            // добавляем «воздух» сверху, если кнопок мало
             let adjusted = data.actions.count <= 2 ? base + 28 : base
 
             TrackActionSheet(
@@ -54,17 +59,15 @@ struct ContentView: View {
                 context: data.context,
                 actions: data.actions,
                 onAction: { action in
-                    // Обработчик выбранного действия
                     print("Выбрано действие: \(action)")
                 }
             )
             .presentationDetents([.height(adjusted)])
-            
         }
     }
+
     
-// MARK: - Тост
-    
+// MARK: - Тост-паддинг
     private var toastBottomPadding: CGFloat {
         let hasMiniPlayer = playerViewModel.currentTrackDisplayable != nil && selectedTab != 2
         let miniPlayerHeight: CGFloat = hasMiniPlayer ? 88 : 0
@@ -73,4 +76,13 @@ struct ContentView: View {
         let spacing: CGFloat = 12
         return miniPlayerHeight + toastGap + tabBarHeight + spacing
     }
+}
+
+
+// MARK: - Вычесляемое свойство для Dynamic Island, Face ID, iPhone SE и т.д.
+private var safeTabBarInset: CGFloat {
+    UIApplication.shared.connectedScenes
+        .compactMap { ($0 as? UIWindowScene)?.keyWindow }
+        .first?
+        .safeAreaInsets.bottom ?? 49
 }

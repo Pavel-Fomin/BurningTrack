@@ -49,7 +49,7 @@ struct MusicLibraryView: View {
                         Button(role: .destructive) {
                             manager.removeBookmark(for: folder.url)
                         } label: {
-                            Label("Открепить", systemImage: "trash")
+                            Image(systemName: "pin.slash.fill")
                         }
                     }
                 }

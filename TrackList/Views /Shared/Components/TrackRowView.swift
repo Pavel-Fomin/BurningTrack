@@ -21,8 +21,6 @@ struct TrackRowView: View {
     let artist: String?
     let onTap: () -> Void
     
-    var swipeActionsLeft: [CustomSwipeAction] = []
-    var swipeActionsRight: [CustomSwipeAction] = []
     var trackListNames: [String]? = nil
     var useNativeSwipeActions: Bool = false
     
@@ -30,7 +28,6 @@ struct TrackRowView: View {
         HStack(spacing: 12) {
             artworkView
             trackInfoView
-            
         }
         .padding(.vertical, 0)
         .padding(.horizontal, 4)
@@ -44,32 +41,6 @@ struct TrackRowView: View {
             }
         }
         .listRowBackground(rowHighlightColor)
-        
-        .if(!useNativeSwipeActions) { view in
-            view.customSwipeActions(
-                swipeActionsLeft: swipeActionsLeft,
-                swipeActionsRight: swipeActionsRight
-            )
-        }
-        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-            if useNativeSwipeActions {
-                ForEach(swipeActionsRight) { action in
-                    Button(role: action.role) {
-                        action.handler()
-                    } label: {
-                        switch action.labelType {
-                        case .iconOnly:
-                            Image(systemName: action.systemImage)
-                        case .textOnly:
-                            Text(action.label)
-                        case .iconAndText:
-                            Label(action.label, systemImage: action.systemImage)
-                        }
-                    }
-                    
-                }
-            }
-        }
     }
     
     

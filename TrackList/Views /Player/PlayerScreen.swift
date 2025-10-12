@@ -25,7 +25,7 @@ struct PlayerScreen: View {
                     .ignoresSafeArea()
                 VStack(spacing: 0) {
                     
-                    
+        
 // MARK: - Хедер
                     
                     PlayerHeaderView(

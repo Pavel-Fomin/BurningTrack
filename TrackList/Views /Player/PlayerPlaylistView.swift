@@ -17,7 +17,7 @@ struct PlayerPlaylistView: View {
     
     var body: some View {
         PlayerView(
-            tracks: manager.tracks.map { $0 as any TrackDisplayable },
+            tracks: manager.tracks,
             playerViewModel: playerViewModel
         )
                 }

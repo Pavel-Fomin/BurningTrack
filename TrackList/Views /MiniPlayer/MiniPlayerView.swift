@@ -164,7 +164,7 @@ struct MiniPlayerView: View {
     
             }
             .padding(.horizontal, 16)
-            .padding(.bottom, 0) /// отступ между плеером и меню
+            .padding(.bottom, 24) /// отступ между плеером и меню
         }
         
     }

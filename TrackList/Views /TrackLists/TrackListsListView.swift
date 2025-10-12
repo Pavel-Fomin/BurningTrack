@@ -45,13 +45,12 @@ struct TrackListsListView: View {
                 Spacer()
             }
             .contentShape(Rectangle())
-            .navigationBarHidden(true)
         }
         .swipeActions(edge: .trailing) {
             Button(role: .destructive) {
                 viewModel.deleteTrackList(id: list.id)
             } label: {
-                Label("Удалить", systemImage: "trash")
+                Image(systemName: "trash")
             }
         }
     }

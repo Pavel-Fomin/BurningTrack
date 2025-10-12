@@ -5,6 +5,7 @@
 //  Created by Pavel Fomin on 22.06.2025.
 //
 
+/*
 import SwiftUI
 
 struct TrackListLibraryView: View {
@@ -30,9 +31,10 @@ struct TrackListLibraryView: View {
                                         Button(role: .destructive) {
                                             trackListToDelete = meta
                                         } label: {
-                                            Label("Удалить", systemImage: "trash")
+                                            Label("Удалить треклист", systemImage: "trash")
                                         }
                                     }
+                    
                                 }
                             }
                             .confirmationDialog(
@@ -90,3 +92,4 @@ struct TrackListLibraryView: View {
     }
     
 }
+ */
