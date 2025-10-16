@@ -11,10 +11,22 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var sheetManager = SheetManager.shared
+    @StateObject private var trackDetailManager = TrackDetailManager.shared
     @ObservedObject var playerViewModel: PlayerViewModel
     @EnvironmentObject var toast: ToastManager
     @State private var selectedTab: Int = 0
+    
     let trackListViewModel: TrackListViewModel
+    
+    // MARK: - Обёртка и computed property
+        private struct IdentifiableTrack: Identifiable {
+            let id = UUID()
+            let track: any TrackDisplayable
+        }
+
+        private var identifiableTrack: IdentifiableTrack? {
+            trackDetailManager.track.map { IdentifiableTrack(track: $0) }
+        }
     
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -23,7 +35,7 @@ struct ContentView: View {
                 trackListViewModel: trackListViewModel,
                 playerViewModel: playerViewModel
             )
-
+            
             // Мини-плеер
             if playerViewModel.currentTrackDisplayable != nil {
                 MiniPlayerView(
@@ -34,7 +46,7 @@ struct ContentView: View {
                 .padding(.bottom, safeTabBarInset)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
-
+            
             // Тост-уведомления
             if let data = toast.data {
                 VStack(spacing: 8) {
@@ -46,13 +58,13 @@ struct ContentView: View {
                 .animation(.easeInOut(duration: 0.3), value: data.id)
             }
         }
-
+        
         .sheet(item: $sheetManager.trackActionsSheet, onDismiss: {
             sheetManager.highlightedTrackID = nil
         }) { data in
             let base = CGFloat(data.actions.count) * 56 + 8
             let adjusted = data.actions.count <= 2 ? base + 28 : base
-
+            
             TrackActionSheet(
                 track: data.track,
                 context: data.context,
@@ -63,8 +75,23 @@ struct ContentView: View {
             )
             .presentationDetents([.height(adjusted)])
         }
+        
+        // Экран "О треке"
+        .sheet(
+            isPresented: Binding(
+                get: { trackDetailManager.track != nil },
+                set: { newValue in
+                    if !newValue {
+                        TrackDetailManager.shared.close() // синхронизация при свайпе вниз
+                    }
+                }
+            )
+        ) {
+            if let track = trackDetailManager.track {
+                TrackDetailSheet(fileURL: track.url)
+            }
+        }
     }
-
     
 // MARK: - Тост-паддинг
     private var toastBottomPadding: CGFloat {

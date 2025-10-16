@@ -71,4 +71,10 @@ final class SheetManager: ObservableObject {
         highlightedTrackID = track.id
         trackActionsSheet = TrackActionsSheetData(track: track, context: context)
     }
+    
+    func closeAllSheets() {
+        trackActionsSheet = nil
+        trackToAdd = nil
+        highlightedTrackID = nil
+    }
 }

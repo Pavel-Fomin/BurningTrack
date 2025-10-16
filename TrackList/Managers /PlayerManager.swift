@@ -23,7 +23,6 @@ final class PlayerManager {
 // MARK: - Инициализация плеера
     
     init() {
-        configureAudioSession()
         print("🧠 PlayerManager инициализирован")
         
         // Подписка на завершение трека

@@ -21,7 +21,12 @@ struct TrackActionSheet: View {
         VStack(spacing: 0) {
             ForEach(actions, id: \.self) { action in
                 Button {
-                    onAction(action)
+                    if action == .showInfo {
+                        SheetManager.shared.closeAllSheets()
+                        TrackDetailManager.shared.open(track: track)
+                    } else {
+                        onAction(action)
+                    }
                 } label: {
                     HStack(spacing: 12) {
                         icon(for: action)
