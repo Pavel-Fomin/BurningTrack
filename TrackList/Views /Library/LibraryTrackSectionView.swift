@@ -20,6 +20,7 @@ struct LibraryTrackSectionView: View {
     let playerViewModel: PlayerViewModel
     let metadataByURL: [URL: TrackMetadataCacheManager.CachedMetadata]
     let isScrollingFast: Bool
+    let revealedTrackID: UUID?
     
     @EnvironmentObject var toast: ToastManager
     @EnvironmentObject var sheetManager: SheetManager
@@ -37,8 +38,10 @@ struct LibraryTrackSectionView: View {
                     trackListNamesByURL: trackListNamesByURL,
                     metadata: metadataByURL[track.resolvedURL],
                     isScrollingFast: isScrollingFast,
-                    playerViewModel: playerViewModel          
+                    isRevealed: track.id == revealedTrackID,
+                    playerViewModel: playerViewModel
                 )
+                .id(track.id)
                 .environmentObject(toast)
                 .environmentObject(sheetManager)
             }

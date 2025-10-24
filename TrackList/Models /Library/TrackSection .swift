@@ -9,8 +9,13 @@
 
 import Foundation
 
-struct TrackSection: Identifiable {
+struct TrackSection: Identifiable, Equatable {
     let id: String
     let title: String
     let tracks: [LibraryTrack]
+
+    // Достаточно поверхностного сравнения для SwiftUI:
+    static func == (lhs: TrackSection, rhs: TrackSection) -> Bool {
+        lhs.id == rhs.id && lhs.tracks.count == rhs.tracks.count
+    }
 }

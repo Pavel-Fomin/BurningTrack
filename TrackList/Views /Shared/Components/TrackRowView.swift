@@ -115,9 +115,9 @@ struct TrackRowView: View {
     
     private var rowHighlightColor: Color {
         if isHighlighted {
-            return Color.gray.opacity(0.12)      // временная подсветка при открытом шите
+            return Color.gray.opacity(0.12)      // Подсветка при открытом шите
         } else if isCurrent {
-            return Color.accentColor.opacity(0.12) // активный трек
+            return Color.accentColor.opacity(0.12) // Подсветка шита при активный трек
         } else {
             return Color.clear
         }

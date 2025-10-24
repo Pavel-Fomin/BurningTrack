@@ -18,7 +18,8 @@ struct LibraryScreen: View {
     let playerViewModel: PlayerViewModel
     let trackListViewModel: TrackListViewModel
     @EnvironmentObject var toast: ToastManager
-
+    @EnvironmentObject private var navObserver: NavigationObserver
+    
     var body: some View {
         NavigationStack(path: $path) {
             ZStack {
@@ -28,7 +29,7 @@ struct LibraryScreen: View {
                             isShowingFolderPicker = true
                         }
                     }
-
+                    
                     MusicLibraryView(
                         path: $path,
                         trackListViewModel: trackListViewModel,
@@ -39,7 +40,7 @@ struct LibraryScreen: View {
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-
+                
                 .navigationDestination(for: LibraryFolder.self) { folder in
                     LibraryFolderView(
                         folder: folder,
@@ -47,7 +48,7 @@ struct LibraryScreen: View {
                         playerViewModel: playerViewModel
                     )
                 }
-
+                
                 .fileImporter(
                     isPresented: $isShowingFolderPicker,
                     allowedContentTypes: [.folder],
@@ -66,12 +67,60 @@ struct LibraryScreen: View {
                     }
                 }
             }
-            .task(id: didWarmUp) {
-                guard !didWarmUp else { return }
-                didWarmUp = true
-
+        }
+        .id(path.first?.id ?? UUID())
+        
+            // MARK: - Реакция на revealTrack
+            .onReceive(navObserver.$requestedTrackURL.compactMap { $0 }) { url in
+                // 1) URL папки, где лежит трек
+                let folderURL = url.deletingLastPathComponent()
+                
+                // 2) Ищем папку РЕКУРСИВНО (учитывая подпапки)
+                guard let folder = findFolder(for: folderURL,
+                                              in: MusicLibraryManager.shared.attachedFolders) else {
+                    print("⚠️ Папка для трека не найдена среди прикреплённых")
+                    return
+                }
+                
+                // 3) Уже в нужной папке — выходим
+                if path.first?.url.standardizedFileURL == folderURL.standardizedFileURL {
+                    print("📌 Уже внутри нужной папки: \(folder.name)")
+                    return
+                }
+                
+                // 4) Даём SwiftUI дорисовать стек и мгновенно меняем path без дёрганий
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                    path.removeAll()
+                    path.append(folder)
+                    print("➡️ Переход в папку: \(folder.name)")
+                }
             }
             
+            
+            // MARK: - Первый запуск
+            .task {
+                guard !didWarmUp else { return }
+                didWarmUp = true
+                print("📡 LibraryScreen готова принимать переходы")
+            }
+            .onDisappear {
+                print("📴 LibraryScreen выгружена")
+            }
         }
     }
-}
+    
+    
+    // Рекурсивный поиск папки по URL в прикреплённом дереве
+    private func findFolder(for url: URL, in folders: [LibraryFolder]) -> LibraryFolder? {
+        for folder in folders {
+            // сравниваем «нормализованные» URL, чтобы исключить различия в путях
+            if folder.url.standardizedFileURL == url.standardizedFileURL {
+                return folder
+            }
+            if let found = findFolder(for: url, in: folder.subfolders) {
+                return found
+            }
+        }
+        return nil
+    }
+

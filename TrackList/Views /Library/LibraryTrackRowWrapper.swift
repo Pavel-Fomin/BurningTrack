@@ -16,6 +16,7 @@ struct LibraryTrackRowWrapper: View {
     let trackListNamesByURL: [URL: [String]]
     let metadata: TrackMetadataCacheManager.CachedMetadata?
     let isScrollingFast: Bool
+    let isRevealed: Bool
     
     @State private var artwork: CGImage? = nil
     
@@ -44,7 +45,7 @@ struct LibraryTrackRowWrapper: View {
             track: track,
             isCurrent: isCurrent,
             isPlaying: isPlaying,
-            isHighlighted: isHighlighted,
+            isHighlighted: isRevealed || isHighlighted,
             artwork: artwork,
             title: metadata?.title ?? track.original.title,
             artist: metadata?.artist ?? track.original.artist,

@@ -12,11 +12,14 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var sheetManager = SheetManager.shared
     @StateObject private var trackDetailManager = TrackDetailManager.shared
+    @StateObject private var navigation = NavigationCoordinator.shared
     @ObservedObject var playerViewModel: PlayerViewModel
     @EnvironmentObject var toast: ToastManager
     @State private var selectedTab: Int = 0
+    @StateObject private var navObserver = NavigationObserver()
     
     let trackListViewModel: TrackListViewModel
+    
     
     // MARK: - Обёртка и computed property
         private struct IdentifiableTrack: Identifiable {
@@ -33,8 +36,10 @@ struct ContentView: View {
             // Основные вкладки
             MainTabView(
                 trackListViewModel: trackListViewModel,
-                playerViewModel: playerViewModel
+                playerViewModel: playerViewModel,
+                selectedTab: $selectedTab           // ← передаём биндинг
             )
+            .environmentObject(navObserver)
             
             // Мини-плеер
             if playerViewModel.currentTrackDisplayable != nil {
@@ -90,6 +95,9 @@ struct ContentView: View {
             if let track = trackDetailManager.track {
                 TrackDetailSheet(fileURL: track.url)
             }
+        }
+        .onReceive(navigation.revealTrack) { _ in
+            selectedTab = 1 // открыть вкладку «Фонотека»
         }
     }
     

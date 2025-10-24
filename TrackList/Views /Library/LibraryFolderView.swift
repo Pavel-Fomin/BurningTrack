@@ -18,12 +18,14 @@ struct LibraryFolderView: View {
     let trackListViewModel: TrackListViewModel
     @ObservedObject var playerViewModel: PlayerViewModel
     @StateObject private var viewModel: LibraryFolderViewModel
+    @State private var scrollTargetID: UUID? = nil
+    @State private var revealedTrackID: UUID? = nil
 
     
 // MARK: - Инициализация зависимостей
     
     init(folder: LibraryFolder, trackListViewModel: TrackListViewModel, playerViewModel: PlayerViewModel) {
-        self.folder = folder                               // ← ЭТОГО НЕ ХВАТАЛО
+        self.folder = folder
         self.trackListViewModel = trackListViewModel
         self._playerViewModel = ObservedObject(wrappedValue: playerViewModel)
         self._viewModel = StateObject(wrappedValue: LibraryFolderViewModel(folder: folder))
@@ -32,21 +34,28 @@ struct LibraryFolderView: View {
     var body: some View {
         Group {
             if viewModel.subfolders.isEmpty {
-                // Нет подпапок → экран треков
+                // Нет подпапок → показываем треки
                 LibraryTracksView(
                     folder: viewModel.folder,
                     trackListViewModel: trackListViewModel,
                     playerViewModel: playerViewModel
                 )
+                .navigationTitle(viewModel.folder.name)
+                .navigationBarTitleDisplayMode(.inline)
+                
             } else {
-                // Есть подпапки → показываем их
+                // Есть подпапки → список подпапок
                 List { folderSectionView() }
                     .listStyle(.insetGrouped)
                     .navigationTitle(viewModel.folder.name)
+                    .navigationBarTitleDisplayMode(.inline)
             }
         }
-        .task(id: viewModel.folder.url) { 
+        .task(id: viewModel.folder.url) {
             viewModel.loadSubfoldersIfNeeded()
+        }
+        .onAppear {
+            NavigationCoordinator.shared.notifyLibraryReady(for: folder.url)
         }
     }
 

@@ -24,6 +24,12 @@ struct TrackActionSheet: View {
                     if action == .showInfo {
                         SheetManager.shared.closeAllSheets()
                         TrackDetailManager.shared.open(track: track)
+                    } else if action == .showInLibrary {
+                        SheetManager.shared.closeAllSheets()
+                        
+                        // Переход к папке с треком
+                        NavigationCoordinator.shared.showInLibrary(for: track.url)
+                        
                     } else {
                         onAction(action)
                     }
