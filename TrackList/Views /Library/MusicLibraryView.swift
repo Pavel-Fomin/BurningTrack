@@ -12,13 +12,12 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct MusicLibraryView: View {
-    @Binding var path: [LibraryFolder]
-    @StateObject private var manager = MusicLibraryManager.shared
-    
     let trackListViewModel: TrackListViewModel
     let playerViewModel: PlayerViewModel
     let onAddFolder: () -> Void
     
+    @ObservedObject var coordinator: LibraryCoordinator
+    @StateObject private var manager = MusicLibraryManager.shared
     
     var body: some View {
         if manager.attachedFolders.isEmpty {
@@ -34,7 +33,9 @@ struct MusicLibraryView: View {
         } else {
             List {
                 ForEach(manager.attachedFolders) { folder in
-                    NavigationLink(value: folder) {
+                    Button(action: {
+                        coordinator.openFolder(folder)
+                    }) {
                         HStack(spacing: 12) {
                             Image(systemName: "folder.fill")
                                 .foregroundColor(.blue)
@@ -43,8 +44,8 @@ struct MusicLibraryView: View {
                                 .lineLimit(1)
                         }
                         .padding(.vertical, 4)
-                        
                     }
+                    .buttonStyle(.plain)
                     .swipeActions(edge: .trailing) {
                         Button(role: .destructive) {
                             manager.removeBookmark(for: folder.url)
@@ -53,7 +54,6 @@ struct MusicLibraryView: View {
                         }
                     }
                 }
-
                 Button(action: onAddFolder) {
                     HStack(spacing: 12) {
                         Image(systemName: "folder.fill.badge.plus")

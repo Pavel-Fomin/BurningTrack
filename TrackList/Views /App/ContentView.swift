@@ -16,7 +16,6 @@ struct ContentView: View {
     @ObservedObject var playerViewModel: PlayerViewModel
     @EnvironmentObject var toast: ToastManager
     @State private var selectedTab: Int = 0
-    @StateObject private var navObserver = NavigationObserver()
     
     let trackListViewModel: TrackListViewModel
     
@@ -37,9 +36,9 @@ struct ContentView: View {
             MainTabView(
                 trackListViewModel: trackListViewModel,
                 playerViewModel: playerViewModel,
-                selectedTab: $selectedTab           // ← передаём биндинг
+                selectedTab: $selectedTab
             )
-            .environmentObject(navObserver)
+            
             
             // Мини-плеер
             if playerViewModel.currentTrackDisplayable != nil {
@@ -96,8 +95,9 @@ struct ContentView: View {
                 TrackDetailSheet(fileURL: track.url)
             }
         }
-        .onReceive(navigation.revealTrack) { _ in
-            selectedTab = 1 // открыть вкладку «Фонотека»
+        // открыть вкладку «Фонотека»
+        .onReceive(navigation.$pendingReveal.compactMap { $0 }) { _ in
+            selectedTab = 1 
         }
     }
     

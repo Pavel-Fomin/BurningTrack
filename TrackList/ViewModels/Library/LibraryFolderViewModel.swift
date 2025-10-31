@@ -13,6 +13,7 @@ import Combine
 
 @MainActor
 final class LibraryFolderViewModel: ObservableObject {
+    private let debugID = UUID()
     let folder: LibraryFolder
     private let allowedAudioExts: Set<String> = ["mp3","flac","wav","aiff","aac","m4a","ogg"]
     private let initialParseCount = 20                     /// подберём позже (20–40)
@@ -56,88 +57,55 @@ final class LibraryFolderViewModel: ObservableObject {
         }
         // Сбрасываем старые подписки перед созданием новой
         cancellables.removeAll()
-        
-        NavigationCoordinator.shared.revealTrack
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] url in
-                guard let self else { return }
-                
-                // Проверяем, что это актуальная папка
-                guard url.deletingLastPathComponent() == self.folder.url else { return }
-                
-                // Если уже обрабатывали этот reveal — пропускаем
-                if self.pendingRevealTrackURL == url { return }
-                self.pendingRevealTrackURL = url
-                
-                print("♻️ Восстанавливаем reveal-сигнал для:", url.lastPathComponent)
-                
-                if !self.trackSections.isEmpty {
-                    self.scrollToTrackIfExists(url)
-                } else {
-                    print("⏳ Ожидаем загрузку секций для восстановленного сигнала...")
-                    Task { @MainActor [weak self] in
-                        guard let self else { return }
-                        for await sections in self.$trackSections.values {
-                            if !sections.isEmpty {
-                                print("✅ Секции загружены (восстановление), выполняем скролл")
-                                self.scrollToTrackIfExists(url)
-                                break
-                            }
-                        }
-                    }
-                }
-            }
-            .store(in: &cancellables)
-        
-        // Если к моменту создания ViewModel уже есть активный трек — обработаем его сразу
-        if let pending = NavigationCoordinator.shared.lastRevealedTrack {
-            // если этот трек уже в обработке — не дублируем
-            guard pendingRevealTrackURL != pending else { return }
-            pendingRevealTrackURL = pending
-            
-            print("♻️ Восстанавливаем reveal-сигнал для:", pending.lastPathComponent)
-            
-            if pending.deletingLastPathComponent() == folder.url {
-                if !self.trackSections.isEmpty {
-                    self.scrollToTrackIfExists(pending)
-                } else {
-                    print("⏳ Ожидаем загрузку секций для восстановленного сигнала...")
-                    Task { @MainActor [weak self] in
-                        guard let self else { return }
-                        for await sections in self.$trackSections.values {
-                            if !sections.isEmpty {
-                                print("✅ Секции загружены (восстановление), выполняем скролл")
-                                self.scrollToTrackIfExists(pending)
-                                break
-                            }
-                        }
-                    }
-                }
-            }
-        }
     }
     
-    private func scrollToTrackIfExists(_ url: URL) {
-        // 1) Пытаемся найти трек сразу
-        if let found = self.trackSections
-            .flatMap({ $0.tracks })
-            .first(where: { $0.resolvedURL == url }) {
-            
-            print("🎯 Найден трек, запускаем прокрутку:", found.title ?? found.url.lastPathComponent)
-            self.scrollTargetID = found.id
-            self.revealedTrackID = found.id
-            
-            // Сбрасываем подсветку через 4 сек
-            DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
-                if self.revealedTrackID == found.id {
-                    self.revealedTrackID = nil
-                }
-            }
-        } else {
-            // 2) Если не найден — ждём первое изменение trackSections и пробуем один раз
-            print("⚠️ Трек не найден среди секций, ждём обновления...")
+    init(folder: LibraryFolder, pendingReveal: URL) {
+        self.folder = folder
+        self.pendingRevealTrackURL = pendingReveal
+        trackListsObserver = NotificationCenter.default.addObserver(
+            forName: .trackListsDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
             Task { @MainActor [weak self] in
-                guard let self else { return }
+                self?.loadTrackListNamesByURL()
+            }
+        }
+        cancellables.removeAll()
+        print("🎯 [Init] ViewModel создан с pendingReveal:", pendingReveal.lastPathComponent)
+        
+        DispatchQueue.main.async {
+                self.pendingRevealTrackURL = pendingReveal
+            }
+    }
+        
+// MARK: - Скролл к треку
+    
+    func scrollToTrackIfExists(_ url: URL) {
+        print("🚀 scrollToTrackIfExists вызван для:", url.lastPathComponent)
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+
+            // теперь ищем трек
+            if let found = self.trackSections
+                .flatMap({ $0.tracks })
+                .first(where: { $0.resolvedURL.standardizedFileURL == url.standardizedFileURL }) {
+
+                print("🎯 Найден трек, запускаем прокрутку:", found.title ?? found.url.lastPathComponent)
+                self.scrollTargetID = found.id
+                self.revealedTrackID = found.id
+
+                // Сбрасываем подсветку через 4 сек
+                DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+                    if self.revealedTrackID == found.id {
+                        self.revealedTrackID = nil
+                    }
+                }
+
+                // Сбрасываем состояние reveal
+                self.pendingRevealTrackURL = nil
+            } else {
+                print("⚠️ Трек не найден среди секций, ждём обновления...")
                 for await sections in self.$trackSections.values {
                     if sections.flatMap({ $0.tracks }).contains(where: { $0.resolvedURL == url }) {
                         print("✅ Повторная попытка: трек найден после обновления секций")
@@ -203,7 +171,6 @@ final class LibraryFolderViewModel: ObservableObject {
             self.trackSections = firstSections
             self.isLoading = false
         }
-        
         
         // грузим tail (треки)
         let restTracks: [LibraryTrack] = await Task.detached(priority: .utility) { [tail] in
@@ -431,6 +398,10 @@ final class LibraryFolderViewModel: ObservableObject {
         loadTrackListNamesByURL()   // теги появились → пересчитываем плашки
     }
     
+    func clearRevealState() {
+        revealedTrackID = nil
+    }
+    
     deinit {
         // Отписываемся от всех Combine-подписок (revealTrack и др.)
         cancellables.forEach { $0.cancel() }
@@ -440,7 +411,7 @@ final class LibraryFolderViewModel: ObservableObject {
         if let o = trackListsObserver {
             NotificationCenter.default.removeObserver(o)
         }
-        print("🧹 LibraryFolderViewModel освобождён для:", folder.name)
+        print("🧹 [deinit] LibraryFolderViewModel освобождён для:", folder.name, "ID:", ObjectIdentifier(self))
     }
 }
 

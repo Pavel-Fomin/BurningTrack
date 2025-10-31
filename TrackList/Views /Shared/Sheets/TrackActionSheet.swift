@@ -28,6 +28,7 @@ struct TrackActionSheet: View {
                         SheetManager.shared.closeAllSheets()
                         
                         // Переход к папке с треком
+                        print("🧭 [TrackActionSheet] showInLibrary вызван для:", track.url.lastPathComponent)
                         NavigationCoordinator.shared.showInLibrary(for: track.url)
                         
                     } else {

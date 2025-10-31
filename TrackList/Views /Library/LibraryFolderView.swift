@@ -16,19 +16,37 @@ import SwiftUI
 struct LibraryFolderView: View {
     let folder: LibraryFolder
     let trackListViewModel: TrackListViewModel
+    
+    @ObservedObject var coordinator: LibraryCoordinator
     @ObservedObject var playerViewModel: PlayerViewModel
     @StateObject private var viewModel: LibraryFolderViewModel
     @State private var scrollTargetID: UUID? = nil
     @State private var revealedTrackID: UUID? = nil
+    
 
     
 // MARK: - Инициализация зависимостей
     
-    init(folder: LibraryFolder, trackListViewModel: TrackListViewModel, playerViewModel: PlayerViewModel) {
+    init(
+        folder: LibraryFolder,
+        coordinator: LibraryCoordinator,
+        trackListViewModel: TrackListViewModel,
+        playerViewModel: PlayerViewModel
+    ) {
         self.folder = folder
+        self.coordinator = coordinator
         self.trackListViewModel = trackListViewModel
         self._playerViewModel = ObservedObject(wrappedValue: playerViewModel)
-        self._viewModel = StateObject(wrappedValue: LibraryFolderViewModel(folder: folder))
+
+        // Проверяем, есть ли отложенный reveal-трек
+        if let revealURL = coordinator.pendingRevealTrackURL {
+            self._viewModel = StateObject(
+                wrappedValue: LibraryFolderViewModel(folder: folder, pendingReveal: revealURL)
+            )
+            print("🎯 [FolderView] Передан pendingReveal:", revealURL.lastPathComponent)
+        } else {
+            self._viewModel = StateObject(wrappedValue: LibraryFolderViewModel(folder: folder))
+        }
     }
 
     var body: some View {
@@ -37,8 +55,10 @@ struct LibraryFolderView: View {
                 // Нет подпапок → показываем треки
                 LibraryTracksView(
                     folder: viewModel.folder,
-                    trackListViewModel: trackListViewModel,
-                    playerViewModel: playerViewModel
+                    trackListViewModel: trackListViewModel, // ← теперь идёт сразу после folder
+                    coordinator: coordinator,
+                    playerViewModel: playerViewModel,
+                    viewModel: viewModel
                 )
                 .navigationTitle(viewModel.folder.name)
                 .navigationBarTitleDisplayMode(.inline)
@@ -54,11 +74,27 @@ struct LibraryFolderView: View {
         .task(id: viewModel.folder.url) {
             viewModel.loadSubfoldersIfNeeded()
         }
-        .onAppear {
-            NavigationCoordinator.shared.notifyLibraryReady(for: folder.url)
+        
+        .id(folder.url)
+        
+        .onReceive(
+            coordinator.$pendingRevealTrackURL
+                .compactMap { $0 }
+        ) { url in
+            if url.deletingLastPathComponent().standardizedFileURL
+                == viewModel.folder.url.standardizedFileURL {
+                
+                print("📬 [FolderView] Приняли pendingReveal от координатора:", url.lastPathComponent)
+                viewModel.pendingRevealTrackURL = url
+                
+                // Сбрасываем reveal, чтобы не повторялся при ручном входе
+                DispatchQueue.main.async {
+                    coordinator.pendingRevealTrackURL = nil
+                }
+            }
         }
     }
-
+    
     
 // MARK: - Секция подпапок
     
@@ -66,13 +102,9 @@ struct LibraryFolderView: View {
     private func folderSectionView() -> some View {
         Section {
             ForEach(viewModel.subfolders) { subfolder in
-                NavigationLink(
-                    destination: LibraryFolderView(
-                        folder: subfolder,
-                        trackListViewModel: trackListViewModel,
-                        playerViewModel: playerViewModel
-                    )
-                ) {
+                Button(action: {
+                    coordinator.openFolder(subfolder)
+                }) {
                     HStack(spacing: 12) {
                         Image(systemName: "folder.fill")
                             .foregroundColor(.blue)

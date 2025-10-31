@@ -248,7 +248,7 @@ final class MusicLibraryManager: ObservableObject {
             attachedFolders[index] = folder
         }
         // Отправляем событие напрямую через NavigationCoordinator
-        NavigationCoordinator.shared.revealTrack.send(trackURL)
+        NavigationCoordinator.shared.pendingReveal = trackURL
     }
     
     

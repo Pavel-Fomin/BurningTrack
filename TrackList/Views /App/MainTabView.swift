@@ -11,7 +11,7 @@ import SwiftUI
 struct MainTabView: View {
     @ObservedObject var trackListViewModel: TrackListViewModel
     @ObservedObject var playerViewModel: PlayerViewModel
-    @Binding var selectedTab: Int          // ← добавили
+    @Binding var selectedTab: Int
 
     var body: some View {
         TabView(selection: $selectedTab) { // ← привязали selection
@@ -22,6 +22,7 @@ struct MainTabView: View {
             LibraryScreen(
                 playerViewModel: playerViewModel,
                 trackListViewModel: trackListViewModel
+                
             )
                 .tabItem { Label("Фонотека", systemImage: "play.square.stack") }
                 .tag(1)

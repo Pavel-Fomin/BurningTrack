@@ -20,6 +20,7 @@ struct LibraryTrackRowWrapper: View {
     
     @State private var artwork: CGImage? = nil
     
+    @ObservedObject var coordinator: LibraryCoordinator
     @ObservedObject var playerViewModel: PlayerViewModel
     @EnvironmentObject var toast: ToastManager
     @EnvironmentObject var sheetManager: SheetManager

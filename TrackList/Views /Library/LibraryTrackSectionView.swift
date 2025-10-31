@@ -22,6 +22,7 @@ struct LibraryTrackSectionView: View {
     let isScrollingFast: Bool
     let revealedTrackID: UUID?
     
+    @ObservedObject var coordinator: LibraryCoordinator
     @EnvironmentObject var toast: ToastManager
     @EnvironmentObject var sheetManager: SheetManager
     
@@ -39,7 +40,9 @@ struct LibraryTrackSectionView: View {
                     metadata: metadataByURL[track.resolvedURL],
                     isScrollingFast: isScrollingFast,
                     isRevealed: track.id == revealedTrackID,
+                    coordinator: coordinator,
                     playerViewModel: playerViewModel
+                   
                 )
                 .id(track.id)
                 .environmentObject(toast)
