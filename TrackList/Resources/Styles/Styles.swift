@@ -117,7 +117,7 @@ struct ButtonTextStyle: ViewModifier {
 // MARK: - Стиль для строки в списке треков
 struct TrackRowStyle: ViewModifier {
     var isCurrent: Bool
-
+    
     func body(content: Content) -> some View {
         content
             .padding(.vertical, Spacing.medium)
@@ -127,6 +127,35 @@ struct TrackRowStyle: ViewModifier {
             .shadow(color: Colors.secondaryText.opacity(0.1), radius: isCurrent ? 4 : 0)
     }
 }
+
+// MARK: - Стиль для системного заголовка iOS 26
+
+enum HeaderStyle {
+    /// Адаптивный фон — светлый/тёмный под iOS 26
+    static func background(for scheme: ColorScheme) -> Color {
+        switch scheme {
+        case .dark:
+            // Тёмный — более плотный и глубокий
+            return Color(.secondarySystemBackground).opacity(0.92)
+        default:
+            // Светлый — лёгкий и полупрозрачный
+            return Color(.systemBackground).opacity(0.85)
+        }
+    }
+
+    /// Тень под хедером — мягкая, как у системного навбара
+    static let shadowColor = Color.black.opacity(0.05)
+
+    /// Разделитель снизу
+    static let divider = Color.black.opacity(0.07)
+
+    /// Шрифт заголовка
+    static let titleFont = Font.system(size: 17, weight: .semibold)
+
+    /// Цвет текста
+    static let titleColor = Color.primary
+}
+
 
 // MARK: - View Extensions
 
@@ -150,4 +179,6 @@ extension View {
     func trackRowStyle(isCurrent: Bool) -> some View {
         self.modifier(TrackRowStyle(isCurrent: isCurrent))
     }
+    
+    
 }

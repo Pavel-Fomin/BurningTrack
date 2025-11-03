@@ -13,18 +13,8 @@ struct TrackListHeaderView: View {
     var isEditing: Bool
     var onAdd: () -> Void
     var onEditToggle: () -> Void
-
+    
     var body: some View {
-        ScreenHeaderView(title: "Треклисты") {
-            EmptyView()
-        } trailing: {
-            Menu {
-                Button("Новый треклист", action: {})
-                Button("Удалить несколько", action: {})
-            } label: {
-                Image(systemName: "ellipsis.circle")
-                    .headerIconStyle()
-            }
-        }
+        ScreenHeaderView(title: "Треклисты")
     }
 }
