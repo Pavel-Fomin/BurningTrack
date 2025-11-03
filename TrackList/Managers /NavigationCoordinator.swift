@@ -22,10 +22,14 @@ final class NavigationCoordinator: ObservableObject {
     private init() {}
     
     // MARK: - Запрос показа трека во фонотеке
-    func showInLibrary(for trackURL: URL) {
-        let u = trackURL.standardizedFileURL
-        print("🧭 Переключаемся во фонотеку для трека: \(u.lastPathComponent)")
-        pendingReveal = u
+    func showInLibrary(for url: URL) {
+        print("🧭 Переключаемся во фонотеку для трека:", url.lastPathComponent)
+        pendingReveal = url
+        
+        // Переключаем активную вкладку на фонотеку
+        Task { @MainActor in
+            ScenePhaseHandler.shared.activeTab = .library
+        }
     }
     
     // MARK: - Уведомление о готовности LibraryScreen

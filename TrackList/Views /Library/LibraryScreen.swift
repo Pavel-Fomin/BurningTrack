@@ -19,6 +19,7 @@ struct LibraryScreen: View {
     @State private var didWarmUp = false
     @StateObject private var coordinator = LibraryCoordinator()
     @EnvironmentObject var toast: ToastManager
+    @ObservedObject private var sceneHandler = ScenePhaseHandler.shared
 
     var body: some View {
             VStack(spacing: 0) {
@@ -84,6 +85,20 @@ struct LibraryScreen: View {
                     )
                 }
             }
+            .onReceive(sceneHandler.$repeatedTabSelection.compactMap { $0 }) { tab in
+                if tab == .library {
+                    print("🔁 Повторное нажатие на вкладку Фонотека — возвращаемся в корень")
+                    coordinator.resetToRoot()
+                }
+            }
+            .task {
+                if let url = NavigationCoordinator.shared.pendingReveal {
+                    print("📨 [LibraryScreen] Отложенный reveal обнаружен при старте:", url.lastPathComponent)
+                    NavigationCoordinator.shared.pendingReveal = nil
+                    await coordinator.revealTrack(at: url, in: musicLibraryManager.attachedFolders)
+                }
+            }
+        
 
         // MARK: - Импорт папок
         .fileImporter(
