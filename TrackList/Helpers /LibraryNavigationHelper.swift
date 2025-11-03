@@ -39,5 +39,19 @@ struct LibraryNavigationHelper {
         }
         return nil
     }
+    func buildPath(to targetURL: URL, in folders: [LibraryFolder]) -> [LibraryFolder]? {
+        for folder in folders {
+            // Совпала целевая папка — возвращаем её
+            if folder.url.standardizedFileURL == targetURL.standardizedFileURL {
+                return [folder]
+            }
+
+            // Проверяем вложенные подпапки
+            if let subpath = buildPath(to: targetURL, in: folder.subfolders) {
+                return [folder] + subpath
+            }
+        }
+        return nil
+    }
 }
 

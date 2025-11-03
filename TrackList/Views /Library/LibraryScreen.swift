@@ -30,9 +30,8 @@ struct LibraryScreen: View {
                 .zIndex(1)
 
                 // MARK: - Контент
-                Group {
-                    switch coordinator.state {
-                    case .root:
+                ZStack {
+                    if case .root = coordinator.state {
                         MusicLibraryView(
                             trackListViewModel: trackListViewModel,
                             playerViewModel: playerViewModel,
@@ -40,8 +39,10 @@ struct LibraryScreen: View {
                             coordinator: coordinator
                         )
                         .id("root")
+                        .libraryTransition()
+                    }
 
-                    case .folder(let folder):
+                    if case .folder(let folder) = coordinator.state {
                         LibraryFolderView(
                             folder: folder,
                             coordinator: coordinator,
@@ -49,8 +50,10 @@ struct LibraryScreen: View {
                             playerViewModel: playerViewModel
                         )
                         .id(folder.url)
+                        .libraryTransition()
+                    }
 
-                    case .tracks(let folder):
+                    if case .tracks(let folder) = coordinator.state {
                         LibraryFolderView(
                             folder: folder,
                             coordinator: coordinator,
@@ -58,8 +61,10 @@ struct LibraryScreen: View {
                             playerViewModel: playerViewModel
                         )
                         .id("tracks-\(folder.url.path)")
+                        .libraryTransition()
                     }
                 }
+                .animation(.easeInOut(duration: 0.40), value: coordinator.stateID)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color(.systemBackground))
             }

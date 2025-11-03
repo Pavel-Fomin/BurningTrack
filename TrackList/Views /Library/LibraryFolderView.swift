@@ -55,7 +55,7 @@ struct LibraryFolderView: View {
                 // Нет подпапок → показываем треки
                 LibraryTracksView(
                     folder: viewModel.folder,
-                    trackListViewModel: trackListViewModel, // ← теперь идёт сразу после folder
+                    trackListViewModel: trackListViewModel,
                     coordinator: coordinator,
                     playerViewModel: playerViewModel,
                     viewModel: viewModel

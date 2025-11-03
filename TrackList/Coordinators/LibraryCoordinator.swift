@@ -19,66 +19,77 @@ final class LibraryCoordinator: ObservableObject {
         case folder(LibraryFolder)
         case tracks(LibraryFolder)
     }
-
+    
+    private var folderStack: [LibraryFolder] = []         /// Иерархический стек переходов
+    @Published private(set) var stateID: UUID = UUID()
     @Published private(set) var state: NavigationState = .root
     @Published var pendingRevealTrackURL: URL? = nil
 
     // MARK: - Навигация
 
     func openFolder(_ folder: LibraryFolder) {
-        // если уже открыта эта папка — не дублируем переход
+        // уже эта же папка — игнор
         if case .folder(let current) = state,
-           current.url.standardizedFileURL == folder.url.standardizedFileURL {
-            print("⚠️ [Coordinator] Папка уже открыта:", folder.name)
-            return
+           current.url.standardizedFileURL == folder.url.standardizedFileURL { return }
+
+        // если открываем подпапку текущей
+        if let last = folderStack.last,
+           folder.url.deletingLastPathComponent().standardizedFileURL == last.url.standardizedFileURL {
+            folderStack.append(folder)
+        } else {
+            // иначе начинаем новую ветку (новый путь)
+            folderStack = [folder]
         }
 
-        print("📂 Открываем папку:", folder.name)
         state = .folder(folder)
-    }
-
-    func openTracks(for folder: LibraryFolder) {
-        print("🎵 Открываем треки для папки: \(folder.name)")
-        state = .tracks(folder)
+        stateID = UUID()
     }
 
     func goBack() {
-        switch state {
-        case .tracks(let folder):
-            // назад со страницы треков — в папку
-            state = .folder(folder)
-        case .folder:
-            // назад из папки — в корень
+        guard !folderStack.isEmpty else {
             state = .root
-        default:
-            print("🔙 Уже на корне — возврат невозможен")
+            return
+        }
+
+        _ = folderStack.popLast() // удалить текущую папку
+
+        if let last = folderStack.last {
+            // есть родитель → возвращаемся к нему
+            state = .folder(last)
+        } else {
+            // иначе возвращаемся в корень
+            state = .root
         }
     }
 
     func resetToRoot() {
-        print("🏠 Возврат в корень фонотеки")
+        folderStack.removeAll()
         state = .root
     }
-
+    
+    
     // MARK: - Reveal переход (из плеера или треклиста)
 
     func revealTrack(at url: URL, in folders: [LibraryFolder]) async {
         let folderURL = url.deletingLastPathComponent()
 
-        // Не сбрасываемся в root без нужды
-        if let current = currentFolder, current.url == folderURL {
+        // Если уже открыта нужная папка — просто передаём сигнал
+        if let current = currentFolder,
+           current.url.standardizedFileURL == folderURL.standardizedFileURL {
             pendingRevealTrackURL = url
             return
         }
 
-        // Если нужно, открываем нужную папку
-        pendingRevealTrackURL = url
-
-        await LibraryNavigationHelper().openContainingFolder(
-            for: url,
-            in: folders,
-            using: self
-        )
+        // Найдём цепочку всех родительских папок до нужной
+        if let fullPath = LibraryNavigationHelper().buildPath(to: folderURL, in: folders) {
+            folderStack = fullPath               // 💥 вот ключ — мы восстанавливаем стек
+            if let last = fullPath.last {
+                state = .folder(last)
+                pendingRevealTrackURL = url
+            }
+        } else {
+            print("⚠️ [Reveal] Не удалось найти путь к папке:", folderURL.lastPathComponent)
+        }
     }
 
     // MARK: - Вспомогательное свойство
