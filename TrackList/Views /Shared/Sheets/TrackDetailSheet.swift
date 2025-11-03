@@ -51,7 +51,7 @@ struct TrackDetailSheet: View {
                         .foregroundColor(.secondary)
 
                     Text(displayPath(from: fileURL))
-                        .font(.caption)
+                        .font(.body) // теперь как у других строк
                         .foregroundColor(.secondary)
                         .textSelection(.enabled)
                         .lineLimit(3)
@@ -92,8 +92,8 @@ struct TrackDetailSheet: View {
         .background(
             ZStack {
                 (artwork?.averageColor ?? Color(.systemGroupedBackground))
-                    .opacity(0.25) // базовый цвет обложки
-                Color.black.opacity(0.1) // мягкая затемняющая подложка
+                    .opacity(0.25)       /// базовый цвет обложки
+                Color.black.opacity(0.1) /// мягкая затемняющая подложка
             }
             .ignoresSafeArea()
             .animation(.easeInOut(duration: 0.3), value: artwork)
@@ -102,6 +102,7 @@ struct TrackDetailSheet: View {
 
     
 // MARK: - Загрузка
+    
     private func loadMetadata() async {
         let tagFile = TLTagLibFile(fileURL: fileURL)
         if let parsed = tagFile.readMetadata() {
@@ -125,6 +126,7 @@ struct TrackDetailSheet: View {
 
     
 // MARK: - Метки для ключей
+    
     private func label(for key: String) -> String {
         switch key {
         case "title": return "Название трека"
@@ -142,15 +144,16 @@ struct TrackDetailSheet: View {
         let path = url.path
 
         if let range = path.range(of: "/File Provider Storage/") {
-            let trimmed = path[range.upperBound...]
-            return "iPhone: \(trimmed)"
+            let trimmed = String(path[range.upperBound...])
+            let folderURL = URL(fileURLWithPath: trimmed).deletingLastPathComponent()
+            return "iPhone: \(folderURL.path)"
         } else if let range = path.range(of: "/Mobile Documents/") {
-            let trimmed = path[range.upperBound...]
-            return "iCloud: \(trimmed)"
+            let trimmed = String(path[range.upperBound...])
+            let folderURL = URL(fileURLWithPath: trimmed).deletingLastPathComponent()
+            return "iCloud: \(folderURL.path)"
         } else {
-            // fallback — родительская папка + имя файла
-            let folder = url.deletingLastPathComponent().lastPathComponent
-            return "\(folder)/\(url.lastPathComponent)"
+            // fallback — только папка, без имени файла
+            return url.deletingLastPathComponent().lastPathComponent
         }
     }
 }
