@@ -25,7 +25,7 @@ final class ScenePhaseHandler: ObservableObject {
     }
 
     // MARK: - Публикуемые состояния
-    @Published var activeTab: Tab = .player {
+    @Published var activeTab: Tab = .library {
         didSet {
             if oldValue == activeTab {
                 repeatedTabSelection = activeTab
