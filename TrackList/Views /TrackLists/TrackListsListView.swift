@@ -11,22 +11,38 @@ import Foundation
 import SwiftUI
 
 struct TrackListsListView: View {
+    @State private var trackListToDelete: TrackList? = nil
+    @State private var showDeleteAlert = false
     @ObservedObject var viewModel: TrackListViewModel
     let playerViewModel: PlayerViewModel
-
+    
+    
     var body: some View {
-        List {
-            ForEach(viewModel.trackLists) { list in
-                trackListRow(for: list)
+        ZStack {
+            List {
+                ForEach(viewModel.trackLists) { list in
+                    trackListRow(for: list)
+                }
             }
+            .onAppear { viewModel.refreshTrackLists() }
+            .listStyle(.insetGrouped)
         }
-        .onAppear {
-            viewModel.refreshTrackLists()
-        
+        .alert(
+            "Удалить треклист\n«\(trackListToDelete?.name ?? "")»?",
+            isPresented: $showDeleteAlert,
+            presenting: trackListToDelete
+        ) { list in
+            Button("Удалить", role: .destructive) {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    viewModel.deleteTrackList(id: list.id)
+                }
+            }
+            Button("Отмена", role: .cancel) {}
+        } message: { _ in
+            Text("Треклист удалится безвозвратно")
         }
-        .listStyle(.insetGrouped)
     }
-
+    
     @ViewBuilder
     private func trackListRow(for list: TrackList) -> some View {
         NavigationLink(
@@ -41,16 +57,17 @@ struct TrackListsListView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-
+                
                 Spacer()
             }
             .contentShape(Rectangle())
         }
-        .swipeActions(edge: .trailing) {
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             Button(role: .destructive) {
-                viewModel.deleteTrackList(id: list.id)
+                trackListToDelete = list
+                showDeleteAlert = true
             } label: {
-                Image(systemName: "trash")
+                Label("Удалить", systemImage: "trash")
             }
         }
     }
