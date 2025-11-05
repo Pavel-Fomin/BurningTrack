@@ -12,50 +12,50 @@ struct SaveTrackListSheet: View {
     @Binding var isPresented: Bool
     @Binding var name: String
     var onSave: () -> Void
-
+    
     var body: some View {
-        VStack(spacing: 16) {
-            Text("Сохранить треклист")
-                .font(.headline)
-                .padding(.top)
+            NavigationStack {
+                ZStack(alignment: .bottom) {
+                    
+// MARK: - Инпут
+                    List {
+                        Section {
+                            TextField("Название", text: $name)
+                        }
+                        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+                    }
+                    .listStyle(.insetGrouped)
+                    .contentMargins(.top, 0, for: .scrollContent)
+                    .scrollDisabled(true)
+                    .navigationTitle("Сохранить треклист")
+                    .navigationBarTitleDisplayMode(.inline)
+                    
+// MARK: - Кнопки
+                    
+                    HStack(spacing: 16) {
+                        Button {
+                            onSave()
+                            isPresented = false
+                        } label: {
+                            Text("Сохранить")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
 
-            TextField("Название", text: $name)
-                .padding(.vertical, 14)
-                .padding(.horizontal, 16)
-                .frame(maxWidth: .infinity)
-                .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemGray6)))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color(.separator), lineWidth: 1)
-                )
-                .padding(.horizontal)
-
-            VStack(spacing: 12) {
-                Button(action: {
-                    onSave()
-                    isPresented = false
-                }) {
-                    Text("Сохранить")
-                        .frame(maxWidth: .infinity)
+                        Button {
+                            isPresented = false
+                        } label: {
+                            Text("Отмена")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.large)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 16)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                
-                Button(action: {
-                    isPresented = false
-                }) {
-                    Text("Отмена")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
-
+                .presentationDetents([.height(208)])
             }
-            .padding(.horizontal)
-
-            Spacer(minLength: 12)
         }
-        .padding(.bottom)
-        .presentationDetents([.height(280)])
     }
-}
