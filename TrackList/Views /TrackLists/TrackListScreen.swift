@@ -23,36 +23,32 @@ struct TrackListScreen: View {
     }
     
     var body: some View {
-        TrackListView(
-            trackListViewModel: viewModel,
-            playerViewModel: playerViewModel
-        )
-        .navigationTitle(trackList.name)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Menu {
-                    Button("Экспортировать треки", action: handleExport)
-                    
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                }
+            VStack(spacing: 0) {
+                TrackListHeaderView(
+                    viewModel: viewModel,
+                    onExport: handleExport,
+                    onRename: { /* TODO: откроем sheet переименования */ }
+                )
+                TrackListView(
+                    trackListViewModel: viewModel,
+                    playerViewModel: playerViewModel
+                )
+            }
+            .navigationBarHidden(true) // скрываем системный
+        }
+
+        private func handleExport() {
+            let importedTracks = viewModel.tracks.map { $0.asImportedTrack() }
+
+            guard !importedTracks.isEmpty else {
+                print("❌ Нет треков для экспорта")
+                return
+            }
+
+            if let topVC = UIApplication.topViewController() {
+                ExportManager.shared.exportViaTempAndPicker(importedTracks, presenter: topVC)
+            } else {
+                print("❌ Не удалось получить topViewController")
             }
         }
     }
-    
-    private func handleExport() {
-        let importedTracks = viewModel.tracks.map { $0.asImportedTrack() }
-        
-        guard !importedTracks.isEmpty else {
-            print("❌ Нет треков для экспорта")
-            return
-        }
-        
-        if let topVC = UIApplication.topViewController() {
-            ExportManager.shared.exportViaTempAndPicker(importedTracks, presenter: topVC)
-        } else {
-            print("❌ Не удалось получить topViewController")
-        }
-    }
-}

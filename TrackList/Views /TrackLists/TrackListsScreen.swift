@@ -17,7 +17,7 @@ struct TrackListsScreen: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                TrackListHeaderView(
+                TrackListsHeaderView(
                     isEditing: trackListViewModel.isEditing,
                     onAdd: {
                         trackListViewModel.startImport()

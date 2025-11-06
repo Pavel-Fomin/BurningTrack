@@ -35,6 +35,7 @@ final class TrackListViewModel: NSObject, ObservableObject {
     init(trackList: TrackList) {
         self.tracks = trackList.tracks.map { $0.asTrack() }
         self.currentListId = trackList.id
+        self.name = trackList.name
     }
     
     override init() {

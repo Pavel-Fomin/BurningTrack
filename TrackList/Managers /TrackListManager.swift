@@ -15,7 +15,7 @@ import Foundation
 final class TrackListManager {
     
     /// Синглтон-экземпляр
-    static let shared = TrackListManager()
+    static let shared = TrackListManager() 
     private init() {}
 
     
