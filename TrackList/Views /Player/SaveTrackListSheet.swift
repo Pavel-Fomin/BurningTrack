@@ -10,8 +10,8 @@ import SwiftUI
 
 struct SaveTrackListSheet: View {
     @Binding var isPresented: Bool
-    @Binding var name: String
-    var onSave: () -> Void
+    @State private var name: String = ""
+    var onSave: (_ name: String) -> Void
     
     var body: some View {
             NavigationStack {
@@ -21,6 +21,7 @@ struct SaveTrackListSheet: View {
                     List {
                         Section {
                             TextField("Название", text: $name)
+                                .clearable($name)
                         }
                         .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
                     }
@@ -34,14 +35,15 @@ struct SaveTrackListSheet: View {
                     
                     HStack(spacing: 16) {
                         Button {
-                            onSave()
+                            onSave(name.trimmingCharacters(in: .whitespacesAndNewlines))
                             isPresented = false
                         } label: {
                             Text("Сохранить")
                                 .frame(maxWidth: .infinity)
                         }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
+                        .primaryButtonStyle()
+                        .disabled(!TrackListManager.shared.validateName(name))
+                        .opacity(TrackListManager.shared.validateName(name) ? 1 : 0.5)
 
                         Button {
                             isPresented = false
@@ -49,13 +51,15 @@ struct SaveTrackListSheet: View {
                             Text("Отмена")
                                 .frame(maxWidth: .infinity)
                         }
-                        .buttonStyle(.bordered)
-                        .controlSize(.large)
+                        .secondaryButtonStyle()
                     }
                     .padding(.horizontal, 16)
                     .padding(.bottom, 16)
                 }
                 .presentationDetents([.height(208)])
+                .onAppear {
+                    name = generateDefaultTrackListName()
+                }
             }
         }
     }

@@ -21,7 +21,7 @@ final class TrackListViewModel: NSObject, ObservableObject {
     
     
     // MARK: - Состояния
-    
+    @Published var name: String = ""
     @Published var tracks: [Track] = []         /// Текущий список треков
     @Published var trackLists: [TrackList] = [] /// Все доступные треклисты
     @Published var currentListId: UUID?
@@ -49,6 +49,9 @@ final class TrackListViewModel: NSObject, ObservableObject {
         case addToCurrent
     }
     
+    var isNameValid: Bool {
+        TrackListManager.shared.validateName(name)
+    }
     
     
     // MARK: - Треки и треклисты

@@ -58,12 +58,9 @@ struct TrackListView: View {
             .frame(maxHeight: .infinity)
             .animation(.easeInOut, value: trackListViewModel.toastData?.message ?? "")
             .sheet(isPresented: $trackListViewModel.isShowingSaveSheet) {
-                SaveTrackListSheet(
-                    isPresented: $trackListViewModel.isShowingSaveSheet,
-                    name: $trackListViewModel.newTrackListName
-                ) {
+                SaveTrackListSheet(isPresented: $trackListViewModel.isShowingSaveSheet) { name in
                     if let id = trackListViewModel.currentListId {
-                        TrackListManager.shared.renameTrackList(id: id, to: trackListViewModel.newTrackListName)
+                        TrackListManager.shared.renameTrackList(id: id, to: name)
                     }
                 }
             }

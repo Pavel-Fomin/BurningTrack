@@ -59,11 +59,11 @@ func formatTrackListLabel(from date: Date) -> String {
     }
 
 
-// MARK: - Возвращает название треклиста в формате: "23 июля, 12:13"
+// MARK: - Возвращает название треклиста в формате: "06.11.25, 23:24"
 
 func generateDefaultTrackListName() -> String {
     let formatter = DateFormatter()
     formatter.locale = Locale(identifier: "ru_RU")
-    formatter.dateFormat = "d MMMM, HH:mm"
+    formatter.dateFormat = "dd.MM.yy, HH:mm"
     return formatter.string(from: Date())
 }

@@ -185,6 +185,13 @@ final class TrackListManager {
         metas[index].name = newName
         saveTrackListMetas(metas)
     }
+    
+    
+    // MARK: - Валидация имени треклиста
+
+    func validateName(_ name: String) -> Bool {
+        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 
     
 // MARK: - Сохранение всех треклистов
