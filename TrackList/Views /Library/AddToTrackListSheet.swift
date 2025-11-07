@@ -15,7 +15,7 @@ struct AddToTrackListSheet: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var toast: ToastManager
     
-    private let trackLists = TrackListManager.shared.loadTrackListMetas()
+    private let trackLists = TrackListsManager.shared.loadTrackListMetas()
     
     var body: some View {
         List(trackLists) { meta in

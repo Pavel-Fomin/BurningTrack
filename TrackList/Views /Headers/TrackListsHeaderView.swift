@@ -10,9 +10,6 @@
 import SwiftUI
 
 struct TrackListsHeaderView: View {
-    var isEditing: Bool
-    var onAdd: () -> Void
-    var onEditToggle: () -> Void
     
     var body: some View {
         ScreenHeaderView(title: "Треклисты")

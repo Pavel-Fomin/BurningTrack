@@ -60,7 +60,7 @@ struct TrackListView: View {
             .sheet(isPresented: $trackListViewModel.isShowingSaveSheet) {
                 SaveTrackListSheet(isPresented: $trackListViewModel.isShowingSaveSheet) { name in
                     if let id = trackListViewModel.currentListId {
-                        TrackListManager.shared.renameTrackList(id: id, to: name)
+                        TrackListsManager.shared.renameTrackList(id: id, to: name)
                     }
                 }
             }

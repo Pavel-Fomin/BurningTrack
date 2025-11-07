@@ -11,24 +11,16 @@ import Foundation
 import SwiftUI
 
 struct TrackListsScreen: View {
-    @ObservedObject var trackListViewModel: TrackListViewModel
+    @ObservedObject var trackListsViewModel: TrackListsViewModel
     @ObservedObject var playerViewModel: PlayerViewModel
     
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                TrackListsHeaderView(
-                    isEditing: trackListViewModel.isEditing,
-                    onAdd: {
-                        trackListViewModel.startImport()
-                    },
-                    onEditToggle: {
-                        trackListViewModel.toggleEditMode()
-                    }
-                )
+                TrackListsHeaderView()
                 
                 TrackListsListView(
-                    viewModel: trackListViewModel,
+                    viewModel: trackListsViewModel,
                     playerViewModel: playerViewModel
                 )
             }

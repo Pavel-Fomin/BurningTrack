@@ -32,7 +32,7 @@ struct MainTabView: View {
             
 
             TrackListsScreen(
-                trackListViewModel: trackListViewModel,
+                trackListsViewModel: TrackListsViewModel(),
                 playerViewModel: playerViewModel)
             
                 .tabItem { Label("Треклисты", systemImage: "list.star") }

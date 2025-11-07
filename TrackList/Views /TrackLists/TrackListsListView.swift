@@ -13,7 +13,7 @@ import SwiftUI
 struct TrackListsListView: View {
     @State private var trackListToDelete: TrackList? = nil
     @State private var showDeleteAlert = false
-    @ObservedObject var viewModel: TrackListViewModel
+    @ObservedObject var viewModel: TrackListsViewModel
     let playerViewModel: PlayerViewModel
     
     
@@ -24,7 +24,7 @@ struct TrackListsListView: View {
                     trackListRow(for: list)
                 }
             }
-            .onAppear { viewModel.refreshTrackLists() }
+            .onAppear { viewModel.refresh() }
             .listStyle(.insetGrouped)
         }
         .alert(

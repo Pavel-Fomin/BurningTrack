@@ -60,7 +60,7 @@ struct PlayerScreen: View {
                 isPresented: $isShowingSaveSheet
             ) { name in
                 let importedTracks = PlaylistManager.shared.tracks.map { $0.asImportedTrack() }
-                let newList = TrackListManager.shared.createTrackList(from: importedTracks, withName: name)
+                let newList = TrackListsManager.shared.createTrackList(from: importedTracks, withName: name)
                 toast.show(
                     ToastData(style: .trackList(name: newList.name), artwork: nil)
                 )

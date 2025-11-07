@@ -208,7 +208,7 @@ final class LibraryFolderViewModel: ObservableObject {
         var namesByStem:   [String: Set<String>] = [:] // имя файла без расширения (fallback)
         
         // 2) обойдём все треклисты и заполним карты
-        let metas = TrackListManager.shared.loadTrackListMetas()
+        let metas = TrackListsManager.shared.loadTrackListMetas()
         for meta in metas {
             let list = TrackListManager.shared.getTrackListById(meta.id)
             for t in list.tracks {
