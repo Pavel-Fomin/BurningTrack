@@ -33,12 +33,23 @@ struct TrackListScreen: View {
             }
             // Тулбар
             .trackListToolbar(
-                trackListName: trackList.name,
+                viewModel: viewModel,
                 onExport: handleExport,
-                onRename: { /* TODO: откроем sheet переименования */ }
+                onRename: {
+                    viewModel.isShowingRenameSheet = true
+                }
             )
+            .sheet(isPresented: $viewModel.isShowingRenameSheet) {
+                RenameTrackListSheet(
+                    isPresented: $viewModel.isShowingRenameSheet,
+                    currentName: viewModel.name
+                ) { newName in
+                    viewModel.renameCurrentTrackList(to: newName)
+                }
+            }
         }
     }
+    
         private func handleExport() {
             let importedTracks = viewModel.tracks.map { $0.asImportedTrack() }
 

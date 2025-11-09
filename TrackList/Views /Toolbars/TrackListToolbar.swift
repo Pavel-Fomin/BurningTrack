@@ -10,14 +10,14 @@
 import SwiftUI
 
 struct TrackListToolbar: ViewModifier {
-    var trackListName: String
+    @ObservedObject var viewModel: TrackListViewModel
     var onExport: () -> Void
     var onRename: () -> Void
 
     func body(content: Content) -> some View {
         content
             .screenToolbar(
-                title: trackListName,
+                title: viewModel.name,
                 leading: { EmptyView() },
                 trailing: {
                     Menu {
@@ -34,12 +34,12 @@ struct TrackListToolbar: ViewModifier {
 
 extension View {
     func trackListToolbar(
-        trackListName: String,
+        viewModel: TrackListViewModel,
         onExport: @escaping () -> Void,
         onRename: @escaping () -> Void
     ) -> some View {
         self.modifier(TrackListToolbar(
-            trackListName: trackListName,
+            viewModel: viewModel,
             onExport: onExport,
             onRename: onRename
         ))

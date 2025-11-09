@@ -2,7 +2,7 @@
 //  TrackListViewModel.swift
 //  TrackList
 //
-//  ViewModel для управления треклистами и UI-состоянием:
+//  ViewModel для управления треклистом и UI-состоянием:
 //  - выбор плейлиста
 //  - импорт/экспорт треков
 //  - очистка, удаление, создание
@@ -29,6 +29,7 @@ final class TrackListViewModel: NSObject, ObservableObject {
     @Published var toastData: ToastData? = nil
     @Published var isEditing: Bool = false
     @Published var artworkByURL: [URL: UIImage] = [:]
+    @Published var isShowingRenameSheet = false
     
     init(trackList: TrackList) {
         self.tracks = trackList.tracks.map { $0.asTrack() }
@@ -228,6 +229,32 @@ final class TrackListViewModel: NSObject, ObservableObject {
                 self.toastData = nil
             }
         }
+    }
+    
+    // MARK: - Переименование треклиста
+
+    func renameCurrentTrackList(to newName: String) {
+        guard let id = currentListId else {
+            print("⚠️ Плейлист не выбран — переименование невозможно")
+            return
+        }
+        guard TrackListManager.shared.validateName(newName) else {
+            print("⚠️ Некорректное имя треклиста")
+            return
+        }
+
+        var metas = TrackListsManager.shared.loadTrackListMetas()
+        guard let index = metas.firstIndex(where: { $0.id == id }) else {
+            print("⚠️ Метаданные треклиста не найдены для id \(id)")
+            return
+        }
+
+        metas[index].name = newName
+        TrackListsManager.shared.saveTrackListMetas(metas)
+
+        self.name = newName
+        print("✏️ Треклист переименован в «\(newName)»")
+        showToast(message: "Треклист «\(newName)» переименован")
     }
 }
 
