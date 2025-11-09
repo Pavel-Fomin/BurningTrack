@@ -17,18 +17,18 @@ struct TrackListsScreen: View {
     @State private var navigationPath = NavigationPath()
     
     var body: some View {
-        NavigationStack(path: $navigationPath){
-            VStack(spacing: 0) {
-                TrackListsHeaderView()
-                
-                TrackListsListView(
-                    viewModel: trackListsViewModel,
-                    playerViewModel: playerViewModel
-                )
+            NavigationStack(path: $navigationPath) {
+                VStack(spacing: 0) {
+                    TrackListsListView(
+                        viewModel: trackListsViewModel,
+                        playerViewModel: playerViewModel
+                    )
+                }
+                .background(Color(.systemGroupedBackground))
+
+                // Тулбар
+                .trackListsToolbar()
             }
-            .background(Color(.systemGroupedBackground))
-        }
-        .id(coordinator.resetTrackListsView)
+            .id(coordinator.resetTrackListsView)
         }
     }
-

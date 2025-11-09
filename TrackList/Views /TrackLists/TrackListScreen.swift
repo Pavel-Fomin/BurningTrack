@@ -13,7 +13,6 @@ import SwiftUI
 struct TrackListScreen: View {
     let trackList: TrackList
     @ObservedObject var playerViewModel: PlayerViewModel
-    
     @StateObject private var viewModel: TrackListViewModel
     
     init(trackList: TrackList, playerViewModel: PlayerViewModel) {
@@ -23,20 +22,23 @@ struct TrackListScreen: View {
     }
     
     var body: some View {
+        NavigationStack {
             VStack(spacing: 0) {
-                TrackListHeaderView(
-                    viewModel: viewModel,
-                    onExport: handleExport,
-                    onRename: { /* TODO: откроем sheet переименования */ }
-                )
+                
+                // Контент
                 TrackListView(
                     trackListViewModel: viewModel,
                     playerViewModel: playerViewModel
                 )
             }
-            .navigationBarHidden(true) // скрываем системный
+            // Тулбар
+            .trackListToolbar(
+                trackListName: trackList.name,
+                onExport: handleExport,
+                onRename: { /* TODO: откроем sheet переименования */ }
+            )
         }
-
+    }
         private func handleExport() {
             let importedTracks = viewModel.tracks.map { $0.asImportedTrack() }
 

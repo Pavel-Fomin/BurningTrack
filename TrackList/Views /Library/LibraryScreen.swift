@@ -22,13 +22,8 @@ struct LibraryScreen: View {
     @ObservedObject private var sceneHandler = ScenePhaseHandler.shared
 
     var body: some View {
+        NavigationStack {
             VStack(spacing: 0) {
-                // MARK: - Заголовок
-                LibraryHeaderView(
-                    onAddFolder: { isShowingFolderPicker = true },
-                    coordinator: coordinator
-                )
-                .zIndex(1)
 
                 // MARK: - Контент
                 ZStack {
@@ -69,7 +64,13 @@ struct LibraryScreen: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color(.systemBackground))
             }
-            .ignoresSafeArea(edges: .bottom)
+            // Тулбар
+            .libraryToolbar(
+                coordinator: coordinator,
+                onAddFolder: { isShowingFolderPicker = true }
+            )
+        }
+    
             .onReceive(
                 NavigationCoordinator.shared.$pendingReveal
                     .compactMap { $0 }
@@ -98,31 +99,26 @@ struct LibraryScreen: View {
                     await coordinator.revealTrack(at: url, in: musicLibraryManager.attachedFolders)
                 }
             }
-        
-
-        // MARK: - Импорт папок
-        .fileImporter(
-            isPresented: $isShowingFolderPicker,
-            allowedContentTypes: [.folder],
-            allowsMultipleSelection: false
-        ) { result in
-            switch result {
-            case .success(let urls):
-                if let folderURL = urls.first {
-                    musicLibraryManager.saveBookmark(for: folderURL)
-                    Task { await musicLibraryManager.restoreAccessAsync() }
+            .fileImporter(
+                isPresented: $isShowingFolderPicker,
+                allowedContentTypes: [.folder],
+                allowsMultipleSelection: false
+            ) { result in
+                switch result {
+                case .success(let urls):
+                    if let folderURL = urls.first {
+                        musicLibraryManager.saveBookmark(for: folderURL)
+                        Task { await musicLibraryManager.restoreAccessAsync() }
+                    }
+                case .failure(let error):
+                    print("❌ Ошибка выбора папки: \(error.localizedDescription)")
                 }
-            case .failure(let error):
-                print("❌ Ошибка выбора папки: \(error.localizedDescription)")
             }
-        }
-
-        .task {
-            if !didWarmUp {
-                didWarmUp = true
-                print("📡 LibraryScreen активна")
+            .task {
+                if !didWarmUp {
+                    didWarmUp = true
+                    print("📡 LibraryScreen активна")
+                }
             }
         }
     }
-    
-}

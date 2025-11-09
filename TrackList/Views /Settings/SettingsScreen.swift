@@ -12,12 +12,14 @@ import SwiftUI
 
 struct SettingsScreen: View {
     var body: some View {
-        VStack(spacing: 0) {
-            SettingsToolbar()
-
-            SettingsView()
-                .padding(.horizontal, 16)
-                .background(Color(.systemGroupedBackground))
+        NavigationStack {
+            VStack(spacing: 0) {
+                SettingsView()
+                    .padding(.horizontal, 16)
+                    .background(Color(.systemGroupedBackground))
+            }
+            // Тулбар
+            .settingsToolbar()
         }
     }
 }

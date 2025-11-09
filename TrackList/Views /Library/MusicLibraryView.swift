@@ -2,7 +2,7 @@
 //  MusicLibraryView.swift
 //  TrackList
 //
-//  Главный экран фонотеки. Показывает корневые папки (attachedFolders)
+//  Показывает корневые папки
 //  При клике — переходит в LibraryFolderView
 //
 //  Created by Pavel Fomin on 22.06.2025.

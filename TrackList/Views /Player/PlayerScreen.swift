@@ -15,44 +15,38 @@ struct PlayerScreen: View {
     @State private var isShowingExportPicker = false
     @State private var isShowingSaveSheet = false
     @State private var trackListName: String = defaultTrackListName()
-    
+
     @EnvironmentObject var toast: ToastManager
-    
+
     var body: some View {
         NavigationStack {
             ZStack(alignment: .bottom) {
-                Color(.systemBackground)
-                    .ignoresSafeArea()
-                VStack(spacing: 0) {
-                    
-        
-// MARK: - Хедер
-                    
-                    PlayerHeaderView(
-                        trackCount: PlaylistManager.shared.tracks.count,
-                        onSave: {
-                            PlaylistManager.shared.saveToDisk()
-                        },
-                        onExport: {
-                            PlaylistManager.shared.exportCurrentTracks(to: URL(fileURLWithPath: "/"))
-                            
-                        },
-                        onClear: {
-                            PlaylistManager.shared.clear()
-                        },
-                        onSaveTrackList: {
-                            isShowingSaveSheet = true
-                        }
-                    )
-                    
-                    
+               VStack(spacing: 0) {
+
 // MARK: - Список треков
                     
                     PlayerPlaylistView(playerViewModel: playerViewModel)
                 }
             }
+// MARK: - Тулбар (вместо PlayerHeaderView)
+            
+            .playerToolbar(
+                trackCount: PlaylistManager.shared.tracks.count,
+                onSave: {
+                    PlaylistManager.shared.saveToDisk()
+                },
+                onExport: {
+                    PlaylistManager.shared.exportCurrentTracks(to: URL(fileURLWithPath: "/"))
+                },
+                onClear: {
+                    PlaylistManager.shared.clear()
+                },
+                onSaveTrackList: {
+                    isShowingSaveSheet = true
+                }
+            )
         }
-        
+
 // MARK: - Окно сохранения треклиста
         
         .sheet(isPresented: $isShowingSaveSheet) {
@@ -69,12 +63,10 @@ struct PlayerScreen: View {
     }
 }
 
+// MARK: - Вспомогательная функция
 
-// MARK: - Вспомогательная функция (вне body)
-
-        func defaultTrackListName() -> String {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "dd.MM.yy, HH:mm"
-            return formatter.string(from: Date())
-        }
-
+private func defaultTrackListName() -> String {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "dd.MM.yy, HH:mm"
+    return formatter.string(from: Date())
+}
