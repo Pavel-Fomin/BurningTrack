@@ -30,6 +30,11 @@ final class ScenePhaseHandler: ObservableObject {
             if oldValue == activeTab {
                 repeatedTabSelection = activeTab
                 print("🔁 Повторное нажатие на вкладку: \(activeTab)")
+
+                // 🧩 Сбрасываем только при повторном тапе на вкладку треклистов
+                if activeTab == .tracklists {
+                    NavigationCoordinator.shared.triggerTrackListsReset()
+                }
             } else {
                 repeatedTabSelection = nil
                 print("🧭 Переключились на вкладку: \(activeTab)")

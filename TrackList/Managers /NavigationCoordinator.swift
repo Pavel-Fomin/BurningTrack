@@ -18,6 +18,7 @@ final class NavigationCoordinator: ObservableObject {
     @Published var currentTab: Int = 0                 /// Текущая вкладка (0 – Плеер, 1 – Фонотека, 2 – Треклисты, 3 – Настройки)
     @Published var isLibraryReady: Bool = false
     @Published var pendingReveal: URL? = nil
+    @Published var resetTrackListsView = UUID()        /// Cброса экрана треклистов
     
     private init() {}
     
@@ -33,6 +34,7 @@ final class NavigationCoordinator: ObservableObject {
     }
     
     // MARK: - Уведомление о готовности LibraryScreen
+    
     func notifyLibraryReady(for url: URL) {
         print("📡 LibraryScreen готова принимать переходы")
         lastReadyLibraryURL = url
@@ -49,5 +51,10 @@ final class NavigationCoordinator: ObservableObject {
     func takeLastRevealedTrack() -> URL? {
         defer { lastRevealedTrack = nil }
         return lastRevealedTrack
+    }
+    
+    func triggerTrackListsReset() {
+        resetTrackListsView = UUID()
+        print("↩️ Сброс экрана треклистов")
     }
 }

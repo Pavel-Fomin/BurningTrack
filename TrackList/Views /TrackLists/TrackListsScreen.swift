@@ -13,9 +13,11 @@ import SwiftUI
 struct TrackListsScreen: View {
     @ObservedObject var trackListsViewModel: TrackListsViewModel
     @ObservedObject var playerViewModel: PlayerViewModel
+    @ObservedObject private var coordinator = NavigationCoordinator.shared
+    @State private var navigationPath = NavigationPath()
     
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath){
             VStack(spacing: 0) {
                 TrackListsHeaderView()
                 
@@ -26,5 +28,7 @@ struct TrackListsScreen: View {
             }
             .background(Color(.systemGroupedBackground))
         }
+        .id(coordinator.resetTrackListsView)
+        }
     }
-}
+
