@@ -8,6 +8,7 @@
 //
 
 import Foundation
+import SwiftUI
 import UniformTypeIdentifiers
 import Combine
 import AVFoundation
@@ -110,7 +111,22 @@ final class MusicLibraryManager: ObservableObject {
             }
         }
         
-        return LibraryFolder(name: folderName, url: folderURL, subfolders: subfolders, audioFiles: audioFiles)
+        let folder = LibraryFolder(name: folderName, url: folderURL, subfolders: subfolders, audioFiles: audioFiles)
+        Task.detached { [folder] in
+            await self.registerFolder(folder)
+        }
+        return folder
+    }
+    
+    
+    // MARK: - Регистрация папки в TrackRegistry
+    
+    private func registerFolder(_ folder: LibraryFolder) async {
+        await TrackRegistry.shared.registerFolder(
+            folderId: folder.id,
+            name: folder.name,
+            path: folder.url.path
+        )
     }
     
     
@@ -173,19 +189,23 @@ final class MusicLibraryManager: ObservableObject {
     
     
     // MARK: - Восстанавливает доступ к ранее прикреплённым папкам
-    
+
     /// Восстанавливает доступ к прикреплённым папкам при запуске
     func restoreAccessAsync() async {
         print("🔁 Начало восстановления доступа")
+
+        // Загружаем TrackRegistry перед восстановлением папок
+        await TrackRegistry.shared.load()
+
         guard let dataArray = loadBookmarkDataFromFile(), !dataArray.isEmpty else {
             print("ℹ️ Bookmarks не найдены")
             await MainActor.run { self.attachedFolders = [] }
             return
         }
-        
+
         var urls: [URL] = []
         urls.reserveCapacity(dataArray.count)
-        
+
         for data in dataArray {
             do {
                 var isStale = false
@@ -195,14 +215,14 @@ final class MusicLibraryManager: ObservableObject {
                     relativeTo: nil,
                     bookmarkDataIsStale: &isStale
                 )
-                
+
                 if isStale {
                     if let newData = try? url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil) {
                         replaceBookmarkData(old: data, with: newData)
                         print("♻️ Обновили протухший bookmark для: \(url.lastPathComponent)")
                     }
                 }
-                
+
                 if url.startAccessingSecurityScopedResource() {
                     urls.append(url)
                     print("✅ Доступ к папке восстановлен: \(url.lastPathComponent)")
@@ -213,16 +233,14 @@ final class MusicLibraryManager: ObservableObject {
                 print("❌ Ошибка восстановления доступа: \(error)")
             }
         }
-        
-        // создаём независимую константу — это снимает предупреждение Swift 6
+
         let resolvedURLs = urls.map { $0 }
-        
+
         await MainActor.run {
             self.attachedFolders = resolvedURLs.map { self.buildFolderTree(from: $0) }
-        }
-        await MainActor.run {
             self.isAccessRestored = true
         }
+
         print("✅ Завершено восстановление доступа")
     }
     
@@ -311,6 +329,11 @@ final class MusicLibraryManager: ObservableObject {
                 self.attachedFolders.removeAll { $0.url == folderURL }
                 self.tracks = self.attachedFolders.flatMap { $0.audioFiles }
             }
+            // Удаляем треки из TrackRegistry, связанные с этой папкой
+            Task {
+                await TrackRegistry.shared.removeTracks(inFolder: folderURL.libraryFolderId)
+            }
+
         }
         
     
@@ -335,7 +358,7 @@ final class MusicLibraryManager: ObservableObject {
 // MARK: - Генерация LibraryTrack объектов для отображения
         
         /// Асинхронно преобразует массив URL-ов в массив LibraryTrack, включая парсинг тегов и создание bookmark
-        func generateLibraryTracks(from urls: [URL]) async -> [LibraryTrack] {
+    func generateLibraryTracks(from urls: [URL], folderId: UUID) async -> [LibraryTrack] {
             await withTaskGroup(of: LibraryTrack?.self) { group in
                 for url in urls {
                     group.addTask { [self] in
@@ -354,6 +377,14 @@ final class MusicLibraryManager: ObservableObject {
                         // Bookmark для доступа к файлу
                         let bookmarkData = try? url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
                         let bookmarkBase64 = bookmarkData?.base64EncodedString() ?? ""
+
+                        // Регистрируем трек в TrackRegistry
+                        await TrackRegistry.shared.register(
+                            trackId: UUID.v5(from: url.path),
+                            bookmarkBase64: bookmarkBase64,
+                            folderId: folderId,
+                            fileName: url.lastPathComponent
+                        )
                         
                         // Проверка кэша
                         let imported: ImportedTrack

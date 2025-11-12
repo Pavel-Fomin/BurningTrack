@@ -163,7 +163,7 @@ final class LibraryFolderViewModel: ObservableObject {
         
         // показываем первые N
         let firstSections: [TrackSection] = await Task.detached(priority: .userInitiated) { [head, orderMap] in
-            let tracks = await MusicLibraryManager.shared.generateLibraryTracks(from: head)
+            let tracks = await MusicLibraryManager.shared.generateLibraryTracks(from: head, folderId: self.folder.id)
             return Self.groupTracksByDate(tracks, order: orderMap)
         }.value
         
@@ -175,7 +175,7 @@ final class LibraryFolderViewModel: ObservableObject {
         // грузим tail (треки)
         let restTracks: [LibraryTrack] = await Task.detached(priority: .utility) { [tail] in
             guard !tail.isEmpty else { return [] }
-            return await MusicLibraryManager.shared.generateLibraryTracks(from: tail)
+            return await MusicLibraryManager.shared.generateLibraryTracks(from: tail, folderId: self.folder.id)
         }.value
         
         // дождались head-метаданных — пересчитываем плашки ОДИН РАЗ

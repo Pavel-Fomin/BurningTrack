@@ -15,7 +15,7 @@ struct PlayerToolbar: ViewModifier {
     var onExport: () -> Void
     var onClear: () -> Void
     var onSaveTrackList: () -> Void
-
+    
     func body(content: Content) -> some View {
         content
             .screenToolbar(
@@ -24,7 +24,16 @@ struct PlayerToolbar: ViewModifier {
                 trailing: {
                     Menu {
                         Button("Сохранить треклист", action: onSaveTrackList)
-                        Button("Записать треклист", action: onExport)
+                        
+                        Button(action: onExport) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Записать треклист")
+                                Text("с префиксом")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        
                         Button("Очистить треклист", role: .destructive, action: onClear)
                     } label: {
                         Image(systemName: "ellipsis")

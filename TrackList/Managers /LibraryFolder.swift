@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import CryptoKit
 
 // MARK: - Модель для одной папки в библиотеке
 
@@ -20,11 +21,11 @@ struct LibraryFolder: Identifiable, Hashable {
 
     /// Инициализатор папки
     init(name: String, url: URL, subfolders: [LibraryFolder] = [], audioFiles: [URL] = []) {
-        self.id = UUID()               /// Генерируем уникальный ID при создании (не зависит от содержимого)
-        self.name = name               /// Отображаемое имя
-        self.url = url                 /// Абсолютный путь к директории
-        self.subfolders = subfolders   /// subfolders: Вложенные папки (по умолчанию — пусто)
-        self.audioFiles = audioFiles   /// audioFiles: Файлы в текущей папке (по умолчанию — пусто)
+        self.id = UUID.v5(from: url.standardizedFileURL.absoluteString)
+        self.name = name
+        self.url = url
+        self.subfolders = subfolders
+        self.audioFiles = audioFiles
     }
     
 }
@@ -42,5 +43,24 @@ extension LibraryFolder {
             result.append(contentsOf: subfolder.flattenedTracks())
         }
         return result
+    }
+}
+
+
+extension UUID {
+    /// Стабильный UUID v5-подобного типа на основе строки (используется для URL)
+    static func v5(from string: String) -> UUID {
+        let data = Data(string.utf8)
+        let hash = Insecure.MD5.hash(data: data)
+        var bytes = [UInt8](repeating: 0, count: 16)
+        for (i, b) in hash.enumerated().prefix(16) { bytes[i] = b }
+        bytes[6] = (bytes[6] & 0x0F) | 0x50   // версия 5
+        bytes[8] = (bytes[8] & 0x3F) | 0x80   // вариант RFC 4122
+        return UUID(uuid: (
+            bytes[0], bytes[1], bytes[2], bytes[3],
+            bytes[4], bytes[5], bytes[6], bytes[7],
+            bytes[8], bytes[9], bytes[10], bytes[11],
+            bytes[12], bytes[13], bytes[14], bytes[15]
+        ))
     }
 }
