@@ -2,7 +2,12 @@
 //  TrackRegistry.swift
 //  TrackList
 //
-//  Централизованный реестр треков — человекочитаемая структура JSON.
+//  Централизованный реестр треков и папок.
+//
+//  Хранит:
+//  - список папок (FolderEntry)
+//  - список треков (TrackEntry)
+//  - быстрый индекс: absolutePath → trackId
 //
 //  Created by Pavel Fomin on 10.11.2025.
 //
@@ -12,6 +17,14 @@ import Foundation
 actor TrackRegistry {
 
     // MARK: - Вложенные типы
+
+    struct FolderEntry: Codable, Identifiable {
+        var id: UUID
+        var name: String
+        var path: String
+        var bookmarkBase64: String
+        var updatedAt: Date
+    }
 
     struct TrackEntry: Codable, Identifiable {
         var id: UUID
@@ -25,27 +38,22 @@ actor TrackRegistry {
         var folders: [FolderEntry]
         var registry: [TrackEntry]
     }
-    
-    struct FolderEntry: Codable, Identifiable {
-        var id: UUID
-        var name: String
-        var path: String
-        var updatedAt: Date
-    }
+
 
     // MARK: - Свойства
 
     static let shared = TrackRegistry()
+
     private var registry: [UUID: TrackEntry] = [:]
     private var folders: [UUID: FolderEntry] = [:]
 
+    /// Быстрый индекс: абсолютный путь → trackId
+    private var pathIndex: [String: UUID] = [:]
+
     private let fileURL: URL = {
-        // Берём основную папку приложения, без добавления "Track List"
-        let appDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        
-        // Создаём файл прямо в корне
-        let file = appDir.appendingPathComponent("TrackRegistry.json")
-        return file
+        let appDir = FileManager.default.urls(for: .documentDirectory,
+                                              in: .userDomainMask).first!
+        return appDir.appendingPathComponent("TrackRegistry.json")
     }()
 
     private let encoder: JSONEncoder = {
@@ -61,75 +69,124 @@ actor TrackRegistry {
         return d
     }()
 
+
     // MARK: - Загрузка / сохранение
 
     func load() {
         do {
             let data = try Data(contentsOf: fileURL)
             let decoded = try decoder.decode(RegistryFile.self, from: data)
-            folders = Dictionary(uniqueKeysWithValues: decoded.folders.map { ($0.id, $0) })
-            registry = Dictionary(uniqueKeysWithValues: decoded.registry.map { ($0.id, $0) })
-            print("📘 TrackRegistry загружен (\(registry.count) записей)")
+
+            folders = Dictionary(uniqueKeysWithValues:
+                                    decoded.folders.map { ($0.id, $0) })
+
+            registry = Dictionary(uniqueKeysWithValues:
+                                    decoded.registry.map { ($0.id, $0) })
+
+            // Перестраиваем быстрый индекс
+            rebuildPathIndex(from: decoded.registry)
+
+            print("📘 TrackRegistry загружен (\(registry.count) треков)")
         } catch {
-            print("ℹ️ TrackRegistry: нет файла или ошибка загрузки — создан новый.")
+            print("ℹ️ TrackRegistry: нет файла, создаём новый.")
+            folders = [:]
             registry = [:]
+            pathIndex = [:]
         }
     }
-    
-    
-// MARK: - Загрузка / сохранение (Структура json)
+
+    private func rebuildPathIndex(from entries: [TrackEntry]) {
+        pathIndex = [:]
+
+        for entry in entries {
+            if let data = Data(base64Encoded: entry.bookmarkBase64) {
+                var stale = false
+                if let url = try? URL(
+                    resolvingBookmarkData: data,
+                    bookmarkDataIsStale: &stale
+                ) {
+                    pathIndex[url.path] = entry.id
+                }
+            }
+        }
+    }
+
 
     func persist() {
-        let sorted = registry.values.sorted { $0.updatedAt > $1.updatedAt }
-        let sortedFolders = folders.values.sorted { $0.updatedAt > $1.updatedAt }
-        let fileData = RegistryFile(folders: sortedFolders, registry: sorted)                        /// Создаём объект, который станет JSON
+        let file = RegistryFile(
+            folders: folders.values.sorted { $0.updatedAt > $1.updatedAt },
+            registry: registry.values.sorted { $0.updatedAt > $1.updatedAt }
+        )
+
         do {
-            let data = try encoder.encode(fileData)                          /// JSONEncoder превращает RegistryFile в JSON
+            let data = try encoder.encode(file)
             try data.write(to: fileURL, options: .atomic)
-            print("💾 TrackRegistry сохранён (\(registry.count) записей)")
+            print("💾 TrackRegistry сохранён")
         } catch {
             print("❌ Ошибка сохранения TrackRegistry: \(error)")
         }
     }
 
-    
-    // MARK: - Удаление всех треков по папке
-    
-    func removeTracks(inFolder folderId: UUID) {
-        let beforeCount = registry.count
-        let removedTracks = registry.values.filter { $0.folderId == folderId }
-        registry = registry.filter { $0.value.folderId != folderId }
+
+    // MARK: - API — Работа с папками
+
+    func registerFolder(
+        folderId: UUID,
+        name: String,
+        path: String,
+        bookmarkBase64: String
+    ) {
+        let entry = FolderEntry(
+            id: folderId,
+            name: name,
+            path: path,
+            bookmarkBase64: bookmarkBase64,
+            updatedAt: Date()
+        )
+        folders[folderId] = entry
         persist()
-        
-        let diff = beforeCount - registry.count
-        if diff > 0 {
-            print("🧹 TrackRegistry: удалено \(diff) треков из папки \(folderId.uuidString.prefix(8))")
-        } else {
-            print("ℹ️ TrackRegistry: нет треков для удаления (\(folderId.uuidString.prefix(8)))")
-        }
     }
-    
-    
-    // MARK: - API
 
-    func register(trackId: UUID, bookmarkBase64: String, folderId: UUID, fileName: String) {
-        if let existing = registry[trackId] {
-            // 🔹 Проверяем: если уже есть, и bookmark + folder совпадают, выходим
-            if existing.bookmarkBase64 == bookmarkBase64 && existing.folderId == folderId {
-                return // уже зарегистрирован, не трогаем
+    func foldersList() -> [FolderEntry] {
+        folders.values.sorted { $0.updatedAt > $1.updatedAt }
+    }
+
+
+    // MARK: - API — Работа с треками
+
+    func register(
+        trackId: UUID,
+        bookmarkBase64: String,
+        folderId: UUID,
+        fileName: String
+    ) {
+        // Удаляем старый путь из индекса, если был
+        if let existing = registry[trackId],
+           let oldData = Data(base64Encoded: existing.bookmarkBase64)
+        {
+            var stale = false
+            if let oldURL = try? URL(
+                resolvingBookmarkData: oldData,
+                bookmarkDataIsStale: &stale
+            ) {
+                pathIndex.removeValue(forKey: oldURL.path)
             }
-            // 🔸 Если изменился bookmark или folder — обновляем
-            var updated = existing
-            updated.bookmarkBase64 = bookmarkBase64
-            updated.folderId = folderId
-            updated.updatedAt = Date()
-            registry[trackId] = updated
-            persist()
-            print("🔁 Обновлён трек: \(fileName)")
-            return
         }
 
-        // 🆕 Новый трек — добавляем в реестр
+        // Резолвим новый bookmark → URL
+        var newPath: String?
+        if let data = Data(base64Encoded: bookmarkBase64) {
+            var stale = false
+            if let url = try? URL(
+                resolvingBookmarkData: data,
+                bookmarkDataIsStale: &stale
+            ) {
+                newPath = url.path
+                pathIndex[url.path] = trackId
+            }
+        }
+
+        // Сохраняем обновлённую запись
         let entry = TrackEntry(
             id: trackId,
             fileName: fileName,
@@ -137,56 +194,74 @@ actor TrackRegistry {
             bookmarkBase64: bookmarkBase64,
             updatedAt: Date()
         )
+
         registry[trackId] = entry
         persist()
-        print("✅ Зарегистрирован новый трек: \(fileName)")
+
+        print("🎧 Зарегистрирован трек: \(fileName)\(newPath != nil ? " → \(newPath!)" : "")")
     }
-    
-    // Регистрации папок
-    func registerFolder(folderId: UUID, name: String, path: String) {
-        let entry = FolderEntry(
-            id: folderId,
-            name: name,
-            path: path,
-            updatedAt: Date()
-        )
-        folders[folderId] = entry
+
+
+    func removeTracks(inFolder folderId: UUID) {
+        let before = registry.count
+
+        registry = registry.filter { $0.value.folderId != folderId }
         persist()
-        print("📁 Зарегистрирована папка: \(name)")
+
+        let removed = before - registry.count
+        print("🗑️ Удалено \(removed) треков для папки \(folderId)")
     }
+
+
+    func remove(trackId: UUID) {
+        registry.removeValue(forKey: trackId)
+        persist()
+    }
+
+
+    // MARK: - URL Resolution
 
     func resolvedURL(for id: UUID) -> URL? {
         guard let entry = registry[id],
-              let data = Data(base64Encoded: entry.bookmarkBase64)
-        else { return nil }
-
-        var stale = false
-        do {
-            let url = try URL(resolvingBookmarkData: data, bookmarkDataIsStale: &stale)
-            if stale { print("⚠️ Bookmark устарел для трека \(entry.fileName)") }
-            return url
-        } catch {
-            print("❌ Ошибка резолва URL: \(error)")
+              let data = Data(base64Encoded: entry.bookmarkBase64) else {
             return nil
         }
+
+        var stale = false
+        return try? URL(
+            resolvingBookmarkData: data,
+            bookmarkDataIsStale: &stale
+        )
     }
 
-    func updateBookmark(for id: UUID, newBookmark: String) {
-        guard var entry = registry[id] else { return }
-        entry.bookmarkBase64 = newBookmark
-        entry.updatedAt = Date()
-        registry[id] = entry
-        persist()
-        print("🔁 Обновлён bookmark для трека \(entry.fileName)")
+    nonisolated
+    func resolvedURLSync(for id: UUID) -> URL? {
+        var result: URL?
+        let sema = DispatchSemaphore(value: 0)
+
+        Task {
+            result = await self.resolvedURL(for: id)
+            sema.signal()
+        }
+
+        sema.wait()
+        return result
     }
 
-    func remove(trackId: UUID) {
-        guard let entry = registry.removeValue(forKey: trackId) else { return }
-        persist()
-        print("🗑️ Удалён трек из реестра: \(entry.fileName)")
-    }
 
-    func allEntries() -> [TrackEntry] {
-        registry.values.sorted { $0.updatedAt > $1.updatedAt }
+    // MARK: - Быстрый trackId по пути
+
+    func trackId(for url: URL) async -> UUID {
+        let path = url.path
+
+        // 1) Мгновенный поиск
+        if let id = pathIndex[path] {
+            return id
+        }
+
+        // 2) Генерируем новый стабильный UUID(v5)
+        let newId = UUID.v5(from: path)
+        pathIndex[path] = newId
+        return newId
     }
 }

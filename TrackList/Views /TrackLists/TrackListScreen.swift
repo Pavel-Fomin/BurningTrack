@@ -50,18 +50,18 @@ struct TrackListScreen: View {
         }
     }
     
-        private func handleExport() {
-            let importedTracks = viewModel.tracks.map { $0.asImportedTrack() }
-
-            guard !importedTracks.isEmpty else {
-                print("❌ Нет треков для экспорта")
-                return
-            }
-
-            if let topVC = UIApplication.topViewController() {
-                ExportManager.shared.exportViaTempAndPicker(importedTracks, presenter: topVC)
-            } else {
-                print("❌ Не удалось получить topViewController")
-            }
+    private func handleExport() {
+        let tracks = viewModel.tracks
+        
+        guard !tracks.isEmpty else {
+            print("❌ Нет треков для экспорта")
+            return
+        }
+        
+        if let topVC = UIApplication.topViewController() {
+            ExportManager.shared.exportViaTempAndPicker(tracks, presenter: topVC)
+        } else {
+            print("❌ Не удалось получить topViewController")
         }
     }
+}

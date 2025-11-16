@@ -2,19 +2,27 @@
 //  TrackDisplayable.swift
 //  TrackList
 //
+//  Универсальный протокол для отображения треков в списке
+//
 //  Created by Pavel Fomin on 05.07.2025.
 //
 
 import UIKit
 
-// Универсальный протокол для отображения треков в списке
+// MARK: -  Протокол
+
 protocol TrackDisplayable: Identifiable {
     var id: UUID { get }
+
+    // Показываемое имя файла
+    var fileName: String { get }
+
+    // Метаданные
     var title: String? { get }
     var artist: String? { get }
-    var artwork: UIImage? { get }
     var duration: Double { get }
+    var artwork: UIImage? { get }
+
+    // Флаг доступности
     var isAvailable: Bool { get }
-    var fileName: String { get }
-    var url: URL { get }
 }
