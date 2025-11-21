@@ -29,7 +29,6 @@ struct LibraryTrackSectionsListView: View {
                 allTracks: allTracks,
                 trackListViewModel: trackListViewModel,
                 trackListNamesByURL: trackListNamesByURL,
-                artworkByURL: [:],
                 playerViewModel: playerViewModel,
                 metadataByURL: metadataByURL,
                 isScrollingFast: isScrollingFast,

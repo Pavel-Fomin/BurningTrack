@@ -26,14 +26,19 @@ struct TrackActionSheet: View {
                         TrackDetailManager.shared.open(track: track)
                     } else if action == .showInLibrary {
                         SheetManager.shared.closeAllSheets()
-                        
-                        // Переход к папке с треком
-                        print("🧭 [TrackActionSheet] showInLibrary вызван для:", track.url.lastPathComponent)
-                        NavigationCoordinator.shared.showInLibrary(for: track.url)
-                        
+
+                        print("🧭 [TrackActionSheet] showInLibrary вызван для id:", track.id)
+
+                        NavigationCoordinator.shared.showInLibrary(trackId: track.id)
+
+                    } else if action == .showInfo {
+                        SheetManager.shared.closeAllSheets()
+                        TrackDetailManager.shared.open(track: track)
+
                     } else {
                         onAction(action)
                     }
+                    
                 } label: {
                     HStack(spacing: 12) {
                         icon(for: action)

@@ -36,7 +36,7 @@ struct PlayerScreen: View {
                     PlaylistManager.shared.saveToDisk()
                 },
                 onExport: {
-                    PlaylistManager.shared.exportCurrentTracks(to: URL(fileURLWithPath: "/"))
+                    print("⚠️ Экспорт из плеера временно отключён")
                 },
                 onClear: {
                     PlaylistManager.shared.clear()
@@ -53,8 +53,8 @@ struct PlayerScreen: View {
             SaveTrackListSheet(
                 isPresented: $isShowingSaveSheet
             ) { name in
-                let importedTracks = PlaylistManager.shared.tracks.map { $0.asImportedTrack() }
-                let newList = TrackListsManager.shared.createTrackList(from: importedTracks, withName: name)
+                let tracks = PlaylistManager.shared.tracks.map { $0.asTrack() }
+                let newList = TrackListsManager.shared.createTrackList(from: tracks, withName: name)
                 toast.show(
                     ToastData(style: .trackList(name: newList.name), artwork: nil)
                 )

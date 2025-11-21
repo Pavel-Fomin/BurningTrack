@@ -30,9 +30,11 @@ struct TrackListRowView: View {
             onTap: onTap
         )
         
-        .task(id: track.url) {
-            artwork = await ArtworkLoader.loadIfNeeded(current: artwork, url: track.url)
-            
+        .task(id: track.id) {
+            artwork = await ArtworkLoader.loadIfNeeded(
+                current: artwork,
+                trackId: track.id
+            )
         }
         .padding(.vertical, 4)
         .listRowInsets(EdgeInsets())

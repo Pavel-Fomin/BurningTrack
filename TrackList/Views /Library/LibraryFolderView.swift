@@ -38,15 +38,9 @@ struct LibraryFolderView: View {
         self.trackListViewModel = trackListViewModel
         self._playerViewModel = ObservedObject(wrappedValue: playerViewModel)
 
-        // Проверяем, есть ли отложенный reveal-трек
-        if let revealURL = coordinator.pendingRevealTrackURL {
-            self._viewModel = StateObject(
-                wrappedValue: LibraryFolderViewModel(folder: folder, pendingReveal: revealURL)
-            )
-            print("🎯 [FolderView] Передан pendingReveal:", revealURL.lastPathComponent)
-        } else {
-            self._viewModel = StateObject(wrappedValue: LibraryFolderViewModel(folder: folder))
-        }
+        self._viewModel = StateObject(
+            wrappedValue: LibraryFolderViewModel(folder: folder)
+        )
     }
 
     var body: some View {
@@ -76,23 +70,6 @@ struct LibraryFolderView: View {
         }
         
         .id(folder.url)
-        
-        .onReceive(
-            coordinator.$pendingRevealTrackURL
-                .compactMap { $0 }
-        ) { url in
-            if url.deletingLastPathComponent().standardizedFileURL
-                == viewModel.folder.url.standardizedFileURL {
-                
-                print("📬 [FolderView] Приняли pendingReveal от координатора:", url.lastPathComponent)
-                viewModel.pendingRevealTrackURL = url
-                
-                // Сбрасываем reveal, чтобы не повторялся при ручном входе
-                DispatchQueue.main.async {
-                    coordinator.pendingRevealTrackURL = nil
-                }
-            }
-        }
     }
     
     

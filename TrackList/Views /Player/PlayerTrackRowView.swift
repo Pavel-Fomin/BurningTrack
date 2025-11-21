@@ -16,7 +16,7 @@ struct PlayerTrackRowView: View {
     
     @State private var artwork: CGImage? = nil
     @EnvironmentObject var sheetManager: SheetManager
-    
+
     var body: some View {
         TrackRowView(
             track: track,
@@ -28,9 +28,13 @@ struct PlayerTrackRowView: View {
             artist: track.artist ?? "",
             onTap: onTap
         )
-        .task(id: track.url) {
-            artwork = await ArtworkLoader.loadIfNeeded(current: artwork, url: track.url)
+        .task(id: track.id) {
+            artwork = await ArtworkLoader.loadIfNeeded(
+                current: artwork,
+                trackId: track.id
+            )
         }
+        
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             Button(role: .destructive) {
                 if let index = PlaylistManager.shared.tracks.firstIndex(where: { $0.id == track.id }) {

@@ -43,19 +43,13 @@ final class SheetManager: ObservableObject {
     private init() {}
 
     func open(track: LibraryTrack) {
-        // Если текущий трек уже открыт — ничего не делаем
-        if let current = trackToAdd, current.id == track.id {
-            return
-        }
+        if let current = trackToAdd, current.id == track.id { return }
 
-        // Отменяем предыдущую задачу показа, если она ещё в процессе
         presentationTask?.cancel()
 
-        // Запускаем новую задачу показа с задержкой
         presentationTask = Task {
             try? await Task.sleep(nanoseconds: 200_000_000)
             guard !Task.isCancelled else { return }
-
             trackToAdd = track
         }
     }

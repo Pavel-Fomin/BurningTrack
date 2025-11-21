@@ -16,7 +16,6 @@ struct LibraryTrackSectionView: View {
     let allTracks: [LibraryTrack]
     let trackListViewModel: TrackListViewModel
     let trackListNamesByURL: [URL: [String]]
-    let artworkByURL: [URL: UIImage]
     let playerViewModel: PlayerViewModel
     let metadataByURL: [URL: TrackMetadataCacheManager.CachedMetadata]
     let isScrollingFast: Bool
@@ -25,10 +24,7 @@ struct LibraryTrackSectionView: View {
     @ObservedObject var coordinator: LibraryCoordinator
     @EnvironmentObject var toast: ToastManager
     @EnvironmentObject var sheetManager: SheetManager
-    
-    
-    // MARK: - Вью обёртка для одного трека
-    
+
     var body: some View {
         Section(header: Text(title).font(.headline)) {
             ForEach(tracks, id: \.id) { track in
@@ -37,12 +33,11 @@ struct LibraryTrackSectionView: View {
                     allTracks: allTracks,
                     trackListViewModel: trackListViewModel,
                     trackListNamesByURL: trackListNamesByURL,
-                    metadata: metadataByURL[track.resolvedURL],
+                    metadata: metadataByURL[track.url],
                     isScrollingFast: isScrollingFast,
                     isRevealed: track.id == revealedTrackID,
                     coordinator: coordinator,
                     playerViewModel: playerViewModel
-                   
                 )
                 .id(track.id)
                 .environmentObject(toast)

@@ -71,34 +71,24 @@ struct LibraryScreen: View {
             )
         }
     
-            .onReceive(
-                NavigationCoordinator.shared.$pendingReveal
-                    .compactMap { $0 }
-                    .removeDuplicates()
-            ) { url in
-                print("📨 Получен reveal-сигнал для:", url.lastPathComponent)
-                NavigationCoordinator.shared.pendingReveal = nil
-
-                Task { @MainActor in
-                    await coordinator.revealTrack(
-                        at: url,
-                        in: musicLibraryManager.attachedFolders
-                    )
-                }
+        // открыть вкладку «Фонотека»
+        .onReceive(
+            NavigationCoordinator.shared.$pendingRevealTrackID
+                .compactMap { $0 }
+                .removeDuplicates()
+        ) { trackId in
+            Task { @MainActor in
+                let folders = musicLibraryManager.attachedFolders
+                await coordinator.revealTrack(trackId: trackId, in: folders)
             }
-            .onReceive(sceneHandler.$repeatedTabSelection.compactMap { $0 }) { tab in
-                if tab == .library {
-                    print("🔁 Повторное нажатие на вкладку Фонотека — возвращаемся в корень")
-                    coordinator.resetToRoot()
-                }
+        }
+        .onReceive(sceneHandler.$repeatedTabSelection.compactMap { $0 }) { tab in
+            if tab == .library {
+                print("🔁 Повторное нажатие на вкладку Фонотека — возвращаемся в корень")
+                coordinator.resetToRoot()
             }
-            .task {
-                if let url = NavigationCoordinator.shared.pendingReveal {
-                    print("📨 [LibraryScreen] Отложенный reveal обнаружен при старте:", url.lastPathComponent)
-                    NavigationCoordinator.shared.pendingReveal = nil
-                    await coordinator.revealTrack(at: url, in: musicLibraryManager.attachedFolders)
-                }
-            }
+        }
+            
             .fileImporter(
                 isPresented: $isShowingFolderPicker,
                 allowedContentTypes: [.folder],

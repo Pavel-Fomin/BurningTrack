@@ -37,8 +37,6 @@ struct TrackListView: View {
                         onMove: { source, destination in
                             trackListViewModel.moveTrack(from: source, to: destination)
                         }
-
-                    
                 )
             }
             

@@ -11,9 +11,18 @@
 import Foundation
 
 extension Notification.Name {
-    /// Сигнал на очистку текущего треклиста (вызывается, например, из меню чипса)
-    static let clearTrackList = Notification.Name("clearTrackList")
     
-    /// Сигнал, что треклист был переименован (используется для обновления UI)
-    static let trackListDidRename = Notification.Name("trackListDidRename")
+    // MARK: - TrackList
+    
+    static let trackListsDidChange = Notification.Name("trackListsDidChange")   /// Любое изменение списка треклистов (создание/удаление/переименование)
+    static let clearTrackList = Notification.Name("clearTrackList")             /// Очистка текущего треклиста
+    static let trackListDidRename = Notification.Name("trackListDidRename")     /// Треклист был переименован
+    
+    // MARK: - LibraryFolderViewModel
+   
+    
+    // MARK: - Player
+    
+    static let trackDidFinish = Notification.Name("trackDidFinish")              /// Трек доиграл до конца (AVPlayerItem → PlayerManager → PlayerViewModel)
+    static let trackDurationUpdated = Notification.Name("trackDurationUpdated")  /// Обновилась длительность текущего трека
 }

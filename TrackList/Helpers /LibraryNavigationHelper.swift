@@ -14,7 +14,9 @@ struct LibraryNavigationHelper {
         for url: URL,
         in folders: [LibraryFolder],
         using coordinator: LibraryCoordinator
-    ) async {
+    ) async{
+    
+    
         let folderURL = url.deletingLastPathComponent()
 
         guard let folder = Self.findFolder(for: folderURL, in: folders) else {
@@ -24,7 +26,7 @@ struct LibraryNavigationHelper {
 
         print("➡️ Reveal: открываем папку \(folder.name)")
 
-        // 🔹 Просто открываем нужную папку, без reset’ов и костылей
+        // Просто открываем нужную папку, без reset’ов и костылей
         coordinator.openFolder(folder)
     }
 

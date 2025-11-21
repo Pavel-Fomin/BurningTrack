@@ -23,7 +23,7 @@ final class LibraryCoordinator: ObservableObject {
     private var folderStack: [LibraryFolder] = []         /// Иерархический стек переходов
     @Published private(set) var stateID: UUID = UUID()
     @Published private(set) var state: NavigationState = .root
-    @Published var pendingRevealTrackURL: URL? = nil
+    @Published var pendingRevealTrackID: UUID? = nil
 
     // MARK: - Навигация
 
@@ -70,25 +70,32 @@ final class LibraryCoordinator: ObservableObject {
     
     // MARK: - Reveal переход (из плеера или треклиста)
 
-    func revealTrack(at url: URL, in folders: [LibraryFolder]) async {
-        let folderURL = url.deletingLastPathComponent()
-
-        // Если уже открыта нужная папка — просто передаём сигнал
-        if let current = currentFolder,
-           current.url.standardizedFileURL == folderURL.standardizedFileURL {
-            pendingRevealTrackURL = url
+    func revealTrack(trackId: UUID, in folders: [LibraryFolder]) async {
+        // 1) resolved URL из registry
+        guard let resolvedURL = await TrackRegistry.shared.resolvedURL(for: trackId) else {
+            print("⚠️ [Reveal] trackId \(trackId) не найден в реестре")
             return
         }
 
-        // Найдём цепочку всех родительских папок до нужной
+        let folderURL = resolvedURL.deletingLastPathComponent()
+
+        // 2) уже в нужной папке?
+        if let current = currentFolder,
+           current.url.standardizedFileURL == folderURL.standardizedFileURL {
+            pendingRevealTrackID = trackId
+            return
+        }
+
+        // 3) строим путь к папке
         if let fullPath = LibraryNavigationHelper().buildPath(to: folderURL, in: folders) {
-            folderStack = fullPath               // 💥 вот ключ — мы восстанавливаем стек
+            folderStack = fullPath
+
             if let last = fullPath.last {
                 state = .folder(last)
-                pendingRevealTrackURL = url
+                pendingRevealTrackID = trackId
             }
         } else {
-            print("⚠️ [Reveal] Не удалось найти путь к папке:", folderURL.lastPathComponent)
+            print("⚠️ [Reveal] Путь к папке не найден:", folderURL.lastPathComponent)
         }
     }
 

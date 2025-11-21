@@ -14,256 +14,291 @@ import Combine
 @MainActor
 final class LibraryFolderViewModel: ObservableObject {
     private let debugID = UUID()
+    
     let folder: LibraryFolder
     private let allowedAudioExts: Set<String> = ["mp3","flac","wav","aiff","aac","m4a","ogg"]
-    private let initialParseCount = 20                     /// подберём позже (20–40)
-    private var lastScannedURLs: [URL] = []                /// Сохраняем список файлов последнего скана чтобы считать tail без повторного сканирования
+    private let initialParseCount = 20
+    
+    private var lastScannedURLs: [URL] = []
     private var tailWarmupTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
     
-    @Published var trackSections: [TrackSection] = []          /// Группы треков по дате
-    @Published var trackListNamesByURL: [URL: [String]] = [:]  /// Соответствие: URL → [названия треклистов, в которых есть трек]
-    @Published var metadataByURL: [URL: TrackMetadataCacheManager.CachedMetadata] = [:]  /// Кеш метаданных (artist, title, duration и др.)
+    // MARK: - Состояния
+    
+    @Published var pendingRevealTrackID: UUID?
+    @Published var trackSections: [TrackSection] = []
+    @Published var trackListNamesByURL: [URL: [String]] = [:]
+    @Published var metadataByURL: [URL: TrackMetadataCacheManager.CachedMetadata] = [:]
+    
     @Published var isLoading: Bool = false
     @Published private(set) var didLoad: Bool = false
     @Published private(set) var didLoadTrackListNames = false
+    
     @Published var subfolders: [LibraryFolder] = []
     @Published var pendingRevealTrackURL: URL?
-    @Published var revealedTrackID: UUID? = nil               /// Подсветка трека после скролла
-    @Published private(set) var didStartTailWarmup = false    /// Управление хвостовой подгрузкой
-    @Published var scrollTargetID: UUID? = nil                /// Цель для автопрокрутки
+    @Published var revealedTrackID: UUID? = nil
+    @Published private(set) var didStartTailWarmup = false
+    @Published var scrollTargetID: UUID? = nil
     
-    var headCount: Int { min(initialParseCount, trackSections.flatMap { $0.tracks }.count) }  /// Для удобства в UI
-    
-    func loadSubfoldersIfNeeded() {
-        guard subfolders.isEmpty else { return }
-        subfolders = MusicLibraryManager.shared.loadSubfolders(for: folder.url)
+    var headCount: Int {
+        let allTracks = trackSections.reduce(into: 0) { result, section in
+            result += section.tracks.count
+        }
+        return min(initialParseCount, allTracks)
     }
     
     private var trackListsObserver: NSObjectProtocol?
     
+    // MARK: - Инициализация
+    
     init(folder: LibraryFolder) {
         self.folder = folder
+        
         trackListsObserver = NotificationCenter.default.addObserver(
             forName: .trackListsDidChange,
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            // замыкание синхронное → внутри создаём async‑задачу на MainActor
-            Task { @MainActor [weak self] in
+            Task { @MainActor in
                 self?.loadTrackListNamesByURL()
             }
-            
         }
-        // Сбрасываем старые подписки перед созданием новой
+        
         cancellables.removeAll()
     }
     
     init(folder: LibraryFolder, pendingReveal: URL) {
         self.folder = folder
         self.pendingRevealTrackURL = pendingReveal
+        
         trackListsObserver = NotificationCenter.default.addObserver(
             forName: .trackListsDidChange,
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            Task { @MainActor [weak self] in
+            Task { @MainActor in
                 self?.loadTrackListNamesByURL()
             }
         }
+        
         cancellables.removeAll()
-        print("🎯 [Init] ViewModel создан с pendingReveal:", pendingReveal.lastPathComponent)
         
         DispatchQueue.main.async {
-                self.pendingRevealTrackURL = pendingReveal
-            }
+            self.pendingRevealTrackURL = pendingReveal
+        }
     }
-        
-// MARK: - Скролл к треку
     
-    func scrollToTrackIfExists(_ url: URL) {
-        print("🚀 scrollToTrackIfExists вызван для:", url.lastPathComponent)
-        Task { @MainActor [weak self] in
-            guard let self else { return }
+    // MARK: - Подпапки
+    
+    func loadSubfoldersIfNeeded() {
+        guard subfolders.isEmpty else { return }
+        subfolders = MusicLibraryManager.shared.loadSubfolders(for: folder.url)
+    }
+    
+    // MARK: - Reveal / Scroll
+    
+    func scrollToTrackIfExists(_ id: UUID) {
+        print("🚀 scrollToTrackIfExists для trackId:", id)
 
-            // теперь ищем трек
-            if let found = self.trackSections
-                .flatMap({ $0.tracks })
-                .first(where: { $0.resolvedURL.standardizedFileURL == url.standardizedFileURL }) {
+        Task { @MainActor in
+            // 1) Пробуем найти сразу
+            if let found = findTrack(in: trackSections, matching: id) {
+                scrollTargetID = found.id
+                revealedTrackID = found.id
 
-                print("🎯 Найден трек, запускаем прокрутку:", found.title ?? found.url.lastPathComponent)
-                self.scrollTargetID = found.id
-                self.revealedTrackID = found.id
-
-                // Сбрасываем подсветку через 4 сек
                 DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
                     if self.revealedTrackID == found.id {
                         self.revealedTrackID = nil
                     }
                 }
 
-                // Сбрасываем состояние reveal
-                self.pendingRevealTrackURL = nil
-            } else {
-                print("⚠️ Трек не найден среди секций, ждём обновления...")
-                for await sections in self.$trackSections.values {
-                    if sections.flatMap({ $0.tracks }).contains(where: { $0.resolvedURL == url }) {
-                        print("✅ Повторная попытка: трек найден после обновления секций")
-                        self.scrollToTrackIfExists(url)
-                        break
-                    }
+                pendingRevealTrackID = nil
+                return
+            }
+
+            print("⚠️ не найден, ждём обновления секций...")
+
+            // 2) Ждём, пока секции обновятся
+            for await sections in $trackSections.values {
+                if let _ = findTrack(in: sections, matching: id) {
+                    print("✅ найден после обновления")
+                    self.scrollToTrackIfExists(id)
+                    return
                 }
             }
         }
     }
     
+    // MARK: - Ленивая загрузка
     
-    // MARK: - Префетч артов с лимитом параллельных задач
-    
-    private func prefetchArtwork(urls: [URL], limit: Int = 1) {
-        guard !urls.isEmpty else { return }
-        Task.detached(priority: .userInitiated) {
-            var i = 0
-            while i < urls.count {
-                let end = min(i + limit, urls.count)
-                let chunk = Array(urls[i..<end])
-                await withTaskGroup(of: Void.self) { group in
-                    for u in chunk {
-                        group.addTask { _ = await ArtworkLoader.loadIfNeeded(current: nil, url: u) }
-                    }
-                }
-                i = end
-            }
-        }
-    }
-    
-    
-    // MARK: - Загружает треки из папки и группирует по дате
-    
-    func refresh() async {
-        await refreshFastStart(firstCount: initialParseCount)
-    }
-    
-    
-    // MARK: - Быстрый старт: сначала первые N, потом остальное, со стабильным порядком
-    func refreshFastStart(firstCount: Int) async {
-        isLoading = true
-        
-        let urls = scanFolderURLs(recursive: false)
-        let orderMap: [URL:Int] = Dictionary(uniqueKeysWithValues:
-                                                urls.enumerated().map { ($0.element, $0.offset) }
-        )
-        self.lastScannedURLs = urls
-        
-        let head = Array(urls.prefix(firstCount))
-        let tail = Array(urls.dropFirst(firstCount))
-        
-        // ранний префетч обложек для head
-        //prefetchArtwork(urls: head, limit: 6)
-        
-        // показываем первые N
-        let firstSections: [TrackSection] = await Task.detached(priority: .userInitiated) { [head, orderMap] in
-            let tracks = await MusicLibraryManager.shared.generateLibraryTracks(from: head, folderId: self.folder.id)
-            return Self.groupTracksByDate(tracks, order: orderMap)
-        }.value
-        
-        withAnimation(nil) {
-            self.trackSections = firstSections
-            self.isLoading = false
-        }
-        
-        // грузим tail (треки)
-        let restTracks: [LibraryTrack] = await Task.detached(priority: .utility) { [tail] in
-            guard !tail.isEmpty else { return [] }
-            return await MusicLibraryManager.shared.generateLibraryTracks(from: tail, folderId: self.folder.id)
-        }.value
-        
-        // дождались head-метаданных — пересчитываем плашки ОДИН РАЗ
-        _ = headCount
-        await MainActor.run { self.loadTrackListNamesByURL() }
-        
-        guard !restTracks.isEmpty else { return }
-        
-        let allTracks = firstSections.flatMap { $0.tracks } + restTracks
-        let grouped = Self.groupTracksByDate(allTracks, order: orderMap)
-        await MainActor.run { withAnimation(nil) { self.trackSections = grouped } }
-        
-        // ПРОГРЕВ МЕТАДАННЫХ ДЛЯ TAIL -> ещё один пересчёт плашек
-        Task.detached { [weak self] in
-            guard let self else { return }
-            await MainActor.run { self.loadTrackListNamesByURL() }
-        }
-    }
-    
-    // MARK: - Загружает названия треклистов, в которых встречаются треки из этой папки
-    
-    func loadTrackListNamesByURL() {
-        // какие URL сейчас на экране
-        let urlsInView = trackSections.flatMap { $0.tracks.map { $0.url } }
-        
-        // 1) карты соответствий
-        var namesByURL:   [URL: Set<String>] = [:]   // прямое совпадение по URL
-        var namesByStrong: [String: Set<String>] = [:] // title|artist|duration
-        var namesBySoft:   [String: Set<String>] = [:] // title|artist
-        var namesByStem:   [String: Set<String>] = [:] // имя файла без расширения (fallback)
-        
-        // 2) обойдём все треклисты и заполним карты
-        let metas = TrackListsManager.shared.loadTrackListMetas()
-        for meta in metas {
-            let list = TrackListManager.shared.getTrackListById(meta.id)
-            for t in list.tracks {
-                namesByURL[t.url, default: []].insert(meta.name)
-                
-                let k = identityKeys(title: t.title, artist: t.artist, duration: t.duration)
-                if !k.strong.isEmpty { namesByStrong[k.strong, default: []].insert(meta.name) }
-                if !k.soft.isEmpty   { namesBySoft[k.soft,   default: []].insert(meta.name) }
-                
-                let stem = fileStem(t.url)
-                if !stem.isEmpty     { namesByStem[stem,     default: []].insert(meta.name) }
-            }
-        }
-        
-        // 3) собираем результат для текущих URL
-        var result: [URL: [String]] = [:]
-        result.reserveCapacity(urlsInView.count)
-        
-        for url in urlsInView {
-            var names = namesByURL[url] ?? []
-            
-            // берём теги если уже есть; иначе будем падать на stem
-            let meta = metadataByURL[url]
-            let title = meta?.title
-            let artist = meta?.artist
-            let duration = meta?.duration ?? 0
-            let k = identityKeys(title: title, artist: artist, duration: duration)
-            
-            if let s = namesByStrong[k.strong] { names.formUnion(s) }
-            if names.isEmpty, let s2 = namesBySoft[k.soft] { names.formUnion(s2) }
-            
-            // fallback: имя файла — работает до загрузки тегов
-            let stem = fileStem(url)
-            if names.isEmpty, let s3 = namesByStem[stem] { names.formUnion(s3) }
-            
-            result[url] = Array(names).sorted()
-        }
-        
-        trackListNamesByURL = result
-    }
-    
-    
-    // MARK: - Ленивая загрузка треков, если ещё не были загружены
-    
+    /// Загружает треки только один раз
     func loadTracksIfNeeded() async {
         guard !didLoad else { return }
         didLoad = true
         await refresh()
     }
     
+    /// Загружает названия треклистов только один раз
+    func loadTrackListNamesIfNeeded() {
+        guard !didLoadTrackListNames else { return }
+        didLoadTrackListNames = true
+        loadTrackListNamesByURL()
+    }
     
-    // MARK: - Внутренние методы
+    // MARK: - Быстрая загрузка треков (Fast Start)
     
-    /// Группирует треки по дате (используется для создания секций)
-    nonisolated private static func groupTracksByDate(
+    func refresh() async {
+        await refreshFastStart(firstCount: initialParseCount)
+    }
+    
+    func refreshFastStart(firstCount: Int) async {
+        isLoading = true
+        
+        let urls = scanFolderURLs(recursive: false)
+        lastScannedURLs = urls
+        
+        let orderMap = Dictionary(uniqueKeysWithValues: urls.enumerated().map { ($0.element, $0.offset) })
+        
+        let head = Array(urls.prefix(firstCount))
+        let tail = Array(urls.dropFirst(firstCount))
+        
+        // HEAD
+        let firstSections: [TrackSection] =
+        await Task.detached(priority: .userInitiated) { [head, orderMap, folderId = self.folder.id] in
+            let tracks = await MusicLibraryManager.shared.generateLibraryTracks(from: head, folderId: folderId)
+            return Self.groupTracksByDate(tracks, order: orderMap)
+        }.value
+        
+        await MainActor.run {
+            withAnimation(nil) {
+                self.trackSections = firstSections
+                self.isLoading = false
+            }
+        }
+        
+        // TAIL
+        let restTracks: [LibraryTrack] =
+        await Task.detached(priority: .utility) { [tail, folderId = self.folder.id] in
+            guard !tail.isEmpty else { return [] }
+            return await MusicLibraryManager.shared.generateLibraryTracks(from: tail, folderId: folderId)
+        }.value
+        
+        // бейджи треклистов для HEAD
+        await MainActor.run { self.loadTrackListNamesByURL() }
+        
+        guard !restTracks.isEmpty else { return }
+        
+        let allTracks = firstSections.reduce(into: [LibraryTrack]()) { result, section in
+            result.append(contentsOf: section.tracks)
+        } + restTracks
+        
+        let grouped = Self.groupTracksByDate(allTracks, order: orderMap)
+        
+        await MainActor.run {
+            withAnimation(nil) { self.trackSections = grouped }
+        }
+        
+        // Прогрев бейджей (после загрузки метаданных tail)
+        Task.detached { [weak self] in
+            guard let self else { return }
+            await MainActor.run { self.loadTrackListNamesByURL() }
+        }
+    }
+    
+    // MARK: - TrackList Badges
+    
+    func loadTrackListNamesByURL() {
+        // какие URL сейчас в секциях
+        var urlsInView: [URL] = []
+        urlsInView.reserveCapacity(trackSections.count * 10)
+        
+        for section in trackSections {
+            for track in section.tracks {
+                urlsInView.append(track.url)
+            }
+        }
+        
+        var namesByURL: [URL: Set<String>] = [:]
+        var result: [URL: [String]] = [:]
+        
+        // все треклисты
+        let metas = TrackListsManager.shared.loadTrackListMetas()
+        
+        for meta in metas {
+            let list = TrackListManager.shared.getTrackListById(meta.id)
+            
+            for t in list.tracks {
+                namesByURL[t.url, default: []].insert(meta.name)
+            }
+        }
+        
+        for url in urlsInView {
+            let names = namesByURL[url] ?? []
+            result[url] = Array(names).sorted()
+        }
+        
+        trackListNamesByURL = result
+    }
+    
+    // MARK: - Metadata update
+    
+    func setMetadata(_ meta: TrackMetadataCacheManager.CachedMetadata, for url: URL) {
+        metadataByURL[url] = meta
+        loadTrackListNamesByURL()
+    }
+    
+    // MARK: - Scan
+    
+    private func scanFolderURLs(recursive: Bool = false, maxDepth: Int = 1) -> [URL] {
+        scanFolderURLs(at: folder.url, maxDepth: maxDepth, recursive: recursive)
+    }
+    
+    private func scanFolderURLs(at root: URL, maxDepth: Int, recursive: Bool) -> [URL] {
+        var result: [URL] = []
+        
+        let accessed = root.startAccessingSecurityScopedResource()
+        defer { if accessed { root.stopAccessingSecurityScopedResource() } }
+        
+        do {
+            let fm = FileManager.default
+            let items = try fm.contentsOfDirectory(
+                at: root,
+                includingPropertiesForKeys: [.isDirectoryKey],
+                options: [.skipsHiddenFiles]
+            )
+            
+            var subfolders: [URL] = []
+            
+            for item in items {
+                let isDir = (try? item.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
+                
+                if isDir {
+                    if recursive && maxDepth > 0 {
+                        subfolders.append(item)
+                    }
+                } else {
+                    let ext = item.pathExtension.lowercased()
+                    if allowedAudioExts.contains(ext) {
+                        result.append(item)
+                    }
+                }
+            }
+            
+            if recursive && maxDepth > 0 {
+                for sub in subfolders {
+                    result.append(contentsOf: scanFolderURLs(at: sub, maxDepth: maxDepth - 1, recursive: true))
+                }
+            }
+        } catch {
+            print("❌ scanFolderURLs error:", error)
+        }
+        
+        return result
+    }
+    
+    // MARK: - Support
+    
+    nonisolated static func groupTracksByDate(
         _ tracks: [LibraryTrack],
         order: [URL:Int]? = nil
     ) -> [TrackSection] {
@@ -279,22 +314,22 @@ final class LibraryFolderViewModel: ObservableObject {
             var items = grouped[day] ?? []
             
             items.sort { a, b in
-                // 1) по позиции из скана — самый стабильный вариант
-                if let oa = order?[a.url], let ob = order?[b.url], oa != ob {
+                if let order,
+                   let oa = order[a.url],
+                   let ob = order[b.url],
+                   oa != ob {
                     return oa < ob
                 }
-                // 2) иначе по дате (новее выше)
                 if a.addedDate != b.addedDate { return a.addedDate > b.addedDate }
-                // 3) и, на всякий, по имени файла
-                return a.url.lastPathComponent.localizedCaseInsensitiveCompare(
-                    b.url.lastPathComponent
-                ) == .orderedAscending
+                return a.url.lastPathComponent < b.url.lastPathComponent
             }
             
             let title: String = {
                 if calendar.isDateInToday(day) { return "Сегодня" }
                 if calendar.isDateInYesterday(day) { return "Вчера" }
-                let df = DateFormatter(); df.dateStyle = .medium; df.timeStyle = .none
+                let df = DateFormatter()
+                df.dateStyle = .medium
+                df.timeStyle = .none
                 return df.string(from: day)
             }()
             
@@ -306,112 +341,26 @@ final class LibraryFolderViewModel: ObservableObject {
         }
     }
     
-    
-    // MARK: - Сканирование папки (одна реализация + рекурсия)
-    
-    private func scanFolderURLs(recursive: Bool = false, maxDepth: Int = 1) -> [URL] {
-        
-        // основной вход: сканируем текущую папку viewModel'а
-        return scanFolderURLs(at: folder.url, maxDepth: maxDepth, recursive: recursive)
-    }
-    
-    private func scanFolderURLs(at root: URL, maxDepth: Int, recursive: Bool) -> [URL] {
-        var result: [URL] = []
-        
-        let accessed = root.startAccessingSecurityScopedResource()
-        defer { if accessed { root.stopAccessingSecurityScopedResource() } }
-        
-        do {
-            let fm = FileManager.default
-            let contents = try fm.contentsOfDirectory(
-                at: root,
-                includingPropertiesForKeys: [.isDirectoryKey],
-                options: [.skipsHiddenFiles]
-            )
-            
-            var subfolders: [URL] = []
-            
-            for item in contents {
-                let isDir = (try? item.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
-                
-                if isDir {
-                    if recursive && maxDepth > 0 {
-                        subfolders.append(item)
-                    }
-                } else {
-                    let ext = item.pathExtension.lowercased()
-                    if allowedAudioExts.contains(ext) {
-                        result.append(item)
-                    }
-                }
-            }
-            
-            // Уходим в подкаталоги, если рекурсия включена
-            if recursive && maxDepth > 0 {
-                for sub in subfolders {
-                    result.append(
-                        contentsOf: scanFolderURLs(at: sub, maxDepth: maxDepth - 1, recursive: true)
-                    )
-                }
-            }
-        } catch {
-            print("❌ scanFolderURLs error:", error)
-        }
-        
-        return result
-    }
-    
-    
-    // MARK: - Названия треклистов
-    
-    func loadTrackListNamesIfNeeded() {
-        guard !didLoadTrackListNames else { return }
-        didLoadTrackListNames = true
-        loadTrackListNamesByURL()
-    }
-    
-    // MARK: - Хелперы принадлежности к треклисту
-    
-    private func norm(_ s: String?) -> String {
-        guard var t = s?.lowercased().trimmingCharacters(in: .whitespacesAndNewlines), !t.isEmpty else { return "" }
-        // убираем лишние пробелы и пунктуацию
-        t = t.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
-        t = t.replacingOccurrences(of: "[\\p{Punct}]+", with: "", options: .regularExpression)
-        return t
-    }
-    
-    // вернём два ключа: строгий (с длительностью) и мягкий (без длительности)
-    private func identityKeys(title: String?, artist: String?, duration: Double?) -> (strong: String, soft: String) {
-        let nt = norm(title), na = norm(artist)
-        let soft = (nt.isEmpty && na.isEmpty) ? "" : "\(nt)|\(na)"
-        let d = Int((duration ?? 0).rounded())
-        let strong = soft.isEmpty ? "" : "\(soft)|\(d)"
-        return (strong, soft)
-    }
-    
-    private func fileStem(_ url: URL) -> String {
-        norm(url.deletingPathExtension().lastPathComponent)
-    }
-    
-    func setMetadata(_ meta: TrackMetadataCacheManager.CachedMetadata, for url: URL) {
-        metadataByURL[url] = meta
-        loadTrackListNamesByURL()   // теги появились → пересчитываем плашки
-    }
-    
     func clearRevealState() {
         revealedTrackID = nil
     }
     
     deinit {
-        // Отписываемся от всех Combine-подписок (revealTrack и др.)
         cancellables.forEach { $0.cancel() }
-        cancellables.removeAll()
-        
-        // Убираем наблюдатель изменений треклистов
         if let o = trackListsObserver {
             NotificationCenter.default.removeObserver(o)
         }
-        print("🧹 [deinit] LibraryFolderViewModel освобождён для:", folder.name, "ID:", ObjectIdentifier(self))
+        print("🧹 deinit LibraryFolderViewModel:", folder.name)
+    }
+    
+    // MARK: - Поиск трека в секциях
+    
+    private func findTrack(in sections: [TrackSection], matching id: UUID) -> LibraryTrack? {
+        for section in sections {
+            if let match = section.tracks.first(where: { $0.id == id }) {
+                return match
+            }
+        }
+        return nil
     }
 }
-

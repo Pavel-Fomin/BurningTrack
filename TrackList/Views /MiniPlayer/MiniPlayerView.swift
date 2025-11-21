@@ -155,13 +155,14 @@ struct MiniPlayerView: View {
             .cornerRadius(12)
             .shadow(radius: 4)
             .id(track.id)
-            .task(id: track.url) {
-                if let cgImage = await TrackMetadataCacheManager.shared
-                    .loadMetadata(for: track.url)?
-                    .artwork {
+            .task(id: track.id) {
+                artwork = nil
+                if let url = await TrackRegistry.shared.resolvedURL(for: track.id),
+                   let cgImage = await TrackMetadataCacheManager.shared
+                       .loadMetadata(for: url)?
+                       .artwork {
                     artwork = UIImage(cgImage: cgImage)
                 }
-    
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 24) /// отступ между плеером и меню

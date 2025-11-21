@@ -11,7 +11,12 @@
 import SwiftUI
 
 struct TrackDetailSheet: View {
-    let fileURL: URL
+    let track: any TrackDisplayable
+    
+    private var resolvedURL: URL {
+        TrackRegistry.shared.resolvedURLSync(for: track.id)
+        ?? URL(fileURLWithPath: "/dev/null")
+    }
     
     @State private var artwork: UIImage? = nil
     @State private var tags: [(String, String)] = []
@@ -50,7 +55,7 @@ struct TrackDetailSheet: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
 
-                    Text(displayPath(from: fileURL))
+                    Text(displayPath(from: resolvedURL))
                         .font(.body) // теперь как у других строк
                         .foregroundColor(.secondary)
                         .textSelection(.enabled)
@@ -63,7 +68,7 @@ struct TrackDetailSheet: View {
                     Text("НАЗВАНИЕ ФАЙЛА")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    Text(fileURL.deletingPathExtension().lastPathComponent)
+                    Text(resolvedURL.deletingPathExtension().lastPathComponent)
                         .font(.body)
                         .foregroundColor(.primary)
                         .lineLimit(3)
@@ -104,7 +109,9 @@ struct TrackDetailSheet: View {
 // MARK: - Загрузка
     
     private func loadMetadata() async {
-        let tagFile = TLTagLibFile(fileURL: fileURL)
+        let url = resolvedURL
+        let tagFile = TLTagLibFile(fileURL: url)
+
         if let parsed = tagFile.readMetadata() {
             var result: [(String, String)] = []
 
@@ -123,7 +130,6 @@ struct TrackDetailSheet: View {
             await MainActor.run { self.tags = [] }
         }
     }
-
     
 // MARK: - Метки для ключей
     

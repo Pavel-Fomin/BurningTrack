@@ -92,14 +92,27 @@ struct ContentView: View {
             )
         ) {
             if let track = trackDetailManager.track {
-                TrackDetailSheet(fileURL: track.url)
-            }
+                TrackDetailSheet(track: track)            }
         }
         // открыть вкладку «Фонотека»
-        .onReceive(navigation.$pendingReveal.compactMap { $0 }) { _ in
-            selectedTab = 1 
+        .onReceive(navigation.$pendingRevealTrackID) { trackId in
+            guard let trackId else { return }
+            handleReveal(trackId)
         }
     }
+    
+    // MARK: - Reveal логика
+    
+    private func handleReveal(_ trackId: UUID) {
+        Task { @MainActor in
+            // 1) переключаемся на фонотеку
+            ScenePhaseHandler.shared.activeTab = .library
+            
+            // 2) сохраняем ID трека, который нужно раскрыть
+            navigation.pendingRevealTrackID = trackId
+        }
+    }
+    
     
 // MARK: - Тост-паддинг
     private var toastBottomPadding: CGFloat {

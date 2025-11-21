@@ -8,7 +8,8 @@
 import Foundation
 
 extension URL {
-    /// Стабильный ID папки, совпадающий с тем, что создаётся в LibraryFolder.init
+    
+    // Стабильный ID папки, совпадающий с тем, что создаётся в LibraryFolder.init
     var libraryFolderId: UUID {
         UUID.v5(from: self.standardizedFileURL.absoluteString)
     }

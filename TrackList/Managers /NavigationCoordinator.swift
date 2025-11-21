@@ -12,47 +12,48 @@ import Combine
 
 final class NavigationCoordinator: ObservableObject {
     static let shared = NavigationCoordinator()
-    private(set) var lastRevealedTrack: URL? = nil     /// Последний трек, переданный во фонотеку (для новых подписчиков)
-    var lastReadyLibraryURL: URL? = nil
-    
-    @Published var currentTab: Int = 0                 /// Текущая вкладка (0 – Плеер, 1 – Фонотека, 2 – Треклисты, 3 – Настройки)
+
+    @Published var currentTab: Int = 0
     @Published var isLibraryReady: Bool = false
-    @Published var pendingReveal: URL? = nil
-    @Published var resetTrackListsView = UUID()        /// Cброса экрана треклистов
+    @Published var pendingRevealTrackID: UUID? = nil
+    @Published var resetTrackListsView = UUID()
+
+    // Последний трек, который нужно “доставить” во фонотеку
+    @Published private(set) var lastRevealedTrackID: UUID? = nil
     
     private init() {}
     
+
     // MARK: - Запрос показа трека во фонотеке
-    func showInLibrary(for url: URL) {
-        print("🧭 Переключаемся во фонотеку для трека:", url.lastPathComponent)
-        pendingReveal = url
-        
-        // Переключаем активную вкладку на фонотеку
+    func showInLibrary(trackId: UUID) {
+        print("🧭 Запрос показать трек по id:", trackId)
+        pendingRevealTrackID = trackId
+        lastRevealedTrackID = trackId
+
         Task { @MainActor in
             ScenePhaseHandler.shared.activeTab = .library
         }
     }
-    
+
     // MARK: - Уведомление о готовности LibraryScreen
-    
-    func notifyLibraryReady(for url: URL) {
+    @MainActor
+    func notifyLibraryReady() {
         print("📡 LibraryScreen готова принимать переходы")
-        lastReadyLibraryURL = url
         isLibraryReady = true
     }
-    
+
     @MainActor
-    func clearLastRevealedTrack() {
-        lastRevealedTrack = nil
-        print("🧹 NavigationCoordinator: очищен lastRevealedTrack")
+    func clearLastRevealedTrackID() {
+        lastRevealedTrackID = nil
+        print("🧹 NavigationCoordinator: очищен lastRevealedTrackID")
     }
-    
+
     @MainActor
-    func takeLastRevealedTrack() -> URL? {
-        defer { lastRevealedTrack = nil }
-        return lastRevealedTrack
+    func takeLastRevealedTrackID() -> UUID? {
+        defer { lastRevealedTrackID = nil }
+        return lastRevealedTrackID
     }
-    
+
     func triggerTrackListsReset() {
         resetTrackListsView = UUID()
         print("↩️ Сброс экрана треклистов")

@@ -10,15 +10,17 @@
 import Foundation
 import UIKit
 
-// Глобальный ограничитель параллельных декодирований (каппим CPU)
+// Глобальный ограничитель параллельных декодирований
 actor _ArtworkDecodeGate {
     private var value: Int
     private var waiters: [CheckedContinuation<Void, Never>] = []
     init(value: Int) { self.value = value }
+
     func wait() async {
         if value > 0 { value -= 1; return }
         await withCheckedContinuation { cont in waiters.append(cont) }
     }
+
     func signal() {
         if !waiters.isEmpty {
             let c = waiters.removeFirst()
@@ -29,27 +31,37 @@ actor _ArtworkDecodeGate {
     }
 }
 
-
 enum ArtworkLoader {
-    // Максимум 3 одновременных декодирования/ресайза
+
     static let decodeGate = _ArtworkDecodeGate(value: 2)
 
-    static func loadIfNeeded(current: CGImage?, url: URL, priorityList: [URL] = []) async -> CGImage? {
+    // MARK: - Основной загрузчик через trackId
+
+    static func loadIfNeeded(current: CGImage?, trackId: UUID) async -> CGImage? {
         if let current { return current }
 
-        // обычная ленивая загрузка с лимитом и дедупом
+        // 1) получаем URL из TrackRegistry
+        guard let url = await TrackRegistry.shared.resolvedURL(for: trackId) else {
+            print("⚠️ [ArtworkLoader] Не найден URL для trackId:", trackId)
+            return nil
+        }
+
+        // 2) обычная ленивая загрузка
         await decodeGate.wait()
         defer { Task { await decodeGate.signal() } }
 
         return await TrackMetadataCacheManager.shared.loadArtworkThrottled(url: url) {
-            if let cg = TrackMetadataCacheManager.shared.loadMetadataFromCache(url: url)?.artwork {
-                return cg
+            if let cached = TrackMetadataCacheManager.shared.loadMetadataFromCache(url: url)?.artwork {
+                return cached
             }
             return await TrackMetadataCacheManager.shared.loadMetadata(for: url)?.artwork
         }
     }
 
-    static func cancelLoad(for url: URL) {
+    // MARK: - Отмена загрузки
+
+    static func cancelLoad(trackId: UUID) async {
+        guard let url = await TrackRegistry.shared.resolvedURL(for: trackId) else { return }
         TrackMetadataCacheManager.shared.cancelArtworkLoad(url: url)
     }
 }

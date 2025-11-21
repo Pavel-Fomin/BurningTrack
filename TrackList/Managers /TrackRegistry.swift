@@ -151,7 +151,14 @@ actor TrackRegistry {
         folders.values.sorted { $0.updatedAt > $1.updatedAt }
     }
 
-
+    func removeFolder(folderId: UUID) {
+        folders.removeValue(forKey: folderId)
+        removeTracks(inFolder: folderId)
+        persist()
+        print("🗑️ Удалена папка \(folderId)")
+    }
+    
+    
     // MARK: - API — Работа с треками
 
     func register(
@@ -263,5 +270,15 @@ actor TrackRegistry {
         let newId = UUID.v5(from: path)
         pathIndex[path] = newId
         return newId
+    }
+}
+
+// MARK: - Convenience
+
+extension TrackRegistry {
+    /// Возвращает актуальный resolvedURL для исходного fileURL через TrackRegistry
+    func resolve(url: URL) async -> URL {
+        let id = await trackId(for: url)         // async — нормально
+        return resolvedURL(for: id) ?? url       // синхронно — await не нужен
     }
 }
