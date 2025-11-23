@@ -26,6 +26,7 @@ struct PlayerTrackRowView: View {
             artwork: artwork,
             title: track.title ?? track.fileName,
             artist: track.artist ?? "",
+            duration: track.duration,
             onTap: onTap
         )
         .task(id: track.id) {

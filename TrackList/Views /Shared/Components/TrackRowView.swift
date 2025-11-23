@@ -19,6 +19,7 @@ struct TrackRowView: View {
     let artwork: CGImage?
     let title: String?
     let artist: String?
+    let duration: Double?
     let onTap: () -> Void
     
     var trackListNames: [String]? = nil
@@ -97,7 +98,7 @@ struct TrackRowView: View {
                 
                 Spacer()
                 
-                Text(formatTimeSmart(track.duration))
+                Text(formatTimeSmart(duration ?? track.duration))
                     .font(.footnote)
                     .foregroundColor(.secondary)
                 

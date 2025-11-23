@@ -15,6 +15,7 @@ struct LibraryTrackRowWrapper: View {
     let trackListViewModel: TrackListViewModel
     let trackListNamesByURL: [URL: [String]]
     let metadata: TrackMetadataCacheManager.CachedMetadata?
+    let onMetadataLoaded: (URL, TrackMetadataCacheManager.CachedMetadata) -> Void
     let isScrollingFast: Bool
     let isRevealed: Bool
     
@@ -52,10 +53,9 @@ struct LibraryTrackRowWrapper: View {
             isPlaying: isPlaying,
             isHighlighted: isRevealed || isHighlighted,
             artwork: artwork,
-            
-            // Заголовок и артист теперь берём корректно
             title: metadata?.title ?? track.title,
             artist: metadata?.artist ?? track.artist ?? "",
+            duration: metadata?.duration ?? track.duration,
             
             onTap: {
                 if isCurrent {
@@ -67,25 +67,30 @@ struct LibraryTrackRowWrapper: View {
             
             trackListNames: trackListNames
         )
+        
         .task(id: track.url.absoluteString + "|" + (isScrollingFast ? "1" : "0")) {
+
             // Ленивая загрузка обложки
-            if isScrollingFast || artwork != nil { return }
-            
-            try? await Task.sleep(nanoseconds: 60_000_000)
-            
-            let img = await ArtworkLoader.loadIfNeeded(
-                current: artwork,
-                trackId: track.id
-            )
-            if let img {
-                await MainActor.run { artwork = img }
+            if !isScrollingFast && artwork == nil {
+                let img = await ArtworkLoader.loadIfNeeded(
+                    current: artwork,
+                    trackId: track.id
+                )
+                if let img {
+                    await MainActor.run { artwork = img }
+                }
             }
-            
+
             // Ленивая загрузка метаданных
             if metadata == nil {
-                _ = await TrackMetadataCacheManager.shared.loadMetadata(for: track.url)
+                if let meta = await TrackMetadataCacheManager.shared.loadMetadata(for: track.url) {
+                    await MainActor.run {
+                        onMetadataLoaded(track.url, meta)
+                    }
+                }
             }
         }
+        
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             
             // В ПЛЕЕР

@@ -18,6 +18,7 @@ struct LibraryTrackSectionsListView: View {
     let playerViewModel: PlayerViewModel
     let isScrollingFast: Bool
     let revealedTrackID: UUID?
+    let folderViewModel: LibraryFolderViewModel
     
     @ObservedObject var coordinator: LibraryCoordinator
 
@@ -33,6 +34,7 @@ struct LibraryTrackSectionsListView: View {
                 metadataByURL: metadataByURL,
                 isScrollingFast: isScrollingFast,
                 revealedTrackID: revealedTrackID,
+                folderViewModel: folderViewModel,
                 coordinator: coordinator
             )
         }

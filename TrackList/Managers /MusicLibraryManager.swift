@@ -118,7 +118,7 @@ final class MusicLibraryManager: ObservableObject {
     
     
     // MARK: - Сохраняем bookmark выбранной папки и регистрируем её
-    
+
     func saveBookmark(for url: URL) {
         guard url.startAccessingSecurityScopedResource() else {
             print("❌ Не удалось начать доступ к папке")
@@ -136,6 +136,7 @@ final class MusicLibraryManager: ObservableObject {
                 let name = url.lastPathComponent
                 let path = url.path
                 
+                // 1) Регистрируем папку в TrackRegistry
                 await TrackRegistry.shared.registerFolder(
                     folderId: folderId,
                     name: name,
@@ -143,6 +144,49 @@ final class MusicLibraryManager: ObservableObject {
                     bookmarkBase64: bookmarkBase64
                 )
                 
+                // 2) Индексируем все аудиофайлы в этой папке (рекурсивно)
+                let fm = FileManager.default
+                var stack: [URL] = [url]
+                
+                while let current = stack.popLast() {
+                    guard let items = try? fm.contentsOfDirectory(
+                        at: current,
+                        includingPropertiesForKeys: [.isDirectoryKey],
+                        options: [.skipsHiddenFiles]
+                    ) else { continue }
+                    
+                    for item in items {
+                        let isDir = (try? item.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
+                        
+                        if isDir {
+                            // Папка — добавляем в стек для дальнейшего обхода
+                            stack.append(item)
+                        } else {
+                            // Файл — проверяем расширение
+                            let ext = item.pathExtension.lowercased()
+                            let allowed = ["mp3", "flac", "wav", "aiff", "aac", "m4a", "ogg"]
+                            
+                            guard allowed.contains(ext) else { continue }
+                            
+                            // Генерируем/получаем стабильный trackId
+                            let trackId = await TrackRegistry.shared.trackId(for: item)
+                            
+                            // Создаём bookmark для конкретного файла
+                            guard let fileBookmark = try? item.bookmarkData() else { continue }
+                            let fileBookmarkBase64 = fileBookmark.base64EncodedString()
+                            
+                            // Регистрируем трек в реестре
+                            await TrackRegistry.shared.register(
+                                trackId: trackId,
+                                bookmarkBase64: fileBookmarkBase64,
+                                folderId: folderId,
+                                fileName: item.lastPathComponent
+                            )
+                        }
+                    }
+                }
+                
+                // 3) Обновляем UI-состояние
                 await MainActor.run {
                     self.folderURL = url
                     if self.attachedFolders.contains(where: { $0.url == url }) == false {
@@ -150,13 +194,13 @@ final class MusicLibraryManager: ObservableObject {
                     }
                 }
                 
-                print("📁 Папка добавлена: \(name)")
+                print("📁 Папка добавлена и проиндексирована: \(name)")
+                
             } catch {
                 print("❌ Не удалось создать bookmarkData: \(error)")
             }
         }
     }
-    
     
     // MARK: - Удаление прикреплённой папки
     
@@ -188,7 +232,10 @@ final class MusicLibraryManager: ObservableObject {
         
         if folders.isEmpty {
             print("ℹ️ Нет сохранённых папок")
-            await MainActor.run { self.isAccessRestored = true }
+            await MainActor.run {
+                self.isAccessRestored = true
+                self.isInitialFoldersLoadFinished = true
+            }
             return
         }
         
@@ -236,7 +283,7 @@ final class MusicLibraryManager: ObservableObject {
         
         
         // MARK: - Асинхронная генерация LibraryTrack
-        
+
         func generateLibraryTracks(from urls: [URL], folderId: UUID) async -> [LibraryTrack] {
             await withTaskGroup(of: LibraryTrack?.self) { group in
                 for url in urls {
@@ -252,11 +299,11 @@ final class MusicLibraryManager: ObservableObject {
                         values?.contentModificationDate ??
                         Date()
                         
-                        let metadata = try? await MetadataParser.parseMetadata(from: url)
-                        
+                        // Создаём bookmark для конкретного файла
                         let bookmarkData = (try? url.bookmarkData()) ?? Data()
                         let bookmarkBase64 = bookmarkData.base64EncodedString()
                         
+                        // Регистрация трека
                         await TrackRegistry.shared.register(
                             trackId: trackId,
                             bookmarkBase64: bookmarkBase64,
@@ -267,9 +314,9 @@ final class MusicLibraryManager: ObservableObject {
                         return LibraryTrack(
                             id: trackId,
                             fileURL: url,
-                            title: metadata?.title ?? url.deletingPathExtension().lastPathComponent,
-                            artist: metadata?.artist,
-                            duration: metadata?.duration ?? 0,
+                            title: nil,
+                            artist: nil,
+                            duration: 0,
                             addedDate: addedDate
                         )
                     }

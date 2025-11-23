@@ -20,6 +20,7 @@ struct LibraryTrackSectionView: View {
     let metadataByURL: [URL: TrackMetadataCacheManager.CachedMetadata]
     let isScrollingFast: Bool
     let revealedTrackID: UUID?
+    let folderViewModel: LibraryFolderViewModel
     
     @ObservedObject var coordinator: LibraryCoordinator
     @EnvironmentObject var toast: ToastManager
@@ -34,6 +35,7 @@ struct LibraryTrackSectionView: View {
                     trackListViewModel: trackListViewModel,
                     trackListNamesByURL: trackListNamesByURL,
                     metadata: metadataByURL[track.url],
+                    onMetadataLoaded: { url, meta in folderViewModel.setMetadata(meta, for: url)},
                     isScrollingFast: isScrollingFast,
                     isRevealed: track.id == revealedTrackID,
                     coordinator: coordinator,

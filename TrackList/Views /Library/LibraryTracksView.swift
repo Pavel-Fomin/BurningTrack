@@ -41,6 +41,7 @@ struct LibraryTracksView: View {
                         playerViewModel: playerViewModel,
                         isScrollingFast: scrollSpeed.isFast,
                         revealedTrackID: viewModel.revealedTrackID,
+                        folderViewModel: viewModel,
                         coordinator: coordinator
                     )
                     
