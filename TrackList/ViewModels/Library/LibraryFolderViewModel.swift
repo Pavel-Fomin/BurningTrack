@@ -146,59 +146,79 @@ final class LibraryFolderViewModel: ObservableObject {
     }
     
     // MARK: - Быстрая загрузка треков (Fast Start)
-    
+
     func refresh() async {
         await refreshFastStart(firstCount: initialParseCount)
     }
-    
+
     func refreshFastStart(firstCount: Int) async {
         isLoading = true
-        
+
+        // 1) Сканируем папку → порядок файлов
         let urls = scanFolderURLs(recursive: false)
         lastScannedURLs = urls
-        
+
         let orderMap = Dictionary(uniqueKeysWithValues: urls.enumerated().map { ($0.element, $0.offset) })
-        
+
         let head = Array(urls.prefix(firstCount))
         let tail = Array(urls.dropFirst(firstCount))
-        
-        // HEAD
+
+        let folderId = folder.id
+
+        // 2) Загружаем записи из акторa ДО detached
+        let entries = await TrackRegistry.shared.tracks(inFolder: folderId)
+
+        // 3) Преобразуем TrackEntry → LibraryTrack
+        let allTracks: [LibraryTrack] = entries.compactMap { entry in
+            guard let realURL = TrackRegistry.shared.resolvedURLSync(for: entry.id) else { return nil }
+            return LibraryTrack(
+                id: entry.id,
+                fileURL: realURL,
+                title: nil,
+                artist: nil,
+                duration: 0,
+                addedDate: entry.updatedAt
+            )
+        }
+
+        // HEAD (первые N треков)
         let firstSections: [TrackSection] =
-        await Task.detached(priority: .userInitiated) { [head, orderMap, folderId = self.folder.id] in
-            let tracks = await MusicLibraryManager.shared.generateLibraryTracks(from: head, folderId: folderId)
-            return Self.groupTracksByDate(tracks, order: orderMap)
+        await Task.detached(priority: .userInitiated) { [allTracks, head, orderMap] in
+            let headTracks = allTracks.filter { head.contains($0.url) }
+            return Self.groupTracksByDate(headTracks, order: orderMap)
         }.value
-        
+
         await MainActor.run {
             withAnimation(nil) {
                 self.trackSections = firstSections
                 self.isLoading = false
             }
         }
-        
-        // TAIL
+
+        // TAIL (всё остальное)
         let restTracks: [LibraryTrack] =
-        await Task.detached(priority: .utility) { [tail, folderId = self.folder.id] in
+        await Task.detached(priority: .utility) { [allTracks, tail] in
             guard !tail.isEmpty else { return [] }
-            return await MusicLibraryManager.shared.generateLibraryTracks(from: tail, folderId: folderId)
+            return allTracks.filter { tail.contains($0.url) }
         }.value
-        
-        // бейджи треклистов для HEAD
+
+        // Подгружаем бейджи треклистов для уже видимых треков
         await MainActor.run { self.loadTrackListNamesByURL() }
-        
+
         guard !restTracks.isEmpty else { return }
-        
-        let allTracks = firstSections.reduce(into: [LibraryTrack]()) { result, section in
-            result.append(contentsOf: section.tracks)
-        } + restTracks
-        
-        let grouped = Self.groupTracksByDate(allTracks, order: orderMap)
-        
+
+        // Склеиваем HEAD + TAIL
+        let allCombined = firstSections.flatMap { $0.tracks } + restTracks
+
+        let grouped = Self.groupTracksByDate(allCombined, order: orderMap)
+
         await MainActor.run {
-            withAnimation(nil) { self.trackSections = grouped }
+            withAnimation(nil) {
+                self.trackSections = grouped
+            }
         }
-        
-        // Прогрев бейджей (после загрузки метаданных tail)
+
+        // После завершения tail — обновляем бейджи ещё раз
         Task.detached { [weak self] in
             guard let self else { return }
             await MainActor.run { self.loadTrackListNamesByURL() }

@@ -225,6 +225,15 @@ actor TrackRegistry {
         persist()
     }
 
+    // MARK: - Public API — чтение треков
+
+    func allTracks() -> [TrackEntry] {
+        Array(registry.values)
+    }
+    
+    func tracks(inFolder folderId: UUID) -> [TrackEntry] {
+        registry.values.filter { $0.folderId == folderId }
+    }
 
     // MARK: - URL Resolution
 

@@ -26,7 +26,7 @@ final class MusicLibraryManager: ObservableObject {
     @Published var folderURL: URL?
     @Published var rootFolder: LibraryFolder?
     @Published var tracks: [URL] = []
-    
+    @Published var isInitialFoldersLoadFinished: Bool = false
     
     // MARK: - Инициализация
     
@@ -159,19 +159,19 @@ final class MusicLibraryManager: ObservableObject {
     
     
     // MARK: - Удаление прикреплённой папки
-
+    
     func removeBookmark(for url: URL) {
         Task {
             let folderId = url.libraryFolderId
-
+            
             // 1) Удаляем запись папки и все её треки из TrackRegistry
             await TrackRegistry.shared.removeFolder(folderId: folderId)
-
+            
             // 2) Обновляем UI-состояние
             await MainActor.run {
                 self.attachedFolders.removeAll { $0.url == url }
             }
-
+            
             print("📁 Папка откреплена:", url.lastPathComponent)
         }
     }
@@ -229,67 +229,68 @@ final class MusicLibraryManager: ObservableObject {
         await MainActor.run {
             self.attachedFolders = resolvedFolders
             self.isAccessRestored = true
+            self.isInitialFoldersLoadFinished = true
         }
         
         print("✅ Восстановление доступа завершено")
-    }
-    
-    
-    // MARK: - Асинхронная генерация LibraryTrack
-    
-    func generateLibraryTracks(from urls: [URL], folderId: UUID) async -> [LibraryTrack] {
-        await withTaskGroup(of: LibraryTrack?.self) { group in
-            for url in urls {
-                group.addTask {
-                    
-                    let trackId = await TrackRegistry.shared.trackId(for: url)
-                    
-                    let accessed = url.startAccessingSecurityScopedResource()
-                    defer { if accessed { url.stopAccessingSecurityScopedResource() } }
-                    
-                    let values = try? url.resourceValues(forKeys: [.creationDateKey, .contentModificationDateKey])
-                    let addedDate = values?.creationDate ??
-                    values?.contentModificationDate ??
-                    Date()
-                    
-                    let metadata = try? await MetadataParser.parseMetadata(from: url)
-                    
-                    let bookmarkData = (try? url.bookmarkData()) ?? Data()
-                    let bookmarkBase64 = bookmarkData.base64EncodedString()
-                    
-                    await TrackRegistry.shared.register(
-                        trackId: trackId,
-                        bookmarkBase64: bookmarkBase64,
-                        folderId: folderId,
-                        fileName: url.lastPathComponent
-                    )
-                    
-                    return LibraryTrack(
-                        id: trackId,
-                        fileURL: url,
-                        title: metadata?.title ?? url.deletingPathExtension().lastPathComponent,
-                        artist: metadata?.artist,
-                        duration: metadata?.duration ?? 0,
-                        addedDate: addedDate
-                    )
+        
+        
+        // MARK: - Асинхронная генерация LibraryTrack
+        
+        func generateLibraryTracks(from urls: [URL], folderId: UUID) async -> [LibraryTrack] {
+            await withTaskGroup(of: LibraryTrack?.self) { group in
+                for url in urls {
+                    group.addTask {
+                        
+                        let trackId = await TrackRegistry.shared.trackId(for: url)
+                        
+                        let accessed = url.startAccessingSecurityScopedResource()
+                        defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+                        
+                        let values = try? url.resourceValues(forKeys: [.creationDateKey, .contentModificationDateKey])
+                        let addedDate = values?.creationDate ??
+                        values?.contentModificationDate ??
+                        Date()
+                        
+                        let metadata = try? await MetadataParser.parseMetadata(from: url)
+                        
+                        let bookmarkData = (try? url.bookmarkData()) ?? Data()
+                        let bookmarkBase64 = bookmarkData.base64EncodedString()
+                        
+                        await TrackRegistry.shared.register(
+                            trackId: trackId,
+                            bookmarkBase64: bookmarkBase64,
+                            folderId: folderId,
+                            fileName: url.lastPathComponent
+                        )
+                        
+                        return LibraryTrack(
+                            id: trackId,
+                            fileURL: url,
+                            title: metadata?.title ?? url.deletingPathExtension().lastPathComponent,
+                            artist: metadata?.artist,
+                            duration: metadata?.duration ?? 0,
+                            addedDate: addedDate
+                        )
+                    }
                 }
+                
+                var result: [LibraryTrack] = []
+                for await track in group {
+                    if let track { result.append(track) }
+                }
+                return result
             }
-            
-            var result: [LibraryTrack] = []
-            for await track in group {
-                if let track { result.append(track) }
-            }
-            return result
         }
-    }
-    
-    
-    // MARK: - Навигация и выделение трека
-    
-    func openFolder(at folderURL: URL, highlight trackId: UUID) async {
-        if let idx = attachedFolders.firstIndex(where: { $0.url == folderURL }) {
-            NavigationCoordinator.shared.pendingRevealTrackID = trackId
-            attachedFolders[idx] = attachedFolders[idx]  // триггер обновления
+        
+        
+        // MARK: - Навигация и выделение трека
+        
+        func openFolder(at folderURL: URL, highlight trackId: UUID) async {
+            if let idx = attachedFolders.firstIndex(where: { $0.url == folderURL }) {
+                NavigationCoordinator.shared.pendingRevealTrackID = trackId
+                attachedFolders[idx] = attachedFolders[idx]  // триггер обновления
+            }
         }
     }
 }

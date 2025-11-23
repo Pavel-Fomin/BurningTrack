@@ -20,7 +20,15 @@ struct MusicLibraryView: View {
     @StateObject private var manager = MusicLibraryManager.shared
     
     var body: some View {
-        if manager.attachedFolders.isEmpty {
+        if !manager.isInitialFoldersLoadFinished {
+            // MARK: - Скелетон загрузки корневых папок
+            VStack(spacing: 0) {
+                LibraryFoldersSkeletonView()
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            
+        } else if manager.attachedFolders.isEmpty {
+            // MARK: - Папок нет
             VStack {
                 Spacer()
                 Button("Выбрать папку", action: onAddFolder)
@@ -31,6 +39,7 @@ struct MusicLibraryView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             
         } else {
+            // MARK: - Список прикреплённых папок
             List {
                 ForEach(manager.attachedFolders) { folder in
                     Button(action: {
@@ -54,6 +63,7 @@ struct MusicLibraryView: View {
                         }
                     }
                 }
+                
                 Button(action: onAddFolder) {
                     HStack(spacing: 12) {
                         Image(systemName: "folder.fill.badge.plus")
@@ -64,9 +74,6 @@ struct MusicLibraryView: View {
                     .padding(.vertical, 4)
                 }
             }
-            
         }
-        
     }
-    
 }
