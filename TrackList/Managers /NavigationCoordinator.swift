@@ -17,25 +17,25 @@ final class NavigationCoordinator: ObservableObject {
     @Published var isLibraryReady: Bool = false
     @Published var pendingRevealTrackID: UUID? = nil
     @Published var resetTrackListsView = UUID()
-
-    // Последний трек, который нужно “доставить” во фонотеку
-    @Published private(set) var lastRevealedTrackID: UUID? = nil
+    @Published private(set) var lastRevealedTrackID: UUID? = nil  /// Последний трек, который нужно “доставить” во фонотеку
     
     private init() {}
     
-
     // MARK: - Запрос показа трека во фонотеке
+    @MainActor
     func showInLibrary(trackId: UUID) {
         print("🧭 Запрос показать трек по id:", trackId)
         pendingRevealTrackID = trackId
         lastRevealedTrackID = trackId
 
-        Task { @MainActor in
+        // Меняем вкладку только если это НЕ library
+        if ScenePhaseHandler.shared.activeTab != .library {
             ScenePhaseHandler.shared.activeTab = .library
         }
     }
 
     // MARK: - Уведомление о готовности LibraryScreen
+    
     @MainActor
     func notifyLibraryReady() {
         print("📡 LibraryScreen готова принимать переходы")
@@ -52,6 +52,13 @@ final class NavigationCoordinator: ObservableObject {
     func takeLastRevealedTrackID() -> UUID? {
         defer { lastRevealedTrackID = nil }
         return lastRevealedTrackID
+    }
+    
+    
+    @MainActor
+    func takePendingRevealTrackID() -> UUID? {
+        defer { pendingRevealTrackID = nil }
+        return pendingRevealTrackID
     }
 
     func triggerTrackListsReset() {

@@ -54,28 +54,23 @@ struct LibraryTracksView: View {
                 }
                 
                 // Реактивные события
-                .onChange(of: viewModel.trackSections) { _, _ in
-                    guard let id = viewModel.pendingRevealTrackID else { return }
-                    viewModel.scrollToTrackIfExists(id)
+                .onReceive(viewModel.$trackSections) { _ in
+                    if let id = viewModel.pendingRevealTrackID {
+                        viewModel.scrollToTrackIfExists(id)
+                    }
                 }
+                
                 .onReceive(viewModel.$scrollTargetID) { value in
                     guard let id = value else { return }
-                    print("📜 Получена команда прокрутки → \(id.uuidString)")
                     withAnimation(.easeInOut(duration: 0.35)) {
                         proxy.scrollTo(id, anchor: .center)
                     }
                     viewModel.scrollTargetID = nil
                     viewModel.clearRevealState()
                 }
-                
-                .task(id: viewModel.pendingRevealTrackID) {
-                    if let id = viewModel.pendingRevealTrackID {
-                        viewModel.scrollToTrackIfExists(id)
-                    }
-                }
             }
             
-            // Лоадер — только при первой загрузке
+            // Лоадер — (при первой загрузке)
             if viewModel.isLoading && viewModel.trackSections.isEmpty {
                 VStack {
                     Spacer()
@@ -94,10 +89,9 @@ struct LibraryTracksView: View {
         .refreshable {
             await viewModel.refresh()
         }
-        
-        // Первая загрузка
+        // Звгрузка треков
         .task(id: folder.url) {
-            await viewModel.refresh()
+            await viewModel.loadTracksIfNeeded()
         }
         
         .navigationTitle(folder.name)

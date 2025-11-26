@@ -17,7 +17,7 @@ struct MusicLibraryView: View {
     let onAddFolder: () -> Void
     
     @ObservedObject var coordinator: LibraryCoordinator
-    @StateObject private var manager = MusicLibraryManager.shared
+    @ObservedObject private var manager = MusicLibraryManager.shared
     
     var body: some View {
         if !manager.isInitialFoldersLoadFinished {

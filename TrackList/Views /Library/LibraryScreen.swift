@@ -27,40 +27,35 @@ struct LibraryScreen: View {
 
                 // MARK: - Контент
                 ZStack {
-                    if case .root = coordinator.state {
+                    switch coordinator.state {
+                    case .root:
                         MusicLibraryView(
                             trackListViewModel: trackListViewModel,
                             playerViewModel: playerViewModel,
                             onAddFolder: { isShowingFolderPicker = true },
                             coordinator: coordinator
                         )
-                        .id("root")
                         .libraryTransition()
-                    }
 
-                    if case .folder(let folder) = coordinator.state {
+                    case .folder(let folder):
                         LibraryFolderView(
                             folder: folder,
                             coordinator: coordinator,
                             trackListViewModel: trackListViewModel,
                             playerViewModel: playerViewModel
                         )
-                        .id(folder.url)
                         .libraryTransition()
-                    }
 
-                    if case .tracks(let folder) = coordinator.state {
+                    case .tracks(let folder):
                         LibraryFolderView(
                             folder: folder,
                             coordinator: coordinator,
                             trackListViewModel: trackListViewModel,
                             playerViewModel: playerViewModel
                         )
-                        .id("tracks-\(folder.url.path)")
                         .libraryTransition()
                     }
                 }
-                .animation(.easeInOut(duration: 0.40), value: coordinator.stateID)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color(.systemBackground))
             }
@@ -82,12 +77,18 @@ struct LibraryScreen: View {
                 await coordinator.revealTrack(trackId: trackId, in: folders)
             }
         }
-        .onReceive(sceneHandler.$repeatedTabSelection.compactMap { $0 }) { tab in
+        /*.onReceive(sceneHandler.$repeatedTabSelection.compactMap { $0 }) { tab in
+            guard coordinator.pendingRevealTrackID == nil else {
+                // если в процессе REVEAL — запрещаем resetToRoot
+                print("⛔ Игнорируем repeatedTabSelection, идёт REVEAL")
+                return
+            }
+
             if tab == .library {
                 print("🔁 Повторное нажатие на вкладку Фонотека — возвращаемся в корень")
                 coordinator.resetToRoot()
             }
-        }
+        }*/
             
             .fileImporter(
                 isPresented: $isShowingFolderPicker,

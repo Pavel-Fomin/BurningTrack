@@ -21,6 +21,7 @@ final class LibraryCoordinator: ObservableObject {
     }
     
     private var folderStack: [LibraryFolder] = []         /// Иерархический стек переходов
+    private var isRevealNavigation = false
     @Published private(set) var stateID: UUID = UUID()
     @Published private(set) var state: NavigationState = .root
     @Published var pendingRevealTrackID: UUID? = nil
@@ -68,9 +69,12 @@ final class LibraryCoordinator: ObservableObject {
     }
     
     
+    
     // MARK: - Reveal переход (из плеера или треклиста)
 
     func revealTrack(trackId: UUID, in folders: [LibraryFolder]) async {
+        isRevealNavigation = true
+        
         // 1) resolved URL из registry
         guard let resolvedURL = await TrackRegistry.shared.resolvedURL(for: trackId) else {
             print("⚠️ [Reveal] trackId \(trackId) не найден в реестре")
@@ -82,8 +86,9 @@ final class LibraryCoordinator: ObservableObject {
         // 2) уже в нужной папке?
         if let current = currentFolder,
            current.url.standardizedFileURL == folderURL.standardizedFileURL {
-            pendingRevealTrackID = trackId
-            return
+               pendingRevealTrackID = trackId
+               isRevealNavigation = false
+               return
         }
 
         // 3) строим путь к папке

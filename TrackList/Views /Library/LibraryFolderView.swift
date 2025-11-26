@@ -10,9 +10,6 @@
 
 import SwiftUI
 
-/// Экран конкретной папки фонотеки.
-/// Отвечает ТОЛЬКО за навигацию по подпапкам.
-/// Если подпапок нет — рендерит экран треков (LibraryTracksView).
 struct LibraryFolderView: View {
     let folder: LibraryFolder
     let trackListViewModel: TrackListViewModel
@@ -20,10 +17,6 @@ struct LibraryFolderView: View {
     @ObservedObject var coordinator: LibraryCoordinator
     @ObservedObject var playerViewModel: PlayerViewModel
     @StateObject private var viewModel: LibraryFolderViewModel
-    @State private var scrollTargetID: UUID? = nil
-    @State private var revealedTrackID: UUID? = nil
-    
-
     
 // MARK: - Инициализация зависимостей
     
@@ -39,13 +32,14 @@ struct LibraryFolderView: View {
         self._playerViewModel = ObservedObject(wrappedValue: playerViewModel)
 
         self._viewModel = StateObject(
-            wrappedValue: LibraryFolderViewModel(folder: folder)
+            wrappedValue: LibraryFolderViewModelCache.shared.resolve(for: folder)
         )
     }
 
     var body: some View {
         Group {
             if viewModel.subfolders.isEmpty {
+                
                 // Нет подпапок → показываем треки
                 LibraryTracksView(
                     folder: viewModel.folder,
@@ -58,6 +52,7 @@ struct LibraryFolderView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 
             } else {
+                
                 // Есть подпапки → список подпапок
                 List { folderSectionView() }
                     .listStyle(.insetGrouped)
@@ -67,9 +62,20 @@ struct LibraryFolderView: View {
         }
         .task(id: viewModel.folder.url) {
             viewModel.loadSubfoldersIfNeeded()
-        }
+            if let revealId = coordinator.pendingRevealTrackID {
+                    applyRevealIfNeeded(revealId)
+                }
+            }
         
         .id(folder.url)
+    }
+    
+// MARK: - Reveal обработка
+    private func applyRevealIfNeeded(_ trackId: UUID) {
+        if viewModel.trackSections.flatMap({ $0.tracks }).contains(where: { $0.id == trackId }) {
+            viewModel.pendingRevealTrackID = trackId
+            coordinator.pendingRevealTrackID = nil
+        }
     }
     
     
@@ -79,16 +85,16 @@ struct LibraryFolderView: View {
     private func folderSectionView() -> some View {
         Section {
             ForEach(viewModel.subfolders) { subfolder in
-                Button(action: {
+                HStack(spacing: 12) {
+                    Image(systemName: "folder.fill")
+                        .foregroundColor(.blue)
+                        .frame(width: 24)
+                    Text(subfolder.name).lineLimit(1)
+                }
+                .padding(.vertical, 4)
+                .contentShape(Rectangle())
+                .onTapGesture {
                     coordinator.openFolder(subfolder)
-                }) {
-                    HStack(spacing: 12) {
-                        Image(systemName: "folder.fill")
-                            .foregroundColor(.blue)
-                            .frame(width: 24)
-                        Text(subfolder.name).lineLimit(1)
-                    }
-                    .padding(.vertical, 4)
                 }
             }
         }

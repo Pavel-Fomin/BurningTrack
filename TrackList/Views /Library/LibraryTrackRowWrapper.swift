@@ -18,10 +18,10 @@ struct LibraryTrackRowWrapper: View {
     let onMetadataLoaded: (URL, TrackMetadataCacheManager.CachedMetadata) -> Void
     let isScrollingFast: Bool
     let isRevealed: Bool
+    let coordinator: LibraryCoordinator
     
     @State private var artwork: CGImage? = nil
     
-    @ObservedObject var coordinator: LibraryCoordinator
     @ObservedObject var playerViewModel: PlayerViewModel
     @EnvironmentObject var toast: ToastManager
     @EnvironmentObject var sheetManager: SheetManager
@@ -96,15 +96,10 @@ struct LibraryTrackRowWrapper: View {
             // В ПЛЕЕР
             Button {
                 Task {
-                    let id = track.id
-
-                    guard let resolved = await TrackRegistry.shared.resolvedURL(for: id) else {
-                        print("❌ Нет resolvedURL для trackId \(id)")
-                        return
-                    }
+                    let resolved = track.url   // URL уже резолвлен заранее
 
                     let playerTrack = PlayerTrack(
-                        id: id,
+                        id: track.id,
                         title: track.title,
                         artist: track.artist,
                         duration: track.duration,

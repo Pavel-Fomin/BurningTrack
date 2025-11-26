@@ -23,11 +23,9 @@ struct LibraryTrackSectionView: View {
     let folderViewModel: LibraryFolderViewModel
     
     @ObservedObject var coordinator: LibraryCoordinator
-    @EnvironmentObject var toast: ToastManager
-    @EnvironmentObject var sheetManager: SheetManager
-
+    
     var body: some View {
-        Section(header: Text(title).font(.headline)) {
+        Section(header: Text(title).font(.headline).id(title)) {
             ForEach(tracks, id: \.id) { track in
                 LibraryTrackRowWrapper(
                     track: track,
@@ -42,9 +40,8 @@ struct LibraryTrackSectionView: View {
                     playerViewModel: playerViewModel
                 )
                 .id(track.id)
-                .environmentObject(toast)
-                .environmentObject(sheetManager)
             }
         }
+        .id(title)
     }
 }
