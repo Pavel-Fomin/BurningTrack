@@ -1,18 +1,7 @@
-//
-//  LibraryToolbar.swift
-//  TrackList
-//
-//  Универсальный тулбар для раздела “Фонотека” и подпапок
-//  Заголовок наследуется от названия текущей папки.
-//
-//  Created by Pavel Fomin on 09.11.2025.
-//
-
 import SwiftUI
 
 struct LibraryToolbar: ViewModifier {
-    @ObservedObject var coordinator: LibraryCoordinator
-    var onAddFolder: () -> Void
+    @ObservedObject private var nav = NavigationCoordinator.shared
 
     func body(content: Content) -> some View {
         content
@@ -21,7 +10,7 @@ struct LibraryToolbar: ViewModifier {
                 leading: {
                     if !isAtRoot {
                         Button {
-                            coordinator.goBack()
+                            nav.openLibraryRoot()
                         } label: {
                             Image(systemName: "chevron.left")
                                 .font(.headline)
@@ -30,37 +19,31 @@ struct LibraryToolbar: ViewModifier {
                     }
                 },
                 trailing: {
-                    EmptyView() // временно без кнопок
+                    EmptyView()
                 }
             )
     }
 
-
-// MARK: - Вычисления
+    // MARK: Title / State
 
     private var isAtRoot: Bool {
-        if case .root = coordinator.state { return true }
-        return false
+        nav.libraryRoute == .root
     }
 
     private var titleText: String {
-        switch coordinator.state {
+        switch nav.libraryRoute {
         case .root:
             return "Фонотека"
-        case .folder(let folder), .tracks(let folder):
-            return folder.name
+        case .folder(let id):
+            return MusicLibraryManager.shared.folder(for: id)?.name ?? "Папка"
         }
     }
 }
 
-
-// MARK: - Расширение для вызова
+// MARK: Modifier
 
 extension View {
-    func libraryToolbar(
-        coordinator: LibraryCoordinator,
-        onAddFolder: @escaping () -> Void
-    ) -> some View {
-        self.modifier(LibraryToolbar(coordinator: coordinator, onAddFolder: onAddFolder))
+    func libraryToolbar() -> some View {
+        self.modifier(LibraryToolbar())
     }
 }

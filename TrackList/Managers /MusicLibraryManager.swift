@@ -23,8 +23,6 @@ final class MusicLibraryManager: ObservableObject {
     
     @Published private(set) var isAccessRestored = false
     @Published var attachedFolders: [LibraryFolder] = []
-    @Published var folderURL: URL?
-    @Published var rootFolder: LibraryFolder?
     @Published var tracks: [URL] = []
     @Published var isInitialFoldersLoadFinished: Bool = false
     
@@ -36,7 +34,6 @@ final class MusicLibraryManager: ObservableObject {
         }
     }
     
-    
     // MARK: - Ленивая модель папки
     
     func liteFolder(from url: URL) -> LibraryFolder {
@@ -47,8 +44,6 @@ final class MusicLibraryManager: ObservableObject {
             audioFiles: []
         )
     }
-    
-    
     
     // MARK: - Полное дерево папки
     
@@ -118,7 +113,7 @@ final class MusicLibraryManager: ObservableObject {
     
     
     // MARK: - Сохраняем bookmark выбранной папки и регистрируем её
-
+    
     func saveBookmark(for url: URL) {
         guard url.startAccessingSecurityScopedResource() else {
             print("❌ Не удалось начать доступ к папке")
@@ -188,7 +183,6 @@ final class MusicLibraryManager: ObservableObject {
                 
                 // 3) Обновляем UI-состояние
                 await MainActor.run {
-                    self.folderURL = url
                     if self.attachedFolders.contains(where: { $0.url == url }) == false {
                         self.attachedFolders.append(self.liteFolder(from: url))
                     }
@@ -220,6 +214,23 @@ final class MusicLibraryManager: ObservableObject {
         }
     }
     
+    // MARK: - Поиск папки по ID
+
+    func folder(for folderId: UUID) -> LibraryFolder? {
+        func search(in folders: [LibraryFolder]) -> LibraryFolder? {
+            for f in folders {
+                if f.url.libraryFolderId == folderId {
+                    return f
+                }
+                if let found = search(in: f.subfolders) {
+                    return found
+                }
+            }
+            return nil
+        }
+
+        return search(in: attachedFolders)
+    }
     
     // MARK: - Восстановление прикреплённых папок через TrackRegistry
     
@@ -283,7 +294,7 @@ final class MusicLibraryManager: ObservableObject {
         
         
         // MARK: - Асинхронная генерация LibraryTrack
-
+        
         func generateLibraryTracks(from urls: [URL], folderId: UUID) async -> [LibraryTrack] {
             await withTaskGroup(of: LibraryTrack?.self) { group in
                 for url in urls {
@@ -327,16 +338,6 @@ final class MusicLibraryManager: ObservableObject {
                     if let track { result.append(track) }
                 }
                 return result
-            }
-        }
-        
-        
-        // MARK: - Навигация и выделение трека
-        
-        func openFolder(at folderURL: URL, highlight trackId: UUID) async {
-            if let idx = attachedFolders.firstIndex(where: { $0.url == folderURL }) {
-                NavigationCoordinator.shared.pendingRevealTrackID = trackId
-                attachedFolders[idx] = attachedFolders[idx]  // триггер обновления
             }
         }
     }

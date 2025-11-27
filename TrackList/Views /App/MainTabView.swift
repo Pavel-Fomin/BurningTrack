@@ -2,48 +2,59 @@
 //  MainTabView.swift
 //  TrackList
 //
+//  Корневой контейнер с TabView.
+//  — читает активную вкладку из ScenePhaseHandler,
+//  — отображает основные разделы приложения.
+//
+//  NavigationCoordinator НЕ хранит вкладки — он переключает их через ScenePhaseHandler.
+//
 //  Created by Pavel Fomin on 17.07.2025.
 //
 
-import Foundation
 import SwiftUI
+import Foundation
 
 struct MainTabView: View {
-    @ObservedObject private var sceneHandler = ScenePhaseHandler.shared
+
+    // MARK: - Global managers
+
+    @ObservedObject private var scene = ScenePhaseHandler.shared
+    @ObservedObject private var nav = NavigationCoordinator.shared
+
     @ObservedObject var trackListViewModel: TrackListViewModel
     @ObservedObject var playerViewModel: PlayerViewModel
-    @Binding var selectedTab: Int
-
     
+    @StateObject private var trackListsVM = TrackListsViewModel()
+
+
     var body: some View {
-        TabView(selection: $sceneHandler.activeTab) {
+        TabView(selection: $scene.activeTab) {
+
+            // MARK: - Плеер
             PlayerScreen(playerViewModel: playerViewModel)
                 .tabItem { Label("Плеер", systemImage: "waveform") }
                 .tag(ScenePhaseHandler.Tab.player)
-                .tag(0)
 
+            // MARK: - Фонотека
             LibraryScreen(
                 playerViewModel: playerViewModel,
-                trackListViewModel: trackListViewModel)
-            
+                trackListViewModel: trackListViewModel
+            )
                 .tabItem { Label("Фонотека", systemImage: "play.square.stack") }
                 .tag(ScenePhaseHandler.Tab.library)
-                .tag(1)
-            
 
+            // MARK: - Треклисты
             TrackListsScreen(
-                trackListsViewModel: TrackListsViewModel(),
-                playerViewModel: playerViewModel)
-            
+                trackListsViewModel: trackListsVM,   // ← ПЕРЕДАЁМ СЮДА
+                playerViewModel: playerViewModel
+            )
                 .tabItem { Label("Треклисты", systemImage: "list.star") }
                 .tag(ScenePhaseHandler.Tab.tracklists)
-                .tag(2)
 
+            // MARK: - Настройки
             SettingsScreen()
                 .tabItem { Label("Настройки", systemImage: "gear") }
                 .tag(ScenePhaseHandler.Tab.settings)
-                .tag(3)
         }
     }
-    
 }

@@ -26,6 +26,7 @@ final class LibraryFolderViewModel: ObservableObject {
     // MARK: - Состояния
     
     @Published var pendingRevealTrackID: UUID?
+    
     @Published var trackSections: [TrackSection] = []
     @Published var trackListNamesByURL: [URL: [String]] = [:]
     @Published var metadataByURL: [URL: TrackMetadataCacheManager.CachedMetadata] = [:]
@@ -35,10 +36,8 @@ final class LibraryFolderViewModel: ObservableObject {
     @Published private(set) var didLoadTrackListNames = false
     
     @Published var subfolders: [LibraryFolder] = []
-    @Published var pendingRevealTrackURL: URL?
-    @Published var revealedTrackID: UUID? = nil
+    
     @Published private(set) var didStartTailWarmup = false
-    @Published var scrollTargetID: UUID? = nil
     
     var headCount: Int {
         let allTracks = trackSections.reduce(into: 0) { result, section in
@@ -66,27 +65,7 @@ final class LibraryFolderViewModel: ObservableObject {
         
         cancellables.removeAll()
     }
-    
-    init(folder: LibraryFolder, pendingReveal: URL) {
-        self.folder = folder
-        self.pendingRevealTrackURL = pendingReveal
-        
-        trackListsObserver = NotificationCenter.default.addObserver(
-            forName: .trackListsDidChange,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in
-                self?.loadTrackListNamesByURL()
-            }
-        }
-        
-        cancellables.removeAll()
-        
-        DispatchQueue.main.async {
-            self.pendingRevealTrackURL = pendingReveal
-        }
-    }
+
     
     // MARK: - Подпапки
     
@@ -95,39 +74,6 @@ final class LibraryFolderViewModel: ObservableObject {
         subfolders = MusicLibraryManager.shared.loadSubfolders(for: folder.url)
     }
     
-    // MARK: - Reveal / Scroll
-    
-    func scrollToTrackIfExists(_ id: UUID) {
-        print("🚀 scrollToTrackIfExists для trackId:", id)
-
-        Task { @MainActor in
-            // 1) Пробуем найти сразу
-            if let found = findTrack(in: trackSections, matching: id) {
-                scrollTargetID = found.id
-                revealedTrackID = found.id
-
-                DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
-                    if self.revealedTrackID == found.id {
-                        self.revealedTrackID = nil
-                    }
-                }
-
-                pendingRevealTrackID = nil
-                return
-            }
-
-            print("⚠️ не найден, ждём обновления секций...")
-
-            // 2) Ждём, пока секции обновятся
-            for await sections in $trackSections.values {
-                if let _ = findTrack(in: sections, matching: id) {
-                    print("✅ найден после обновления")
-                    self.scrollToTrackIfExists(id)
-                    return
-                }
-            }
-        }
-    }
     
     // MARK: - Ленивая загрузка
     
@@ -228,6 +174,7 @@ final class LibraryFolderViewModel: ObservableObject {
     // MARK: - TrackList Badges
     
     func loadTrackListNamesByURL() {
+        
         // какие URL сейчас в секциях
         var urlsInView: [URL] = []
         urlsInView.reserveCapacity(trackSections.count * 10)
@@ -360,10 +307,7 @@ final class LibraryFolderViewModel: ObservableObject {
             )
         }
     }
-    
-    func clearRevealState() {
-        revealedTrackID = nil
-    }
+  
     
     deinit {
         cancellables.forEach { $0.cancel() }

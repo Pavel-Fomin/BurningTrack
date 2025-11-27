@@ -2,7 +2,15 @@
 //  ContentView.swift
 //  TrackList
 //
-//  Основное view приложения
+//  Корневой контейнер приложения.
+//  - содержит TabView (через MainTabView),
+//  - поверх показывает мини-плеер,
+//  - поверх показывает тосты и шиты,
+//  - НЕ содержит никакой навигационной логики.
+//
+//  Навигация:
+//  — вкладки: ScenePhaseHandler.shared
+//  — маршрутизация фонотеки: NavigationCoordinator.shared
 //
 //  Created by Pavel Fomin on 28.04.2025.
 //
@@ -10,37 +18,40 @@
 import SwiftUI
 
 struct ContentView: View {
+
+    // MARK: - Глобальные менеджеры (живут всё приложение)
     @StateObject private var sheetManager = SheetManager.shared
     @StateObject private var trackDetailManager = TrackDetailManager.shared
-    @StateObject private var navigation = NavigationCoordinator.shared
-    @ObservedObject var playerViewModel: PlayerViewModel
+    
     @EnvironmentObject var toast: ToastManager
-    @State private var selectedTab: Int = 0
-    
-    let trackListViewModel: TrackListViewModel
-    
-    
-    // MARK: - Обёртка и computed property
-        private struct IdentifiableTrack: Identifiable {
-            let id = UUID()
-            let track: any TrackDisplayable
-        }
 
-        private var identifiableTrack: IdentifiableTrack? {
-            trackDetailManager.track.map { IdentifiableTrack(track: $0) }
-        }
-    
+    @ObservedObject private var navigation = NavigationCoordinator.shared
+    @ObservedObject private var scene = ScenePhaseHandler.shared
+
+    @ObservedObject var playerViewModel: PlayerViewModel
+    let trackListViewModel: TrackListViewModel
+
+    // MARK: - Обёртка для sheet(item:)
+    private struct IdentifiableTrack: Identifiable {
+        let id = UUID()
+        let track: any TrackDisplayable
+    }
+
+    private var identifiableTrack: IdentifiableTrack? {
+        trackDetailManager.track.map { IdentifiableTrack(track: $0) }
+    }
+
+    // MARK: - Основной слой UI
     var body: some View {
         ZStack(alignment: .bottom) {
-            // Основные вкладки
+
+            // MARK: - Основные вкладки
             MainTabView(
                 trackListViewModel: trackListViewModel,
-                playerViewModel: playerViewModel,
-                selectedTab: $selectedTab
+                playerViewModel: playerViewModel
             )
-            
-            
-            // Мини-плеер
+
+            // MARK: - Мини-плеер
             if playerViewModel.currentTrackDisplayable != nil {
                 MiniPlayerView(
                     trackListViewModel: trackListViewModel,
@@ -50,8 +61,8 @@ struct ContentView: View {
                 .padding(.bottom, safeTabBarInset)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
-            
-            // Тост-уведомления
+
+            // MARK: - Тосты
             if let data = toast.data {
                 VStack(spacing: 8) {
                     ToastView(data: data)
@@ -62,74 +73,55 @@ struct ContentView: View {
                 .animation(.easeInOut(duration: 0.3), value: data.id)
             }
         }
-        
+
+        // MARK: - Шит "Действия с треком"
         .sheet(item: $sheetManager.trackActionsSheet, onDismiss: {
             sheetManager.highlightedTrackID = nil
         }) { data in
             let base = CGFloat(data.actions.count) * 56 + 8
             let adjusted = data.actions.count <= 2 ? base + 28 : base
-            
+
             TrackActionSheet(
                 track: data.track,
                 context: data.context,
                 actions: data.actions,
-                onAction: { action in
-                    print("Выбрано действие: \(action)")
-                }
+                onAction: { action in print("Выбрано действие: \(action)") }
             )
             .presentationDetents([.height(adjusted)])
         }
-        
-        // Экран "О треке"
+
+        // MARK: - Экран "О треке"
         .sheet(
             isPresented: Binding(
                 get: { trackDetailManager.track != nil },
-                set: { newValue in
-                    if !newValue {
-                        TrackDetailManager.shared.close() // синхронизация при свайпе вниз
-                    }
-                }
+                set: { if !$0 { trackDetailManager.close() } }
             )
         ) {
             if let track = trackDetailManager.track {
-                TrackDetailSheet(track: track)            }
-        }
-        // открыть вкладку «Фонотека»
-        .onReceive(navigation.$pendingRevealTrackID) { trackId in
-            guard let trackId else { return }
-            handleReveal(trackId)
+                TrackDetailSheet(track: track)
+            }
         }
     }
-    
-    // MARK: - Reveal логика
-    
-    private func handleReveal(_ trackId: UUID) {
-        Task { @MainActor in
-            // 1) переключаемся на фонотеку
-            ScenePhaseHandler.shared.activeTab = .library
-            
-            // 2) сохраняем ID трека, который нужно раскрыть
-            navigation.pendingRevealTrackID = trackId
-        }
-    }
-    
-    
-// MARK: - Тост-паддинг
+
+    // MARK: - Паддинг для тоста
     private var toastBottomPadding: CGFloat {
-        let hasMiniPlayer = playerViewModel.currentTrackDisplayable != nil && selectedTab != 2
+        let hasMiniPlayer =
+        playerViewModel.currentTrackDisplayable != nil
+        && scene.activeTab != .tracklists
+
         let miniPlayerHeight: CGFloat = hasMiniPlayer ? 88 : 0
         let tabBarHeight: CGFloat = 49
         let toastGap: CGFloat = hasMiniPlayer ? 8 : 0
         let spacing: CGFloat = 12
+
         return miniPlayerHeight + toastGap + tabBarHeight + spacing
     }
-}
 
-
-// MARK: - Вычесляемое свойство для Dynamic Island, Face ID, iPhone SE и т.д.
-private var safeTabBarInset: CGFloat {
-    UIApplication.shared.connectedScenes
-        .compactMap { ($0 as? UIWindowScene)?.keyWindow }
-        .first?
-        .safeAreaInsets.bottom ?? 49
+    // MARK: - Safe area для мини-плеера (Dynamic Island / Face ID / SE)
+    private var safeTabBarInset: CGFloat {
+        UIApplication.shared.connectedScenes
+            .compactMap { ($0 as? UIWindowScene)?.keyWindow }
+            .first?
+            .safeAreaInsets.bottom ?? 49
+    }
 }

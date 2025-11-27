@@ -2,7 +2,9 @@
 //  LibraryTrackRowWrapper.swift
 //  TrackList
 //
-//  Обёртка для TrackRowView с реакцией на изменения playerViewModel
+//  Обёртка для TrackRowView с реакцией на playerViewModel.
+//  Чистый UI-компонент — не содержит навигации.
+//  NavigationCoordinator и маршруты здесь НЕ используются.
 //
 //  Created by Pavel Fomin on 03.08.2025.
 //
@@ -10,42 +12,46 @@
 import SwiftUI
 
 struct LibraryTrackRowWrapper: View {
+
     let track: LibraryTrack
     let allTracks: [LibraryTrack]
+
     let trackListViewModel: TrackListViewModel
     let trackListNamesByURL: [URL: [String]]
+
     let metadata: TrackMetadataCacheManager.CachedMetadata?
     let onMetadataLoaded: (URL, TrackMetadataCacheManager.CachedMetadata) -> Void
+
     let isScrollingFast: Bool
     let isRevealed: Bool
-    let coordinator: LibraryCoordinator
-    
-    @State private var artwork: CGImage? = nil
-    
+
     @ObservedObject var playerViewModel: PlayerViewModel
+
     @EnvironmentObject var toast: ToastManager
     @EnvironmentObject var sheetManager: SheetManager
-    
+
+    @State private var artwork: CGImage? = nil
+
     // MARK: - Player state
-    
+
     private var isCurrent: Bool {
         playerViewModel.isCurrent(track, in: .library)
     }
-    
+
     private var isPlaying: Bool {
         isCurrent && playerViewModel.isPlaying
     }
-    
+
     private var trackListNames: [String] {
         trackListNamesByURL[track.url] ?? []
     }
-    
+
     private var isHighlighted: Bool {
         sheetManager.highlightedTrackID == track.id
     }
-    
+
     // MARK: - Body
-    
+
     var body: some View {
         TrackRowView(
             track: track,
@@ -56,7 +62,7 @@ struct LibraryTrackRowWrapper: View {
             title: metadata?.title ?? track.title,
             artist: metadata?.artist ?? track.artist ?? "",
             duration: metadata?.duration ?? track.duration,
-            
+
             onTap: {
                 if isCurrent {
                     playerViewModel.togglePlayPause()
@@ -64,10 +70,10 @@ struct LibraryTrackRowWrapper: View {
                     playerViewModel.play(track: track, context: allTracks)
                 }
             },
-            
+
             trackListNames: trackListNames
         )
-        
+
         .task(id: track.url.absoluteString + "|" + (isScrollingFast ? "1" : "0")) {
 
             // Ленивая загрузка обложки
@@ -90,13 +96,15 @@ struct LibraryTrackRowWrapper: View {
                 }
             }
         }
-        
+
+        // MARK: - Системные свайпы (В плеер / В треклист / Ещё)
+
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            
+
             // В ПЛЕЕР
             Button {
                 Task {
-                    let resolved = track.url   // URL уже резолвлен заранее
+                    let resolved = track.url
 
                     let playerTrack = PlayerTrack(
                         id: track.id,
@@ -110,20 +118,21 @@ struct LibraryTrackRowWrapper: View {
                     PlaylistManager.shared.tracks.append(playerTrack)
                     PlaylistManager.shared.saveToDisk()
 
-                    toast.show(ToastData(
-                        style: .track(
-                            title: track.title ?? track.fileName,
-                            artist: track.artist ?? ""
-                        ),
-                        artwork: track.artwork
-                    ))
+                    toast.show(
+                        ToastData(
+                            style: .track(
+                                title: track.title ?? track.fileName,
+                                artist: track.artist ?? ""
+                            ),
+                            artwork: track.artwork
+                        )
+                    )
                 }
             } label: {
                 Label("В плеер", systemImage: "waveform")
             }
             .tint(.blue)
-            
-            
+
             // В ТРЕКЛИСТ
             Button {
                 sheetManager.open(track: track)
@@ -131,7 +140,7 @@ struct LibraryTrackRowWrapper: View {
                 Label("В треклист", systemImage: "list.star")
             }
             .tint(.green)
-            
+
             // ЕЩЁ
             Button {
                 sheetManager.highlightedTrackID = track.id

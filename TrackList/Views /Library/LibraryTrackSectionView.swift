@@ -2,31 +2,35 @@
 //  LibraryTrackSectionView.swift
 //  TrackList
 //
-//  Cекция треков с разделителем
+//  Секция треков с заголовком.
+//  Чистый UI — не содержит навигации.
+//  Навигация обрабатывается уровнем выше (FolderView / LibraryScreen).
 //
 //  Created by Pavel Fomin on 07.07.2025.
 //
 
-
 import SwiftUI
 
 struct LibraryTrackSectionView: View {
+
     let title: String
     let tracks: [LibraryTrack]
     let allTracks: [LibraryTrack]
+
     let trackListViewModel: TrackListViewModel
     let trackListNamesByURL: [URL: [String]]
+
     let playerViewModel: PlayerViewModel
     let metadataByURL: [URL: TrackMetadataCacheManager.CachedMetadata]
+
     let isScrollingFast: Bool
     let revealedTrackID: UUID?
     let folderViewModel: LibraryFolderViewModel
-    
-    @ObservedObject var coordinator: LibraryCoordinator
-    
+
     var body: some View {
         Section(header: Text(title).font(.headline).id(title)) {
             ForEach(tracks, id: \.id) { track in
+
                 LibraryTrackRowWrapper(
                     track: track,
                     allTracks: allTracks,
@@ -36,7 +40,6 @@ struct LibraryTrackSectionView: View {
                     onMetadataLoaded: { url, meta in folderViewModel.setMetadata(meta, for: url)},
                     isScrollingFast: isScrollingFast,
                     isRevealed: track.id == revealedTrackID,
-                    coordinator: coordinator,
                     playerViewModel: playerViewModel
                 )
                 .id(track.id)

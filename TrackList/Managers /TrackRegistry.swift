@@ -234,6 +234,10 @@ actor TrackRegistry {
     func tracks(inFolder folderId: UUID) -> [TrackEntry] {
         registry.values.filter { $0.folderId == folderId }
     }
+    
+    func entry(for trackId: UUID) -> TrackEntry? {
+        registry[trackId]
+    }
 
     // MARK: - URL Resolution
 

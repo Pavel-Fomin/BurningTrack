@@ -2,8 +2,14 @@
 //  LibraryFolderView.swift
 //  TrackList
 //
-//  Экран вложенной папки
-//  Показывает подпапки внутри выбранной папки (folder.subfolders)
+//  Экран вложенной папки:
+//  - показывает подпапки,
+//  - либо список треков (через LibraryTracksView),
+//  - выполняет только UI и пользовательские действия.
+//
+//  Вся навигация:
+//  - переход на подпапку → NavigationCoordinator.openFolder(_)
+//  - reveal/переадресация → обрабатывается В LibraryScreen, не здесь.
 //
 //  Created by Pavel Fomin on 27.06.2025.
 //
@@ -11,90 +17,88 @@
 import SwiftUI
 
 struct LibraryFolderView: View {
+
+    // MARK: - Входные данные
+
     let folder: LibraryFolder
     let trackListViewModel: TrackListViewModel
-    
-    @ObservedObject var coordinator: LibraryCoordinator
     @ObservedObject var playerViewModel: PlayerViewModel
+
+    // MARK: - Навигация и ViewModel
+
+    @ObservedObject private var nav = NavigationCoordinator.shared
     @StateObject private var viewModel: LibraryFolderViewModel
-    
-// MARK: - Инициализация зависимостей
-    
+
+    // MARK: - Инициализация
+
     init(
         folder: LibraryFolder,
-        coordinator: LibraryCoordinator,
         trackListViewModel: TrackListViewModel,
         playerViewModel: PlayerViewModel
     ) {
         self.folder = folder
-        self.coordinator = coordinator
         self.trackListViewModel = trackListViewModel
         self._playerViewModel = ObservedObject(wrappedValue: playerViewModel)
 
+        // Все кэши/VM создаются через LibraryFolderViewModelCache
         self._viewModel = StateObject(
             wrappedValue: LibraryFolderViewModelCache.shared.resolve(for: folder)
         )
     }
 
+    // MARK: - UI
+
     var body: some View {
         Group {
             if viewModel.subfolders.isEmpty {
-                
-                // Нет подпапок → показываем треки
+
+                // Папка без подпапок → показываем треки
                 LibraryTracksView(
                     folder: viewModel.folder,
                     trackListViewModel: trackListViewModel,
-                    coordinator: coordinator,
                     playerViewModel: playerViewModel,
                     viewModel: viewModel
                 )
                 .navigationTitle(viewModel.folder.name)
                 .navigationBarTitleDisplayMode(.inline)
-                
+
             } else {
-                
-                // Есть подпапки → список подпапок
-                List { folderSectionView() }
-                    .listStyle(.insetGrouped)
-                    .navigationTitle(viewModel.folder.name)
-                    .navigationBarTitleDisplayMode(.inline)
-            }
-        }
-        .task(id: viewModel.folder.url) {
-            viewModel.loadSubfoldersIfNeeded()
-            if let revealId = coordinator.pendingRevealTrackID {
-                    applyRevealIfNeeded(revealId)
+
+                // Есть подпапки → показываем список подпапок
+                List {
+                    folderSectionView()
                 }
+                .listStyle(.insetGrouped)
+                .navigationTitle(viewModel.folder.name)
+                .navigationBarTitleDisplayMode(.inline)
             }
-        
-        .id(folder.url)
-    }
-    
-// MARK: - Reveal обработка
-    private func applyRevealIfNeeded(_ trackId: UUID) {
-        if viewModel.trackSections.flatMap({ $0.tracks }).contains(where: { $0.id == trackId }) {
-            viewModel.pendingRevealTrackID = trackId
-            coordinator.pendingRevealTrackID = nil
+        }
+        .task {
+            // Загружаем подпапки (лениво)
+            viewModel.loadSubfoldersIfNeeded()
         }
     }
-    
-    
-// MARK: - Секция подпапок
-    
+
+    // MARK: - Список подпапок
+
     @ViewBuilder
     private func folderSectionView() -> some View {
         Section {
             ForEach(viewModel.subfolders) { subfolder in
                 HStack(spacing: 12) {
+
                     Image(systemName: "folder.fill")
                         .foregroundColor(.blue)
                         .frame(width: 24)
-                    Text(subfolder.name).lineLimit(1)
+
+                    Text(subfolder.name)
+                        .lineLimit(1)
                 }
                 .padding(.vertical, 4)
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    coordinator.openFolder(subfolder)
+                    // Новый чистый маршрут
+                    nav.openFolder(subfolder.id)
                 }
             }
         }

@@ -21,31 +21,29 @@ struct TrackActionSheet: View {
         VStack(spacing: 0) {
             ForEach(actions, id: \.self) { action in
                 Button {
-                    if action == .showInfo {
+                    switch action {
+                    case .showInfo:
                         SheetManager.shared.closeAllSheets()
                         TrackDetailManager.shared.open(track: track)
-                    } else if action == .showInLibrary {
-                        SheetManager.shared.closeAllSheets()
 
+                    case .showInLibrary:
+                        SheetManager.shared.closeAllSheets()
                         print("🧭 [TrackActionSheet] showInLibrary вызван для id:", track.id)
+                        NavigationCoordinator.shared.showTrackInLibrary(trackId: track.id)
 
-                        NavigationCoordinator.shared.showInLibrary(trackId: track.id)
-
-                    } else if action == .showInfo {
-                        SheetManager.shared.closeAllSheets()
-                        TrackDetailManager.shared.open(track: track)
-
-                    } else {
+                    case .moveToFolder:
                         onAction(action)
                     }
-                    
+
                 } label: {
                     HStack(spacing: 12) {
                         icon(for: action)
                             .font(.system(size: 20, weight: .medium))
                             .frame(width: 28)
+
                         Text(title(for: action))
                             .font(.system(size: 17))
+
                         Spacer()
                     }
                     .padding(.horizontal, 20)

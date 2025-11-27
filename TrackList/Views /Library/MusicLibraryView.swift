@@ -2,8 +2,11 @@
 //  MusicLibraryView.swift
 //  TrackList
 //
-//  Показывает корневые папки
-//  При клике — переходит в LibraryFolderView
+//  Корневой экран фонотеки:
+//  — показывает прикреплённые папки,
+//  — по нажатию переходит в LibraryFolderView,
+//  — не содержит логики вкладок,
+//  — не использует старый route.
 //
 //  Created by Pavel Fomin on 22.06.2025.
 //
@@ -12,23 +15,29 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct MusicLibraryView: View {
+
+    // MARK: - Входные данные
+
     let trackListViewModel: TrackListViewModel
     let playerViewModel: PlayerViewModel
     let onAddFolder: () -> Void
-    
-    @ObservedObject var coordinator: LibraryCoordinator
+
+    // MARK: - Менеджеры
+
     @ObservedObject private var manager = MusicLibraryManager.shared
-    
+    @ObservedObject private var nav = NavigationCoordinator.shared
+
     var body: some View {
+
+        // MARK: - Загрузка при первом запуске
         if !manager.isInitialFoldersLoadFinished {
-            // MARK: - Скелетон загрузки корневых папок
             VStack(spacing: 0) {
                 LibraryFoldersSkeletonView()
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            
+
+        // MARK: - Нет прикреплённых папок
         } else if manager.attachedFolders.isEmpty {
-            // MARK: - Папок нет
             VStack {
                 Spacer()
                 Button("Выбрать папку", action: onAddFolder)
@@ -37,18 +46,20 @@ struct MusicLibraryView: View {
                 Spacer()
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            
+
+        // MARK: - Папки есть → показываем список
         } else {
-            // MARK: - Список прикреплённых папок
             List {
+
                 ForEach(manager.attachedFolders) { folder in
-                    Button(action: {
-                        coordinator.openFolder(folder)
-                    }) {
+                    Button {
+                        nav.openFolder(folder.id)   // ← НОВЫЙ ЧИСТЫЙ API
+                    } label: {
                         HStack(spacing: 12) {
                             Image(systemName: "folder.fill")
                                 .foregroundColor(.blue)
                                 .frame(width: 24)
+
                             Text(folder.name)
                                 .lineLimit(1)
                         }
@@ -63,7 +74,8 @@ struct MusicLibraryView: View {
                         }
                     }
                 }
-                
+
+                // Добавить папку
                 Button(action: onAddFolder) {
                     HStack(spacing: 12) {
                         Image(systemName: "folder.fill.badge.plus")

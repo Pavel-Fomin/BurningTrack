@@ -19,9 +19,7 @@ import SwiftUI
 import UIKit
 
 @MainActor
-final class TrackListViewModel: NSObject, ObservableObject {
-
-    // MARK: - Published state
+final class TrackListViewModel: ObservableObject {
 
     @Published var name: String = ""
     @Published var tracks: [Track] = []
@@ -31,19 +29,14 @@ final class TrackListViewModel: NSObject, ObservableObject {
     @Published var toastData: ToastData? = nil
     @Published var isShowingSaveSheet: Bool = false
 
-
-    // MARK: - Init
-
+    // MARK: Init
     init(trackList: TrackList) {
         self.currentListId = trackList.id
         self.name = trackList.name
         self.tracks = trackList.tracks
-        super.init()
     }
 
-    override init() {
-        super.init()
-    }
+    init() { }
 
 
     // MARK: - Loading

@@ -2,7 +2,16 @@
 //  LibraryTracksView.swift
 //  TrackList
 //
-//  Отображает список треков из папки, сгруппированных по дате
+//  Отображает список треков из папки, сгруппированных по дате.
+//
+//  Created by Pavel Fomin on 09.08.2025.
+//
+
+//
+//  LibraryTracksView.swift
+//  TrackList
+//
+//  Отображает список треков из папки, сгруппированных по дате.
 //
 //  Created by Pavel Fomin on 09.08.2025.
 //
@@ -10,24 +19,26 @@
 import SwiftUI
 
 struct LibraryTracksView: View {
-    let folder: LibraryFolder                                  // Папка, из которой отображаются треки
-    let trackListViewModel: TrackListViewModel                 // Треклист для свайпов/добавлений
-    
-    @ObservedObject var coordinator: LibraryCoordinator                                               // Координатор
-    @ObservedObject var playerViewModel: PlayerViewModel                                              // Плеер
-    @ObservedObject var viewModel: LibraryFolderViewModel                                             // ViewModel для загрузки треков
-    @EnvironmentObject var sheetManager: SheetManager                                                 // Sheet "Добавить в треклист"
-    @StateObject private var scrollSpeed = ScrollSpeedModel(thresholdPtPerSec: 1500, debounceMs: 180) // Скорость скролла
-    @StateObject private var navigation = NavigationCoordinator.shared
-    
-    
-    
-    // MARK: - Инициализация с передачей зависимостей и созданием viewModel
-    
-    
-    
+
+    let folder: LibraryFolder
+    let trackListViewModel: TrackListViewModel
+
+    @ObservedObject var playerViewModel: PlayerViewModel
+    @ObservedObject var viewModel: LibraryFolderViewModel
+
+    @EnvironmentObject var sheetManager: SheetManager
+
+    @StateObject private var scrollSpeed = ScrollSpeedModel(
+        thresholdPtPerSec: 1500,
+        debounceMs: 180
+    )
+
+    /// Локальное состояние для скролла/подсветки
+    @State private var scrollTargetID: UUID?
+    @State private var revealedTrackID: UUID?
+
     // MARK: - Основное тело View
-    
+
     var body: some View {
         ZStack {
             ScrollViewReader { proxy in
@@ -40,37 +51,47 @@ struct LibraryTracksView: View {
                         metadataByURL: viewModel.metadataByURL,
                         playerViewModel: playerViewModel,
                         isScrollingFast: scrollSpeed.isFast,
-                        revealedTrackID: viewModel.revealedTrackID,
-                        folderViewModel: viewModel,
-                        coordinator: coordinator
+                        revealedTrackID: revealedTrackID,
+                        folderViewModel: viewModel
                     )
-                    
                 }
-                // Визуальные модификаторы
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
                 .safeAreaInset(edge: .bottom) {
                     Color.clear.frame(height: 88)
                 }
-                
-                // Реактивные события
-                .onReceive(viewModel.$trackSections) { _ in
-                    if let id = viewModel.pendingRevealTrackID {
-                        viewModel.scrollToTrackIfExists(id)
+
+                // Когда секции обновились — пробуем отреагировать на pendingRevealTrackID
+                .onReceive(viewModel.$trackSections) { sections in
+                    guard
+                        let targetId = viewModel.pendingRevealTrackID,
+                        containsTrack(with: targetId, in: sections)
+                    else { return }
+
+                    // Ставим цель для скролла и подсветки
+                    scrollTargetID = targetId
+                    revealedTrackID = targetId
+                    viewModel.pendingRevealTrackID = nil
+
+                    // Снимаем подсветку через несколько секунд
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+                        if self.revealedTrackID == targetId {
+                            self.revealedTrackID = nil
+                        }
                     }
                 }
-                
-                .onReceive(viewModel.$scrollTargetID) { value in
-                    guard let id = value else { return }
+
+                // Как только появилась цель — скроллим
+                .onChange(of: scrollTargetID) { _, id in
+                    guard let id else { return }
                     withAnimation(.easeInOut(duration: 0.35)) {
                         proxy.scrollTo(id, anchor: .center)
                     }
-                    viewModel.scrollTargetID = nil
-                    viewModel.clearRevealState()
+                    scrollTargetID = nil
                 }
             }
-            
-            // Лоадер — (при первой загрузке)
+
+            // Скелетон / лоадер
             if viewModel.isLoading && viewModel.trackSections.isEmpty {
                 VStack {
                     Spacer()
@@ -84,17 +105,18 @@ struct LibraryTracksView: View {
                 .background(Color(.systemBackground).opacity(0.9))
             }
         }
-        
-        // Pull-to-refresh
+
         .refreshable {
             await viewModel.refresh()
         }
-        // Звгрузка треков
+
         .task(id: folder.url) {
             await viewModel.loadTracksIfNeeded()
+            // pendingRevealTrackID уже установлен в ViewModel (из LibraryScreen)
         }
-        
+
         .navigationTitle(folder.name)
+
         .sheet(item: $sheetManager.trackToAdd) { track in
             NavigationStack {
                 AddToTrackListSheet(track: track) {
@@ -103,5 +125,15 @@ struct LibraryTracksView: View {
                 .presentationDetents([.fraction(0.5)])
             }
         }
+    }
+
+    // MARK: - Вспомогательное
+
+    /// Проверяем, есть ли трек с данным id в текущих секциях
+    private func containsTrack(with id: UUID, in sections: [TrackSection]) -> Bool {
+        for section in sections {
+            if section.tracks.contains(where: { $0.id == id }) { return true }
+        }
+        return false
     }
 }
