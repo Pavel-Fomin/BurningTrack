@@ -31,9 +31,7 @@ final class MusicLibraryManager: ObservableObject {
     /// Прикреплённые корневые папки (дерево подпапок и файлов для UI)
     @Published var attachedFolders: [LibraryFolder] = []
     
-    /// Старое состояние (если где-то используется) — список URL треков
-    @Published var tracks: [URL] = []
-    
+  
     /// Флаг, что начальная загрузка списка папок завершена
     @Published var isInitialFoldersLoadFinished: Bool = false
     
@@ -61,36 +59,7 @@ final class MusicLibraryManager: ObservableObject {
         )
     }
     
-    // MARK: - Загрузка подпапок (1 уровень, синхронно)
-    // Здесь оставляем простой обход FileManager для совместимости с текущим UI.
     
-    func loadSubfolders(for folderURL: URL) -> [LibraryFolder] {
-        var subfolders: [LibraryFolder] = []
-        
-        let accessed = folderURL.startAccessingSecurityScopedResource()
-        defer { if accessed { folderURL.stopAccessingSecurityScopedResource() } }
-        
-        do {
-            let fm = FileManager.default
-            let items = try fm.contentsOfDirectory(
-                at: folderURL,
-                includingPropertiesForKeys: [.isDirectoryKey],
-                options: [.skipsHiddenFiles]
-            )
-            
-            for item in items {
-                let isDir = (try? item.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
-                if isDir {
-                    let folder = liteFolder(from: item)
-                    subfolders.append(folder)
-                }
-            }
-        } catch {
-            print("❌ loadSubfolders error:", error)
-        }
-        
-        return subfolders
-    }
     
     // MARK: - Добавление папки: сохраняем bookmark, сканируем, регистрируем
 
@@ -157,7 +126,7 @@ final class MusicLibraryManager: ObservableObject {
                 // 6) UI: пересобираем дерево для attachedFolders
                 await MainActor.run {
                     if attachedFolders.contains(where: { $0.url == url }) == false {
-                        attachedFolders.append(rootTree)
+                        attachedFolders.insert(rootTree, at: 0)
                     }
                 }
 
@@ -305,16 +274,11 @@ final class MusicLibraryManager: ObservableObject {
         for subURL in scanned.subfolders {
             let child = await buildFolderTree(from: subURL)
             subfoldersModels.append(child)
-            
-            print("🔍 SCAN:", folderURL.lastPathComponent,
-                  "subfolders:", scanned.subfolders.count,
-                  "audio:", scanned.audioFiles.count)
-            
         }
         
         return LibraryFolder(
             name: scanned.name,
-            url: scanned.url,
+            url: scanned.url.resolvingSymlinksInPath(),
             subfolders: subfoldersModels,
             audioFiles: scanned.audioFiles
         )

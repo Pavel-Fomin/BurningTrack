@@ -55,14 +55,16 @@ final class LibraryScanner: LibraryScannerProtocol {
         var subfolders: [URL] = []
         var audioFiles: [URL] = []
         
+        let accessed = url.startAccessingSecurityScopedResource()
+        defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+        
         let items = (try? fm.contentsOfDirectory(
             at: url,
             includingPropertiesForKeys: [.isDirectoryKey],
             options: [.skipsHiddenFiles]
         )) ?? []
         
-        print("📡 SCAN FOLDER RAW:", url.lastPathComponent,
-              "items:", items.count)
+        print("📡 SCAN FOLDER RAW:", url.lastPathComponent, "items:", items.count)
         
         for item in items {
             let isDir = (try? item.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
@@ -77,11 +79,12 @@ final class LibraryScanner: LibraryScannerProtocol {
             }
         }
         
+        let resolved = url.resolvingSymlinksInPath()
         return ScannedFolder(
-            url: url,
-            name: url.lastPathComponent,
-            subfolders: subfolders,
-            audioFiles: audioFiles
+            url: resolved,
+            name: resolved.lastPathComponent,
+            subfolders: subfolders.map { $0.resolvingSymlinksInPath() },
+            audioFiles: audioFiles.map { $0.resolvingSymlinksInPath() }
         )
     }
     
@@ -92,6 +95,10 @@ final class LibraryScanner: LibraryScannerProtocol {
         var stack: [URL] = [url]
         
         while let current = stack.popLast() {
+            
+            let accessed = current.startAccessingSecurityScopedResource()
+            defer { if accessed { current.stopAccessingSecurityScopedResource() } }
+            
             let items = (try? fm.contentsOfDirectory(
                 at: current,
                 includingPropertiesForKeys: [.isDirectoryKey],
@@ -108,9 +115,9 @@ final class LibraryScanner: LibraryScannerProtocol {
                     if allowedExtensions.contains(ext) {
                         result.append(
                             ScannedAudioFile(
-                                url: item,
+                                url: item.resolvingSymlinksInPath(),
                                 fileName: item.lastPathComponent,
-                                folderURL: current
+                                folderURL: current.resolvingSymlinksInPath()
                             )
                         )
                     }

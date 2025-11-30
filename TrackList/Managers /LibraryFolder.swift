@@ -22,9 +22,10 @@ struct LibraryFolder: Identifiable, Hashable {
 
     /// Инициализатор папки
     init(name: String, url: URL, subfolders: [LibraryFolder] = [], audioFiles: [URL] = []) {
-        self.id = url.libraryFolderId
+        let resolved = url.resolvingSymlinksInPath()
+        self.id = resolved.libraryFolderId
+        self.url = resolved
         self.name = name
-        self.url = url
         self.subfolders = subfolders
         self.audioFiles = audioFiles
     }

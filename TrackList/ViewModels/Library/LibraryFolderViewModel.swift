@@ -18,23 +18,6 @@ final class LibraryFolderViewModel: ObservableObject {
     
     let folder: LibraryFolder
     
-    // MARK: - Константы
-    
-    private let allowedAudioExts: Set<String> = ["mp3","flac","wav","aiff","aac","m4a","ogg"]
-    private let initialParseCount = 20
-    
-    // MARK: - Служебные поля
-    
-    private var trackListsObserver: NSObjectProtocol?
-    
-    // MARK: - Display mode
-    
-    enum DisplayMode {
-        case tracks
-        case subfolders
-        case empty
-    }
-    
     // MARK: - Состояния
     
     @Published var pendingRevealTrackID: UUID?
@@ -48,19 +31,22 @@ final class LibraryFolderViewModel: ObservableObject {
     @Published private(set) var didLoadTrackListNames = false
     @Published private(set) var displayMode: DisplayMode = .empty
     
-    var headCount: Int {
-        let allTracks = trackSections.reduce(into: 0) { result, section in
-            result += section.tracks.count
-        }
-        return min(initialParseCount, allTracks)
+    // MARK: - Display mode
+    
+    enum DisplayMode {
+        case tracks
+        case subfolders
+        case empty
     }
     
-    // MARK: - Инициализация
+    // MARK: - Subscriptions
+    
+    private var trackListsObserver: NSObjectProtocol?
+    
+    // MARK: - Init
     
     init(folder: LibraryFolder) {
         self.folder = folder
-        
-        // Начальное определение режима отображения
         updateDisplayMode()
         
         trackListsObserver = NotificationCenter.default.addObserver(
@@ -74,140 +60,100 @@ final class LibraryFolderViewModel: ObservableObject {
         }
     }
     
+    deinit {
+        if let o = trackListsObserver {
+            NotificationCenter.default.removeObserver(o)
+        }
+        print("🧹 deinit LibraryFolderViewModel:", folder.name)
+    }
     
     // MARK: - Подпапки
     
     func loadSubfoldersIfNeeded() {
         guard subfolders.isEmpty else { return }
-        
-        // Берём подпапки из уже построенного дерева фонотеки,
-        // которое пришло из MusicLibraryManager.restoreAccessAsync()
         subfolders = folder.subfolders
         updateDisplayMode()
     }
     
     func updateDisplayMode() {
         if !subfolders.isEmpty {
-            displayMode = .subfolders      // Есть подпапки → показываем их
+            displayMode = .subfolders
         } else if !folder.audioFiles.isEmpty {
-            displayMode = .tracks          // Треки только если подпапок нет
+            displayMode = .tracks
         } else {
-            displayMode = .empty           // Вообще ничего нет
+            displayMode = .empty
         }
     }
     
-    
     // MARK: - Ленивая загрузка треков
     
-    /// Загружает треки только один раз
     func loadTracksIfNeeded() async {
         guard !didLoad else { return }
         didLoad = true
         await refresh()
-        // displayMode здесь не меняем — он зависит от структуры папки,
-        // а не от факта загрузки метаданных
     }
     
-    /// Загружает названия треклистов только один раз
     func loadTrackListNamesIfNeeded() {
         guard !didLoadTrackListNames else { return }
         didLoadTrackListNames = true
         loadTrackListNamesByURL()
     }
     
-    
-    // MARK: - Быстрая загрузка треков (Fast Start)
+    // MARK: - Refresh (основная загрузка)
     
     func refresh() async {
-        await refreshFastStart(firstCount: initialParseCount)
-    }
-    
-    func refreshFastStart(firstCount: Int) async {
         isLoading = true
-        
-        // 1) Сканируем папку → порядок файлов на диске
-        let urls = scanFolderURLs(recursive: false)
-        let orderMap = Dictionary(uniqueKeysWithValues: urls.enumerated().map { ($0.element, $0.offset) })
-        
-        let head = Array(urls.prefix(firstCount))
-        let tail = Array(urls.dropFirst(firstCount))
+        defer { isLoading = false }
         
         let folderId = folder.url.libraryFolderId
         
-        // 2) Загружаем записи из актора ДО detached
+        // 1. Получаем entry треков из TrackRegistry
         let entries = await TrackRegistry.shared.tracks(inFolder: folderId)
         
-        // 3) Преобразуем TrackEntry → LibraryTrack
-        var allTracks: [LibraryTrack] = []
-        allTracks.reserveCapacity(entries.count)
+        // 2. Преобразуем в LibraryTrack
+        var tracks: [LibraryTrack] = []
+        tracks.reserveCapacity(entries.count)
         
         for entry in entries {
-            if let realURL = await BookmarkResolver.url(forTrack: entry.id) {
-                allTracks.append(
+            if let url = await BookmarkResolver.url(forTrack: entry.id) {
+                
+                // Дата файла: contentModificationDate / creationDate
+                var fileDate = entry.updatedAt
+                if let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .creationDateKey]) {
+                    fileDate =
+                    values.contentModificationDate ??
+                    values.creationDate ??
+                    entry.updatedAt
+                }
+                
+                tracks.append(
                     LibraryTrack(
                         id: entry.id,
-                        fileURL: realURL,
+                        fileURL: url,
                         title: nil,
                         artist: nil,
                         duration: 0,
-                        addedDate: entry.updatedAt
+                        addedDate: fileDate
                     )
                 )
             }
         }
         
-        // HEAD (первые N треков)
-        let firstSections: [TrackSection] =
-        await Task.detached(priority: .userInitiated) { [allTracks, head, orderMap] in
-            let headTracks = allTracks.filter { head.contains($0.url) }
-            return Self.groupTracksByDate(headTracks, order: orderMap)
-        }.value
+        // 3. Группируем по датам изменения файла
+        let grouped = Self.groupTracksByDate(tracks)
         
+        // 4. UI
         await MainActor.run {
-            withAnimation(nil) {
-                self.trackSections = firstSections
-                self.isLoading = false
-            }
-        }
-        
-        // TAIL (всё остальное)
-        let restTracks: [LibraryTrack] =
-        await Task.detached(priority: .utility) { [allTracks, tail] in
-            guard !tail.isEmpty else { return [] }
-            return allTracks.filter { tail.contains($0.url) }
-        }.value
-        
-        // Подгружаем бейджи треклистов для уже видимых треков
-        await MainActor.run { self.loadTrackListNamesByURL() }
-        
-        guard !restTracks.isEmpty else { return }
-        
-        // Склеиваем HEAD + TAIL
-        let allCombined = firstSections.flatMap { $0.tracks } + restTracks
-        
-        let grouped = Self.groupTracksByDate(allCombined, order: orderMap)
-        
-        await MainActor.run {
-            withAnimation(nil) {
-                self.trackSections = grouped
-            }
-        }
-        
-        // После завершения tail — обновляем бейджи ещё раз
-        Task.detached { [weak self] in
-            guard let self else { return }
-            await MainActor.run { self.loadTrackListNamesByURL() }
+            self.trackSections = grouped
+            self.loadTrackListNamesByURL()
         }
     }
-    
     
     // MARK: - TrackList Badges
     
     func loadTrackListNamesByURL() {
-        // какие URL сейчас в секциях
+        // Собираем URL всех треков на экране
         var urlsInView: [URL] = []
-        urlsInView.reserveCapacity(trackSections.count * 10)
-        
         for section in trackSections {
             for track in section.tracks {
                 urlsInView.append(track.url)
@@ -218,7 +164,6 @@ final class LibraryFolderViewModel: ObservableObject {
             var namesByURL: [URL: Set<String>] = [:]
             var result: [URL: [String]] = [:]
             
-            // все треклисты
             let metas = TrackListsManager.shared.loadTrackListMetas()
             
             for meta in metas {
@@ -232,14 +177,12 @@ final class LibraryFolderViewModel: ObservableObject {
             }
             
             for url in urlsInView {
-                let names = namesByURL[url] ?? []
-                result[url] = Array(names).sorted()
+                result[url] = Array(namesByURL[url] ?? []).sorted()
             }
             
             self.trackListNamesByURL = result
         }
     }
-    
     
     // MARK: - Metadata update
     
@@ -247,119 +190,51 @@ final class LibraryFolderViewModel: ObservableObject {
         metadataByURL[url] = meta
     }
     
-    // MARK: - Scan
+    // MARK: - Support. Отображение дат в формате "сегодня,вчера"
     
-    private func scanFolderURLs(recursive: Bool = false, maxDepth: Int = 1) -> [URL] {
-        scanFolderURLs(at: folder.url, maxDepth: maxDepth, recursive: recursive)
-    }
-    
-    private func scanFolderURLs(at root: URL, maxDepth: Int, recursive: Bool) -> [URL] {
-        var result: [URL] = []
-        
-        let accessed = root.startAccessingSecurityScopedResource()
-        defer { if accessed { root.stopAccessingSecurityScopedResource() } }
-        
-        do {
-            let fm = FileManager.default
-            let items = try fm.contentsOfDirectory(
-                at: root,
-                includingPropertiesForKeys: [.isDirectoryKey],
-                options: [.skipsHiddenFiles]
-            )
-            
-            var subfolders: [URL] = []
-            
-            for item in items {
-                let isDir = (try? item.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
-                
-                if isDir {
-                    if recursive && maxDepth > 0 {
-                        subfolders.append(item)
-                    }
-                } else {
-                    let ext = item.pathExtension.lowercased()
-                    if allowedAudioExts.contains(ext) {
-                        result.append(item)
-                    }
-                }
-            }
-            
-            if recursive && maxDepth > 0 {
-                for sub in subfolders {
-                    result.append(contentsOf: scanFolderURLs(at: sub, maxDepth: maxDepth - 1, recursive: true))
-                }
-            }
-        } catch {
-            print("❌ scanFolderURLs error:", error)
-        }
-        
-        return result
-    }
-    
-    
-    // MARK: - Support
-    
-    nonisolated static func groupTracksByDate(
-        _ tracks: [LibraryTrack],
-        order: [URL:Int]? = nil
-    ) -> [TrackSection] {
+    nonisolated static func groupTracksByDate(_ tracks: [LibraryTrack]) -> [TrackSection] {
         let calendar = Calendar.current
         
+        // Группировка треков по дню
         let grouped = Dictionary(grouping: tracks) { track in
             calendar.startOfDay(for: track.addedDate)
         }
         
-        let days = grouped.keys.sorted(by: >)
+        // Сортировка дней: новые сверху
+        let sortedDays = grouped.keys.sorted(by: >)
         
-        return days.map { day in
-            var items = grouped[day] ?? []
-            
-            items.sort { a, b in
-                if let order,
-                   let oa = order[a.url],
-                   let ob = order[b.url],
-                   oa != ob {
-                    return oa < ob
-                }
-                if a.addedDate != b.addedDate { return a.addedDate > b.addedDate }
-                return a.url.lastPathComponent < b.url.lastPathComponent
-            }
-            
-            let title: String = {
+        // Один раз создаём форматтер
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateStyle = .medium
+        dateFormatter.timeStyle = .none
+        
+        // Формируем секции
+        return sortedDays.map { day in
+            let sectionTitle: String = {
                 if calendar.isDateInToday(day) { return "Сегодня" }
                 if calendar.isDateInYesterday(day) { return "Вчера" }
-                let df = DateFormatter()
-                df.dateStyle = .medium
-                df.timeStyle = .none
-                return df.string(from: day)
+                return dateFormatter.string(from: day)
             }()
             
+            let items = (grouped[day] ?? []).sorted {
+                // Сортировка внутри дня:
+                // сначала по дате изменения, потом по имени файла
+                ($0.addedDate, $0.url.lastPathComponent)
+                >
+                ($1.addedDate, $1.url.lastPathComponent)
+            }
+            
             return TrackSection(
-                id: ISO8601DateFormatter().string(from: day),
-                title: title,
+                id: day.ISO8601String,
+                title: sectionTitle,
                 tracks: items
             )
         }
     }
-    
-    
-    // MARK: - Deinit
-    
-    deinit {
-        if let o = trackListsObserver {
-            NotificationCenter.default.removeObserver(o)
-        }
-        print("🧹 deinit LibraryFolderViewModel:", folder.name)
-    }
-    
-    // MARK: - Поиск трека в секциях
-    
-    private func findTrack(in sections: [TrackSection], matching id: UUID) -> LibraryTrack? {
-        for section in sections {
-            if let match = section.tracks.first(where: { $0.id == id }) {
-                return match
-            }
-        }
-        return nil
+}
+
+private extension Date {
+    var ISO8601String: String {
+        ISO8601DateFormatter().string(from: self)
     }
 }
