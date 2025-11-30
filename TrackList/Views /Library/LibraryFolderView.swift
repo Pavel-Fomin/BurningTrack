@@ -9,7 +9,7 @@
 //
 //  Вся навигация:
 //  - переход на подпапку → NavigationCoordinator.openFolder(_)
-//  - reveal/переадресация → обрабатывается В LibraryScreen, не здесь.
+//  - reveal/переадресация → обрабатывается в LibraryScreen, не здесь.
 //
 //  Created by Pavel Fomin on 27.06.2025.
 //
@@ -17,20 +17,20 @@
 import SwiftUI
 
 struct LibraryFolderView: View {
-
+    
     // MARK: - Входные данные
-
+    
     let folder: LibraryFolder
     let trackListViewModel: TrackListViewModel
     @ObservedObject var playerViewModel: PlayerViewModel
-
+    
     // MARK: - Навигация и ViewModel
-
+    
     @ObservedObject private var nav = NavigationCoordinator.shared
-    @StateObject private var viewModel: LibraryFolderViewModel
-
+    @EnvironmentObject var viewModel: LibraryFolderViewModel
+    
     // MARK: - Инициализация
-
+    
     init(
         folder: LibraryFolder,
         trackListViewModel: TrackListViewModel,
@@ -39,20 +39,15 @@ struct LibraryFolderView: View {
         self.folder = folder
         self.trackListViewModel = trackListViewModel
         self._playerViewModel = ObservedObject(wrappedValue: playerViewModel)
-
-        // Все кэши/VM создаются через LibraryFolderViewModelCache
-        self._viewModel = StateObject(
-            wrappedValue: LibraryFolderViewModelCache.shared.resolve(for: folder)
-        )
     }
-
+    
+    
     // MARK: - UI
-
+    
     var body: some View {
         Group {
-            if viewModel.subfolders.isEmpty {
-
-                // Папка без подпапок → показываем треки
+            switch viewModel.displayMode {
+            case .tracks:
                 LibraryTracksView(
                     folder: viewModel.folder,
                     trackListViewModel: trackListViewModel,
@@ -61,44 +56,50 @@ struct LibraryFolderView: View {
                 )
                 .navigationTitle(viewModel.folder.name)
                 .navigationBarTitleDisplayMode(.inline)
-
-            } else {
-
-                // Есть подпапки → показываем список подпапок
+                
+            case .subfolders:
                 List {
                     folderSectionView()
                 }
                 .listStyle(.insetGrouped)
                 .navigationTitle(viewModel.folder.name)
                 .navigationBarTitleDisplayMode(.inline)
+                
+            case .empty:
+                Color.clear
+                    .navigationTitle(viewModel.folder.name)
+                    .navigationBarTitleDisplayMode(.inline)
             }
         }
         .task {
-            // Загружаем подпапки (лениво)
+            // 1. Всегда сначала подгружаем подпапки из дерева
             viewModel.loadSubfoldersIfNeeded()
+            
+            // 2. Если режим — треки, подгружаем сами треки
+            if viewModel.displayMode == .tracks {
+                await viewModel.loadTracksIfNeeded()
+            }
         }
     }
-
-    // MARK: - Список подпапок
-
+    
+    // MARK: - Секция подпапок
+    
     @ViewBuilder
     private func folderSectionView() -> some View {
         Section {
             ForEach(viewModel.subfolders) { subfolder in
                 HStack(spacing: 12) {
-
                     Image(systemName: "folder.fill")
                         .foregroundColor(.blue)
                         .frame(width: 24)
-
+                    
                     Text(subfolder.name)
                         .lineLimit(1)
                 }
                 .padding(.vertical, 4)
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    // Новый чистый маршрут
-                    nav.openFolder(subfolder.id)
+                    nav.openFolder(subfolder.url.libraryFolderId)
                 }
             }
         }

@@ -13,31 +13,40 @@ import Combine
 
 @MainActor
 final class LibraryFolderViewModel: ObservableObject {
-    private let debugID = UUID()
+    
+    // MARK: - Входные данные
     
     let folder: LibraryFolder
+    
+    // MARK: - Константы
+    
     private let allowedAudioExts: Set<String> = ["mp3","flac","wav","aiff","aac","m4a","ogg"]
     private let initialParseCount = 20
     
-    private var lastScannedURLs: [URL] = []
-    private var tailWarmupTask: Task<Void, Never>?
-    private var cancellables = Set<AnyCancellable>()
+    // MARK: - Служебные поля
+    
+    private var trackListsObserver: NSObjectProtocol?
+    
+    // MARK: - Display mode
+    
+    enum DisplayMode {
+        case tracks
+        case subfolders
+        case empty
+    }
     
     // MARK: - Состояния
     
     @Published var pendingRevealTrackID: UUID?
-    
     @Published var trackSections: [TrackSection] = []
     @Published var trackListNamesByURL: [URL: [String]] = [:]
     @Published var metadataByURL: [URL: TrackMetadataCacheManager.CachedMetadata] = [:]
-    
     @Published var isLoading: Bool = false
-    @Published private(set) var didLoad: Bool = false
-    @Published private(set) var didLoadTrackListNames = false
-    
     @Published var subfolders: [LibraryFolder] = []
     
-    @Published private(set) var didStartTailWarmup = false
+    @Published private(set) var didLoad: Bool = false
+    @Published private(set) var didLoadTrackListNames = false
+    @Published private(set) var displayMode: DisplayMode = .empty
     
     var headCount: Int {
         let allTracks = trackSections.reduce(into: 0) { result, section in
@@ -46,12 +55,13 @@ final class LibraryFolderViewModel: ObservableObject {
         return min(initialParseCount, allTracks)
     }
     
-    private var trackListsObserver: NSObjectProtocol?
-    
     // MARK: - Инициализация
     
     init(folder: LibraryFolder) {
         self.folder = folder
+        
+        // Начальное определение режима отображения
+        updateDisplayMode()
         
         trackListsObserver = NotificationCenter.default.addObserver(
             forName: .trackListsDidChange,
@@ -62,26 +72,40 @@ final class LibraryFolderViewModel: ObservableObject {
                 self?.loadTrackListNamesByURL()
             }
         }
-        
-        cancellables.removeAll()
     }
-
+    
     
     // MARK: - Подпапки
     
     func loadSubfoldersIfNeeded() {
         guard subfolders.isEmpty else { return }
-        subfolders = MusicLibraryManager.shared.loadSubfolders(for: folder.url)
+        
+        // Берём подпапки из уже построенного дерева фонотеки,
+        // которое пришло из MusicLibraryManager.restoreAccessAsync()
+        subfolders = folder.subfolders
+        updateDisplayMode()
+    }
+    
+    func updateDisplayMode() {
+        if !subfolders.isEmpty {
+            displayMode = .subfolders      // Есть подпапки → показываем их
+        } else if !folder.audioFiles.isEmpty {
+            displayMode = .tracks          // Треки только если подпапок нет
+        } else {
+            displayMode = .empty           // Вообще ничего нет
+        }
     }
     
     
-    // MARK: - Ленивая загрузка
+    // MARK: - Ленивая загрузка треков
     
     /// Загружает треки только один раз
     func loadTracksIfNeeded() async {
         guard !didLoad else { return }
         didLoad = true
         await refresh()
+        // displayMode здесь не меняем — он зависит от структуры папки,
+        // а не от факта загрузки метаданных
     }
     
     /// Загружает названия треклистов только один раз
@@ -91,79 +115,84 @@ final class LibraryFolderViewModel: ObservableObject {
         loadTrackListNamesByURL()
     }
     
+    
     // MARK: - Быстрая загрузка треков (Fast Start)
-
+    
     func refresh() async {
         await refreshFastStart(firstCount: initialParseCount)
     }
-
+    
     func refreshFastStart(firstCount: Int) async {
         isLoading = true
-
-        // 1) Сканируем папку → порядок файлов
+        
+        // 1) Сканируем папку → порядок файлов на диске
         let urls = scanFolderURLs(recursive: false)
-        lastScannedURLs = urls
-
         let orderMap = Dictionary(uniqueKeysWithValues: urls.enumerated().map { ($0.element, $0.offset) })
-
+        
         let head = Array(urls.prefix(firstCount))
         let tail = Array(urls.dropFirst(firstCount))
-
-        let folderId = folder.id
-
-        // 2) Загружаем записи из акторa ДО detached
+        
+        let folderId = folder.url.libraryFolderId
+        
+        // 2) Загружаем записи из актора ДО detached
         let entries = await TrackRegistry.shared.tracks(inFolder: folderId)
-
+        
         // 3) Преобразуем TrackEntry → LibraryTrack
-        let allTracks: [LibraryTrack] = entries.compactMap { entry in
-            guard let realURL = TrackRegistry.shared.resolvedURLSync(for: entry.id) else { return nil }
-            return LibraryTrack(
-                id: entry.id,
-                fileURL: realURL,
-                title: nil,
-                artist: nil,
-                duration: 0,
-                addedDate: entry.updatedAt
-            )
+        var allTracks: [LibraryTrack] = []
+        allTracks.reserveCapacity(entries.count)
+        
+        for entry in entries {
+            if let realURL = await BookmarkResolver.url(forTrack: entry.id) {
+                allTracks.append(
+                    LibraryTrack(
+                        id: entry.id,
+                        fileURL: realURL,
+                        title: nil,
+                        artist: nil,
+                        duration: 0,
+                        addedDate: entry.updatedAt
+                    )
+                )
+            }
         }
-
+        
         // HEAD (первые N треков)
         let firstSections: [TrackSection] =
         await Task.detached(priority: .userInitiated) { [allTracks, head, orderMap] in
             let headTracks = allTracks.filter { head.contains($0.url) }
             return Self.groupTracksByDate(headTracks, order: orderMap)
         }.value
-
+        
         await MainActor.run {
             withAnimation(nil) {
                 self.trackSections = firstSections
                 self.isLoading = false
             }
         }
-
+        
         // TAIL (всё остальное)
         let restTracks: [LibraryTrack] =
         await Task.detached(priority: .utility) { [allTracks, tail] in
             guard !tail.isEmpty else { return [] }
             return allTracks.filter { tail.contains($0.url) }
         }.value
-
+        
         // Подгружаем бейджи треклистов для уже видимых треков
         await MainActor.run { self.loadTrackListNamesByURL() }
-
+        
         guard !restTracks.isEmpty else { return }
-
+        
         // Склеиваем HEAD + TAIL
         let allCombined = firstSections.flatMap { $0.tracks } + restTracks
-
+        
         let grouped = Self.groupTracksByDate(allCombined, order: orderMap)
-
+        
         await MainActor.run {
             withAnimation(nil) {
                 self.trackSections = grouped
             }
         }
-
+        
         // После завершения tail — обновляем бейджи ещё раз
         Task.detached { [weak self] in
             guard let self else { return }
@@ -171,10 +200,10 @@ final class LibraryFolderViewModel: ObservableObject {
         }
     }
     
+    
     // MARK: - TrackList Badges
     
     func loadTrackListNamesByURL() {
-        
         // какие URL сейчас в секциях
         var urlsInView: [URL] = []
         urlsInView.reserveCapacity(trackSections.count * 10)
@@ -185,33 +214,37 @@ final class LibraryFolderViewModel: ObservableObject {
             }
         }
         
-        var namesByURL: [URL: Set<String>] = [:]
-        var result: [URL: [String]] = [:]
-        
-        // все треклисты
-        let metas = TrackListsManager.shared.loadTrackListMetas()
-        
-        for meta in metas {
-            let list = TrackListManager.shared.getTrackListById(meta.id)
+        Task { @MainActor in
+            var namesByURL: [URL: Set<String>] = [:]
+            var result: [URL: [String]] = [:]
             
-            for t in list.tracks {
-                namesByURL[t.url, default: []].insert(meta.name)
+            // все треклисты
+            let metas = TrackListsManager.shared.loadTrackListMetas()
+            
+            for meta in metas {
+                let list = TrackListManager.shared.getTrackListById(meta.id)
+                
+                for t in list.tracks {
+                    if let url = await BookmarkResolver.url(forTrack: t.id) {
+                        namesByURL[url, default: []].insert(meta.name)
+                    }
+                }
             }
+            
+            for url in urlsInView {
+                let names = namesByURL[url] ?? []
+                result[url] = Array(names).sorted()
+            }
+            
+            self.trackListNamesByURL = result
         }
-        
-        for url in urlsInView {
-            let names = namesByURL[url] ?? []
-            result[url] = Array(names).sorted()
-        }
-        
-        trackListNamesByURL = result
     }
+    
     
     // MARK: - Metadata update
     
     func setMetadata(_ meta: TrackMetadataCacheManager.CachedMetadata, for url: URL) {
         metadataByURL[url] = meta
-        loadTrackListNamesByURL()
     }
     
     // MARK: - Scan
@@ -263,6 +296,7 @@ final class LibraryFolderViewModel: ObservableObject {
         return result
     }
     
+    
     // MARK: - Support
     
     nonisolated static func groupTracksByDate(
@@ -307,10 +341,11 @@ final class LibraryFolderViewModel: ObservableObject {
             )
         }
     }
-  
+    
+    
+    // MARK: - Deinit
     
     deinit {
-        cancellables.forEach { $0.cancel() }
         if let o = trackListsObserver {
             NotificationCenter.default.removeObserver(o)
         }

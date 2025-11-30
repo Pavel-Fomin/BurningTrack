@@ -20,35 +20,41 @@ struct AddToTrackListSheet: View {
     var body: some View {
         List(trackLists) { meta in
             Button {
-                Task { @MainActor in
-                    // Загружаем URL через TrackRegistry
-                    guard let url = await TrackRegistry.shared.resolvedURL(for: track.id) else {
-                        print("❌ URL не найден в TrackRegistry для \(track.id)")
+                Task {
+                    // 1) Резолвим URL только через BookmarksRegistry + BookmarkResolver
+                    guard let url = await BookmarkResolver.url(forTrack: track.id) else {
+                        print("❌ BookmarkResolver: нет URL для трека \(track.id)")
                         return
                     }
 
-                    // Собираем Track из TrackDisplayable
+                    // 2) Собираем Track
                     let imported = Track(
                         id: track.id,
                         title: track.title,
                         artist: track.artist,
                         duration: track.duration,
                         fileName: url.lastPathComponent,
-                        isAvailable: true     // доступность проверится позже в refresh
+                        isAvailable: true
                     )
-                    
-                    // Загружаем список → дополняем → сохраняем
+
+                    // 3) Работа с треклистом
                     var list = TrackListManager.shared.getTrackListById(meta.id)
                     list.tracks.append(imported)
                     TrackListManager.shared.saveTracks(list.tracks, for: list.id)
-                    
-                    // Тост
-                    toast.show(ToastData(
-                        style: .track(title: track.title ?? track.fileName, artist: track.artist ?? ""),
-                        artwork: track.artwork
-                    ))
-                    
-                    onComplete()
+
+                    // 4) UI
+                    await MainActor.run {
+                        toast.show(
+                            ToastData(
+                                style: .track(
+                                    title: track.title ?? track.fileName,
+                                    artist: track.artist ?? ""
+                                ),
+                                artwork: track.artwork
+                            )
+                        )
+                        onComplete()
+                    }
                 }
             } label: {
                 HStack {

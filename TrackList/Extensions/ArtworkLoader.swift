@@ -41,11 +41,10 @@ enum ArtworkLoader {
         if let current { return current }
 
         // 1) получаем URL из TrackRegistry
-        guard let url = await TrackRegistry.shared.resolvedURL(for: trackId) else {
-            print("⚠️ [ArtworkLoader] Не найден URL для trackId:", trackId)
+        guard let url = await BookmarkResolver.url(forTrack: trackId) else {
             return nil
         }
-
+        
         // 2) обычная ленивая загрузка
         await decodeGate.wait()
         defer { Task { await decodeGate.signal() } }
@@ -61,7 +60,8 @@ enum ArtworkLoader {
     // MARK: - Отмена загрузки
 
     static func cancelLoad(trackId: UUID) async {
-        guard let url = await TrackRegistry.shared.resolvedURL(for: trackId) else { return }
-        TrackMetadataCacheManager.shared.cancelArtworkLoad(url: url)
+        guard let url = await BookmarkResolver.url(forTrack: trackId) else {
+            return
+        }
     }
 }

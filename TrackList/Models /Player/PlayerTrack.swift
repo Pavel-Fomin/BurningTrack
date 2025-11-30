@@ -30,31 +30,6 @@ struct PlayerTrack: Identifiable, TrackDisplayable, Codable, Equatable {
     // MARK: - Artwork (runtime only — не кодируем)
     var artwork: UIImage? { nil }
 
-    // MARK: - TrackDisplayable
-    var resolvedURL: URL {
-        TrackRegistry.shared.resolvedURLSync(for: id)
-        ?? URL(fileURLWithPath: "/dev/null")
-    }
-
-    // MARK: - Refresh availability
-    func refreshAvailability() -> PlayerTrack {
-        let url = resolvedURL
-
-        let access = url.startAccessingSecurityScopedResource()
-        defer { if access { url.stopAccessingSecurityScopedResource() } }
-
-        let exists = FileManager.default.fileExists(atPath: url.path)
-
-        return PlayerTrack(
-            id: id,
-            title: title,
-            artist: artist,
-            duration: duration,
-            fileName: fileName,
-            isAvailable: exists
-        )
-    }
-
     // MARK: - Init
     init(
         id: UUID,

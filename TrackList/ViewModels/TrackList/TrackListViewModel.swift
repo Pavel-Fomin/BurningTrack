@@ -99,7 +99,7 @@ final class TrackListViewModel: ObservableObject {
             for track in tracks {
                 let trackId = track.id
 
-                if let url = await TrackRegistry.shared.resolvedURL(for: trackId) {
+                if let url = await BookmarkResolver.url(forTrack: trackId) {
                     let exists = FileManager.default.fileExists(atPath: url.path)
 
                     updated.append(

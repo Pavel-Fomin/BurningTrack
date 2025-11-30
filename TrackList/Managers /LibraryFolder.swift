@@ -22,7 +22,7 @@ struct LibraryFolder: Identifiable, Hashable {
 
     /// Инициализатор папки
     init(name: String, url: URL, subfolders: [LibraryFolder] = [], audioFiles: [URL] = []) {
-        self.id = UUID.v5(from: url.standardizedFileURL.absoluteString)
+        self.id = url.libraryFolderId
         self.name = name
         self.url = url
         self.subfolders = subfolders

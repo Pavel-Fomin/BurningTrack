@@ -47,9 +47,9 @@ final class PlayerManager {
 
     func play(track: any TrackDisplayable) {
         Task {
-            // 1. resolvedURL — только через TrackRegistry
-            guard let resolvedURL = await TrackRegistry.shared.resolvedURL(for: track.id) else {
-                print("❌ Нет URL в TrackRegistry для \(track.id)")
+            // 1. resolvedURL — теперь через BookmarkResolver
+            guard let resolvedURL = await BookmarkResolver.url(forTrack: track.id) else {
+                print("❌ Нет URL в BookmarksRegistry для \(track.id)")
                 return
             }
 

@@ -60,7 +60,6 @@ struct LibraryScreen: View {
             case .success(let urls):
                 if let folderURL = urls.first {
                     musicLibraryManager.saveBookmark(for: folderURL)
-                    Task { await musicLibraryManager.restoreAccessAsync() }
                 }
 
             case .failure(let error):
@@ -92,7 +91,7 @@ struct LibraryScreen: View {
                     playerViewModel: playerViewModel
                 )
                 .environmentObject(vm)
-
+                
             } else {
                 Text("❌ Папка не найдена")
             }

@@ -61,7 +61,7 @@ final class PlaylistManager: ObservableObject {
     // MARK: - Превращение trackId → PlayerTrack
 
     private func makePlayerTrack(from id: UUID) async -> PlayerTrack? {
-        guard let url = await TrackRegistry.shared.resolvedURL(for: id) else {
+        guard let url = await BookmarkResolver.url(forTrack: id) else {
             return nil
         }
 

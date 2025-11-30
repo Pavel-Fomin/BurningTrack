@@ -13,13 +13,10 @@ import SwiftUI
 struct TrackDetailSheet: View {
     let track: any TrackDisplayable
     
-    private var resolvedURL: URL {
-        TrackRegistry.shared.resolvedURLSync(for: track.id)
-        ?? URL(fileURLWithPath: "/dev/null")
-    }
-    
+    @State private var resolvedURL: URL = URL(fileURLWithPath: "/dev/null")
     @State private var artwork: UIImage? = nil
     @State private var tags: [(String, String)] = []
+    
     
 // MARK: - Обложка+Список
     var body: some View {
@@ -93,7 +90,17 @@ struct TrackDetailSheet: View {
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .background(.clear)
-        .task { await loadMetadata() }
+        .task {
+            // 1) Резолвим URL через BookmarkResolver
+            if let url = await BookmarkResolver.url(forTrack: track.id) {
+                resolvedURL = url
+            } else {
+                print("❌ BookmarkResolver: нет URL для трека \(track.id)")
+            }
+
+            // 2) Загружаем теги и обложку
+            await loadMetadata()
+        }
         .background(
             ZStack {
                 (artwork?.averageColor ?? Color(.systemGroupedBackground))
@@ -110,6 +117,8 @@ struct TrackDetailSheet: View {
     
     private func loadMetadata() async {
         let url = resolvedURL
+        guard url.lastPathComponent != "dev/null" else { return }
+
         let tagFile = TLTagLibFile(fileURL: url)
 
         if let parsed = tagFile.readMetadata() {
@@ -123,7 +132,8 @@ struct TrackDetailSheet: View {
 
             await MainActor.run { self.tags = result }
 
-            if let data = parsed.artworkData, let img = UIImage(data: data) {
+            if let data = parsed.artworkData,
+               let img = UIImage(data: data) {
                 await MainActor.run { self.artwork = img }
             }
         } else {

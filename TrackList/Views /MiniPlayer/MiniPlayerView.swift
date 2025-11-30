@@ -157,10 +157,9 @@ struct MiniPlayerView: View {
             .id(track.id)
             .task(id: track.id) {
                 artwork = nil
-                if let url = await TrackRegistry.shared.resolvedURL(for: track.id),
-                   let cgImage = await TrackMetadataCacheManager.shared
-                       .loadMetadata(for: url)?
-                       .artwork {
+                if let url = await BookmarkResolver.url(forTrack: track.id),
+                   let meta = await TrackMetadataCacheManager.shared.loadMetadata(for: url),
+                   let cgImage = meta.artwork {
                     artwork = UIImage(cgImage: cgImage)
                 }
             }
