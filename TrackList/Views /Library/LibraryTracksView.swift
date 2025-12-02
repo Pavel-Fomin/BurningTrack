@@ -115,8 +115,6 @@ struct LibraryTracksView: View {
             // pendingRevealTrackID уже установлен в ViewModel (из LibraryScreen)
         }
 
-        .navigationTitle(folder.name)
-
         .sheet(item: $sheetManager.trackToAdd) { track in
             NavigationStack {
                 AddToTrackListSheet(track: track) {

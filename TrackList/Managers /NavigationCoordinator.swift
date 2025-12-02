@@ -24,63 +24,106 @@ final class NavigationCoordinator: ObservableObject {
 
     // MARK: - Состояние навигации
 
-    /// Маршрут внутри раздела “Фонотека”
-    @Published var libraryRoute: LibraryRoute = .root
+    /// Стек маршрутов для NavigationStack.
+    /// Пустой массив = корень фонотеки.
+    @Published var libraryPath: [LibraryRoute] = []
 
     /// Отложенное событие "показать трек во фонотеке".
-    /// Используется, когда другая вкладка просит открыть трек в фонотеке.
     private var pendingShowTrackId: UUID? = nil
 
     private init() {}
 
+    // MARK: - API для UI (тулбара)
+
+    /// Находимся ли мы в корне.
+    var isAtRoot: Bool {
+        libraryPath.isEmpty
+    }
+
+    /// Текущий маршрут (верхушка стека).
+    var currentRoute: LibraryRoute {
+        libraryPath.last ?? .root
+    }
+
+    /// Заголовок для тулбара.
+    var currentTitle: String {
+        switch currentRoute {
+        case .root:
+            return "Фонотека"
+        case .folder(let id):
+            return MusicLibraryManager.shared.folder(for: id)?.name ?? "Папка"
+        case .tracksInFolder(let id):
+            return MusicLibraryManager.shared.folder(for: id)?.name ?? "Треки"
+        case .groupedTracks:
+            return "Группы"
+        }
+    }
+
     // MARK: - Работа с вкладками
 
-    /// Переключает активную вкладку приложения.
     func setTab(_ tab: ScenePhaseHandler.Tab) {
         ScenePhaseHandler.shared.activeTab = tab
     }
 
-    // MARK: - Маршруты фонотеки
+    // MARK: - Навигация внутри фонотеки
 
-    /// Открывает корень фонотеки (список прикреплённых папок).
+    /// Полный сброс в корень.
     func openLibraryRoot() {
-        libraryRoute = .root
+        libraryPath = []        // корень = пустой стек
     }
 
-    /// Открывает конкретную папку во фонотеке по её ID.
+    /// Открытие папки ИЗ КОРНЯ (заменяет весь стек).
     func openFolder(_ id: UUID) {
-        libraryRoute = .folder(id: id)
+        libraryPath = [.folder(id)]
+    }
+
+    /// Переход внутрь папки (вложенный уровень).
+    func pushFolder(_ id: UUID) {
+        libraryPath.append(.folder(id))
+    }
+
+    /// Переход в список треков папки.
+    func pushTracksInFolder(_ id: UUID) {
+        libraryPath.append(.tracksInFolder(id))
+    }
+
+    /// Переход в сгруппированный список треков.
+    func pushGroupedTracks(_ id: UUID, type: GroupingType) {
+        libraryPath.append(.groupedTracks(id, type))
+    }
+
+    /// Возврат на один уровень назад.
+    func popLibrary() {
+        guard !libraryPath.isEmpty else { return }
+        libraryPath.removeLast()
     }
 
     // MARK: - Переадресация "показать трек во фонотеке"
 
-    /// Вызывается из плеера / треклиста, чтобы показать трек во фонотеке.
-    /// Здесь мы:
-    /// 1) запоминаем ID трека
-    /// 2) переключаемся на вкладку "Фонотека"
     func showTrackInLibrary(trackId: UUID) {
         pendingShowTrackId = trackId
         setTab(.library)
     }
 
-    /// Вызывается из LibraryScreen (или другого корневого экрана фонотеки),
-    /// чтобы забрать отложенный trackId и сразу очистить его.
-    ///
-    /// Пример использования:
-    /// if let trackId = NavigationCoordinator.shared.consumePendingShowTrackId() {
-    ///     viewModel.focusOnTrack(with: trackId)
-    /// }
     func consumePendingShowTrackId() -> UUID? {
-        guard let id = pendingShowTrackId else { return nil }
-        pendingShowTrackId = nil
-        return id
+        defer { pendingShowTrackId = nil }
+        return pendingShowTrackId
     }
 
-    // MARK: - Вложенные типы
+    // MARK: - Маршруты
 
-    /// Маршрут внутри раздела “Фонотека”.
-    enum LibraryRoute: Equatable {
+    enum LibraryRoute: Hashable {
         case root
-        case folder(id: UUID)
+        case folder(UUID)
+        case tracksInFolder(UUID)
+        case groupedTracks(UUID, GroupingType)
+    }
+
+    enum GroupingType: Hashable {
+        case byDate
+        case byArtist
+        case byAlbum
+        case byYear
+        case custom(String)
     }
 }

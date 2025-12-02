@@ -54,21 +54,16 @@ struct LibraryFolderView: View {
                     playerViewModel: playerViewModel,
                     viewModel: viewModel
                 )
-                .navigationTitle(viewModel.folder.name)
-                .navigationBarTitleDisplayMode(.inline)
                 
             case .subfolders:
                 List {
                     folderSectionView()
                 }
                 .listStyle(.insetGrouped)
-                .navigationTitle(viewModel.folder.name)
-                .navigationBarTitleDisplayMode(.inline)
                 
             case .empty:
                 Color.clear
-                    .navigationTitle(viewModel.folder.name)
-                    .navigationBarTitleDisplayMode(.inline)
+                
             }
         }
         .task {
@@ -99,7 +94,7 @@ struct LibraryFolderView: View {
                 .padding(.vertical, 4)
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    nav.openFolder(subfolder.url.libraryFolderId)
+                    nav.pushFolder(subfolder.url.libraryFolderId)
                 }
             }
         }

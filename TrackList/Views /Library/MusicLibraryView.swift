@@ -53,7 +53,7 @@ struct MusicLibraryView: View {
 
                 ForEach(manager.attachedFolders) { folder in
                     Button {
-                        nav.openFolder(folder.id)   // ← НОВЫЙ ЧИСТЫЙ API
+                        nav.openFolder(folder.id) 
                     } label: {
                         HStack(spacing: 12) {
                             Image(systemName: "folder.fill")

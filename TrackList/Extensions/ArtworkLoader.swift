@@ -60,8 +60,7 @@ enum ArtworkLoader {
     // MARK: - Отмена загрузки
 
     static func cancelLoad(trackId: UUID) async {
-        guard let url = await BookmarkResolver.url(forTrack: trackId) else {
-            return
-        }
+        _ = await BookmarkResolver.url(forTrack: trackId)
+        // TODO: implement cancellation when loading tasks become cancelable
     }
 }

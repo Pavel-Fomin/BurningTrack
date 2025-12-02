@@ -33,20 +33,19 @@ struct LibraryScreen: View {
     // MARK: - UI
 
     var body: some View {
-
-        // Навигация только внутри фонотеки
-        NavigationStack {
-            content
+        NavigationStack(path: $nav.libraryPath) {
+            rootContent
+                .libraryToolbar()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color(.systemBackground))
-                .libraryToolbar()
+                .navigationDestination(for: NavigationCoordinator.LibraryRoute.self) { route in
+                    destination(for: route)
+                        .libraryToolbar()
+                    
+                }
         }
 
-        // Потребляем событие showTrackInLibrary
         .onAppear {
-            handlePendingShowTrack()
-        }
-        .onChange(of: nav.libraryRoute) { _, _ in
             handlePendingShowTrack()
         }
 
@@ -61,25 +60,31 @@ struct LibraryScreen: View {
                 if let folderURL = urls.first {
                     musicLibraryManager.saveBookmark(for: folderURL)
                 }
-
             case .failure(let error):
                 print("❌ Ошибка выбора папки: \(error.localizedDescription)")
             }
         }
     }
 
-    // MARK: - Содержимое экрана
+    // MARK: - Root контент (бывший .root)
 
     @ViewBuilder
-    private var content: some View {
-        switch nav.libraryRoute {
+    private var rootContent: some View {
+        MusicLibraryView(
+            trackListViewModel: trackListViewModel,
+            playerViewModel: playerViewModel,
+            onAddFolder: { isShowingFolderPicker = true }
+        )
+    }
+
+    // MARK: - Navigation destinations
+
+    @ViewBuilder
+    private func destination(for route: NavigationCoordinator.LibraryRoute) -> some View {
+        switch route {
 
         case .root:
-            MusicLibraryView(
-                trackListViewModel: trackListViewModel,
-                playerViewModel: playerViewModel,
-                onAddFolder: { isShowingFolderPicker = true }
-            )
+            rootContent
 
         case .folder(let folderId):
             if let folder = musicLibraryManager.folder(for: folderId) {
@@ -91,14 +96,32 @@ struct LibraryScreen: View {
                     playerViewModel: playerViewModel
                 )
                 .environmentObject(vm)
-                
+
             } else {
                 Text("❌ Папка не найдена")
             }
+
+        case .tracksInFolder(let folderId):
+            if let folder = musicLibraryManager.folder(for: folderId) {
+                let vm = LibraryFolderViewModelCache.shared.resolve(for: folder)
+
+                LibraryTracksView(
+                    folder: folder,
+                    trackListViewModel: trackListViewModel,
+                    playerViewModel: playerViewModel,
+                    viewModel: vm
+                )
+
+            } else {
+                Text("❌ Папка не найдена")
+            }
+
+        case .groupedTracks(let folderId, let type):
+            Text("Grouped tracks for folder \(folderId.uuidString), type: \(String(describing: type))")
         }
     }
 
-    // MARK: - Переадресация на трек
+    // MARK: - Переадресация
 
     /// При получении showTrackInLibrary:
     /// 1. получаем trackId
