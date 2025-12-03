@@ -25,17 +25,21 @@ struct MainTabView: View {
     @ObservedObject var playerViewModel: PlayerViewModel
     
     @StateObject private var trackListsVM = TrackListsViewModel()
-
-
+    
+    
+// MARK: - UI
+    
     var body: some View {
         TabView(selection: $scene.activeTab) {
 
-            // MARK: - Плеер
+// MARK: - Плеер
+            
             PlayerScreen(playerViewModel: playerViewModel)
                 .tabItem { Label("Плеер", systemImage: "waveform") }
                 .tag(ScenePhaseHandler.Tab.player)
 
-            // MARK: - Фонотека
+// MARK: - Фонотека
+            
             LibraryScreen(
                 playerViewModel: playerViewModel,
                 trackListViewModel: trackListViewModel
@@ -43,15 +47,17 @@ struct MainTabView: View {
                 .tabItem { Label("Фонотека", systemImage: "play.square.stack") }
                 .tag(ScenePhaseHandler.Tab.library)
 
-            // MARK: - Треклисты
+// MARK: - Треклисты
+            
             TrackListsScreen(
-                trackListsViewModel: trackListsVM,   // ← ПЕРЕДАЁМ СЮДА
+                trackListsViewModel: trackListsVM,
                 playerViewModel: playerViewModel
             )
                 .tabItem { Label("Треклисты", systemImage: "list.star") }
                 .tag(ScenePhaseHandler.Tab.tracklists)
 
-            // MARK: - Настройки
+// MARK: - Настройки
+            
             SettingsScreen()
                 .tabItem { Label("Настройки", systemImage: "gear") }
                 .tag(ScenePhaseHandler.Tab.settings)

@@ -35,12 +35,11 @@ struct LibraryScreen: View {
     var body: some View {
         NavigationStack(path: $nav.libraryPath) {
             rootContent
-                .libraryToolbar()
+                .libraryToolbar(title: "Фонотека")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color(.systemBackground))
                 .navigationDestination(for: NavigationCoordinator.LibraryRoute.self) { route in
                     destination(for: route)
-                        .libraryToolbar()
                     
                 }
         }
@@ -85,6 +84,7 @@ struct LibraryScreen: View {
 
         case .root:
             rootContent
+                .libraryToolbar(title: "Фонотека")
 
         case .folder(let folderId):
             if let folder = musicLibraryManager.folder(for: folderId) {
@@ -96,9 +96,11 @@ struct LibraryScreen: View {
                     playerViewModel: playerViewModel
                 )
                 .environmentObject(vm)
+                .libraryToolbar(title: folder.name)
 
             } else {
                 Text("❌ Папка не найдена")
+                    .libraryToolbar(title: "Ошибка")
             }
 
         case .tracksInFolder(let folderId):
@@ -111,13 +113,12 @@ struct LibraryScreen: View {
                     playerViewModel: playerViewModel,
                     viewModel: vm
                 )
+                .libraryToolbar(title: folder.name)
 
             } else {
                 Text("❌ Папка не найдена")
+                    .libraryToolbar(title: "Ошибка")
             }
-
-        case .groupedTracks(let folderId, let type):
-            Text("Grouped tracks for folder \(folderId.uuidString), type: \(String(describing: type))")
         }
     }
 
@@ -149,6 +150,7 @@ struct LibraryScreen: View {
 
             // 2. Открываем папку
             nav.openFolder(folderId)
+            
         }
     }
 }

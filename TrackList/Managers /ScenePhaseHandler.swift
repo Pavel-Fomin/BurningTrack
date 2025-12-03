@@ -19,42 +19,16 @@ import Combine
 @MainActor
 final class ScenePhaseHandler: ObservableObject {
 
-    // MARK: - Singleton
-
     static let shared = ScenePhaseHandler()
     private init() {}
-
-    // MARK: - Все вкладки приложения
 
     enum Tab: Hashable {
         case player
         case library
         case tracklists
         case settings
-        case search          // пока не используется
+        case search
     }
 
-    // MARK: - Активная вкладка
-
-    /// Текущая активная вкладка приложения.
-    /// При повторном выборе той же вкладки публикуется событие repeatedTabSelection.
-    @Published var activeTab: Tab = .library {
-        didSet {
-            if oldValue == activeTab {
-                // Повторный выбор вкладки
-                repeatedTabSelection = activeTab
-                print("🔁 Повторное нажатие на вкладку: \(activeTab)")
-            } else {
-                // Обычное переключение
-                repeatedTabSelection = nil
-                print("🧭 Переключились на вкладку: \(activeTab)")
-            }
-        }
-    }
-
-    // MARK: - Событие повторного выбора вкладки
-
-    /// Экраны могут подписываться на это,
-    /// чтобы выполнять сброс состояния (скролл в начало, закрытие вложенных экранов и т.п.).
-    @Published var repeatedTabSelection: Tab? = nil
+    @Published var activeTab: Tab = .library
 }

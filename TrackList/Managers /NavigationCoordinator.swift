@@ -45,20 +45,6 @@ final class NavigationCoordinator: ObservableObject {
         libraryPath.last ?? .root
     }
 
-    /// Заголовок для тулбара.
-    var currentTitle: String {
-        switch currentRoute {
-        case .root:
-            return "Фонотека"
-        case .folder(let id):
-            return MusicLibraryManager.shared.folder(for: id)?.name ?? "Папка"
-        case .tracksInFolder(let id):
-            return MusicLibraryManager.shared.folder(for: id)?.name ?? "Треки"
-        case .groupedTracks:
-            return "Группы"
-        }
-    }
-
     // MARK: - Работа с вкладками
 
     func setTab(_ tab: ScenePhaseHandler.Tab) {
@@ -87,11 +73,6 @@ final class NavigationCoordinator: ObservableObject {
         libraryPath.append(.tracksInFolder(id))
     }
 
-    /// Переход в сгруппированный список треков.
-    func pushGroupedTracks(_ id: UUID, type: GroupingType) {
-        libraryPath.append(.groupedTracks(id, type))
-    }
-
     /// Возврат на один уровень назад.
     func popLibrary() {
         guard !libraryPath.isEmpty else { return }
@@ -116,14 +97,5 @@ final class NavigationCoordinator: ObservableObject {
         case root
         case folder(UUID)
         case tracksInFolder(UUID)
-        case groupedTracks(UUID, GroupingType)
-    }
-
-    enum GroupingType: Hashable {
-        case byDate
-        case byArtist
-        case byAlbum
-        case byYear
-        case custom(String)
     }
 }

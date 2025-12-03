@@ -11,13 +11,12 @@
 import SwiftUI
 
 struct LibraryToolbar: ViewModifier {
-
-    @ObservedObject private var nav = NavigationCoordinator.shared
+    let title: String
 
     func body(content: Content) -> some View {
         content
             .screenToolbar(
-                title: nav.currentTitle,
+                title: title,
                 leading: { EmptyView() },
                 trailing: { EmptyView() }
             )
@@ -27,7 +26,7 @@ struct LibraryToolbar: ViewModifier {
 // MARK: - Modifier
 
 extension View {
-    func libraryToolbar() -> some View {
-        self.modifier(LibraryToolbar())
+    func libraryToolbar(title: String) -> some View {
+        self.modifier(LibraryToolbar(title: title))
     }
 }

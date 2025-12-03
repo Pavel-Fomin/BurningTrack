@@ -105,7 +105,7 @@ struct TrackRowView: View {
             }
             
             if let trackListNames, !trackListNames.isEmpty {
-                Text("в треклисте: \(trackListNames.joined(separator: ", "))")
+                Text("уже в: \(trackListNames.joined(separator: ", "))")
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .lineLimit(1)

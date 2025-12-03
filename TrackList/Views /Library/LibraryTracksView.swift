@@ -7,14 +7,6 @@
 //  Created by Pavel Fomin on 09.08.2025.
 //
 
-//
-//  LibraryTracksView.swift
-//  TrackList
-//
-//  Отображает список треков из папки, сгруппированных по дате.
-//
-//  Created by Pavel Fomin on 09.08.2025.
-//
 
 import SwiftUI
 
