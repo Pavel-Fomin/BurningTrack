@@ -18,7 +18,7 @@ struct LibraryTrackSectionView: View {
     let allTracks: [LibraryTrack]
 
     let trackListViewModel: TrackListViewModel
-    let trackListNamesByURL: [URL: [String]]
+    let trackListNamesById: [UUID: [String]]
 
     let playerViewModel: PlayerViewModel
     let metadataByURL: [URL: TrackMetadataCacheManager.CachedMetadata]
@@ -35,7 +35,7 @@ struct LibraryTrackSectionView: View {
                     track: track,
                     allTracks: allTracks,
                     trackListViewModel: trackListViewModel,
-                    trackListNamesByURL: trackListNamesByURL,
+                    trackListNamesById: trackListNamesById,
                     metadata: metadataByURL[track.url],
                     onMetadataLoaded: { url, meta in folderViewModel.setMetadata(meta, for: url)},
                     isScrollingFast: isScrollingFast,

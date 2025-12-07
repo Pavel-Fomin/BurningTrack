@@ -54,21 +54,18 @@ final class LibraryScanner: LibraryScannerProtocol {
     func scanFolder(_ url: URL) async -> ScannedFolder {
         var subfolders: [URL] = []
         var audioFiles: [URL] = []
-        
-        let accessed = url.startAccessingSecurityScopedResource()
-        defer { if accessed { url.stopAccessingSecurityScopedResource() } }
-        
+
         let items = (try? fm.contentsOfDirectory(
             at: url,
             includingPropertiesForKeys: [.isDirectoryKey],
             options: [.skipsHiddenFiles]
         )) ?? []
-        
+
         print("📡 SCAN FOLDER RAW:", url.lastPathComponent, "items:", items.count)
-        
+
         for item in items {
             let isDir = (try? item.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
-            
+
             if isDir {
                 subfolders.append(item)
             } else {
@@ -78,7 +75,7 @@ final class LibraryScanner: LibraryScannerProtocol {
                 }
             }
         }
-        
+
         let resolved = url.resolvingSymlinksInPath()
         return ScannedFolder(
             url: resolved,
@@ -93,21 +90,18 @@ final class LibraryScanner: LibraryScannerProtocol {
     func scanRecursively(_ url: URL) async -> [ScannedAudioFile] {
         var result: [ScannedAudioFile] = []
         var stack: [URL] = [url]
-        
+
         while let current = stack.popLast() {
-            
-            let accessed = current.startAccessingSecurityScopedResource()
-            defer { if accessed { current.stopAccessingSecurityScopedResource() } }
-            
+
             let items = (try? fm.contentsOfDirectory(
                 at: current,
                 includingPropertiesForKeys: [.isDirectoryKey],
                 options: [.skipsHiddenFiles]
             )) ?? []
-            
+
             for item in items {
                 let isDir = (try? item.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
-                
+
                 if isDir {
                     stack.append(item)
                 } else {
@@ -124,7 +118,7 @@ final class LibraryScanner: LibraryScannerProtocol {
                 }
             }
         }
-        
+
         return result
     }
     

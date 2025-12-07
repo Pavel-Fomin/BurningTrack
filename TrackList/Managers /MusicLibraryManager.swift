@@ -59,114 +59,95 @@ final class MusicLibraryManager: ObservableObject {
         )
     }
     
-    
-    
     // MARK: - Добавление папки: сохраняем bookmark, сканируем, регистрируем
 
     func saveBookmark(for url: URL) {
-        // Начинаем доступ к папке
-        guard url.startAccessingSecurityScopedResource() else {
-            print("❌ Не удалось начать доступ к папке")
-            return
-        }
-
         Task {
-            defer { url.stopAccessingSecurityScopedResource() }
-
-            do {
-                // Bookmark для корневой папки
-                let bookmarkData = try url.bookmarkData()
-                let bookmarkBase64 = bookmarkData.base64EncodedString()
-
-                let rootFolderId = url.libraryFolderId
-                let rootFolderName = url.lastPathComponent
-
-                // 1) Сохраняем bookmark корневой папки
-                await BookmarksRegistry.shared.upsertFolderBookmark(
-                    id: rootFolderId,
-                    base64: bookmarkBase64
-                )
-
-                // 2) Строим дерево через LibraryScanner (рекурсивно)
-                let rootTree = await buildFolderTree(from: url)
-
-                // Регистрируем только root
-                await TrackRegistry.shared.upsertFolder(
-                    id: rootFolderId,
-                    name: rootFolderName
-                )
-                
-                // 4) Собираем все аудиофайлы во всём дереве и регистрируем треки + bookmark'и
-                let allFileURLs = collectFileURLs(from: rootTree)
-
-                for fileURL in allFileURLs {
-                    let trackId = UUID.v5(from: fileURL.path)
-                    let folderId = fileURL.deletingLastPathComponent().libraryFolderId
-
-                    // TrackRegistry — только метаданные
-                    await TrackRegistry.shared.upsertTrack(
-                        id: trackId,
-                        fileName: fileURL.lastPathComponent,
-                        folderId: folderId
-                    )
-
-                    // BookmarksRegistry — bookmark конкретного файла
-                    if let fileBookmark = try? fileURL.bookmarkData() {
-                        await BookmarksRegistry.shared.upsertTrackBookmark(
-                            id: trackId,
-                            base64: fileBookmark.base64EncodedString()
-                        )
-                    }
-                }
-
-                // 5) Persist — один раз в конце
-                await TrackRegistry.shared.persist()
-                await BookmarksRegistry.shared.persist()
-
-                // 6) UI: пересобираем дерево для attachedFolders
-                await MainActor.run {
-                    if attachedFolders.contains(where: { $0.url == url }) == false {
-                        attachedFolders.insert(rootTree, at: 0)
-                    }
-                }
-
-                print("📁 Папка добавлена и проиндексирована: \(rootFolderName)")
-
-            } catch {
-                print("❌ Ошибка сохранения bookmark папки:", error)
+            // 1) Bookmark для корневой папки
+            guard let bookmarkBase64 = BookmarkResolver.makeBookmarkBase64(for: url) else {
+                print("❌ Не удалось создать bookmark для папки")
+                return
             }
+
+            let rootFolderId = url.libraryFolderId
+            let rootFolderName = url.lastPathComponent
+
+            // Сохраняем bookmark папки
+            await BookmarksRegistry.shared.upsertFolderBookmark(
+                id: rootFolderId,
+                base64: bookmarkBase64
+            )
+
+            // 2) Строим дерево папки через LibraryScanner (рекурсивно)
+            let rootTree = await buildFolderTree(from: url)
+
+            // Регистрируем метаданные root-папки
+            await TrackRegistry.shared.upsertFolder(
+                id: rootFolderId,
+                name: rootFolderName
+            )
+
+            // 3) Индексация всех файлов: метаданные + bookmark каждого файла
+            let allFileURLs = collectFileURLs(from: rootTree)
+
+            for fileURL in allFileURLs {
+                let trackId = UUID.v5(from: fileURL.path)
+                let folderId = fileURL.deletingLastPathComponent().libraryFolderId
+
+                await TrackRegistry.shared.upsertTrack(
+                    id: trackId,
+                    fileName: fileURL.lastPathComponent,
+                    folderId: folderId
+                )
+
+                if let fileBookmarkBase64 = BookmarkResolver.makeBookmarkBase64(for: fileURL) {
+                    await BookmarksRegistry.shared.upsertTrackBookmark(
+                        id: trackId,
+                        base64: fileBookmarkBase64
+                    )
+                }
+            }
+
+            // 4) Persist — один раз в конце
+            await TrackRegistry.shared.persist()
+            await BookmarksRegistry.shared.persist()
+
+            // 5) UI обновляем
+            await MainActor.run {
+                if attachedFolders.contains(where: { $0.url == url }) == false {
+                    attachedFolders.insert(rootTree, at: 0)
+                }
+            }
+
+            print("📁 Папка добавлена и проиндексирована: \(rootFolderName)")
         }
     }
-    
+
     // MARK: - Удаление прикреплённой папки
 
     func removeBookmark(for url: URL) {
         Task {
             let rootFolderId = url.libraryFolderId
 
-            // 1) Удаляем root-папку из TrackRegistry
-            //    Это автоматически удалит ВСЕ треки, у которых folderId == rootFolderId
+            // 1) Удаляем root-папку из TrackRegistry (удаляет и связанные треки)
             await TrackRegistry.shared.removeFolder(id: rootFolderId)
 
-            // 2) Строим дерево root-папки → собираем все файлы
-            //    Это нужно только для удаления trackBookmarks
-            let rootTree = await buildFolderTree(from: url)
-            let allFileURLs = collectFileURLs(from: rootTree)
+            // 2) Получаем список треков этой папки из реестра
+            let tracksInFolder = await TrackRegistry.shared.tracks(inFolder: rootFolderId)
 
-            // 3) Удаляем trackBookmarks только для файлов root
-            for fileURL in allFileURLs {
-                let trackId = UUID.v5(from: fileURL.path)
-                await BookmarksRegistry.shared.removeTrackBookmark(id: trackId)
+            // 3) Удаляем bookmarks всех треков
+            for track in tracksInFolder {
+                await BookmarksRegistry.shared.removeTrackBookmark(id: track.id)
             }
 
-            // 4) Удаляем bookmark root-папки
+            // 4) Удаляем bookmark для root-папки
             await BookmarksRegistry.shared.removeFolderBookmark(id: rootFolderId)
 
             // 5) Persist
             await TrackRegistry.shared.persist()
             await BookmarksRegistry.shared.persist()
 
-            // 6) UI: удаляем из списка прикреплённых
+            // 6) UI: удаляем папку из списка прикреплённых
             await MainActor.run {
                 attachedFolders.removeAll { $0.url == url }
             }
@@ -198,11 +179,11 @@ final class MusicLibraryManager: ObservableObject {
     func restoreAccessAsync() async {
         print("🔁 Восстановление доступа к папкам…")
 
-        // 1) Загружаем метаданные и bookmark'и
+        // 1) Загружаем информацию из реестров
         await TrackRegistry.shared.load()
         await BookmarksRegistry.shared.load()
 
-        // 2) Берём список ВСЕХ папок из реестра
+        // 2) Получаем список всех сохранённых папок
         let foldersMeta = await TrackRegistry.shared.allFolders()
 
         if foldersMeta.isEmpty {
@@ -214,48 +195,28 @@ final class MusicLibraryManager: ObservableObject {
 
         var restoredTrees: [LibraryFolder] = []
 
-        // 3) Восстанавливаем только те папки, у которых есть bookmark (root)
+        // 3) Восстанавливаем только те папки, у которых есть bookmark
         for folder in foldersMeta {
-            guard
-                let base64 = await BookmarksRegistry.shared.folderBookmark(for: folder.id),
-                let data = Data(base64Encoded: base64)
-            else { continue }
-
-            do {
-                var stale = false
-
-                // 4) Восстановили URL через bookmark
-                let url = try URL(
-                    resolvingBookmarkData: data,
-                    options: [.withoutUI],
-                    relativeTo: nil,
-                    bookmarkDataIsStale: &stale
-                )
-
-                if stale { print("⚠️ Bookmark устарел: \(folder.name)") }
-
-                let accessed = url.startAccessingSecurityScopedResource()
-
-                // 5) Строим дерево для UI
-                let tree = await buildFolderTree(from: url)
-                
-                print("🌳 BUILT TREE:", tree.name,
-                      "subfolders:", tree.subfolders.count,
-                      "audio:", tree.audioFiles.count)
-                restoredTrees.append(tree)
-
-                if accessed {
-                    // Не вызываем stopAccessing: пусть остаётся активный доступ
-                }
-
-                print("✅ Доступ к папке восстановлен:", folder.name)
-
-            } catch {
-                print("❌ Ошибка восстановления bookmark:", folder.name, error)
+            // Получаем URL папки через централизованный Resolver
+            guard let url = await BookmarkResolver.url(forFolder: folder.id) else {
+                print("⚠️ Не удалось восстановить URL папки:", folder.name)
+                continue
             }
+
+            // 4) Строим дерево папки для UI
+            let tree = await buildFolderTree(from: url)
+            restoredTrees.append(tree)
+
+            print(
+                "🌳 BUILT TREE:", tree.name,
+                "subfolders:", tree.subfolders.count,
+                "audio:", tree.audioFiles.count
+            )
+
+            print("✅ Доступ к папке восстановлен:", folder.name)
         }
 
-        // 6) Обновляем UI
+        // 5) Обновляем UI
         self.attachedFolders = restoredTrees
         self.isAccessRestored = true
         self.isInitialFoldersLoadFinished = true

@@ -17,13 +17,8 @@ struct LibraryTracksView: View {
 
     @ObservedObject var playerViewModel: PlayerViewModel
     @ObservedObject var viewModel: LibraryFolderViewModel
-
     @EnvironmentObject var sheetManager: SheetManager
-
-    @StateObject private var scrollSpeed = ScrollSpeedModel(
-        thresholdPtPerSec: 1500,
-        debounceMs: 180
-    )
+    @StateObject private var scrollSpeed = ScrollSpeedModel(thresholdPtPerSec: 1500,debounceMs: 180)
 
     /// Локальное состояние для скролла/подсветки
     @State private var scrollTargetID: UUID?
@@ -39,7 +34,7 @@ struct LibraryTracksView: View {
                         sections: viewModel.trackSections,
                         allTracks: viewModel.trackSections.flatMap(\.tracks),
                         trackListViewModel: trackListViewModel,
-                        trackListNamesByURL: viewModel.trackListNamesByURL,
+                        trackListNamesById: viewModel.trackListNamesById,
                         metadataByURL: viewModel.metadataByURL,
                         playerViewModel: playerViewModel,
                         isScrollingFast: scrollSpeed.isFast,

@@ -56,11 +56,4 @@ enum ArtworkLoader {
             return await TrackMetadataCacheManager.shared.loadMetadata(for: url)?.artwork
         }
     }
-
-    // MARK: - Отмена загрузки
-
-    static func cancelLoad(trackId: UUID) async {
-        _ = await BookmarkResolver.url(forTrack: trackId)
-        // TODO: implement cancellation when loading tasks become cancelable
-    }
 }

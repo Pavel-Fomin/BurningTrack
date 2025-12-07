@@ -38,10 +38,9 @@ final class ExportManager {
                     print("❌ Не удалось получить URL из BookmarkResolver для \(track.fileName)")
                     continue
                 }
-                
-                // 2. security scope
+
                 guard sourceURL.startAccessingSecurityScopedResource() else {
-                    print("❌ Не удалось открыть security scope для \(track.fileName)")
+                    print("❌ Нет доступа к файлу \(track.fileName)")
                     continue
                 }
                 defer { sourceURL.stopAccessingSecurityScopedResource() }

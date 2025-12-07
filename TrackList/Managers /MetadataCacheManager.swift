@@ -16,16 +16,9 @@ import ImageIO
 final class TrackMetadataCacheManager: @unchecked Sendable {
     static let shared = TrackMetadataCacheManager()
     
-    
     // Основной кэш для хранения метаданных (NSCache для автоматического сброса при нехватке памяти)
     private let cache = NSCache<NSURL, CachedMetadata>()
-    
-    // Активные задачи загрузки метаданных, чтобы не дублировать запросы
-    private let activeRequests = MetadataRequests()
-    
-    // Семафор для ограничения одновременных запросов (например, до 4 задач параллельно)
-    private let semaphore = AsyncSemaphore(value: 1)
-    
+ 
     private init() {
         cache.countLimit = 100
         cache.totalCostLimit = 30 * 1024 * 1024 // 30 MB
@@ -73,25 +66,9 @@ final class TrackMetadataCacheManager: @unchecked Sendable {
         guard let metadata = try? await MetadataParser.parseMetadata(from: url) else { return nil }
 
         return convertAndCache(metadata, for: nsurl, includeArtwork: includeArtwork)
-    
-        
     }
+   
     
-    // Преобразует UIImage в CGImage и упаковывает в CachedMetadata (с duration)
-    private func convert(from image: UIImage, metadata: TrackMetadata) -> CachedMetadata {
-        if let cgImage = image.cgImage {
-            return CachedMetadata(title: metadata.title,
-                                  artist: metadata.artist,
-                                  duration: metadata.duration,
-                                  artwork: cgImage)
-        }
-        return CachedMetadata(title: metadata.title,
-                              artist: metadata.artist,
-                              duration: metadata.duration,
-                              artwork: nil)
-    }
-
-
     // MARK: - Обработка и кэширование результата парсинга (с duration)
     
     private func convertAndCache(_ metadata: TrackMetadata,
@@ -152,38 +129,6 @@ final class TrackMetadataCacheManager: @unchecked Sendable {
         }
     }
     
-    
-    // MARK: - Асинхронный семафор для ограничения количества параллельных задач
-    
-    actor AsyncSemaphore {
-        private var value: Int
-        private var waiters: [CheckedContinuation<Void, Never>] = []
-        
-        init(value: Int) {
-            self.value = value
-        }
-        
-        func wait() async {
-            if value > 0 {
-                value -= 1
-                return
-            }
-            
-            await withCheckedContinuation { continuation in
-                waiters.append(continuation)
-            }
-        }
-        
-        func signal() async {
-            if let first = waiters.first {
-                waiters.removeFirst()
-                first.resume()
-            } else {
-                value += 1
-            }
-        }
-    }
-    
     // MARK: - Встроенный лимитер и дедуп загрузок
     
     actor _ArtworkSemaphore {
@@ -241,20 +186,3 @@ final class TrackMetadataCacheManager: @unchecked Sendable {
             Task { await _ArtworkCoordinator.shared.cancel(url: url) }
         }
     }
-
-
-actor MetadataRequests {
-    private var requests: [URL: Task<TrackMetadata?, Never>] = [:]
-    
-    func get(_ url: URL) -> Task<TrackMetadata?, Never>? {
-        requests[url]
-    }
-    
-    func set(_ url: URL, task: Task<TrackMetadata?, Never>) {
-        requests[url] = task
-    }
-    
-    func clear(_ url: URL) {
-        requests[url] = nil
-    }
-}

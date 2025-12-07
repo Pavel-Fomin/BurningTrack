@@ -30,10 +30,7 @@ struct TrackMetadata {
 /// Асинхронный парсер метаданных трека
 /// Получает длительность через AVAsset и передаёт URL в TLTagLibFile для разбора тегов
 final class MetadataParser {
-    
-    // не используется, но оставлен для совместимости
-    static let shared = MetadataParser()
-    
+     
     /// Извлекает длительность (через AVFoundation) и метаданные (через TagLib)
     /// - Parameter url: Путь к аудиофайлу
     /// - Returns: TrackMetadata со всеми доступными полями
@@ -46,13 +43,5 @@ final class MetadataParser {
         
         // Парсим остальные теги через обёртку TLTagLibFile (TagLib)
         return TLTagLibFile(fileURL: url).readMetadata(duration: durationSeconds)
-    }
-    
-    /// Извлекает только обложку из аудиофайла
-    /// Использует TagLib и возвращает UIImage или nil
-    static func extractArtwork(from url: URL) -> UIImage? {
-        let metadata = TLTagLibFile(fileURL: url).readMetadata(duration: nil)
-        guard let data = metadata.artworkData else { return nil }
-        return UIImage(data: data)
     }
 }

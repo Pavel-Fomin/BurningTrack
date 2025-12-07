@@ -14,35 +14,28 @@ import Foundation
 import AVFoundation
 
 final class ImportManager {
-
     func importTracks(from urls: [URL], to folderId: UUID) async -> [UUID] {
-
         var result: [UUID] = []
 
         for url in urls {
 
-            // 1. Доступ к файлу
-            guard url.startAccessingSecurityScopedResource() else {
-                print("❌ Нет доступа: \(url.lastPathComponent)")
-                continue
-            }
-            defer { url.stopAccessingSecurityScopedResource() }
-
-            // 2. Метаданные (опционально)
+            // 1. Метаданные (опционально)
             let metadata = try? await MetadataParser.parseMetadata(from: url)
 
-            // 3. Стабильный trackId
+            // 2. Стабильный trackId
             let trackId = UUID.v5(from: url.path)
 
-            // 4. Bookmark сохраняем в BookmarksRegistry
-            if let bookmarkData = try? url.bookmarkData() {
+            // 3. Bookmark сохраняем в BookmarksRegistry через общий Resolver
+            if let bookmarkBase64 = BookmarkResolver.makeBookmarkBase64(for: url) {
                 await BookmarksRegistry.shared.upsertTrackBookmark(
                     id: trackId,
-                    base64: bookmarkData.base64EncodedString()
+                    base64: bookmarkBase64
                 )
+            } else {
+                print("❌ Не удалось создать bookmark для файла: \(url.lastPathComponent)")
             }
 
-            // 5. TrackRegistry — только метаданные
+            // 4. TrackRegistry — только метаданные
             await TrackRegistry.shared.upsertTrack(
                 id: trackId,
                 fileName: url.lastPathComponent,

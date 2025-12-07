@@ -22,7 +22,7 @@ final class LibraryFolderViewModel: ObservableObject {
     
     @Published var pendingRevealTrackID: UUID?
     @Published var trackSections: [TrackSection] = []
-    @Published var trackListNamesByURL: [URL: [String]] = [:]
+    @Published var trackListNamesById: [UUID: [String]] = [:]
     @Published var metadataByURL: [URL: TrackMetadataCacheManager.CachedMetadata] = [:]
     @Published var isLoading: Bool = false
     @Published var subfolders: [LibraryFolder] = []
@@ -152,35 +152,37 @@ final class LibraryFolderViewModel: ObservableObject {
     // MARK: - TrackList Badges
     
     func loadTrackListNamesByURL() {
-        // Собираем URL всех треков на экране
-        var urlsInView: [URL] = []
-        for section in trackSections {
-            for track in section.tracks {
-                urlsInView.append(track.url)
-            }
-        }
-        
         Task { @MainActor in
-            var namesByURL: [URL: Set<String>] = [:]
-            var result: [URL: [String]] = [:]
             
+            // Собираем все ID треков на экране
+            var idsInView: [UUID] = []
+            for section in trackSections {
+                for track in section.tracks {
+                    idsInView.append(track.id)
+                }
+            }
+            
+            var namesById: [UUID: Set<String>] = [:]
+            
+            // Загружаем все треклисты
             let metas = TrackListsManager.shared.loadTrackListMetas()
             
             for meta in metas {
                 let list = TrackListManager.shared.getTrackListById(meta.id)
                 
                 for t in list.tracks {
-                    if let url = await BookmarkResolver.url(forTrack: t.id) {
-                        namesByURL[url, default: []].insert(meta.name)
-                    }
+                    namesById[t.id, default: []].insert(meta.name)
                 }
             }
             
-            for url in urlsInView {
-                result[url] = Array(namesByURL[url] ?? []).sorted()
+            // Формируем финальный словарь: ID → массив имён
+            var result: [UUID: [String]] = [:]
+            for id in idsInView {
+                let names = namesById[id] ?? []
+                result[id] = Array(names).sorted()
             }
             
-            self.trackListNamesByURL = result
+            self.trackListNamesById = result
         }
     }
     

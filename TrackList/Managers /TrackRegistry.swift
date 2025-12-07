@@ -147,4 +147,5 @@ actor TrackRegistry {
     func entry(for id: UUID) -> TrackEntry? {
         tracks[id]
     }
+    
 }

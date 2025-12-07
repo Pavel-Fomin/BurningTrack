@@ -13,7 +13,7 @@ import SwiftUI
 struct TrackDetailSheet: View {
     let track: any TrackDisplayable
     
-    @State private var resolvedURL: URL = URL(fileURLWithPath: "/dev/null")
+    @State private var resolvedURL: URL?
     @State private var artwork: UIImage? = nil
     @State private var tags: [(String, String)] = []
     
@@ -52,12 +52,18 @@ struct TrackDetailSheet: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
 
-                    Text(displayPath(from: resolvedURL))
-                        .font(.body) // теперь как у других строк
-                        .foregroundColor(.secondary)
-                        .textSelection(.enabled)
-                        .lineLimit(3)
-                        .monospaced()
+                    if let url = resolvedURL {
+                        Text(displayPath(from: url))
+                            .font(.body)
+                            .foregroundColor(.secondary)
+                            .textSelection(.enabled)
+                            .lineLimit(3)
+                            .monospaced()
+                    } else {
+                        Text("—")
+                            .font(.body)
+                            .foregroundColor(.secondary)
+                    }
                 }
 
                 // 2) Имя файла
@@ -65,10 +71,17 @@ struct TrackDetailSheet: View {
                     Text("НАЗВАНИЕ ФАЙЛА")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    Text(resolvedURL.deletingPathExtension().lastPathComponent)
-                        .font(.body)
-                        .foregroundColor(.primary)
-                        .lineLimit(3)
+
+                    if let url = resolvedURL {
+                        Text(url.deletingPathExtension().lastPathComponent)
+                            .font(.body)
+                            .foregroundColor(.primary)
+                            .lineLimit(3)
+                    } else {
+                        Text("—")
+                            .font(.body)
+                            .foregroundColor(.secondary)
+                    }
                 }
 
                 // 3) Теги из TagLib
@@ -116,8 +129,7 @@ struct TrackDetailSheet: View {
 // MARK: - Загрузка
     
     private func loadMetadata() async {
-        let url = resolvedURL
-        guard url.lastPathComponent != "dev/null" else { return }
+        guard let url = resolvedURL else { return }
 
         let tagFile = TLTagLibFile(fileURL: url)
 

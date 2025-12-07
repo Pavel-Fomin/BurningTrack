@@ -47,31 +47,28 @@ final class PlayerManager {
 
     func play(track: any TrackDisplayable) {
         Task {
-            // 1. resolvedURL — теперь через BookmarkResolver
+            // 0. Закрываем доступ к предыдущему треку (если был)
+            stopAccessingCurrentTrack()
+
+            // 1. resolvedURL — теперь через BookmarkResolver (он же открывает доступ)
             guard let resolvedURL = await BookmarkResolver.url(forTrack: track.id) else {
                 print("❌ Нет URL в BookmarksRegistry для \(track.id)")
                 return
             }
 
+            // Запоминаем, какой URL сейчас в работе — чтобы потом закрыть доступ
+            currentAccessedURL = resolvedURL
+
             // 2. Активация аудиосессии
             do {
-                try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
-                try AVAudioSession.sharedInstance().setActive(true)
+                let session = AVAudioSession.sharedInstance()
+                try session.setCategory(.playback, mode: .default)
+                try session.setActive(true)
             } catch {
                 print("❌ Ошибка активации аудиосессии: \(error)")
             }
 
-            // 3. Закрываем старый доступ
-            stopAccessingCurrentTrack()
-
-            // 4. Открываем новый доступ
-            guard resolvedURL.startAccessingSecurityScopedResource() else {
-                print("⚠️ Нет доступа к файлу \(resolvedURL.lastPathComponent)")
-                return
-            }
-            currentAccessedURL = resolvedURL
-
-            // 5. Создаём AVPlayerItem
+            // 3. Создаём AVPlayerItem
             let item = AVPlayerItem(url: resolvedURL)
 
             do {
@@ -81,11 +78,11 @@ final class PlayerManager {
                 return
             }
 
-            // 6. Подключаем item и играем
+            // 4. Подключаем item и играем
             player.replaceCurrentItem(with: item)
             player.play()
 
-            // 7. Читаем длительность трека
+            // 5. Читаем длительность трека
             let duration = (try? await item.asset.load(.duration))?.seconds ?? 0
 
             await MainActor.run {
@@ -102,7 +99,7 @@ final class PlayerManager {
 
     func stopAccessingCurrentTrack() {
         if let url = currentAccessedURL {
-            url.stopAccessingSecurityScopedResource()
+            BookmarkResolver.stopAccessing(url)
             currentAccessedURL = nil
         }
     }

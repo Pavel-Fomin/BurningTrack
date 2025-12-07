@@ -17,7 +17,7 @@ struct LibraryTrackRowWrapper: View {
     let allTracks: [LibraryTrack]
 
     let trackListViewModel: TrackListViewModel
-    let trackListNamesByURL: [URL: [String]]
+    let trackListNamesById: [UUID: [String]]
 
     let metadata: TrackMetadataCacheManager.CachedMetadata?
     let onMetadataLoaded: (URL, TrackMetadataCacheManager.CachedMetadata) -> Void
@@ -43,7 +43,7 @@ struct LibraryTrackRowWrapper: View {
     }
 
     private var trackListNames: [String] {
-        trackListNamesByURL[track.url] ?? []
+        trackListNamesById[track.id] ?? []
     }
 
     private var isHighlighted: Bool {
@@ -74,7 +74,7 @@ struct LibraryTrackRowWrapper: View {
             trackListNames: trackListNames
         )
 
-        .task(id: track.url.absoluteString + "|" + (isScrollingFast ? "1" : "0")) {
+        .task(id: track.id.uuidString + "|" + (isScrollingFast ? "1" : "0")) {
 
             // Ленивая загрузка обложки
             if !isScrollingFast && artwork == nil {
@@ -89,10 +89,10 @@ struct LibraryTrackRowWrapper: View {
 
             // Ленивая загрузка метаданных
             if metadata == nil {
-                if let meta = await TrackMetadataCacheManager.shared.loadMetadata(for: track.url) {
-                    await MainActor.run {
-                        onMetadataLoaded(track.url, meta)
-                    }
+                if let resolved = await BookmarkResolver.url(forTrack: track.id),
+                   let meta = await TrackMetadataCacheManager.shared.loadMetadata(for: resolved)
+                {
+                    await MainActor.run { onMetadataLoaded(resolved, meta) }
                 }
             }
         }
@@ -104,7 +104,7 @@ struct LibraryTrackRowWrapper: View {
             // В ПЛЕЕР
             Button {
                 Task {
-                    let resolved = track.url
+                    guard let resolved = await BookmarkResolver.url(forTrack: track.id) else { return }
 
                     let playerTrack = PlayerTrack(
                         id: track.id,
@@ -128,6 +128,7 @@ struct LibraryTrackRowWrapper: View {
                         )
                     )
                 }
+            
             } label: {
                 Label("В плеер", systemImage: "waveform")
             }
