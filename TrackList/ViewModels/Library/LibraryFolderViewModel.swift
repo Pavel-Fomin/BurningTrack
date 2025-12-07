@@ -192,6 +192,45 @@ final class LibraryFolderViewModel: ObservableObject {
         metadataByURL[url] = meta
     }
     
+    
+    // MARK: - Операции с файлом
+
+    // Перемещение
+    func moveTrack(_ trackId: UUID, toFolder folderId: UUID, playerManager: PlayerManager) async {
+        do {
+            try await LibraryFileManager.shared.moveTrack(
+                id: trackId,
+                toFolder: folderId,
+                using: playerManager
+            )
+            
+            // После перемещения — обновляем список треков
+            await refresh()
+            print("📁 Трек успешно перемещён \(trackId) → папка \(folderId)")
+
+        } catch {
+            print("❌ Ошибка перемещения трека: \(error.localizedDescription)")
+        }
+    }
+
+    // Переименование
+    func renameTrack(_ trackId: UUID, to newFileName: String, playerManager: PlayerManager) async {
+        do {
+            try await LibraryFileManager.shared.renameTrack(
+                id: trackId,
+                to: newFileName,
+                using: playerManager
+            )
+            
+            // Обновляем UI
+            await refresh()
+            print("✏️ Трек переименован \(trackId) → \(newFileName)")
+
+        } catch {
+            print("❌ Ошибка переименования трека: \(error.localizedDescription)")
+        }
+    }
+    
     // MARK: - Support. Отображение дат в формате "сегодня,вчера"
     
     nonisolated static func groupTracksByDate(_ tracks: [LibraryTrack]) -> [TrackSection] {

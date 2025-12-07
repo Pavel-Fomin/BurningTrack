@@ -20,9 +20,18 @@ import MediaPlayer
 final class PlayerManager {
 
     // MARK: - Private
+
     private let player = AVPlayer()
     private var timeObserverToken: Any?
     private var currentAccessedURL: URL?
+
+    // MARK: - Состояние трека
+
+    /// ID текущего трека, загруженного в плеер (не обязательно играет).
+    private(set) var currentTrackId: UUID?
+
+    /// Флаг, что плеер сейчас воспроизводит трек.
+    private(set) var isPlaying: Bool = false
 
     // MARK: - Init
 
@@ -40,6 +49,8 @@ final class PlayerManager {
     // MARK: - Finish Notification
 
     @objc private func trackDidFinishPlaying() {
+        // Трек доиграл до конца — считаем, что больше не играет
+        isPlaying = false
         NotificationCenter.default.post(name: .trackDidFinish, object: nil)
     }
 
@@ -47,28 +58,33 @@ final class PlayerManager {
 
     func play(track: any TrackDisplayable) {
         Task {
-            // 0. Закрываем доступ к предыдущему треку (если был)
-            stopAccessingCurrentTrack()
+            let trackId = track.id
 
-            // 1. resolvedURL — теперь через BookmarkResolver (он же открывает доступ)
-            guard let resolvedURL = await BookmarkResolver.url(forTrack: track.id) else {
-                print("❌ Нет URL в BookmarksRegistry для \(track.id)")
+            // 1. resolvedURL — через BookmarkResolver
+            guard let resolvedURL = await BookmarkResolver.url(forTrack: trackId) else {
+                print("❌ Нет URL в BookmarksRegistry для \(trackId)")
                 return
             }
 
-            // Запоминаем, какой URL сейчас в работе — чтобы потом закрыть доступ
-            currentAccessedURL = resolvedURL
-
             // 2. Активация аудиосессии
             do {
-                let session = AVAudioSession.sharedInstance()
-                try session.setCategory(.playback, mode: .default)
-                try session.setActive(true)
+                try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+                try AVAudioSession.sharedInstance().setActive(true)
             } catch {
                 print("❌ Ошибка активации аудиосессии: \(error)")
             }
 
-            // 3. Создаём AVPlayerItem
+            // 3. Закрываем старый доступ
+            stopAccessingCurrentTrack()
+
+            // 4. Открываем новый доступ
+            guard resolvedURL.startAccessingSecurityScopedResource() else {
+                print("⚠️ Нет доступа к файлу \(resolvedURL.lastPathComponent)")
+                return
+            }
+            currentAccessedURL = resolvedURL
+
+            // 5. Создаём AVPlayerItem
             let item = AVPlayerItem(url: resolvedURL)
 
             do {
@@ -78,11 +94,15 @@ final class PlayerManager {
                 return
             }
 
-            // 4. Подключаем item и играем
+            // 6. Подключаем item и играем
             player.replaceCurrentItem(with: item)
             player.play()
 
-            // 5. Читаем длительность трека
+            // Обновляем состояние текущего трека
+            currentTrackId = trackId
+            isPlaying = true
+
+            // 7. Читаем длительность трека
             let duration = (try? await item.asset.load(.duration))?.seconds ?? 0
 
             await MainActor.run {
@@ -99,19 +119,36 @@ final class PlayerManager {
 
     func stopAccessingCurrentTrack() {
         if let url = currentAccessedURL {
-            BookmarkResolver.stopAccessing(url)
+            url.stopAccessingSecurityScopedResource()
             currentAccessedURL = nil
         }
     }
 
     // MARK: - Controls
 
-    func pause() { player.pause() }
-    func playCurrent() { player.play() }
+    func pause() {
+        player.pause()
+        isPlaying = false
+    }
+
+    func playCurrent() {
+        player.play()
+        if player.currentItem != nil {
+            isPlaying = true
+        }
+    }
 
     func seek(to time: TimeInterval) {
         let cm = CMTime(seconds: time, preferredTimescale: 600)
         player.seek(to: cm)
+    }
+
+    // MARK: - Признак занятости трека
+
+    /// Возвращает `true`, если указанный трек сейчас загружен в плеер
+    /// (даже если стоит на паузе) и держит security-scoped доступ к файлу.
+    func isBusy(_ id: UUID) -> Bool {
+        return currentTrackId == id && currentAccessedURL != nil
     }
 
     // MARK: - Progress

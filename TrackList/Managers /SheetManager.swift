@@ -5,70 +5,155 @@
 //  Created by Pavel Fomin on 29.07.2025.
 //
 
-import Foundation
 import SwiftUI
+import Foundation
+
+// MARK: - Данные для ActionSheet
 
 struct TrackActionsSheetData: Identifiable, Equatable {
     let id = UUID()
     let track: any TrackDisplayable
     let context: TrackContext
-    
-    /// Доступные действия для текущего контекста
+
     var actions: [TrackAction] {
         switch context {
         case .library:
-            return [.moveToFolder, .showInfo]   // без "показать в фонотеке"
+            return [.moveToFolder, .showInfo]
         case .player:
             return [.showInLibrary, .moveToFolder, .showInfo]
         case .tracklist:
             return [.showInLibrary, .moveToFolder, .showInfo]
         }
     }
-    
+
     static func == (lhs: TrackActionsSheetData, rhs: TrackActionsSheetData) -> Bool {
         lhs.id == rhs.id
     }
 }
 
-@MainActor
-final class SheetManager: ObservableObject {
-    static let shared = SheetManager()
+// MARK: - Данные для MoveToFolderSheet
 
-    @Published var trackToAdd: LibraryTrack?
-    @Published var trackActionsSheet: TrackActionsSheetData?
-    @Published var highlightedTrackID: UUID?
-    
-    private var presentationTask: Task<Void, Never>?
+struct MoveToFolderSheetData: Identifiable, Equatable {
+    let id = UUID()
+    let track: any TrackDisplayable
 
-    private init() {}
+    static func == (lhs: MoveToFolderSheetData, rhs: MoveToFolderSheetData) -> Bool {
+        lhs.id == rhs.id
+    }
+}
 
-    func open(track: LibraryTrack) {
-        if let current = trackToAdd, current.id == track.id { return }
+// MARK: - Перечень всех возможных шитов
 
-        presentationTask?.cancel()
+enum AppSheet: Identifiable, Equatable {
+    case trackActions(TrackActionsSheetData)
+    case moveToFolder(MoveToFolderSheetData)
+    case trackDetail(any TrackDisplayable)
+    case addToTrackList(LibraryTrack)
 
-        presentationTask = Task {
-            try? await Task.sleep(nanoseconds: 200_000_000)
-            guard !Task.isCancelled else { return }
-            trackToAdd = track
+    var id: String {
+        switch self {
+        case .trackActions(let data): return "trackActions_\(data.id)"
+        case .moveToFolder(let data): return "moveToFolder_\(data.id)"
+        case .trackDetail(let track): return "trackDetail_\(track.id)"
+        case .addToTrackList(let track): return "addToTrackList_\(track.id)"
         }
     }
 
-    func close() {
-        presentationTask?.cancel()
-        trackToAdd = nil
-        trackActionsSheet = nil
-        highlightedTrackID = nil
+    static func == (lhs: AppSheet, rhs: AppSheet) -> Bool {
+        lhs.id == rhs.id
     }
-    
+}
+
+// MARK: - SheetManager
+
+@MainActor
+final class SheetManager: ObservableObject {
+
+    static let shared = SheetManager()
+
+    /// Текущий отображаемый шит
+    @Published var activeSheet: AppSheet?
+
+    /// Следующий шит, который должен открыться после dismiss текущего
+    private var pendingSheet: AppSheet?
+
+    /// ID трека для выделения в списках
+    @Published var highlightedTrackID: UUID?
+
+    private init() {}
+
+
+    // ============================================================
+    // MARK: - ОСНОВНОЙ МЕТОД ПОКАЗА ШИТОВ
+    // ============================================================
+
+    func present(_ sheet: AppSheet) {
+        highlightedTrackID = sheet.relatedTrackId
+
+        if activeSheet == nil {
+            // Можно открыть сразу
+            activeSheet = sheet
+        } else {
+            // Шит уже на экране → откроем после dismiss
+            pendingSheet = sheet
+            activeSheet = nil  // закрываем текущий
+        }
+    }
+
+
+    // ============================================================
+    // MARK: - ВЫЗЫВАЕТСЯ ИЗ ContentView.onDismiss
+    // ============================================================
+
+    func handleDismiss() {
+        DispatchQueue.main.async {
+            if let next = self.pendingSheet {
+                self.pendingSheet = nil
+                self.activeSheet = next
+            } else {
+                self.highlightedTrackID = nil
+            }
+        }
+    }
+
+
+    // ============================================================
+    // MARK: - Хелперы для вызова конкретных шитов
+    // ============================================================
+
     func presentTrackActions(track: any TrackDisplayable, context: TrackContext) {
-        highlightedTrackID = track.id
-        trackActionsSheet = TrackActionsSheetData(track: track, context: context)
+        let data = TrackActionsSheetData(track: track, context: context)
+        present(.trackActions(data))
     }
-    
-    func closeAllSheets() {
-        trackActionsSheet = nil
-        trackToAdd = nil
-        highlightedTrackID = nil
+
+    func presentMoveToFolder(for track: any TrackDisplayable) {
+        let data = MoveToFolderSheetData(track: track)
+        present(.moveToFolder(data))
+    }
+
+    func presentTrackDetail(_ track: any TrackDisplayable) {
+        present(.trackDetail(track))
+    }
+
+    func presentAddToTrackList(_ track: LibraryTrack) {
+        present(.addToTrackList(track))
+    }
+
+    func closeActive() {
+        activeSheet = nil
+    }
+}
+
+
+// MARK: - Вспомогательная логика извлечения track.id из enum AppSheet
+
+private extension AppSheet {
+    var relatedTrackId: UUID? {
+        switch self {
+        case .trackActions(let d): return d.track.id
+        case .moveToFolder(let d): return d.track.id
+        case .trackDetail(let t): return t.id
+        case .addToTrackList(let t): return t.id
+        }
     }
 }

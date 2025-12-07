@@ -101,15 +101,6 @@ struct LibraryTracksView: View {
             await viewModel.loadTracksIfNeeded()
             // pendingRevealTrackID уже установлен в ViewModel (из LibraryScreen)
         }
-
-        .sheet(item: $sheetManager.trackToAdd) { track in
-            NavigationStack {
-                AddToTrackListSheet(track: track) {
-                    sheetManager.close()
-                }
-                .presentationDetents([.fraction(0.5)])
-            }
-        }
     }
 
     // MARK: - Вспомогательное

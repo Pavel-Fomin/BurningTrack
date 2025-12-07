@@ -15,26 +15,16 @@ struct TrackActionSheet: View {
     let context: TrackContext
     let actions: [TrackAction]
 
+    /// Внешний обработчик — решает, что делать при нажатии
     let onAction: (TrackAction) -> Void
 
     var body: some View {
         VStack(spacing: 0) {
-            ForEach(actions, id: \.self) { action in
+            
+            // Используем enumerated, чтобы не требовать Hashable / Binding
+            ForEach(Array(actions.enumerated()), id: \.offset) { _, action in
                 Button {
-                    switch action {
-                    case .showInfo:
-                        SheetManager.shared.closeAllSheets()
-                        TrackDetailManager.shared.open(track: track)
-
-                    case .showInLibrary:
-                        SheetManager.shared.closeAllSheets()
-                        print("🧭 [TrackActionSheet] showInLibrary вызван для id:", track.id)
-                        NavigationCoordinator.shared.showTrackInLibrary(trackId: track.id)
-
-                    case .moveToFolder:
-                        onAction(action)
-                    }
-
+                    onAction(action)
                 } label: {
                     HStack(spacing: 12) {
                         icon(for: action)
@@ -52,11 +42,7 @@ struct TrackActionSheet: View {
             }
         }
         .padding(.vertical, 0)
-        .onDisappear {
-            SheetManager.shared.highlightedTrackID = nil
-        }
     }
-    
 
     private func title(for action: TrackAction) -> String {
         switch action {

@@ -32,6 +32,7 @@ struct ContentView: View {
     let trackListViewModel: TrackListViewModel
 
     // MARK: - Обёртка для sheet(item:)
+    
     private struct IdentifiableTrack: Identifiable {
         let id = UUID()
         let track: any TrackDisplayable
@@ -41,17 +42,20 @@ struct ContentView: View {
         trackDetailManager.track.map { IdentifiableTrack(track: $0) }
     }
 
-    // MARK: - Основной слой UI
+    // MARK: - UI
+    
     var body: some View {
         ZStack(alignment: .bottom) {
 
             // MARK: - Основные вкладки
+            
             MainTabView(
                 trackListViewModel: trackListViewModel,
                 playerViewModel: playerViewModel
             )
 
             // MARK: - Мини-плеер
+            
             if playerViewModel.currentTrackDisplayable != nil {
                 MiniPlayerView(
                     trackListViewModel: trackListViewModel,
@@ -74,36 +78,13 @@ struct ContentView: View {
             }
         }
 
-        // MARK: - Шит "Действия с треком"
-        .sheet(item: $sheetManager.trackActionsSheet, onDismiss: {
-            sheetManager.highlightedTrackID = nil
-        }) { data in
-            let base = CGFloat(data.actions.count) * 56 + 8
-            let adjusted = data.actions.count <= 2 ? base + 28 : base
-
-            TrackActionSheet(
-                track: data.track,
-                context: data.context,
-                actions: data.actions,
-                onAction: { action in print("Выбрано действие: \(action)") }
-            )
-            .presentationDetents([.height(adjusted)])
-        }
-
-        // MARK: - Экран "О треке"
-        .sheet(
-            isPresented: Binding(
-                get: { trackDetailManager.track != nil },
-                set: { if !$0 { trackDetailManager.close() } }
-            )
-        ) {
-            if let track = trackDetailManager.track {
-                TrackDetailSheet(track: track)
-            }
-        }
-    }
-
+        // MARK: - Подключение SheetHost
+        
+               .sheetHost(playerManager: playerViewModel.playerManager)
+           }
+    
     // MARK: - Паддинг для тоста
+    
     private var toastBottomPadding: CGFloat {
         let hasMiniPlayer =
         playerViewModel.currentTrackDisplayable != nil

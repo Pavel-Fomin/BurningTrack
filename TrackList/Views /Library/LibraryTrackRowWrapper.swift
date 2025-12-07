@@ -136,12 +136,12 @@ struct LibraryTrackRowWrapper: View {
 
             // В ТРЕКЛИСТ
             Button {
-                sheetManager.open(track: track)
+                sheetManager.present(.addToTrackList(track))
             } label: {
                 Label("В треклист", systemImage: "list.star")
             }
             .tint(.green)
-
+            
             // ЕЩЁ
             Button {
                 sheetManager.highlightedTrackID = track.id
