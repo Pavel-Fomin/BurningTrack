@@ -15,7 +15,7 @@ struct TrackListView: View {
     @ObservedObject var playerViewModel: PlayerViewModel
     @Environment(\.colorScheme) var colorScheme
     
-    
+
     var body: some View {
             ZStack {
                 List {
@@ -55,13 +55,6 @@ struct TrackListView: View {
             }
             .frame(maxHeight: .infinity)
             .animation(.easeInOut, value: trackListViewModel.toastData?.message ?? "")
-            .sheet(isPresented: $trackListViewModel.isShowingSaveSheet) {
-                SaveTrackListSheet(isPresented: $trackListViewModel.isShowingSaveSheet) { name in
-                    if let id = trackListViewModel.currentListId {
-                        TrackListsManager.shared.renameTrackList(id: id, to: name)
-                    }
-                }
-            }
         }
     }
 

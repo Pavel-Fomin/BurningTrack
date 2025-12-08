@@ -2,9 +2,8 @@
 //  View+SheetHost.swift
 //  TrackList
 //
-//  Универсальный контейнер для всех sheet’ов приложения.
-//  Вызывает SheetManager и отображает нужные экраны.
-//  ContentView остаётся идеально чистым.
+//  Унифицированный контейнер для всех sheet’ов приложения.
+//  Использует SheetManager и единый стиль через .appSheet().
 //
 //  Created by Pavel Fomin on 07.12.2025.
 //
@@ -12,10 +11,10 @@
 import SwiftUI
 
 struct SheetHostModifier: ViewModifier {
-    
+
     @ObservedObject var sheetManager = SheetManager.shared
     let playerManager: PlayerManager
-    
+
     func body(content: Content) -> some View {
         content
             .sheet(item: $sheetManager.activeSheet, onDismiss: {
@@ -48,7 +47,7 @@ struct SheetHostModifier: ViewModifier {
                             }
                         }
                     )
-                    .sheetStyle([
+                    .appSheet(detents: [
                         .height(CGFloat(data.actions.count * 56 + 40))
                     ])
 
@@ -62,13 +61,12 @@ struct SheetHostModifier: ViewModifier {
                             playerManager: playerManager
                         )
                     }
-                    .sheetStyle([.medium, .large])
+                    .appSheet(detents: [.fraction(0.6), .medium])
 
-                // MARK: - Track detail (почти fullscreen)
-                    
+                // MARK: - Track detail
                 case .trackDetail(let track):
                     TrackDetailSheet(track: track)
-                        .sheetStyle([.large])
+                        .appSheet(detents: [.large])
 
                 // MARK: - Add to tracklist
                     
@@ -78,7 +76,7 @@ struct SheetHostModifier: ViewModifier {
                             sheetManager.closeActive()
                         }
                     }
-                    .sheetStyle([.fraction(0.5), .medium])
+                    .appSheet(detents: [.fraction(0.6), .medium])
                 }
             }
     }

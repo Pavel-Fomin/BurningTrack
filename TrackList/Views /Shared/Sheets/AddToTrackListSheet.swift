@@ -69,6 +69,7 @@ struct AddToTrackListSheet: View {
                         .foregroundColor(.secondary)
                 }
             }
+            .listRowBackground(Color(.tertiarySystemBackground))
         }
         .navigationTitle("Добавить в треклист")
         .navigationBarTitleDisplayMode(.inline)

@@ -2,7 +2,7 @@
 //  RenameTrackListSheet.swift
 //  TrackList
 //
-//  Переименование треклиста
+//  Sheet "Переименование треклиста"
 //
 //  Created by Pavel Fomin on 09.11.2025.
 //
@@ -25,6 +25,7 @@ struct RenameTrackListSheet: View {
             ZStack(alignment: .bottom) {
                 
                 // MARK: - Инпут
+                
                 List {
                     Section {
                         TextField("Новое название", text: $name)
@@ -39,6 +40,7 @@ struct RenameTrackListSheet: View {
                 .navigationBarTitleDisplayMode(.inline)
                 
                 // MARK: - Кнопки
+                
                 HStack(spacing: 16) {
                     Button {
                         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -63,7 +65,6 @@ struct RenameTrackListSheet: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 16)
             }
-            .presentationDetents([.height(208)])
         }
     }
 }

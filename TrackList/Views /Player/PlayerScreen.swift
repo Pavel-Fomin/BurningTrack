@@ -15,20 +15,20 @@ struct PlayerScreen: View {
     @State private var isShowingExportPicker = false
     @State private var isShowingSaveSheet = false
     @State private var trackListName: String = defaultTrackListName()
-
+    
     @EnvironmentObject var toast: ToastManager
-
+    
     var body: some View {
         NavigationStack {
             ZStack(alignment: .bottom) {
-               VStack(spacing: 0) {
-
-// MARK: - Список треков
+                VStack(spacing: 0) {
+                    
+                    // MARK: - Список треков
                     
                     PlayerPlaylistView(playerViewModel: playerViewModel)
                 }
             }
-// MARK: - Тулбар (вместо PlayerHeaderView)
+            // MARK: - Тулбар (вместо PlayerHeaderView)
             
             .playerToolbar(
                 trackCount: PlaylistManager.shared.tracks.count,
@@ -46,8 +46,8 @@ struct PlayerScreen: View {
                 }
             )
         }
-
-// MARK: - Окно сохранения треклиста
+        
+        // MARK: - Окно сохранения треклиста
         
         .sheet(isPresented: $isShowingSaveSheet) {
             SaveTrackListSheet(
@@ -59,6 +59,7 @@ struct PlayerScreen: View {
                     ToastData(style: .trackList(name: newList.name), artwork: nil)
                 )
             }
+            .appSheet(detents: [.height(208)])
         }
     }
 }

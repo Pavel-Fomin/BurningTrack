@@ -35,10 +35,8 @@ struct MoveToFolderSheet: View {
                     // Перемещаем
                     await moveTrack(to: folder.id)
 
-                    // Закрываем sheet
-                    await MainActor.run {
-                        onComplete()
-                        dismiss()
+                    // Закрываем sheet,сообщаем вызывающей стороне, что всё готово
+                    await MainActor.run {onComplete()
                     }
                 }
             } label: {
@@ -56,6 +54,7 @@ struct MoveToFolderSheet: View {
                     }
                 }
             }
+            .listRowBackground(Color(.tertiarySystemBackground))
         }
         .navigationTitle("Переместить в папку")
         .navigationBarTitleDisplayMode(.inline)

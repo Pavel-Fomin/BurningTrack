@@ -39,6 +39,7 @@ struct TrackListScreen: View {
                     viewModel.isShowingRenameSheet = true
                 }
             )
+            // Переименовать треклист
             .sheet(isPresented: $viewModel.isShowingRenameSheet) {
                 RenameTrackListSheet(
                     isPresented: $viewModel.isShowingRenameSheet,
@@ -46,6 +47,7 @@ struct TrackListScreen: View {
                 ) { newName in
                     viewModel.renameCurrentTrackList(to: newName)
                 }
+                .appSheet(detents: [.height(208)])
             }
         }
     }

@@ -20,6 +20,7 @@ import SwiftUI
 struct ContentView: View {
 
     // MARK: - Глобальные менеджеры (живут всё приложение)
+    
     @StateObject private var sheetManager = SheetManager.shared
     @StateObject private var trackDetailManager = TrackDetailManager.shared
     
