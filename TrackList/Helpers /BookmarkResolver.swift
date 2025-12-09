@@ -2,18 +2,10 @@
 //  BookmarkResolver.swift
 //  TrackList
 //
-//  Единая точка доступа к файлам и папкам через bookmark'и.
+//  Централизованный слой доступа к файлам и папкам через bookmark'и.
 //
-//  Отвечает за:
-//  - резолв bookmarkData → URL
-//  - startAccessingSecurityScopedResource()
-//  - stopAccessingSecurityScopedResource()
-//  - хранение активных доступов (чтобы избежать sandbox ошибок)
-//  - обработку устаревших bookmark'ов (stale)
-//
-//  TrackRegistry хранит только метаданные.
-//  BookmarksRegistry хранит сами bookmarkData.
-//  Все остальные менеджеры получают доступ к файлам ТОЛЬКО через этот слой.
+//  Работает ТОЛЬКО со вторичным доступом (после первичного прикрепления).
+//  Первичный доступ всегда открывает MusicLibraryManager.saveBookmark().
 //
 //  Created by Pavel Fomin on 01.12.2025.
 //
@@ -22,17 +14,21 @@ import Foundation
 
 enum BookmarkResolver {
 
-    // MARK: - Хранилище активных доступов
-    
+    // MARK: - Активные security-доступы (чтобы не дублировать startAccessing)
+
     private static var activeAccesses = Set<URL>()
     private static let accessQueue = DispatchQueue(label: "BookmarkResolver.accessQueue")
 
-    // MARK: - Публичный метод: получить URL трека
+    // MARK: - URL для трека
 
-    /// Возвращает доступный URL трека, автоматически резолвя bookmark и открывая доступ.
     static func url(forTrack id: UUID) async -> URL? {
-        guard let base64 = await BookmarksRegistry.shared.trackBookmark(for: id),
-              let url = resolveBookmark(base64) else {
+        guard let base64 = await BookmarksRegistry.shared.trackBookmark(for: id) else {
+            print("⚠️ BookmarkResolver: нет bookmark для трека \(id)")
+            return nil
+        }
+
+        guard let url = resolveBookmark(base64) else {
+            print("⚠️ BookmarkResolver: не удалось резолвить bookmark трека \(id)")
             return nil
         }
 
@@ -40,13 +36,16 @@ enum BookmarkResolver {
         return url
     }
 
+    // MARK: - URL для папки
 
-    // MARK: - Публичный метод: получить URL папки (root)
-
-    /// Возвращает доступный URL папки.
     static func url(forFolder id: UUID) async -> URL? {
-        guard let base64 = await BookmarksRegistry.shared.folderBookmark(for: id),
-              let url = resolveBookmark(base64) else {
+        guard let base64 = await BookmarksRegistry.shared.folderBookmark(for: id) else {
+            print("⚠️ BookmarkResolver: нет bookmark для папки \(id)")
+            return nil
+        }
+
+        guard let url = resolveBookmark(base64) else {
+            print("⚠️ BookmarkResolver: не удалось резолвить bookmark папки \(id)")
             return nil
         }
 
@@ -54,51 +53,59 @@ enum BookmarkResolver {
         return url
     }
 
+    // MARK: - Резолв bookmark → URL
 
-    // MARK: - Приватный: резолв bookmarkData → URL
-
-    /// Резолвит bookmarkData (base64) → URL.
-    /// Если bookmark устарел — печатаем предупреждение.
     private static func resolveBookmark(_ base64: String) -> URL? {
-        guard let data = Data(base64Encoded: base64) else { return nil }
+        guard let data = Data(base64Encoded: base64) else {
+            print("❌ BookmarkResolver: не удалось декодировать base64")
+            return nil
+        }
 
         var stale = false
-        let url = try? URL(
-            resolvingBookmarkData: data,
-            options: [.withoutUI],
-            relativeTo: nil,
-            bookmarkDataIsStale: &stale
-        )
+
+        let url: URL
+        do {
+            url = try URL(
+                resolvingBookmarkData: data,
+                options: [.withoutUI], // .withSecurityScope больше нет в iOS 26
+                relativeTo: nil,
+                bookmarkDataIsStale: &stale
+            )
+        } catch {
+            print("❌ BookmarkResolver: ошибка резолва bookmark:", error)
+            return nil
+        }
 
         if stale {
-            print("⚠️ BookmarkResolver: bookmark устарел для URL:", url?.path ?? "nil")
+            print("⚠️ BookmarkResolver: bookmark устарел →", url.path)
         }
 
         return url
     }
 
+    // MARK: - Старт доступа (централизованный)
 
-    // MARK: - Приватный: старт доступа
-
-    /// Вызывает startAccessingSecurityScopedResource() только если доступ ещё не открыт.
     private static func startAccessingIfNeeded(_ url: URL) {
         accessQueue.sync {
-            if activeAccesses.contains(url) {
-                return
-            }
+            if activeAccesses.contains(url) { return }
 
             if url.startAccessingSecurityScopedResource() {
                 activeAccesses.insert(url)
             } else {
-                print("❌ BookmarkResolver: не удалось начать доступ —", url.path)
+                print("""
+                ❌ BookmarkResolver: startAccessingSecurityScopedResource() вернул false
+                URL: \(url.path)
+                Возможные причины:
+                - bookmark создан без security-scope (до фикса)
+                - файл перемещён / удалён
+                - у приложения нет доступа
+                """)
             }
         }
     }
 
+    // MARK: - Явное завершение доступа
 
-    // MARK: - Публичный: остановить доступ
-
-    /// Явное завершение доступа (редко используется, но полезно для импорта/экспорта).
     static func stopAccessing(_ url: URL) {
         accessQueue.sync {
             guard activeAccesses.contains(url) else { return }
@@ -108,14 +115,18 @@ enum BookmarkResolver {
         }
     }
 
+    // MARK: - Создание bookmarkData (только для bootstrap и индексации файлов)
 
-    // MARK: - Хелпер: создание bookmarkData для папки или файла
-
-    /// Создаёт bookmarkData и возвращает base64-строку.
-    /// Используется при добавлении папки и индексации треков.
     static func makeBookmarkBase64(for url: URL) -> String? {
+        // Даже если MusicLibraryManager открыл доступ,
+        // для файлов доступ может не быть открыт → открываем локально.
+        let started = url.startAccessingSecurityScopedResource()
+        defer { if started { url.stopAccessingSecurityScopedResource() } }
+
         do {
-            let data = try url.bookmarkData()
+            // На iOS 26 bookmark с security-scope создаётся автоматически
+            // если доступ был открыт.
+            let data = try url.bookmarkData(options: [.minimalBookmark])
             return data.base64EncodedString()
         } catch {
             print("❌ BookmarkResolver: не удалось создать bookmark:", error)

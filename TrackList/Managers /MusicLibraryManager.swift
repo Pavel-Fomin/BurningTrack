@@ -63,63 +63,89 @@ final class MusicLibraryManager: ObservableObject {
 
     func saveBookmark(for url: URL) {
         Task {
-            // 1) Bookmark для корневой папки
+            // 0. Bootstrap-доступ
+            let started = url.startAccessingSecurityScopedResource()
+            if !started {
+                print("❌ saveBookmark: не удалось начать доступ к папке:", url.path)
+                return
+            }
+
+            // Гарантированно закрываем доступ после индексации
+            defer {
+                url.stopAccessingSecurityScopedResource()
+            }
+
+            // 1. Создание bookmark для корневой папки
+            /// - откроет временный доступ (на случай вложенных файлов)
+            /// - создаст правильный security bookmark даже на iOS 26
+
             guard let bookmarkBase64 = BookmarkResolver.makeBookmarkBase64(for: url) else {
-                print("❌ Не удалось создать bookmark для папки")
+                print("❌ saveBookmark: не удалось создать bookmark для папки")
                 return
             }
 
             let rootFolderId = url.libraryFolderId
             let rootFolderName = url.lastPathComponent
 
-            // Сохраняем bookmark папки
             await BookmarksRegistry.shared.upsertFolderBookmark(
                 id: rootFolderId,
                 base64: bookmarkBase64
             )
 
-            // 2) Строим дерево папки через LibraryScanner (рекурсивно)
+            // 2. Полное рекурсивное сканирование папки
+            /// - startAccessingSecurityScopedResource() открыт
+            /// - FileManager имеет доступ
+            /// buildFolderTree → scanner.scanFolder → видит реальные файлы
             let rootTree = await buildFolderTree(from: url)
 
-            // Регистрируем метаданные root-папки
+            // 3. Регистрируем саму папку
+            // TrackRegistry хранит только метаданные, без bookmarkData.
             await TrackRegistry.shared.upsertFolder(
                 id: rootFolderId,
                 name: rootFolderName
             )
 
-            // 3) Индексация всех файлов: метаданные + bookmark каждого файла
+            // 4. Индексация ВСЕХ файлов во всех подпапках
+            /// collectFileURLs собирает ВСЕ пути файлов.
+            /// Важно: bookmark каждого файла тоже создаётся через BookmarkResolver.makeBookmarkBase64, который корректно открывает временный доступ
             let allFileURLs = collectFileURLs(from: rootTree)
 
             for fileURL in allFileURLs {
                 let trackId = UUID.v5(from: fileURL.path)
                 let folderId = fileURL.deletingLastPathComponent().libraryFolderId
 
+                // Метаданные трека
                 await TrackRegistry.shared.upsertTrack(
                     id: trackId,
                     fileName: fileURL.lastPathComponent,
                     folderId: folderId
                 )
 
+                // Bookmark для файла
                 if let fileBookmarkBase64 = BookmarkResolver.makeBookmarkBase64(for: fileURL) {
                     await BookmarksRegistry.shared.upsertTrackBookmark(
                         id: trackId,
                         base64: fileBookmarkBase64
                     )
+                } else {
+                    print("⚠️ saveBookmark: не удалось создать bookmark файла:", fileURL.path)
                 }
             }
 
-            // 4) Persist — один раз в конце
+            // 5. Сохраняем реестры
+            /// Один persist в конце — минимальная нагрузка на диск
             await TrackRegistry.shared.persist()
             await BookmarksRegistry.shared.persist()
 
-            // 5) UI обновляем
+            // 6. Обновляем UI
+            /// Вставляем новую прикреплённую папку в начало списка
             await MainActor.run {
                 if attachedFolders.contains(where: { $0.url == url }) == false {
                     attachedFolders.insert(rootTree, at: 0)
                 }
             }
 
-            print("📁 Папка добавлена и проиндексирована: \(rootFolderName)")
+            print("📁 Папка добавлена и проиндексирована:", rootFolderName)
         }
     }
 
@@ -129,25 +155,25 @@ final class MusicLibraryManager: ObservableObject {
         Task {
             let rootFolderId = url.libraryFolderId
 
-            // 1) Удаляем root-папку из TrackRegistry (удаляет и связанные треки)
+            // 1. Удаляем root-папку из TrackRegistry (и связанные треки)
             await TrackRegistry.shared.removeFolder(id: rootFolderId)
 
-            // 2) Получаем список треков этой папки из реестра
+            // 2. Получаем список треков этой папки из реестра
             let tracksInFolder = await TrackRegistry.shared.tracks(inFolder: rootFolderId)
 
-            // 3) Удаляем bookmarks всех треков
+            // 3. Удаляем bookmarks всех треков
             for track in tracksInFolder {
                 await BookmarksRegistry.shared.removeTrackBookmark(id: track.id)
             }
 
-            // 4) Удаляем bookmark для root-папки
+            // 4. Удаляем bookmark для root-папки
             await BookmarksRegistry.shared.removeFolderBookmark(id: rootFolderId)
 
-            // 5) Persist
+            // 5. Persist
             await TrackRegistry.shared.persist()
             await BookmarksRegistry.shared.persist()
 
-            // 6) UI: удаляем папку из списка прикреплённых
+            // 6. UI: удаляем папку из списка прикреплённых
             await MainActor.run {
                 attachedFolders.removeAll { $0.url == url }
             }
