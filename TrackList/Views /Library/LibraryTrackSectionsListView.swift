@@ -24,7 +24,6 @@ struct LibraryTrackSectionsListView: View {
     let isScrollingFast: Bool
 
     let revealedTrackID: UUID?
-    let folderViewModel: LibraryFolderViewModel
 
     var body: some View {
         ForEach(sections, id: \.id) { section in
@@ -37,8 +36,7 @@ struct LibraryTrackSectionsListView: View {
                 playerViewModel: playerViewModel,
                 metadataByURL: metadataByURL,
                 isScrollingFast: isScrollingFast,
-                revealedTrackID: revealedTrackID,
-                folderViewModel: folderViewModel
+                revealedTrackID: revealedTrackID
             )
         }
     }

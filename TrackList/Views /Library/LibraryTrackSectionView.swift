@@ -25,7 +25,6 @@ struct LibraryTrackSectionView: View {
 
     let isScrollingFast: Bool
     let revealedTrackID: UUID?
-    let folderViewModel: LibraryFolderViewModel
 
     var body: some View {
         Section(header: Text(title).font(.headline).id(title)) {
@@ -37,7 +36,7 @@ struct LibraryTrackSectionView: View {
                     trackListViewModel: trackListViewModel,
                     trackListNamesById: trackListNamesById,
                     metadata: metadataByURL[track.url],
-                    onMetadataLoaded: { url, meta in folderViewModel.setMetadata(meta, for: url)},
+                    onMetadataLoaded: { _, _ in },
                     isScrollingFast: isScrollingFast,
                     isRevealed: track.id == revealedTrackID,
                     playerViewModel: playerViewModel

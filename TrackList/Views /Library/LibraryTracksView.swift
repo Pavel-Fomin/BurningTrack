@@ -16,13 +16,27 @@ struct LibraryTracksView: View {
     let trackListViewModel: TrackListViewModel
 
     @ObservedObject var playerViewModel: PlayerViewModel
-    @ObservedObject var viewModel: LibraryFolderViewModel
     @EnvironmentObject var sheetManager: SheetManager
+    @StateObject private var tracksViewModel: LibraryTracksViewModel
     @StateObject private var scrollSpeed = ScrollSpeedModel(thresholdPtPerSec: 1500,debounceMs: 180)
 
     /// Локальное состояние для скролла/подсветки
     @State private var scrollTargetID: UUID?
     @State private var revealedTrackID: UUID?
+    
+    
+    init(
+        folder: LibraryFolder,
+        trackListViewModel: TrackListViewModel,
+        playerViewModel: PlayerViewModel
+    ) {
+        self.folder = folder
+        self.trackListViewModel = trackListViewModel
+        self._playerViewModel = ObservedObject(wrappedValue: playerViewModel)
+        self._tracksViewModel = StateObject(
+            wrappedValue: LibraryTracksViewModel(folderId: folder.url.libraryFolderId)
+        )
+    }
 
     // MARK: - Основное тело View
 
@@ -31,15 +45,14 @@ struct LibraryTracksView: View {
             ScrollViewReader { proxy in
                 List {
                     LibraryTrackSectionsListView(
-                        sections: viewModel.trackSections,
-                        allTracks: viewModel.trackSections.flatMap(\.tracks),
+                        sections: tracksViewModel.trackSections,
+                        allTracks: tracksViewModel.trackSections.flatMap(\.tracks),
                         trackListViewModel: trackListViewModel,
-                        trackListNamesById: viewModel.trackListNamesById,
-                        metadataByURL: viewModel.metadataByURL,
+                        trackListNamesById: tracksViewModel.trackListNamesById,
+                        metadataByURL: tracksViewModel.metadataByURL,
                         playerViewModel: playerViewModel,
                         isScrollingFast: scrollSpeed.isFast,
-                        revealedTrackID: revealedTrackID,
-                        folderViewModel: viewModel
+                        revealedTrackID: revealedTrackID
                     )
                 }
                 .listStyle(.plain)
@@ -48,25 +61,7 @@ struct LibraryTracksView: View {
                     Color.clear.frame(height: 88)
                 }
 
-                // Когда секции обновились — пробуем отреагировать на pendingRevealTrackID
-                .onReceive(viewModel.$trackSections) { sections in
-                    guard
-                        let targetId = viewModel.pendingRevealTrackID,
-                        containsTrack(with: targetId, in: sections)
-                    else { return }
-
-                    // Ставим цель для скролла и подсветки
-                    scrollTargetID = targetId
-                    revealedTrackID = targetId
-                    viewModel.pendingRevealTrackID = nil
-
-                    // Снимаем подсветку через несколько секунд
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
-                        if self.revealedTrackID == targetId {
-                            self.revealedTrackID = nil
-                        }
-                    }
-                }
+               
 
                 // Как только появилась цель — скроллим
                 .onChange(of: scrollTargetID) { _, id in
@@ -79,7 +74,7 @@ struct LibraryTracksView: View {
             }
 
             // Скелетон / лоадер
-            if viewModel.isLoading && viewModel.trackSections.isEmpty {
+            if tracksViewModel.isLoading && tracksViewModel.trackSections.isEmpty {
                 VStack {
                     Spacer()
                     ProgressView("Загружаю треки")
@@ -94,12 +89,11 @@ struct LibraryTracksView: View {
         }
 
         .refreshable {
-            await viewModel.refresh()
+            await tracksViewModel.refresh()
         }
 
-        .task(id: folder.url) {
-            await viewModel.loadTracksIfNeeded()
-            // pendingRevealTrackID уже установлен в ViewModel (из LibraryScreen)
+        .task {
+            await tracksViewModel.loadTracksIfNeeded()
         }
     }
 

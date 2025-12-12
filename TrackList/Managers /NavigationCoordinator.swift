@@ -33,9 +33,9 @@ final class NavigationCoordinator: ObservableObject {
 
     private init() {}
 
-    // MARK: - API для UI (тулбара)
+    // MARK: - API для UI
 
-    /// Находимся ли мы в корне.
+    /// Находимся ли мы в корне фонотеки.
     var isAtRoot: Bool {
         libraryPath.isEmpty
     }
@@ -55,7 +55,7 @@ final class NavigationCoordinator: ObservableObject {
 
     /// Полный сброс в корень.
     func openLibraryRoot() {
-        libraryPath = []        // корень = пустой стек
+        libraryPath = []
     }
 
     /// Открытие папки ИЗ КОРНЯ (заменяет весь стек).
@@ -66,11 +66,6 @@ final class NavigationCoordinator: ObservableObject {
     /// Переход внутрь папки (вложенный уровень).
     func pushFolder(_ id: UUID) {
         libraryPath.append(.folder(id))
-    }
-
-    /// Переход в список треков папки.
-    func pushTracksInFolder(_ id: UUID) {
-        libraryPath.append(.tracksInFolder(id))
     }
 
     /// Возврат на один уровень назад.
@@ -96,6 +91,5 @@ final class NavigationCoordinator: ObservableObject {
     enum LibraryRoute: Hashable {
         case root
         case folder(UUID)
-        case tracksInFolder(UUID)
     }
 }

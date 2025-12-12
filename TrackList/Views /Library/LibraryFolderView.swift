@@ -17,68 +17,44 @@
 import SwiftUI
 
 struct LibraryFolderView: View {
-    
+
     // MARK: - Входные данные
-    
-    let folder: LibraryFolder
+
     let trackListViewModel: TrackListViewModel
     @ObservedObject var playerViewModel: PlayerViewModel
-    
+
     // MARK: - Навигация и ViewModel
-    
+
     @ObservedObject private var nav = NavigationCoordinator.shared
     @EnvironmentObject var viewModel: LibraryFolderViewModel
-    
-    // MARK: - Инициализация
-    
-    init(
-        folder: LibraryFolder,
-        trackListViewModel: TrackListViewModel,
-        playerViewModel: PlayerViewModel
-    ) {
-        self.folder = folder
-        self.trackListViewModel = trackListViewModel
-        self._playerViewModel = ObservedObject(wrappedValue: playerViewModel)
-    }
-    
-    
+
     // MARK: - UI
-    
+
     var body: some View {
         Group {
             switch viewModel.displayMode {
+
             case .tracks:
                 LibraryTracksView(
                     folder: viewModel.folder,
                     trackListViewModel: trackListViewModel,
-                    playerViewModel: playerViewModel,
-                    viewModel: viewModel
+                    playerViewModel: playerViewModel
                 )
-                
+
             case .subfolders:
                 List {
                     folderSectionView()
                 }
                 .listStyle(.insetGrouped)
-                
+
             case .empty:
                 Color.clear
-                
-            }
-        }
-        .task {
-            // 1. Всегда сначала подгружаем подпапки из дерева
-            viewModel.loadSubfoldersIfNeeded()
-            
-            // 2. Если режим — треки, подгружаем сами треки
-            if viewModel.displayMode == .tracks {
-                await viewModel.loadTracksIfNeeded()
             }
         }
     }
-    
+
     // MARK: - Секция подпапок
-    
+
     @ViewBuilder
     private func folderSectionView() -> some View {
         Section {
@@ -87,7 +63,7 @@ struct LibraryFolderView: View {
                     Image(systemName: "folder.fill")
                         .foregroundColor(.blue)
                         .frame(width: 24)
-                    
+
                     Text(subfolder.name)
                         .lineLimit(1)
                 }

@@ -40,14 +40,11 @@ struct LibraryScreen: View {
                 .background(Color(.systemBackground))
                 .navigationDestination(for: NavigationCoordinator.LibraryRoute.self) { route in
                     destination(for: route)
-                    
                 }
         }
-
         .onAppear {
             handlePendingShowTrack()
         }
-
         // Выбор папки
         .fileImporter(
             isPresented: $isShowingFolderPicker,
@@ -65,7 +62,7 @@ struct LibraryScreen: View {
         }
     }
 
-    // MARK: - Root контент (бывший .root)
+    // MARK: - Root контент
 
     @ViewBuilder
     private var rootContent: some View {
@@ -88,31 +85,14 @@ struct LibraryScreen: View {
 
         case .folder(let folderId):
             if let folder = musicLibraryManager.folder(for: folderId) {
-                let vm = LibraryFolderViewModelCache.shared.resolve(for: folder)
+
+                let folderVM = LibraryFolderViewModel(folder: folder)
 
                 LibraryFolderView(
-                    folder: folder,
                     trackListViewModel: trackListViewModel,
                     playerViewModel: playerViewModel
                 )
-                .environmentObject(vm)
-                .libraryToolbar(title: folder.name)
-
-            } else {
-                Text("❌ Папка не найдена")
-                    .libraryToolbar(title: "Ошибка")
-            }
-
-        case .tracksInFolder(let folderId):
-            if let folder = musicLibraryManager.folder(for: folderId) {
-                let vm = LibraryFolderViewModelCache.shared.resolve(for: folder)
-
-                LibraryTracksView(
-                    folder: folder,
-                    trackListViewModel: trackListViewModel,
-                    playerViewModel: playerViewModel,
-                    viewModel: vm
-                )
+                .environmentObject(folderVM)
                 .libraryToolbar(title: folder.name)
 
             } else {
@@ -124,10 +104,6 @@ struct LibraryScreen: View {
 
     // MARK: - Переадресация
 
-    /// При получении showTrackInLibrary:
-    /// 1. получаем trackId
-    /// 2. ищем трек в TrackRegistry → узнаём folderId
-    /// 3. открываем папку
     private func handlePendingShowTrack() {
         guard let trackId = nav.consumePendingShowTrackId() else { return }
 
@@ -139,18 +115,12 @@ struct LibraryScreen: View {
 
             let folderId = entry.folderId
 
-            guard let folder = musicLibraryManager.folder(for: folderId) else {
+            guard musicLibraryManager.folder(for: folderId) != nil else {
                 print("⚠️ MusicLibraryManager: не найдена папка \(folderId)")
                 return
             }
 
-            // 1. Готовим ViewModel папки
-            let vm = LibraryFolderViewModelCache.shared.resolve(for: folder)
-            vm.pendingRevealTrackID = trackId
-
-            // 2. Открываем папку
             nav.openFolder(folderId)
-            
         }
     }
 }
