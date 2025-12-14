@@ -31,7 +31,9 @@ struct MiniPlayerView: View {
     @ObservedObject var playerViewModel: PlayerViewModel
     @State private var dragOffsetX: CGFloat = 0
     @State private var artwork: UIImage? = nil
-    
+    @State private var title: String = ""
+    @State private var artist: String = ""
+    @State private var metadataToken: UUID = .init()
     
     var body: some View {
         if let track = playerViewModel.currentTrackDisplayable {
@@ -61,12 +63,12 @@ struct MiniPlayerView: View {
                         
                         // Информация
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(track.artist ?? "Неизвестный артист")
+                            Text(artist.isEmpty ? "Неизвестный артист" : artist)
                                 .font(.caption)
                                 .foregroundColor(.primary)
                                 .lineLimit(1)
                             
-                            Text(track.title ?? track.fileName)
+                            Text(title.isEmpty ? track.fileName : title)
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
                                 .lineLimit(1)
@@ -101,6 +103,7 @@ struct MiniPlayerView: View {
                             withAnimation(.spring()) { dragOffsetX = 0 }
                         }
                 )
+                .id(metadataToken)
                 
                
                 
@@ -154,15 +157,31 @@ struct MiniPlayerView: View {
             .background(.ultraThinMaterial)
             .cornerRadius(12)
             .shadow(radius: 4)
-            .id(track.id)
+           
+            
             .task(id: track.id) {
-                artwork = nil
-                if let url = await BookmarkResolver.url(forTrack: track.id),
-                   let meta = await TrackMetadataCacheManager.shared.loadMetadata(for: url),
-                   let cgImage = meta.artwork {
-                    artwork = UIImage(cgImage: cgImage)
+                guard let url = await BookmarkResolver.url(forTrack: track.id),
+                      let meta = await TrackMetadataCacheManager.shared.loadMetadata(for: url)
+                else { return }
+
+                let newArtwork: UIImage? = {
+                    if let cgImage = meta.artwork {
+                        return UIImage(cgImage: cgImage)
+                    }
+                    return nil
+                }()
+
+                let newTitle = meta.title ?? ""
+                let newArtist = meta.artist ?? ""
+
+                withAnimation(.easeOut(duration: 0.20)) {
+                    artwork = newArtwork
+                    title = newTitle
+                    artist = newArtist
+                    metadataToken = UUID()
                 }
             }
+            
             .padding(.horizontal, 16)
             .padding(.bottom, 24) /// отступ между плеером и меню
         }
