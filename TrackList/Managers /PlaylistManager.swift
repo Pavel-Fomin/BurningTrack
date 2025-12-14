@@ -12,19 +12,17 @@ import SwiftUI
 
 @MainActor
 final class PlaylistManager: ObservableObject {
-
-    static let shared = PlaylistManager()
     
     @Published var tracks: [PlayerTrack] = []
+    var onTracksChanged: (([PlayerTrack]) -> Void)?
 
+    static let shared = PlaylistManager()
     private let fileName = "player.json"
 
-    private struct PlayerFile: Codable {
-        let trackIds: [UUID]
+    private struct PlayerFile: Codable { let trackIds: [UUID]
     }
 
-    private init() {
-        loadFromDisk()
+    private init() { loadFromDisk()
     }
 
     // MARK: - Загрузка player.json

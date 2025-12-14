@@ -20,7 +20,8 @@ struct LibraryTracksView: View {
     @StateObject private var tracksViewModel: LibraryTracksViewModel
     @StateObject private var scrollSpeed = ScrollSpeedModel(thresholdPtPerSec: 1500,debounceMs: 180)
 
-    /// Локальное состояние для скролла/подсветки
+    // MARK: -  Локальное состояние для скролла/подсветки
+    
     @State private var scrollTargetID: UUID?
     @State private var revealedTrackID: UUID?
     
@@ -38,7 +39,7 @@ struct LibraryTracksView: View {
         )
     }
 
-    // MARK: - Основное тело View
+    // MARK: - Ui
 
     var body: some View {
         ZStack {
@@ -49,7 +50,7 @@ struct LibraryTracksView: View {
                         allTracks: tracksViewModel.trackSections.flatMap(\.tracks),
                         trackListViewModel: trackListViewModel,
                         trackListNamesById: tracksViewModel.trackListNamesById,
-                        metadataByURL: tracksViewModel.metadataByURL,
+                        metadataProvider: tracksViewModel,
                         playerViewModel: playerViewModel,
                         isScrollingFast: scrollSpeed.isFast,
                         revealedTrackID: revealedTrackID

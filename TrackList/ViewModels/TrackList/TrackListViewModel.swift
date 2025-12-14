@@ -19,7 +19,7 @@ import SwiftUI
 import UIKit
 
 @MainActor
-final class TrackListViewModel: ObservableObject {
+final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
 
     @Published var name: String = ""
     @Published var tracks: [Track] = []
@@ -28,16 +28,19 @@ final class TrackListViewModel: ObservableObject {
     @Published var isShowingRenameSheet = false
     @Published var toastData: ToastData? = nil
     @Published var isShowingSaveSheet: Bool = false
+    
+    @Published private(set) var metadataByTrackId: [UUID: TrackMetadataCacheManager.CachedMetadata] = [:]
 
-    // MARK: Init
+    // MARK: - Init
+    
     init(trackList: TrackList) {
         self.currentListId = trackList.id
         self.name = trackList.name
         self.tracks = trackList.tracks
     }
-
+    
+    // Заглушка. Мы ушли от активного треклиста.
     init() { }
-
 
     // MARK: - Loading
 
@@ -60,7 +63,34 @@ final class TrackListViewModel: ObservableObject {
         guard let id = currentListId else { return }
         TrackListManager.shared.saveTracks(tracks, for: id)
     }
+    
+    
+    // MARK: - Metadata
+    
+    // Реализация чтения metadata
+    func metadata(for trackId: UUID)
+        -> TrackMetadataCacheManager.CachedMetadata?
+    {
+        metadataByTrackId[trackId]
+    }
+    
+    // Реализация загрузки metadata
+    func requestMetadataIfNeeded(for trackId: UUID) {
 
+        if metadataByTrackId[trackId] != nil { return }
+
+        Task {
+            guard
+                let url = await BookmarkResolver.url(forTrack: trackId),
+                let meta = await TrackMetadataCacheManager.shared
+                    .loadMetadata(for: url)
+            else { return }
+
+            await MainActor.run {
+                metadataByTrackId[trackId] = meta
+            }
+        }
+    }
 
     // MARK: - Reorder
 

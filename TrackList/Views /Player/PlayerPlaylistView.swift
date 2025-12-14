@@ -20,6 +20,6 @@ struct PlayerPlaylistView: View {
             tracks: manager.tracks,
             playerViewModel: playerViewModel
         )
-                }
-            }
+    }
+}
 

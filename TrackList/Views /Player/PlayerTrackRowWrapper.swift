@@ -1,5 +1,5 @@
 //
-//  PlayerTrackRowView.swift
+//  PlayerTrackRowWrapper.swift
 //  TrackList
 //
 //  Created by Pavel Fomin on 03.08.2025.
@@ -8,15 +8,21 @@
 import Foundation
 import SwiftUI
 
-struct PlayerTrackRowView: View {
+struct PlayerTrackRowWrapper: View {
     let track: any TrackDisplayable
     let isCurrent: Bool
     let isPlaying: Bool
     let onTap: () -> Void
     
+    @ObservedObject var playerViewModel: PlayerViewModel
+    
     @State private var artwork: CGImage? = nil
     @EnvironmentObject var sheetManager: SheetManager
-
+    
+    private var metadata: TrackMetadataCacheManager.CachedMetadata? {
+        playerViewModel.metadata(for: track.id)
+    }
+    
     var body: some View {
         TrackRowView(
             track: track,
@@ -24,9 +30,9 @@ struct PlayerTrackRowView: View {
             isPlaying: isPlaying,
             isHighlighted: sheetManager.highlightedTrackID == track.id,
             artwork: artwork,
-            title: track.title ?? track.fileName,
-            artist: track.artist ?? "",
-            duration: track.duration,
+            title: metadata?.title ?? track.title ?? track.fileName,
+            artist: metadata?.artist ?? track.artist ?? "",
+            duration: metadata?.duration ?? track.duration,
             onTap: onTap
         )
         .task(id: track.id) {
@@ -35,6 +41,9 @@ struct PlayerTrackRowView: View {
                 trackId: track.id
             )
         }
+        .task(id: track.id) {
+            playerViewModel.requestMetadataIfNeeded(for: track.id)
+            }
         
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             Button(role: .destructive) {

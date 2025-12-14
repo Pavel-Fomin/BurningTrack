@@ -29,6 +29,7 @@ final class PlayerViewModel: ObservableObject {
     @Published var currentTime: TimeInterval = 0.0                   /// Текущее время воспроизведения
     @Published var trackDuration: TimeInterval = 0.0                 /// Длительность текущего трека
     @Published var currentContext: PlaybackContext?                  /// Контекст воспроизведения (плеер / треклист / фонотека)
+    @Published private(set) var metadataByTrackId: [UUID: TrackMetadataCacheManager.CachedMetadata] = [:]
     
     // MARK: - Внутренние зависимости
     
@@ -88,6 +89,34 @@ final class PlayerViewModel: ObservableObject {
         )
     }
     
+    // MARK: - Metadata
+    
+    // Реализация метода чтения (контракт)
+    func metadata(for trackId: UUID)
+    -> TrackMetadataCacheManager.CachedMetadata?
+    {
+        metadataByTrackId[trackId]
+    }
+    
+    // Реализация запроса загрузки (контракт)
+    func requestMetadataIfNeeded(for trackId: UUID) {
+        
+        // уже загружено — выходим
+        if metadataByTrackId[trackId] != nil { return }
+        
+        Task {
+            guard
+                let url = await BookmarkResolver.url(forTrack: trackId),
+                let meta = await TrackMetadataCacheManager.shared
+                    .loadMetadata(for: url)
+            else { return }
+            
+            await MainActor.run {
+                metadataByTrackId[trackId] = meta
+            }
+        }
+    }
+    
     
     // MARK: - Воспроизведение трека
     
@@ -112,6 +141,8 @@ final class PlayerViewModel: ObservableObject {
         currentTrackDisplayable = track
         currentTime = 0
         trackDuration = 0
+        requestMetadataIfNeeded(for: track.id)
+        
         
         // Обновляем контексты
         if track is PlayerTrack {

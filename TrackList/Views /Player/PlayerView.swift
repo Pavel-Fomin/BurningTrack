@@ -31,6 +31,7 @@ struct PlayerView: View {
     }
 
     // MARK: - Компонент строк плеера
+    
     private struct PlayerRowsView: View {
         let tracks: [any TrackDisplayable]
         let playerViewModel: PlayerViewModel
@@ -40,7 +41,7 @@ struct PlayerView: View {
                 let isCurrent = playerViewModel.isCurrent(track, in: .player)
                 let isPlaying = isCurrent && playerViewModel.isPlaying
 
-                PlayerTrackRowView(
+                PlayerTrackRowWrapper(
                     track: track,
                     isCurrent: isCurrent,
                     isPlaying: isPlaying,
@@ -50,9 +51,9 @@ struct PlayerView: View {
                         } else {
                             playerViewModel.play(track: track, context: tracks)
                         }
-                    }
+                    },
+                        playerViewModel: playerViewModel
                 )
-                
             }
             .onMove { from, to in
                 PlaylistManager.shared.tracks.move(fromOffsets: from, toOffset: to)

@@ -18,11 +18,12 @@ struct LibraryTrackSectionsListView: View {
 
     let trackListViewModel: TrackListViewModel
     let trackListNamesById: [UUID: [String]]
-    let metadataByURL: [URL: TrackMetadataCacheManager.CachedMetadata]
-
+    
+    let metadataProvider: TrackMetadataProviding
+    
     let playerViewModel: PlayerViewModel
+    
     let isScrollingFast: Bool
-
     let revealedTrackID: UUID?
 
     var body: some View {
@@ -34,7 +35,7 @@ struct LibraryTrackSectionsListView: View {
                 trackListViewModel: trackListViewModel,
                 trackListNamesById: trackListNamesById,
                 playerViewModel: playerViewModel,
-                metadataByURL: metadataByURL,
+                metadataProvider: metadataProvider,
                 isScrollingFast: isScrollingFast,
                 revealedTrackID: revealedTrackID
             )

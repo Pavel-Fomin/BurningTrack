@@ -13,7 +13,8 @@ import SwiftUI
 import Combine
 
 @MainActor
-final class LibraryTracksViewModel: ObservableObject {
+final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
+    
     
     // MARK: - Входные данные
     
@@ -23,7 +24,7 @@ final class LibraryTracksViewModel: ObservableObject {
     
     @Published var trackSections: [TrackSection] = []
     @Published var trackListNamesById: [UUID: [String]] = [:]
-    @Published var metadataByURL: [URL: TrackMetadataCacheManager.CachedMetadata] = [:]
+    @Published private(set) var metadataByTrackId: [UUID: TrackMetadataCacheManager.CachedMetadata] = [:]
     @Published var isLoading: Bool = false
     
     @Published private(set) var didLoad: Bool = false
@@ -89,10 +90,29 @@ final class LibraryTracksViewModel: ObservableObject {
     
     // MARK: - Metadata
     
-    func setMetadata(
-        _ meta: TrackMetadataCacheManager.CachedMetadata,
-        for url: URL
-    ) {
-        metadataByURL[url] = meta
+    // Реализация метода чтения (контракт)
+    func metadata(for trackId: UUID)
+    -> TrackMetadataCacheManager.CachedMetadata?
+    {
+        metadataByTrackId[trackId]
+    }
+    
+    // Реализация запроса загрузки (контракт)
+    func requestMetadataIfNeeded(for trackId: UUID) {
+
+        // уже загружено — выходим
+        if metadataByTrackId[trackId] != nil { return }
+
+        Task {
+            guard
+                let url = await BookmarkResolver.url(forTrack: trackId),
+                let meta = await TrackMetadataCacheManager.shared
+                    .loadMetadata(for: url)
+            else { return }
+
+            await MainActor.run {
+                metadataByTrackId[trackId] = meta
+            }
+        }
     }
 }

@@ -21,6 +21,7 @@ struct TrackListView: View {
                 List {
                     TrackListRowsView(
                         tracks: trackListViewModel.tracks,
+                        metadataProvider: trackListViewModel,
                         playerViewModel: playerViewModel,
                         onTap: { track in
                             if track.isAvailable {
@@ -63,24 +64,24 @@ struct TrackListView: View {
         
 private struct TrackListRowsView: View {
     let tracks: [Track]
+    let metadataProvider: TrackMetadataProviding
     let playerViewModel: PlayerViewModel
     let onTap: (Track) -> Void
     let onDelete: (IndexSet) -> Void
     let onMove: (IndexSet, Int) -> Void
-    
+
     var body: some View {
         ForEach(Array(tracks.enumerated()), id: \.element.id) { index, track in
-            let isCurrent = playerViewModel.isCurrent(track, in: .trackList)
-            let isPlaying = isCurrent && playerViewModel.isPlaying
-
-            TrackListRowView(
+            TrackListRowWrapper(
                 track: track,
-                isCurrent: isCurrent,
-                isPlaying: isPlaying,
-                onTap: { onTap(track) },
-                onDelete: { onDelete(IndexSet(integer: index)) }
+                index: index,
+                tracksContext: tracks,
+                metadataProvider: metadataProvider,
+                playerViewModel: playerViewModel,
+                onTap: onTap,
+                onDelete: onDelete
             )
-            }
-            .onMove(perform: onMove)
         }
+        .onMove(perform: onMove)
     }
+}

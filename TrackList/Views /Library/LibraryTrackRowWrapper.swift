@@ -19,8 +19,7 @@ struct LibraryTrackRowWrapper: View {
     let trackListViewModel: TrackListViewModel
     let trackListNamesById: [UUID: [String]]
 
-    let metadata: TrackMetadataCacheManager.CachedMetadata?
-    let onMetadataLoaded: (URL, TrackMetadataCacheManager.CachedMetadata) -> Void
+    let metadataProvider: TrackMetadataProviding
 
     let isScrollingFast: Bool
     let isRevealed: Bool
@@ -49,8 +48,16 @@ struct LibraryTrackRowWrapper: View {
     private var isHighlighted: Bool {
         sheetManager.highlightedTrackID == track.id
     }
+    
+    
+    // MARK: - Metadata
+    
+    private var metadata: TrackMetadataCacheManager.CachedMetadata? {
+        metadataProvider.metadata(for: track.id)
+    }
+    
 
-    // MARK: - Body
+    // MARK: - UI
 
     var body: some View {
         TrackRowView(
@@ -76,7 +83,7 @@ struct LibraryTrackRowWrapper: View {
 
         .task(id: track.id.uuidString + "|" + (isScrollingFast ? "1" : "0")) {
 
-            // Ленивая загрузка обложки
+            // Обложка
             if !isScrollingFast && artwork == nil {
                 let img = await ArtworkLoader.loadIfNeeded(
                     current: artwork,
@@ -87,14 +94,8 @@ struct LibraryTrackRowWrapper: View {
                 }
             }
 
-            // Ленивая загрузка метаданных
-            if metadata == nil {
-                if let resolved = await BookmarkResolver.url(forTrack: track.id),
-                   let meta = await TrackMetadataCacheManager.shared.loadMetadata(for: resolved)
-                {
-                    await MainActor.run { onMetadataLoaded(resolved, meta) }
-                }
-            }
+            // Metadata
+            metadataProvider.requestMetadataIfNeeded(for: track.id)
         }
 
         // MARK: - Системные свайпы (В плеер / В треклист / Ещё)

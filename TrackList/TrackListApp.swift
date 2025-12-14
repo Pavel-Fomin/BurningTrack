@@ -14,8 +14,10 @@ import SwiftUI
 
 @main
 struct TrackListApp: App {
+    
     let trackListViewModel: TrackListViewModel
     let playerViewModel: PlayerViewModel
+    
     @StateObject private var toast = ToastManager()
 
 
