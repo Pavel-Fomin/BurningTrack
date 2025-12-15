@@ -46,18 +46,9 @@ struct LibraryScreen: View {
             handlePendingShowTrack()
         }
         // Выбор папки
-        .fileImporter(
-            isPresented: $isShowingFolderPicker,
-            allowedContentTypes: [.folder],
-            allowsMultipleSelection: false
-        ) { result in
-            switch result {
-            case .success(let urls):
-                if let folderURL = urls.first {
-                    musicLibraryManager.saveBookmark(for: folderURL)
-                }
-            case .failure(let error):
-                print("❌ Ошибка выбора папки: \(error.localizedDescription)")
+        .sheet(isPresented: $isShowingFolderPicker) {
+            FolderPickerView { folderURL in
+                musicLibraryManager.saveBookmark(for: folderURL)
             }
         }
     }
