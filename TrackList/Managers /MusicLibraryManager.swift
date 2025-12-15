@@ -155,25 +155,25 @@ final class MusicLibraryManager: ObservableObject {
         Task {
             let rootFolderId = url.libraryFolderId
 
-            // 1. Удаляем root-папку из TrackRegistry (и связанные треки)
-            await TrackRegistry.shared.removeFolder(id: rootFolderId)
-
-            // 2. Получаем список треков этой папки из реестра
+            // 1. Получаем треки
             let tracksInFolder = await TrackRegistry.shared.tracks(inFolder: rootFolderId)
 
-            // 3. Удаляем bookmarks всех треков
+            // 2. Удаляем bookmarks всех треков
             for track in tracksInFolder {
                 await BookmarksRegistry.shared.removeTrackBookmark(id: track.id)
             }
 
-            // 4. Удаляем bookmark для root-папки
+            // 3. Удаляем bookmark папки
             await BookmarksRegistry.shared.removeFolderBookmark(id: rootFolderId)
+
+            // 4. Удаляем папку и треки из TrackRegistry
+            await TrackRegistry.shared.removeFolder(id: rootFolderId)
 
             // 5. Persist
             await TrackRegistry.shared.persist()
             await BookmarksRegistry.shared.persist()
 
-            // 6. UI: удаляем папку из списка прикреплённых
+            // 6. UI
             await MainActor.run {
                 attachedFolders.removeAll { $0.url == url }
             }

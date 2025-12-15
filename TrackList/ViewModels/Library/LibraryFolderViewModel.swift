@@ -12,24 +12,24 @@ import SwiftUI
 
 @MainActor
 final class LibraryFolderViewModel: ObservableObject {
-
+    
     // MARK: - Input (immutable)
-
+    
     let folder: LibraryFolder
-
+    
     // MARK: - Output
-
+    
     @Published private(set) var subfolders: [LibraryFolder]
     @Published private(set) var displayMode: DisplayMode
-
+    
     enum DisplayMode {
         case subfolders
         case tracks
         case empty
     }
-
+    
     // MARK: - Init
-
+    
     init(folder: LibraryFolder) {
         self.folder = folder
         self.subfolders = folder.subfolders
@@ -38,19 +38,15 @@ final class LibraryFolderViewModel: ObservableObject {
             audioFiles: folder.audioFiles
         )
     }
-
+    
     // MARK: - Helpers
-
+    
     private static func resolveDisplayMode(
         subfolders: [LibraryFolder],
-        audioFiles: [URL]
+        audioFiles: [URL]   // ← вернуть URL
     ) -> DisplayMode {
-        if !subfolders.isEmpty {
-            return .subfolders
-        }
-        if !audioFiles.isEmpty {
-            return .tracks
-        }
+        if !subfolders.isEmpty { return .subfolders }
+        if !audioFiles.isEmpty { return .tracks }
         return .empty
     }
 }
