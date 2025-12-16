@@ -7,7 +7,6 @@
 //  Эти треки — только внутри TrackList, поэтому bookmark обязателен.
 //
 //  Created by Pavel Fomin on 28.04.2025.
-//  Обновлено под новую архитектуру (TrackRegistry + BookmarksRegistry)
 //
 
 import Foundation
@@ -39,7 +38,8 @@ final class ImportManager {
             await TrackRegistry.shared.upsertTrack(
                 id: trackId,
                 fileName: url.lastPathComponent,
-                folderId: folderId
+                folderId: folderId,
+                rootFolderId: folderId
             )
 
             print("📥 Импортирован: \(metadata?.title ?? url.lastPathComponent)")

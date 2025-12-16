@@ -118,7 +118,8 @@ final class MusicLibraryManager: ObservableObject {
                 await TrackRegistry.shared.upsertTrack(
                     id: trackId,
                     fileName: fileURL.lastPathComponent,
-                    folderId: folderId
+                    folderId: folderId,
+                    rootFolderId: rootFolderId
                 )
 
                 // Bookmark для файла
@@ -155,18 +156,18 @@ final class MusicLibraryManager: ObservableObject {
         Task {
             let rootFolderId = url.libraryFolderId
 
-            // 1. Получаем треки
-            let tracksInFolder = await TrackRegistry.shared.tracks(inFolder: rootFolderId)
+            // 1. Все треки этой root-папки (включая подпапки)
+            let tracks = await TrackRegistry.shared.tracks(inRootFolder: rootFolderId)
 
-            // 2. Удаляем bookmarks всех треков
-            for track in tracksInFolder {
+            // 2. Удаляем bookmarks треков
+            for track in tracks {
                 await BookmarksRegistry.shared.removeTrackBookmark(id: track.id)
             }
 
             // 3. Удаляем bookmark папки
             await BookmarksRegistry.shared.removeFolderBookmark(id: rootFolderId)
 
-            // 4. Удаляем папку и треки из TrackRegistry
+            // 4. Удаляем треки и папку из реестра
             await TrackRegistry.shared.removeFolder(id: rootFolderId)
 
             // 5. Persist

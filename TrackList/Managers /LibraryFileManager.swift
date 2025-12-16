@@ -137,7 +137,8 @@ actor LibraryFileManager {
         await TrackRegistry.shared.upsertTrack(
             id: trackId,
             fileName: fileName,
-            folderId: destinationFolderId
+            folderId: destinationFolderId,
+            rootFolderId: entry.rootFolderId
         )
 
         // 10. Persist
@@ -218,7 +219,8 @@ actor LibraryFileManager {
         await TrackRegistry.shared.upsertTrack(
             id: trackId,
             fileName: newFileName,
-            folderId: entry.folderId
+            folderId: entry.folderId,
+            rootFolderId: entry.rootFolderId
         )
 
         await BookmarksRegistry.shared.persist()

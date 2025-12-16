@@ -25,6 +25,7 @@ actor TrackRegistry {
         var id: UUID
         var fileName: String
         var folderId: UUID
+        var rootFolderId: UUID
         var updatedAt: Date
     }
 
@@ -113,7 +114,7 @@ actor TrackRegistry {
         folders.removeValue(forKey: id)
 
         // Удаляем треки, связанные с этой папкой
-        tracks = tracks.filter { $0.value.folderId != id }
+        tracks = tracks.filter { $0.value.rootFolderId != id }
     }
 
     func allFolders() -> [FolderEntry] {
@@ -122,11 +123,17 @@ actor TrackRegistry {
 
     // MARK: - Треки
 
-    func upsertTrack(id: UUID, fileName: String, folderId: UUID) {
+    func upsertTrack(
+        id: UUID,
+        fileName: String,
+        folderId: UUID,
+        rootFolderId: UUID
+    ) {
         let entry = TrackEntry(
             id: id,
             fileName: fileName,
             folderId: folderId,
+            rootFolderId: rootFolderId,
             updatedAt: Date()
         )
         tracks[id] = entry
@@ -148,4 +155,7 @@ actor TrackRegistry {
         tracks[id]
     }
     
+    func tracks(inRootFolder rootId: UUID) -> [TrackEntry] {
+        tracks.values.filter { $0.rootFolderId == rootId }
+    }
 }
