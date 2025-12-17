@@ -128,16 +128,21 @@ actor LibraryFileManager {
 
         // 8. Создаём новый bookmark для обновлённого пути
         guard let newBookmarkBase64 = BookmarkResolver.makeBookmarkBase64(for: destinationURL) else {
-            print("❌ Не удалось создать bookmark для нового пути файла")
-            throw LibraryFileError.bookmarkCreationFailed
+            print("❌ Не удалось создать bookmark для файла:", destinationURL.path)
+            return
         }
 
+        await BookmarksRegistry.shared.upsertTrackBookmark(
+            id: trackId,
+            base64: newBookmarkBase64
+        )
+        
         // 9. Обновляем BookmarksRegistry и TrackRegistry
-        await BookmarksRegistry.shared.upsertTrackBookmark(id: trackId, base64: newBookmarkBase64)
         await TrackRegistry.shared.upsertTrack(
             id: trackId,
             fileName: fileName,
-            folderId: destinationFolderId
+            folderId: destinationFolderId,
+            rootFolderId: entry.rootFolderId
         )
 
         // 10. Persist
@@ -209,16 +214,21 @@ actor LibraryFileManager {
 
         // 5. Новый bookmark для нового имени
         guard let newBookmarkBase64 = BookmarkResolver.makeBookmarkBase64(for: destinationURL) else {
-            print("❌ Не удалось создать bookmark для нового имени файла")
-            throw LibraryFileError.bookmarkCreationFailed
+            print("❌ Не удалось создать bookmark для файла:", destinationURL.path)
+            return
         }
 
+        await BookmarksRegistry.shared.upsertTrackBookmark(
+            id: trackId,
+            base64: newBookmarkBase64
+        )
+
         // 6. Обновляем реестры
-        await BookmarksRegistry.shared.upsertTrackBookmark(id: trackId, base64: newBookmarkBase64)
         await TrackRegistry.shared.upsertTrack(
             id: trackId,
             fileName: newFileName,
-            folderId: entry.folderId
+            folderId: entry.folderId,
+            rootFolderId: entry.rootFolderId
         )
 
         await BookmarksRegistry.shared.persist()

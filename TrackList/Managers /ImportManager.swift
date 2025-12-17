@@ -39,7 +39,8 @@ final class ImportManager {
             await TrackRegistry.shared.upsertTrack(
                 id: trackId,
                 fileName: url.lastPathComponent,
-                folderId: folderId
+                folderId: folderId,
+                rootFolderId: folderId
             )
 
             print("📥 Импортирован: \(metadata?.title ?? url.lastPathComponent)")

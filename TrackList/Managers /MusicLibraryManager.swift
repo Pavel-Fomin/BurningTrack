@@ -114,11 +114,11 @@ final class MusicLibraryManager: ObservableObject {
                 let trackId = UUID.v5(from: fileURL.path)
                 let folderId = fileURL.deletingLastPathComponent().libraryFolderId
 
-                // Метаданные трека
                 await TrackRegistry.shared.upsertTrack(
                     id: trackId,
                     fileName: fileURL.lastPathComponent,
-                    folderId: folderId
+                    folderId: folderId,
+                    rootFolderId: rootFolderId
                 )
 
                 // Bookmark для файла
@@ -156,7 +156,7 @@ final class MusicLibraryManager: ObservableObject {
             let rootFolderId = url.libraryFolderId
 
             // 1. Получаем треки
-            let tracksInFolder = await TrackRegistry.shared.tracks(inFolder: rootFolderId)
+            let tracksInFolder = await TrackRegistry.shared.tracks(inRootFolder: rootFolderId)
 
             // 2. Удаляем bookmarks всех треков
             for track in tracksInFolder {

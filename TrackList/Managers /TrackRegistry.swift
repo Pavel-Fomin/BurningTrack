@@ -24,7 +24,8 @@ actor TrackRegistry {
     struct TrackEntry: Codable, Identifiable {
         var id: UUID
         var fileName: String
-        var folderId: UUID
+        var folderId: UUID        // FS-папка (подпапка)
+        var rootFolderId: UUID    // Корневая прикреплённая папка
         var updatedAt: Date
     }
 
@@ -42,7 +43,7 @@ actor TrackRegistry {
 
     private let fileURL: URL = {
         let appDir = FileManager.default.urls(for: .documentDirectory,
-                                              in: .userDomainMask).first!
+                                             in: .userDomainMask).first!
         return appDir.appendingPathComponent("TrackRegistry.json")
     }()
 
@@ -66,14 +67,15 @@ actor TrackRegistry {
             let data = try Data(contentsOf: fileURL)
             let decoded = try decoder.decode(RegistryFile.self, from: data)
 
-            folders = Dictionary(uniqueKeysWithValues:
-                                    decoded.folders.map { ($0.id, $0) })
+            folders = Dictionary(
+                uniqueKeysWithValues: decoded.folders.map { ($0.id, $0) }
+            )
 
-            tracks = Dictionary(uniqueKeysWithValues:
-                                    decoded.tracks.map { ($0.id, $0) })
+            tracks = Dictionary(
+                uniqueKeysWithValues: decoded.tracks.map { ($0.id, $0) }
+            )
 
             print("📘 TrackRegistry загружен (\(tracks.count) треков, \(folders.count) папок)")
-
         } catch {
             print("ℹ️ TrackRegistry: нет файла, создаём новый.")
             folders = [:]
@@ -109,11 +111,12 @@ actor TrackRegistry {
         folders[id] = entry
     }
 
-    func removeFolder(id: UUID) {
-        folders.removeValue(forKey: id)
+    /// Удаляет корневую папку и все связанные с ней треки
+    func removeFolder(id rootFolderId: UUID) {
+        folders.removeValue(forKey: rootFolderId)
 
-        // Удаляем треки, связанные с этой папкой
-        tracks = tracks.filter { $0.value.folderId != id }
+        // Удаляем все треки, принадлежащие корню
+        tracks = tracks.filter { $0.value.rootFolderId != rootFolderId }
     }
 
     func allFolders() -> [FolderEntry] {
@@ -122,11 +125,17 @@ actor TrackRegistry {
 
     // MARK: - Треки
 
-    func upsertTrack(id: UUID, fileName: String, folderId: UUID) {
+    func upsertTrack(
+        id: UUID,
+        fileName: String,
+        folderId: UUID,
+        rootFolderId: UUID
+    ) {
         let entry = TrackEntry(
             id: id,
             fileName: fileName,
             folderId: folderId,
+            rootFolderId: rootFolderId,
             updatedAt: Date()
         )
         tracks[id] = entry
@@ -140,6 +149,10 @@ actor TrackRegistry {
         tracks.values.filter { $0.folderId == folderId }
     }
 
+    func tracks(inRootFolder rootFolderId: UUID) -> [TrackEntry] {
+        tracks.values.filter { $0.rootFolderId == rootFolderId }
+    }
+
     func allTracks() -> [TrackEntry] {
         Array(tracks.values)
     }
@@ -147,5 +160,4 @@ actor TrackRegistry {
     func entry(for id: UUID) -> TrackEntry? {
         tracks[id]
     }
-    
 }
