@@ -139,6 +139,8 @@ final class TrackListsManager {
         
         metas[index].name = newName
         saveTrackListMetas(metas)
+        
+        NotificationCenter.default.post(name: .trackListDidRename, object: id)
     }
     
     

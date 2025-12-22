@@ -14,7 +14,6 @@ struct PlayerToolbar: ViewModifier {
     var onSave: () -> Void
     var onExport: () -> Void
     var onClear: () -> Void
-    var onSaveTrackList: () -> Void
     
     func body(content: Content) -> some View {
         content
@@ -23,7 +22,9 @@ struct PlayerToolbar: ViewModifier {
                 leading: { EmptyView() },
                 trailing: {
                     Menu {
-                        Button("Сохранить треклист", action: onSaveTrackList)
+                        Button("Сохранить треклист") {
+                            SheetManager.shared.presentSaveTrackList()
+                        }
                         
                         Button(action: onExport) {
                             VStack(alignment: .leading, spacing: 2) {
@@ -49,15 +50,13 @@ extension View {
         trackCount: Int,
         onSave: @escaping () -> Void,
         onExport: @escaping () -> Void,
-        onClear: @escaping () -> Void,
-        onSaveTrackList: @escaping () -> Void
+        onClear: @escaping () -> Void
     ) -> some View {
         self.modifier(PlayerToolbar(
             trackCount: trackCount,
             onSave: onSave,
             onExport: onExport,
-            onClear: onClear,
-            onSaveTrackList: onSaveTrackList
+            onClear: onClear
         ))
     }
 }

@@ -2,7 +2,8 @@
 //  RenameTrackListSheet.swift
 //  TrackList
 //
-//  Sheet "Переименование треклиста"
+//  Экран переименования треклиста.
+//  Чистая UI-форма ввода имени.
 //
 //  Created by Pavel Fomin on 09.11.2025.
 //
@@ -10,22 +11,23 @@
 import SwiftUI
 
 struct RenameTrackListSheet: View {
-    @Binding var isPresented: Bool
+
+    let trackListId: UUID
+    let currentName: String
+
+    @Environment(\.dismiss) private var dismiss
     @State private var name: String
-    var onRename: (_ newName: String) -> Void
-    
-    init(isPresented: Binding<Bool>, currentName: String, onRename: @escaping (_ newName: String) -> Void) {
-        self._isPresented = isPresented
+
+    init(trackListId: UUID, currentName: String) {
+        self.trackListId = trackListId
+        self.currentName = currentName
         self._name = State(initialValue: currentName)
-        self.onRename = onRename
     }
-    
+
     var body: some View {
         NavigationStack {
             ZStack(alignment: .bottom) {
-                
-                // MARK: - Инпут
-                
+
                 List {
                     Section {
                         TextField("Новое название", text: $name)
@@ -38,14 +40,12 @@ struct RenameTrackListSheet: View {
                 .scrollDisabled(true)
                 .navigationTitle("Переименовать треклист")
                 .navigationBarTitleDisplayMode(.inline)
-                
-                // MARK: - Кнопки
-                
+
                 HStack(spacing: 16) {
                     Button {
-                        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-                        onRename(trimmed)
-                        isPresented = false
+                        Task {
+                            await rename()
+                        }
                     } label: {
                         Text("Сохранить")
                             .frame(maxWidth: .infinity)
@@ -53,9 +53,9 @@ struct RenameTrackListSheet: View {
                     .primaryButtonStyle()
                     .disabled(!TrackListManager.shared.validateName(name))
                     .opacity(TrackListManager.shared.validateName(name) ? 1 : 0.5)
-                    
+
                     Button {
-                        isPresented = false
+                        dismiss()
                     } label: {
                         Text("Отмена")
                             .frame(maxWidth: .infinity)
@@ -65,6 +65,18 @@ struct RenameTrackListSheet: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 16)
             }
+        }
+    }
+
+    private func rename() async {
+        do {
+            try await AppCommandExecutor.shared.renameTrackList(
+                trackListId: trackListId,
+                newName: name
+            )
+            await MainActor.run { dismiss() }
+        } catch {
+            print("❌ Ошибка переименования треклиста: \(error.localizedDescription)")
         }
     }
 }

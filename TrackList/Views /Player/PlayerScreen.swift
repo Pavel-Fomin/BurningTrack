@@ -28,7 +28,7 @@ struct PlayerScreen: View {
                     PlayerPlaylistView(playerViewModel: playerViewModel)
                 }
             }
-            // MARK: - Тулбар (вместо PlayerHeaderView)
+            // MARK: - Тулбар
             
             .playerToolbar(
                 trackCount: PlaylistManager.shared.tracks.count,
@@ -40,26 +40,8 @@ struct PlayerScreen: View {
                 },
                 onClear: {
                     PlaylistManager.shared.clear()
-                },
-                onSaveTrackList: {
-                    isShowingSaveSheet = true
                 }
             )
-        }
-        
-        // MARK: - Окно сохранения треклиста
-        
-        .sheet(isPresented: $isShowingSaveSheet) {
-            SaveTrackListSheet(
-                isPresented: $isShowingSaveSheet
-            ) { name in
-                let tracks = PlaylistManager.shared.tracks.map { $0.asTrack() }
-                let newList = TrackListsManager.shared.createTrackList(from: tracks, withName: name)
-                toast.show(
-                    ToastData(style: .trackList(name: newList.name), artwork: nil)
-                )
-            }
-            .appSheet(detents: [.height(208)])
         }
     }
 }

@@ -2,8 +2,11 @@
 //  MoveToFolderSheet.swift
 //  TrackList
 //
-//  Универсальный экран перемещения трека в другую папку фонотеки.
-//  Работает из любого контекста: Плеер, Фонотека, Треклист.
+//  Экран выбора папки для перемещения трека.
+//  Является UI-формой и не содержит бизнес-логики.
+//
+//  При выборе папки инициирует команду через AppCommandExecutor
+//  и закрывается самостоятельно.
 //
 //  Created by Pavel Fomin on 07.12.2025.
 //
@@ -15,11 +18,8 @@ struct MoveToFolderSheet: View {
 
     // MARK: - Входные параметры
 
-    let trackId: UUID
-    let onComplete: () -> Void
-
-    /// PlayerManager обязателен, чтобы понимать, занят ли трек плеером.
-    let playerManager: PlayerManager
+    let trackId: UUID                 /// Идентификатор перемещаемого трека
+    let playerManager: PlayerManager  /// PlayerManager необходим для проверки занятости трека
 
     // MARK: - Состояние
 
@@ -28,16 +28,13 @@ struct MoveToFolderSheet: View {
     @State private var folders: [TrackRegistry.FolderEntry] = []
     @State private var currentFolderId: UUID?
 
+    // MARK: - UI
+
     var body: some View {
         List(folders) { folder in
             Button {
                 Task {
-                    // Перемещаем
                     await moveTrack(to: folder.id)
-
-                    // Закрываем sheet,сообщаем вызывающей стороне, что всё готово
-                    await MainActor.run {onComplete()
-                    }
                 }
             } label: {
                 HStack {
@@ -46,7 +43,7 @@ struct MoveToFolderSheet: View {
 
                     Spacer()
 
-                    // Подсветка — если это текущая папка трека
+                    // Подсветка текущей папки трека
                     if folder.id == currentFolderId {
                         Text("Текущая")
                             .font(.subheadline)
@@ -58,15 +55,17 @@ struct MoveToFolderSheet: View {
         }
         .navigationTitle("Переместить в папку")
         .navigationBarTitleDisplayMode(.inline)
-        .task { await loadFolders() }
+        .task {
+            await loadFolders()
+        }
     }
 }
 
-
 // MARK: - Вспомогательные методы
+
 private extension MoveToFolderSheet {
 
-    /// Загружаем список всех папок + определяем, где сейчас лежит трек.
+    /// Загружает список папок и определяет текущую папку трека.
     func loadFolders() async {
         folders = await TrackRegistry.shared.allFolders()
 
@@ -75,17 +74,22 @@ private extension MoveToFolderSheet {
         }
     }
 
-    /// Перемещаем через LibraryFileManager.
+    /// Инициирует команду перемещения трека.
     func moveTrack(to folderId: UUID) async {
         do {
-            try await LibraryFileManager.shared.moveTrack(
-                id: trackId,
+            try await AppCommandExecutor.shared.moveTrack(
+                trackId: trackId,
                 toFolder: folderId,
                 using: playerManager
             )
-            print("📁 MoveToFolderSheet: трек \(trackId) перемещён в папку \(folderId)")
+
+            // После выполнения команды закрываем sheet
+            await MainActor.run {
+                dismiss()
+            }
 
         } catch {
+            // Ошибки будут обрабатываться централизованно
             print("❌ Ошибка перемещения трека: \(error.localizedDescription)")
         }
     }

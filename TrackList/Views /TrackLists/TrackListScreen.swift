@@ -25,30 +25,21 @@ struct TrackListScreen: View {
         NavigationStack {
             VStack(spacing: 0) {
                 
-                // Контент
                 TrackListView(
                     trackListViewModel: viewModel,
                     playerViewModel: playerViewModel
                 )
             }
-            // Тулбар
             .trackListToolbar(
                 viewModel: viewModel,
                 onExport: handleExport,
                 onRename: {
-                    viewModel.isShowingRenameSheet = true
+                    SheetManager.shared.presentRenameTrackList(
+                        trackListId: viewModel.currentListId!,
+                        currentName: viewModel.name
+                    )
                 }
             )
-            // Переименовать треклист
-            .sheet(isPresented: $viewModel.isShowingRenameSheet) {
-                RenameTrackListSheet(
-                    isPresented: $viewModel.isShowingRenameSheet,
-                    currentName: viewModel.name
-                ) { newName in
-                    viewModel.renameCurrentTrackList(to: newName)
-                }
-                .appSheet(detents: [.height(208)])
-            }
         }
     }
     

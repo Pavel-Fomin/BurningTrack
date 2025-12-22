@@ -137,7 +137,10 @@ struct LibraryTrackRowWrapper: View {
 
             // В ТРЕКЛИСТ
             Button {
-                sheetManager.present(.addToTrackList(track))
+                sheetManager.present(
+                    .addToTrackList(
+                        AddToTrackListSheetData(track: track))
+                )
             } label: {
                 Label("В треклист", systemImage: "list.star")
             }

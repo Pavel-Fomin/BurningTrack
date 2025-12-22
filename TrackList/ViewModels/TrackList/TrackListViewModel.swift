@@ -24,12 +24,10 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
     @Published var name: String = ""
     @Published var tracks: [Track] = []
     @Published var currentListId: UUID?
-
-    @Published var isShowingRenameSheet = false
     @Published var toastData: ToastData? = nil
-    @Published var isShowingSaveSheet: Bool = false
-    
     @Published private(set) var metadataByTrackId: [UUID: TrackMetadataCacheManager.CachedMetadata] = [:]
+    
+    private var renameObserver: NSObjectProtocol?
 
     // MARK: - Init
     
@@ -37,6 +35,23 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
         self.currentListId = trackList.id
         self.name = trackList.name
         self.tracks = trackList.tracks
+
+        renameObserver = NotificationCenter.default.addObserver(
+            forName: .trackListDidRename,
+            object: nil,
+            queue: nil
+        ) { [weak self] notification in
+            guard let self else { return }
+
+            Task { @MainActor in
+                guard
+                    let renamedId = notification.object as? UUID,
+                    renamedId == self.currentListId
+                else { return }
+
+                self.refreshMeta()
+            }
+        }
     }
     
     // Заглушка. Мы ушли от активного треклиста.
@@ -161,21 +176,18 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
         }
     }
 
-    // MARK: - Rename
+ 
+    // MARK: - Refresh meta
 
-    func renameCurrentTrackList(to newName: String) {
+    func refreshMeta() {
         guard let id = currentListId else { return }
 
-        guard TrackListManager.shared.validateName(newName) else {
-            print("⚠️ Некорректное имя треклиста")
-            return
+        let metas = TrackListsManager.shared.loadTrackListMetas()
+        guard let meta = metas.first(where: { $0.id == id }) else { return }
+
+        if name != meta.name {
+            name = meta.name
         }
-
-        TrackListsManager.shared.renameTrackList(id: id, to: newName)
-        self.name = newName
-        print("✏️ Треклист переименован в: \(newName)")
-
-        showToast(message: "Треклист «\(newName)» переименован")
     }
 
 
@@ -204,6 +216,12 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
 
         DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
             withAnimation { self.toastData = nil }
+        }
+    }
+    
+    deinit {
+        if let renameObserver {
+            NotificationCenter.default.removeObserver(renameObserver)
         }
     }
 }

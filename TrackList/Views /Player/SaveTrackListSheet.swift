@@ -2,25 +2,23 @@
 //  SaveTrackListSheet.swift
 //  TrackList
 //
-//  Sheet "Сохранить трек-лист"
+//  Экран создания нового треклиста.
+//  Чистая UI-форма ввода имени.
 //
 //  Created by Pavel Fomin on 11.07.2025.
 //
 
-import Foundation
 import SwiftUI
 
 struct SaveTrackListSheet: View {
-    @Binding var isPresented: Bool
+
+    @Environment(\.dismiss) private var dismiss
     @State private var name: String = ""
-    var onSave: (_ name: String) -> Void
-    
+
     var body: some View {
         NavigationStack {
             ZStack(alignment: .bottom) {
-                
-                // MARK: - Инпут
-                
+
                 List {
                     Section {
                         TextField("Название", text: $name)
@@ -33,13 +31,12 @@ struct SaveTrackListSheet: View {
                 .scrollDisabled(true)
                 .navigationTitle("Сохранить треклист")
                 .navigationBarTitleDisplayMode(.inline)
-                
-                // MARK: - Кнопки
-                
+
                 HStack(spacing: 16) {
                     Button {
-                        onSave(name.trimmingCharacters(in: .whitespacesAndNewlines))
-                        isPresented = false
+                        Task {
+                            await create()
+                        }
                     } label: {
                         Text("Сохранить")
                             .frame(maxWidth: .infinity)
@@ -49,7 +46,7 @@ struct SaveTrackListSheet: View {
                     .opacity(TrackListManager.shared.validateName(name) ? 1 : 0.5)
 
                     Button {
-                        isPresented = false
+                        dismiss()
                     } label: {
                         Text("Отмена")
                             .frame(maxWidth: .infinity)
@@ -62,6 +59,15 @@ struct SaveTrackListSheet: View {
             .onAppear {
                 name = generateDefaultTrackListName()
             }
+        }
+    }
+
+    private func create() async {
+        do {
+            try await AppCommandExecutor.shared.createTrackList(name: name)
+            await MainActor.run { dismiss() }
+        } catch {
+            print("❌ Ошибка создания треклиста: \(error.localizedDescription)")
         }
     }
 }

@@ -10,32 +10,33 @@
 
 import Foundation
 import SwiftUI
-import Combine
 
 @MainActor
 final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
-    
-    
+
     // MARK: - Входные данные
-    
+
     let folderId: UUID
-    
+
     // MARK: - Состояния
-    
+
     @Published var trackSections: [TrackSection] = []
     @Published var trackListNamesById: [UUID: [String]] = [:]
     @Published private(set) var metadataByTrackId: [UUID: TrackMetadataCacheManager.CachedMetadata] = [:]
-    @Published var isLoading: Bool = false
-    
-    @Published private(set) var didLoad: Bool = false
-    
-    // MARK: - Subscriptions
-    
+    @Published var isLoading = false
+    @Published private(set) var didLoad = false
+
+    // MARK: - Зависимости
+
     private let tracksProvider: LibraryTracksProvider
     private let badgeProvider: TrackListBadgeProvider
-    
+
+    // MARK: - Observer
+
+    private var trackDidMoveObserver: NSObjectProtocol?
+
     // MARK: - Init
-    
+
     init(
         folderId: UUID,
         tracksProvider: LibraryTracksProvider = DefaultLibraryTracksProvider(),
@@ -44,75 +45,100 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         self.folderId = folderId
         self.tracksProvider = tracksProvider
         self.badgeProvider = badgeProvider
+
+        trackDidMoveObserver = NotificationCenter.default.addObserver(
+            forName: .trackDidMove,
+            object: nil,
+            queue: nil
+        ) { [weak self] notification in
+            guard let self else { return }
+
+            Task { @MainActor in
+                self.handleTrackDidMove(notification)
+            }
+        }
     }
-    
+
+    deinit {
+        if let observer = trackDidMoveObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
+
     // MARK: - Load
-    
+
     func loadTracksIfNeeded() async {
         guard !didLoad else { return }
         didLoad = true
         await refresh()
     }
-    
+
     // MARK: - Refresh
-    
+
     func refresh() async {
         isLoading = true
         defer { isLoading = false }
-        
+
         let tracks = await tracksProvider.tracks(inFolder: folderId)
-        
-        self.trackSections = TrackSectionBuilder.build(
+
+        trackSections = TrackSectionBuilder.build(
             from: tracks,
             mode: .date
         )
-        
-        // бейджи считаем здесь же, напрямую
-        let idsInView = trackSections
-            .flatMap { $0.tracks }
-            .map { $0.id }
-        
-        trackListNamesById = badgeProvider.badges(for: idsInView)
+
+        let ids = trackSections.flatMap { $0.tracks }.map { $0.id }
+        trackListNamesById = badgeProvider.badges(for: ids)
     }
-    
-    // MARK: - TrackList Badges
-    
-    /// Бейджи треклистов рассчитываются при входе в папку (refresh).
-    /// Realtime-обновление будет подключено через индекс trackId → trackListId.
-    func loadTrackListNamesByURL() {
-        
-        let idsInView = trackSections
-            .flatMap { $0.tracks }
-            .map { $0.id }
-        
-        trackListNamesById = badgeProvider.badges(for: idsInView)
-    }
-    
-    // MARK: - Metadata
-    
-    // Реализация метода чтения (контракт)
+
+    // MARK: - TrackMetadataProviding
+
     func metadata(for trackId: UUID)
-    -> TrackMetadataCacheManager.CachedMetadata?
-    {
+    -> TrackMetadataCacheManager.CachedMetadata? {
         metadataByTrackId[trackId]
     }
-    
-    // Реализация запроса загрузки (контракт)
-    func requestMetadataIfNeeded(for trackId: UUID) {
 
-        // уже загружено — выходим
+    func requestMetadataIfNeeded(for trackId: UUID) {
         if metadataByTrackId[trackId] != nil { return }
 
         Task {
             guard
                 let url = await BookmarkResolver.url(forTrack: trackId),
-                let meta = await TrackMetadataCacheManager.shared
-                    .loadMetadata(for: url)
+                let meta = await TrackMetadataCacheManager.shared.loadMetadata(for: url)
             else { return }
 
             await MainActor.run {
                 metadataByTrackId[trackId] = meta
             }
         }
+    }
+
+    // MARK: - Track move handling
+
+    private func handleTrackDidMove(_ notification: Notification) {
+        guard let trackId = notification.object as? UUID else { return }
+
+        Task { @MainActor in
+            guard let entry = await TrackRegistry.shared.entry(for: trackId) else { return }
+
+            if entry.folderId != folderId {
+                removeTrackFromSections(trackId: trackId)
+            }
+        }
+    }
+
+    private func removeTrackFromSections(trackId: UUID) {
+        trackSections = trackSections
+            .map { section in
+                let filtered = section.tracks.filter { $0.id != trackId }
+                return TrackSection(
+                    id: section.id,
+                    title: section.title,
+                    tracks: filtered
+                )
+            }
+            .filter { !$0.tracks.isEmpty }
+
+        metadataByTrackId.removeValue(forKey: trackId)
+        trackListNamesById.removeValue(forKey: trackId)
     }
 }
