@@ -84,8 +84,7 @@ private extension MoveToFolderSheet {
             )
 
             // После выполнения команды закрываем sheet
-            await MainActor.run {
-                dismiss()
+            await MainActor.run {SheetManager.shared.closeActive()
             }
 
         } catch {

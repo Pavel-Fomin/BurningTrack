@@ -125,6 +125,10 @@ final class SheetManager: ObservableObject {
 
     /// ID трека для выделения в списках
     @Published var highlightedTrackID: UUID?
+    
+    /// Счётчик закрытий sheet’ов.
+    /// Используется как единая точка UX-commit после dismiss.
+    @Published private(set) var dismissCounter: Int = 0
 
     private init() {}
 
@@ -148,16 +152,18 @@ final class SheetManager: ObservableObject {
     // MARK: - ВЫЗЫВАЕТСЯ ИЗ ContentView.onDismiss
   
     func handleDismiss() {
-        DispatchQueue.main.async {
-            if let next = self.pendingSheet {
-                self.pendingSheet = nil
-                self.activeSheet = next
-            } else {
-                self.highlightedTrackID = nil
-            }
+        // Фиксируем факт закрытия sheet — UX-commit
+        dismissCounter += 1
+
+        if let next = pendingSheet {
+            pendingSheet = nil
+            activeSheet = next
+        } else {
+            highlightedTrackID = nil
         }
     }
-
+    
+    
     // MARK: - Хелперы для вызова конкретных шитов
 
     func presentTrackActions(track: any TrackDisplayable, context: TrackContext) {

@@ -31,10 +31,6 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
     private let tracksProvider: LibraryTracksProvider
     private let badgeProvider: TrackListBadgeProvider
 
-    // MARK: - Observer
-
-    private var trackDidMoveObserver: NSObjectProtocol?
-
     // MARK: - Init
 
     init(
@@ -45,24 +41,6 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         self.folderId = folderId
         self.tracksProvider = tracksProvider
         self.badgeProvider = badgeProvider
-
-        trackDidMoveObserver = NotificationCenter.default.addObserver(
-            forName: .trackDidMove,
-            object: nil,
-            queue: nil
-        ) { [weak self] notification in
-            guard let self else { return }
-
-            Task { @MainActor in
-                self.handleTrackDidMove(notification)
-            }
-        }
-    }
-
-    deinit {
-        if let observer = trackDidMoveObserver {
-            NotificationCenter.default.removeObserver(observer)
-        }
     }
 
     // MARK: - Load
@@ -75,6 +53,8 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
 
     // MARK: - Refresh
 
+    /// Явное обновление данных.
+    /// Вызывается строго из UX-слоя.
     func refresh() async {
         isLoading = true
         defer { isLoading = false }
@@ -110,35 +90,5 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
                 metadataByTrackId[trackId] = meta
             }
         }
-    }
-
-    // MARK: - Track move handling
-
-    private func handleTrackDidMove(_ notification: Notification) {
-        guard let trackId = notification.object as? UUID else { return }
-
-        Task { @MainActor in
-            guard let entry = await TrackRegistry.shared.entry(for: trackId) else { return }
-
-            if entry.folderId != folderId {
-                removeTrackFromSections(trackId: trackId)
-            }
-        }
-    }
-
-    private func removeTrackFromSections(trackId: UUID) {
-        trackSections = trackSections
-            .map { section in
-                let filtered = section.tracks.filter { $0.id != trackId }
-                return TrackSection(
-                    id: section.id,
-                    title: section.title,
-                    tracks: filtered
-                )
-            }
-            .filter { !$0.tracks.isEmpty }
-
-        metadataByTrackId.removeValue(forKey: trackId)
-        trackListNamesById.removeValue(forKey: trackId)
     }
 }

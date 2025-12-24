@@ -96,6 +96,12 @@ struct LibraryTracksView: View {
         .task {
             await tracksViewModel.loadTracksIfNeeded()
         }
+
+        .onChange(of: sheetManager.dismissCounter) { _, _ in
+            Task {
+                await tracksViewModel.refresh()
+            }
+        }
     }
 
     // MARK: - Вспомогательное

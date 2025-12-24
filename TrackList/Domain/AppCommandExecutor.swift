@@ -50,7 +50,6 @@ actor AppCommandExecutor {
             toFolder: folderId,
             using: playerManager
         )
-        NotificationCenter.default.post(name: .trackDidMove,object: trackId)
     }
     
     // Переименовывает файл трека

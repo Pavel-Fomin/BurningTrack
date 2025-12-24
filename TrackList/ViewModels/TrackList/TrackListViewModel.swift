@@ -26,8 +26,6 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
     @Published var currentListId: UUID?
     @Published var toastData: ToastData? = nil
     @Published private(set) var metadataByTrackId: [UUID: TrackMetadataCacheManager.CachedMetadata] = [:]
-    
-    private var renameObserver: NSObjectProtocol?
 
     // MARK: - Init
     
@@ -35,23 +33,6 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
         self.currentListId = trackList.id
         self.name = trackList.name
         self.tracks = trackList.tracks
-
-        renameObserver = NotificationCenter.default.addObserver(
-            forName: .trackListDidRename,
-            object: nil,
-            queue: nil
-        ) { [weak self] notification in
-            guard let self else { return }
-
-            Task { @MainActor in
-                guard
-                    let renamedId = notification.object as? UUID,
-                    renamedId == self.currentListId
-                else { return }
-
-                self.refreshMeta()
-            }
-        }
     }
     
     // Заглушка. Мы ушли от активного треклиста.
@@ -216,12 +197,6 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
 
         DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
             withAnimation { self.toastData = nil }
-        }
-    }
-    
-    deinit {
-        if let renameObserver {
-            NotificationCenter.default.removeObserver(renameObserver)
         }
     }
 }

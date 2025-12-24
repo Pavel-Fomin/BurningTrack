@@ -14,6 +14,7 @@ struct TrackListScreen: View {
     let trackList: TrackList
     @ObservedObject var playerViewModel: PlayerViewModel
     @StateObject private var viewModel: TrackListViewModel
+    @EnvironmentObject var sheetManager: SheetManager
     
     init(trackList: TrackList, playerViewModel: PlayerViewModel) {
         self.trackList = trackList
@@ -40,6 +41,9 @@ struct TrackListScreen: View {
                     )
                 }
             )
+        }
+        .onChange(of: sheetManager.dismissCounter) { _, _ in
+            viewModel.refreshMeta()
         }
     }
     
