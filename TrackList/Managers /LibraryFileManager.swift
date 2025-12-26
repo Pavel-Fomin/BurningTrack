@@ -88,9 +88,17 @@ actor LibraryFileManager {
             throw LibraryFileError.sourceURLUnavailable
         }
 
-        // 4. Получаем URL целевой папки
-        guard let destinationFolderURL = await BookmarkResolver.url(forFolder: destinationFolderId) else {
-            print("❌ Не удалось восстановить URL целевой папки для id \(destinationFolderId)")
+        // 4. Получаем URL целевой папки через структуру фонотеки
+        guard let destinationFolder = await MusicLibraryManager.shared.folder(for: destinationFolderId) else {
+            print("❌ MusicLibraryManager: папка \(destinationFolderId) не найдена в дереве фонотеки")
+            throw LibraryFileError.destinationFolderUnavailable
+        }
+
+        let destinationFolderURL = destinationFolder.url
+
+        // 4.1 Открываем доступ через bookmark корневой папки трека
+        guard let _ = await BookmarkResolver.url(forFolder: entry.rootFolderId) else {
+            print("❌ Не удалось восстановить URL корневой папки для id \(entry.rootFolderId)")
             throw LibraryFileError.destinationFolderUnavailable
         }
 
