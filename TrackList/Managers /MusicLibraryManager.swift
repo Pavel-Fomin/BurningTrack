@@ -3,12 +3,12 @@
 //  TrackList
 //
 //  Управляет доступом к прикреплённым папкам фонотеки, использует:
-//  - LibraryScanner для обхода файловой системы
+//  - LibraryScanner для обхода файловой системы (только для построения UI-дерева)
 //  - TrackRegistry для хранения метаданных
 //  - BookmarksRegistry для хранения bookmark'ов.
+//  — Синхронизация файлов фонотеки с реестрами выполняется ТОЛЬКО через LibrarySyncModule.
 //
 //  Created by Pavel Fomin on 22.06.2025.
-//  Переписано под новую архитектуру в 2025.
 //
 
 import Foundation
@@ -20,36 +20,35 @@ import UIKit
 
 @MainActor
 final class MusicLibraryManager: ObservableObject {
-    
+
     static let shared = MusicLibraryManager()
-    
+
     // MARK: - Published состояния
-    
+
     /// Флаг, что восстановление доступа к папкам завершено
     @Published private(set) var isAccessRestored = false
-    
+
     /// Прикреплённые корневые папки (дерево подпапок и файлов для UI)
     @Published var attachedFolders: [LibraryFolder] = []
-    
-  
+
     /// Флаг, что начальная загрузка списка папок завершена
     @Published var isInitialFoldersLoadFinished: Bool = false
-    
+
     // MARK: - Приватные зависимости
-    
+
     private let scanner = LibraryScanner()
-    
+
     // MARK: - Инициализация
-    
+
     init() {
         // Восстанавливаем доступ к папкам и структуру фонотеки
         Task.detached(priority: .background) { [weak self] in
             await self?.restoreAccessAsync()
         }
     }
-    
+
     // MARK: - Лёгкая модель папки (плоская, без рекурсии)
-    
+
     func liteFolder(from url: URL) -> LibraryFolder {
         LibraryFolder(
             name: url.lastPathComponent,
@@ -58,8 +57,8 @@ final class MusicLibraryManager: ObservableObject {
             audioFiles: []
         )
     }
-    
-    // MARK: - Добавление папки: сохраняем bookmark, сканируем, регистрируем
+
+    // MARK: - Добавление папки: сохраняем bookmark, регистрируем, синхронизируем
 
     func saveBookmark(for url: URL) {
         Task {
@@ -70,15 +69,12 @@ final class MusicLibraryManager: ObservableObject {
                 return
             }
 
-            // Гарантированно закрываем доступ после индексации
+            // Гарантированно закрываем доступ после завершения операции
             defer {
                 url.stopAccessingSecurityScopedResource()
             }
 
             // 1. Создание bookmark для корневой папки
-            /// - откроет временный доступ (на случай вложенных файлов)
-            /// - создаст правильный security bookmark даже на iOS 26
-
             guard let bookmarkBase64 = BookmarkResolver.makeBookmarkBase64(for: url) else {
                 print("❌ saveBookmark: не удалось создать bookmark для папки")
                 return
@@ -92,60 +88,29 @@ final class MusicLibraryManager: ObservableObject {
                 base64: bookmarkBase64
             )
 
-            // 2. Полное рекурсивное сканирование папки
-            /// - startAccessingSecurityScopedResource() открыт
-            /// - FileManager имеет доступ
-            /// buildFolderTree → scanner.scanFolder → видит реальные файлы
+            // 2. Строим дерево папки для UI (сканер используется только для UI-модели)
             let rootTree = await buildFolderTree(from: url)
 
-            // 3. Регистрируем саму папку
-            // TrackRegistry хранит только метаданные, без bookmarkData.
+            // 3. Регистрируем саму папку (только метаданные)
             await TrackRegistry.shared.upsertFolder(
                 id: rootFolderId,
                 name: rootFolderName
             )
 
-            // 4. Индексация ВСЕХ файлов во всех подпапках
-            /// collectFileURLs собирает ВСЕ пути файлов.
-            /// Важно: bookmark каждого файла тоже создаётся через BookmarkResolver.makeBookmarkBase64, который корректно открывает временный доступ
-            let allFileURLs = collectFileURLs(from: rootTree)
+            // 4. Синхронизируем реестры по фактическому состоянию ФС (ТОЛЬКО через sync-модуль)
+            await LibrarySyncModule.shared.syncRootFolder(
+                rootFolderId: rootFolderId,
+                rootURL: url
+            )
 
-            for fileURL in allFileURLs {
-                let trackId = UUID.v5(from: fileURL.path)
-                let folderId = fileURL.deletingLastPathComponent().libraryFolderId
-
-                await TrackRegistry.shared.upsertTrack(
-                    id: trackId,
-                    fileName: fileURL.lastPathComponent,
-                    folderId: folderId,
-                    rootFolderId: rootFolderId
-                )
-
-                // Bookmark для файла
-                if let fileBookmarkBase64 = BookmarkResolver.makeBookmarkBase64(for: fileURL) {
-                    await BookmarksRegistry.shared.upsertTrackBookmark(
-                        id: trackId,
-                        base64: fileBookmarkBase64
-                    )
-                } else {
-                    print("⚠️ saveBookmark: не удалось создать bookmark файла:", fileURL.path)
-                }
-            }
-
-            // 5. Сохраняем реестры
-            /// Один persist в конце — минимальная нагрузка на диск
-            await TrackRegistry.shared.persist()
-            await BookmarksRegistry.shared.persist()
-
-            // 6. Обновляем UI
-            /// Вставляем новую прикреплённую папку в начало списка
+            // 5. Обновляем UI
             await MainActor.run {
                 if attachedFolders.contains(where: { $0.url == url }) == false {
                     attachedFolders.insert(rootTree, at: 0)
                 }
             }
 
-            print("📁 Папка добавлена и проиндексирована:", rootFolderName)
+            print("📁 Папка добавлена и синхронизирована:", rootFolderName)
         }
     }
 
@@ -181,9 +146,9 @@ final class MusicLibraryManager: ObservableObject {
             print("📁 Папка откреплена:", url.lastPathComponent)
         }
     }
-    
+
     // MARK: - Поиск папки по ID (через дерево attachedFolders)
-    
+
     func folder(for folderId: UUID) -> LibraryFolder? {
         func search(in folders: [LibraryFolder]) -> LibraryFolder? {
             for f in folders {
@@ -196,10 +161,10 @@ final class MusicLibraryManager: ObservableObject {
             }
             return nil
         }
-        
+
         return search(in: attachedFolders)
     }
-    
+
     // MARK: - Восстановление прикреплённых папок при запуске
 
     func restoreAccessAsync() async {
@@ -223,7 +188,6 @@ final class MusicLibraryManager: ObservableObject {
 
         // 3) Восстанавливаем только те папки, у которых есть bookmark
         for folder in foldersMeta {
-            // Получаем URL папки через централизованный Resolver
             guard let url = await BookmarkResolver.url(forFolder: folder.id) else {
                 print("⚠️ Не удалось восстановить URL папки:", folder.name)
                 continue
@@ -232,6 +196,12 @@ final class MusicLibraryManager: ObservableObject {
             // 4) Строим дерево папки для UI
             let tree = await buildFolderTree(from: url)
             restoredTrees.append(tree)
+
+            // 5) Синхронизируем реестры по фактическому состоянию ФС
+            await LibrarySyncModule.shared.syncRootFolder(
+                rootFolderId: folder.id,
+                rootURL: url
+            )
 
             print(
                 "🌳 BUILT TREE:", tree.name,
@@ -242,7 +212,7 @@ final class MusicLibraryManager: ObservableObject {
             print("✅ Доступ к папке восстановлен:", folder.name)
         }
 
-        // 5) Обновляем UI
+        // 6) Обновляем UI
         self.attachedFolders = restoredTrees
         self.isAccessRestored = true
         self.isInitialFoldersLoadFinished = true
@@ -250,42 +220,65 @@ final class MusicLibraryManager: ObservableObject {
         print("✅ Восстановление доступа завершено")
     }
     
-    // MARK: - Приватные помощники: дерево и коллекции URL
+    // MARK: - Sync фасад для ViewModel
+
+    /// Синхронизирует фонотеку для папки.
+    /// Работает корректно даже для пустых папок.
+    func syncFolderIfNeeded(folderId: UUID) async {
+
+        // 1. Определяем rootFolderId
+        // Если folderId — корневая папка, используем его напрямую.
+        // Иначе поднимаемся к корню через реестр треков (если есть).
+        let rootFolderId: UUID
+
+        if let folder = await TrackRegistry.shared.allFolders()
+            .first(where: { $0.id == folderId }) {
+            rootFolderId = folder.id
+        } else {
+            // Подпапка: ищем любой трек и берём его rootFolderId
+            let entries = await TrackRegistry.shared.tracks(inFolder: folderId)
+            guard let first = entries.first else {
+                // Пустая подпапка без треков — синк всё равно нужен,
+                // но rootFolderId восстановить нельзя без корня.
+                // В этом случае корректнее просто выйти.
+                return
+            }
+            rootFolderId = first.rootFolderId
+        }
+
+        // 2. Резолвим URL корневой папки
+        guard let rootURL = await BookmarkResolver.url(forFolder: rootFolderId) else {
+            print("⚠️ syncFolderIfNeeded: не удалось восстановить URL корневой папки")
+            return
+        }
+
+        // 3. Запускаем sync
+        await LibrarySyncModule.shared.syncRootFolder(
+            rootFolderId: rootFolderId,
+            rootURL: rootURL
+        )
+    }
     
+
+    // MARK: - Приватные помощники: дерево
+
     /// Рекурсивно строит дерево LibraryFolder из файловой системы через LibraryScanner.
+    /// Важно: используется только для UI и навигации по фонотеке.
     private func buildFolderTree(from folderURL: URL) async -> LibraryFolder {
         let scanned = await scanner.scanFolder(folderURL)
-        
+
         var subfoldersModels: [LibraryFolder] = []
-        
+
         for subURL in scanned.subfolders {
             let child = await buildFolderTree(from: subURL)
             subfoldersModels.append(child)
         }
-        
+
         return LibraryFolder(
             name: scanned.name,
             url: scanned.url.resolvingSymlinksInPath(),
             subfolders: subfoldersModels,
             audioFiles: scanned.audioFiles
         )
-    }
-    
-    /// Собирает все URL папок (корневая + все вложенные).
-    private func collectFolderURLs(from folder: LibraryFolder) -> [URL] {
-        var result: [URL] = [folder.url]
-        for sub in folder.subfolders {
-            result.append(contentsOf: collectFolderURLs(from: sub))
-        }
-        return result
-    }
-    
-    /// Собирает все URL файлов из дерева папок.
-    private func collectFileURLs(from folder: LibraryFolder) -> [URL] {
-        var result: [URL] = folder.audioFiles
-        for sub in folder.subfolders {
-            result.append(contentsOf: collectFileURLs(from: sub))
-        }
-        return result
     }
 }

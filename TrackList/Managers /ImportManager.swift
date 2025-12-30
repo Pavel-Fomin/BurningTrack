@@ -14,7 +14,9 @@ import Foundation
 import AVFoundation
 
 final class ImportManager {
+
     func importTracks(from urls: [URL], to folderId: UUID) async -> [UUID] {
+
         var result: [UUID] = []
 
         for url in urls {
@@ -22,10 +24,10 @@ final class ImportManager {
             // 1. Метаданные (опционально)
             let metadata = try? await MetadataParser.parseMetadata(from: url)
 
-            // 2. Стабильный trackId
-            let trackId = UUID.v5(from: url.path)
+            // 2. Постоянный trackId через слой идентичности
+            let trackId = await TrackIdentityResolver.shared.trackId(for: url)
 
-            // 3. Bookmark сохраняем в BookmarksRegistry через общий Resolver
+            // 3. Bookmark сохраняем в BookmarksRegistry
             if let bookmarkBase64 = BookmarkResolver.makeBookmarkBase64(for: url) {
                 await BookmarksRegistry.shared.upsertTrackBookmark(
                     id: trackId,

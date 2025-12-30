@@ -49,6 +49,12 @@ final class LibraryScanner: LibraryScannerProtocol {
     private let allowedExtensions = ["mp3", "flac", "wav", "aiff", "aac", "m4a", "ogg"]
     private let fm = FileManager.default
     
+    // MARK: - Канонизация URL
+
+    private func canonicalURL(_ url: URL) -> URL {
+        url.standardizedFileURL.resolvingSymlinksInPath()
+    }
+    
     // MARK: - Сканирование одной папки (без рекурсии)
     
     func scanFolder(_ url: URL) async -> ScannedFolder {
@@ -76,12 +82,12 @@ final class LibraryScanner: LibraryScannerProtocol {
             }
         }
 
-        let resolved = url.resolvingSymlinksInPath()
+        let resolved = canonicalURL(url)
         return ScannedFolder(
             url: resolved,
             name: resolved.lastPathComponent,
-            subfolders: subfolders.map { $0.resolvingSymlinksInPath() },
-            audioFiles: audioFiles.map { $0.resolvingSymlinksInPath() }
+            subfolders: subfolders.map { canonicalURL($0) },
+            audioFiles: audioFiles.map { canonicalURL($0) }
         )
     }
     
@@ -109,9 +115,9 @@ final class LibraryScanner: LibraryScannerProtocol {
                     if allowedExtensions.contains(ext) {
                         result.append(
                             ScannedAudioFile(
-                                url: item.resolvingSymlinksInPath(),
+                                url: canonicalURL(item),
                                 fileName: item.lastPathComponent,
-                                folderURL: current.resolvingSymlinksInPath()
+                                folderURL: canonicalURL(current)
                             )
                         )
                     }

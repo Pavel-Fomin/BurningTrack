@@ -46,8 +46,13 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
     // MARK: - Load
 
     func loadTracksIfNeeded() async {
-        guard !didLoad else { return }
-        didLoad = true
+        if !didLoad {
+            didLoad = true
+        }
+
+        // Sync и refresh должны происходить всегда при входе в папку,
+        // так как состояние фонотеки могло измениться извне
+        await MusicLibraryManager.shared.syncFolderIfNeeded(folderId: folderId)
         await refresh()
     }
 
@@ -59,6 +64,10 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         isLoading = true
         defer { isLoading = false }
 
+        // 1. Гарантируем актуальность реестров перед чтением
+        await MusicLibraryManager.shared.syncFolderIfNeeded(folderId: folderId)
+
+        // 2. Загружаем треки из реестра
         let tracks = await tracksProvider.tracks(inFolder: folderId)
 
         trackSections = TrackSectionBuilder.build(
@@ -69,6 +78,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         let ids = trackSections.flatMap { $0.tracks }.map { $0.id }
         trackListNamesById = badgeProvider.badges(for: ids)
     }
+    
 
     // MARK: - TrackMetadataProviding
 
