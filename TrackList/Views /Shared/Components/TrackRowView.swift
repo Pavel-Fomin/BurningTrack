@@ -12,6 +12,9 @@ import UIKit
 import Foundation
 
 struct TrackRowView: View {
+
+    // MARK: - Входные параметры
+
     let track: any TrackDisplayable
     let isCurrent: Bool
     let isPlaying: Bool
@@ -20,33 +23,54 @@ struct TrackRowView: View {
     let title: String?
     let artist: String?
     let duration: Double?
-    let onTap: () -> Void
-    
+
+    /// Тап по правой части строки (воспроизведение / пауза)
+    let onRowTap: () -> Void
+
+    /// Тап по обложке (например, открытие экрана "О треке")
+    let onArtworkTap: (() -> Void)?
+
     var trackListNames: [String]? = nil
     var useNativeSwipeActions: Bool = false
-    
+
+    // MARK: - UI
+
     var body: some View {
         HStack(spacing: 12) {
+
+            // Левая зона — обложка
             artworkView
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    guard track.isAvailable else {
+                        print("❌ Трек недоступен: \(track.title ?? track.fileName)")
+                        return
+                    }
+
+                    // Если обработчик не передан — ничего не делаем
+                    onArtworkTap?()
+                }
+
+            // Правая зона — информация о треке
             trackInfoView
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    guard track.isAvailable else {
+                        print("❌ Трек недоступен: \(track.title ?? track.fileName)")
+                        return
+                    }
+
+                    onRowTap()
+                }
         }
         .padding(.vertical, 0)
         .padding(.horizontal, 4)
         .opacity(track.isAvailable ? 1 : 0.4)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            if track.isAvailable {
-                onTap()
-            } else {
-                print("❌ Трек недоступен: \(track.title ?? track.fileName)")
-            }
-        }
         .listRowBackground(rowHighlightColor)
     }
-    
-    
+
     // MARK: - Обложка
-    
+
     private var artworkView: some View {
         ZStack {
             if let artwork {
@@ -58,11 +82,12 @@ struct TrackRowView: View {
                     rpm: 10
                 )
                 .frame(width: 48, height: 48)
-                
+
             } else {
                 Circle()
                     .fill(Color.gray.opacity(0.3))
                     .frame(width: 48, height: 48)
+
                 if isCurrent {
                     Image(systemName: isPlaying ? "pause.fill" : "play.fill")
                         .foregroundColor(.accentColor)
@@ -72,16 +97,15 @@ struct TrackRowView: View {
             }
         }
     }
-    
-    
-    // MARK: - Информациия о треке
-    
+
+    // MARK: - Информация о треке
+
     private var trackInfoView: some View {
         let hasArtist: Bool = {
             guard let artist = artist?.trimmingCharacters(in: .whitespaces).lowercased() else { return false }
             return !artist.isEmpty && artist != "неизвестен"
         }()
-        
+
         return VStack(alignment: .leading, spacing: hasArtist ? 2 : 0) {
             if hasArtist, let artistText = artist {
                 Text(artistText)
@@ -89,21 +113,20 @@ struct TrackRowView: View {
                     .foregroundColor(.primary)
                     .lineLimit(1)
             }
-            
+
             HStack {
                 Text(title ?? track.fileName)
                     .font(hasArtist ? .footnote : .subheadline)
                     .foregroundColor(hasArtist ? .secondary : .primary)
                     .lineLimit(1)
-                
+
                 Spacer()
-                
+
                 Text(formatTimeSmart(duration ?? track.duration))
                     .font(.footnote)
                     .foregroundColor(.secondary)
-                
             }
-            
+
             if let trackListNames, !trackListNames.isEmpty {
                 Text("уже в: \(trackListNames.joined(separator: ", "))")
                     .font(.caption)
@@ -113,15 +136,16 @@ struct TrackRowView: View {
             }
         }
     }
-    
+
+    // MARK: - Подсветка строки
+
     private var rowHighlightColor: Color {
         if isHighlighted {
-            return Color.gray.opacity(0.12)      // Подсветка при открытом шите
+            return Color.gray.opacity(0.12)          // Подсветка при открытом шите
         } else if isCurrent {
-            return Color.accentColor.opacity(0.12) // Подсветка шита при активный трек
+            return Color.accentColor.opacity(0.12)   // Подсветка текущего трека
         } else {
             return Color.clear
         }
     }
 }
-

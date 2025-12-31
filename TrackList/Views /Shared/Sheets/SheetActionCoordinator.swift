@@ -63,10 +63,6 @@ final class SheetActionCoordinator {
 
             // Закрываем текущий sheet
             sheetManager.closeActive()
-
-        case .showInfo:
-            // Открываем sheet с информацией о треке
-            sheetManager.presentTrackDetail(track)
         }
     }
 }

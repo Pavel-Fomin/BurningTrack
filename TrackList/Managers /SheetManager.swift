@@ -18,11 +18,13 @@ struct TrackActionsSheetData: Identifiable, Equatable {
     var actions: [TrackAction] {
         switch context {
         case .library:
-            return [.moveToFolder, .showInfo]
+            return [.moveToFolder]
+
         case .player:
-            return [.showInLibrary, .moveToFolder, .showInfo]
+            return [.showInLibrary, .moveToFolder]
+
         case .tracklist:
-            return [.showInLibrary, .moveToFolder, .showInfo]
+            return [.showInLibrary, .moveToFolder]
         }
     }
 

@@ -28,8 +28,13 @@ struct TrackListRowView: View {
             title: track.title ?? track.fileName,
             artist: track.artist ?? "",
             duration: track.duration,
-            
-            onTap: onTap
+
+            // Правая зона — воспроизведение / пауза
+            onRowTap: onTap,
+
+            // Левая зона — экран "О треке"
+            onArtworkTap: { sheetManager.present(.trackDetail(track))
+            }
         )
         
         .task(id: track.id) {

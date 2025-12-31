@@ -20,5 +20,4 @@ enum TrackContext {
 enum TrackAction: Hashable {
     case showInLibrary     // Переход к треку в фонотеке
     case moveToFolder      // Переместить в другую папку
-    case showInfo          // Показать информацию о треке
 }

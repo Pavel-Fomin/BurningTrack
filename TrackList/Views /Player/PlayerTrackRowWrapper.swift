@@ -33,7 +33,13 @@ struct PlayerTrackRowWrapper: View {
             title: metadata?.title ?? track.title ?? track.fileName,
             artist: metadata?.artist ?? track.artist ?? "",
             duration: metadata?.duration ?? track.duration,
-            onTap: onTap
+
+            // Правая зона — как и раньше
+            onRowTap: onTap,
+
+            // Левая зона — экран "О треке"
+            onArtworkTap: { sheetManager.present(.trackDetail(track))
+            }
         )
         .task(id: track.id) {
             artwork = await ArtworkLoader.loadIfNeeded(

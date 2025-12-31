@@ -2,7 +2,7 @@
 //  TrackActionSheet.swift
 //  TrackList
 //
-//  Действия над треком: Показать в фонотеке, Переместить, О треке
+//  Действия над треком: Показать в фонотеке, Переместить
 //
 //  Sheet является UI-компонентом и не содержит логики.
 //  При выборе действия инициирует UI-координацию через SheetActionCoordinator.
@@ -25,8 +25,6 @@ struct TrackActionSheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
-
-            // Используем enumerated, чтобы не требовать Hashable
             ForEach(Array(actions.enumerated()), id: \.offset) { _, action in
                 Button {
                     SheetActionCoordinator.shared.handle(
@@ -50,10 +48,9 @@ struct TrackActionSheet: View {
                 }
             }
         }
-        .padding(.vertical, 0)
     }
 
-    // MARK: - Локальные helpers
+    // MARK: - Helpers
 
     private func title(for action: TrackAction) -> String {
         switch action {
@@ -61,8 +58,6 @@ struct TrackActionSheet: View {
             return "Показать в фонотеке"
         case .moveToFolder:
             return "Переместить"
-        case .showInfo:
-            return "О треке"
         }
     }
 
@@ -72,8 +67,6 @@ struct TrackActionSheet: View {
             return Image(systemName: "folder")
         case .moveToFolder:
             return Image(systemName: "arrow.right.doc.on.clipboard")
-        case .showInfo:
-            return Image(systemName: "info.circle")
         }
     }
 }

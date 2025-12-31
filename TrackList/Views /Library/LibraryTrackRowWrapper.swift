@@ -70,12 +70,20 @@ struct LibraryTrackRowWrapper: View {
             artist: metadata?.artist ?? track.artist ?? "",
             duration: metadata?.duration ?? track.duration,
 
-            onTap: {
+            // Правая зона — воспроизведение / пауза
+            onRowTap: {
                 if isCurrent {
                     playerViewModel.togglePlayPause()
                 } else {
                     playerViewModel.play(track: track, context: allTracks)
                 }
+            },
+
+            // Левая зона — экран "О треке"
+            onArtworkTap: {
+                sheetManager.present(
+                    .trackDetail(track)
+                )
             },
 
             trackListNames: trackListNames
