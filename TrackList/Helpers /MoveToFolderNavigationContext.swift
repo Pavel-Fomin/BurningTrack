@@ -76,21 +76,29 @@ final class MoveToFolderNavigationContext: ObservableObject {
 
     // MARK: - Инициализация навигации по текущему треку
 
-    /// Устанавливает навигационный путь так, чтобы текущей папкой
-    /// стала папка, в которой лежит трек.
+    /// Устанавливает навигационный путь так, чтобы пользователь
+    /// видел расположение папки трека, не смешивая навигацию и destination.
     func initializeNavigation(to folderId: UUID?) {
         guard let folderId else { return }
-
         guard let path = findPath(to: folderId) else { return }
 
         // path: [root, ..., target]
-        // stack должен содержать путь БЕЗ последнего элемента
-        stack = path.dropLast()
-        currentFolderId = path.last
+        // target — папка, в которой лежит трек
+        // Если target — leaf (без подпапок), навигационно
+        // остаёмся на родителе, а не "входим" в неё
+        if path.count >= 2 {
+            let parentId = path[path.count - 2]
+            stack = Array(path.dropLast(2))
+            currentFolderId = parentId
+        } else {
+            // Корневая папка без подпапок — навигации нет
+            stack = []
+            currentFolderId = nil
+        }
 
         objectWillChange.send()
     }
-
+    
     // MARK: - Навигация
 
     func enter(_ folderId: UUID) {

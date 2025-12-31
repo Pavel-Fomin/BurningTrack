@@ -69,7 +69,7 @@ actor LibraryFileManager {
         toFolder destinationFolderId: UUID,
         using playerManager: PlayerManager
     ) async throws {
-        
+
         // 1. Проверяем, не занят ли трек плеером
         if playerManager.isBusy(trackId) {
             print("🚫 Нельзя переместить трек \(trackId) — он сейчас воспроизводится.")
@@ -88,20 +88,13 @@ actor LibraryFileManager {
             throw LibraryFileError.sourceURLUnavailable
         }
 
-        // 4. Получаем URL целевой папки через структуру фонотеки
+        // 4. Получаем модель целевой папки из структуры фонотеки
         guard let destinationFolder = await MusicLibraryManager.shared.folder(for: destinationFolderId) else {
             print("❌ MusicLibraryManager: папка \(destinationFolderId) не найдена в дереве фонотеки")
             throw LibraryFileError.destinationFolderUnavailable
         }
 
         let destinationFolderURL = destinationFolder.url
-
-        // 4.1 Открываем доступ через bookmark корневой папки трека
-        guard let _ = await BookmarkResolver.url(forFolder: entry.rootFolderId) else {
-            print("❌ Не удалось восстановить URL корневой папки для id \(entry.rootFolderId)")
-            throw LibraryFileError.destinationFolderUnavailable
-        }
-
         let fileName = entry.fileName
         let destinationURL = destinationFolderURL.appendingPathComponent(fileName)
 
@@ -117,12 +110,22 @@ actor LibraryFileManager {
             throw LibraryFileError.destinationAlreadyExists
         }
 
-        // 6. Открываем security-scoped доступ к файлам и папкам
+        // 6. Открываем security-scoped доступ
+        // ВАЖНО:
+        // - доступ к подпапкам НЕ требует отдельных bookmark'ов
+        // - достаточно открыть доступ к исходному файлу и КОРНЕВОЙ папке
         let sourceStarted = sourceURL.startAccessingSecurityScopedResource()
-        let destStarted = destinationFolderURL.startAccessingSecurityScopedResource()
+
+        guard let rootFolderURL = await BookmarkResolver.url(forFolder: entry.rootFolderId) else {
+            print("❌ Не удалось восстановить URL корневой папки для id \(entry.rootFolderId)")
+            throw LibraryFileError.destinationFolderUnavailable
+        }
+
+        let rootStarted = rootFolderURL.startAccessingSecurityScopedResource()
+
         defer {
             if sourceStarted { sourceURL.stopAccessingSecurityScopedResource() }
-            if destStarted { destinationFolderURL.stopAccessingSecurityScopedResource() }
+            if rootStarted { rootFolderURL.stopAccessingSecurityScopedResource() }
         }
 
         // 7. Перемещаем файл
@@ -137,15 +140,15 @@ actor LibraryFileManager {
         // 8. Создаём новый bookmark для обновлённого пути
         guard let newBookmarkBase64 = BookmarkResolver.makeBookmarkBase64(for: destinationURL) else {
             print("❌ Не удалось создать bookmark для файла:", destinationURL.path)
-            return
+            throw LibraryFileError.bookmarkCreationFailed
         }
 
         await BookmarksRegistry.shared.upsertTrackBookmark(
             id: trackId,
             base64: newBookmarkBase64
         )
-        
-        // 9. Обновляем BookmarksRegistry и TrackRegistry
+
+        // 9. Обновляем метаданные трека в реестре
         await TrackRegistry.shared.upsertTrack(
             id: trackId,
             fileName: fileName,

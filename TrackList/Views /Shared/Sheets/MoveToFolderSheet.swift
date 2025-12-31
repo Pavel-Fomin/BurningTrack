@@ -21,21 +21,57 @@ struct MoveToFolderSheet: View {
     // MARK: - Состояние
 
     @Environment(\.dismiss) private var dismiss
-
     @StateObject private var nav = MoveToFolderNavigationContext(library: MusicLibraryManager.shared)
+    @State private var trackCurrentFolderId: UUID? /// Текущая папка трека (для бейджа "Текущая")
+    @State private var selectedFolderId: UUID?     /// Выбранная папка назначения (radio button)
+    
+    // MARK: - Строки папок для отображения в списке
+    
+    /// - текущая папка трека показывается виртуально ТОЛЬКО на корневом уровне
+    /// - внутри дерева отображается только естественным образом
+    private var orderedRows: [MoveToFolderNavigationContext.FolderRow] {
 
-    /// Текущая папка трека (для бейджа "Текущая")
-    @State private var trackCurrentFolderId: UUID?
+        let rows = nav.rows
 
-    /// Выбранная папка назначения (radio button)
-    @State private var selectedFolderId: UUID?
+        // Пока текущая папка ещё не загружена — показываем список как есть
+        guard let currentId = trackCurrentFolderId else {
+            return rows
+        }
+
+        // Если текущая папка уже есть в списке — просто поднимаем её наверх
+        if rows.contains(where: { $0.id == currentId }) {
+            return rows.sorted { lhs, rhs in
+                if lhs.id == currentId { return true }
+                if rhs.id == currentId { return false }
+                return false
+            }
+        }
+
+        // Виртуально добавляем текущую папку ТОЛЬКО на корневом уровне
+        guard nav.currentFolderId == nil else {
+            return rows
+        }
+
+        // Добавляем текущую папку сверху
+        guard let currentFolder = MusicLibraryManager.shared.folder(for: currentId) else {
+            return rows
+        }
+
+        let currentRow = MoveToFolderNavigationContext.FolderRow(
+            id: currentId,
+            name: currentFolder.name,
+            hasSubfolders: currentFolder.subfolders.isEmpty == false
+        )
+
+        return [currentRow] + rows
+    }
 
     // MARK: - UI
 
     var body: some View {
         VStack(spacing: 0) {
 
-            List(nav.rows) { row in
+            List(orderedRows) { row in
                 HStack(spacing: 12) {
 
                     // Левая зона — навигация (переход в подпапку)
@@ -51,7 +87,8 @@ struct MoveToFolderSheet: View {
                     .buttonStyle(.plain)
 
                     // Правая зона — выбор папки назначения (radio)
-                    if row.id != trackCurrentFolderId {
+                    // Показывается ТОЛЬКО для папок без подпапок и не для текущей папки
+                    if row.id != trackCurrentFolderId && row.hasSubfolders == false {
                         Button {
                             selectedFolderId = (selectedFolderId == row.id) ? nil : row.id
                         } label: {
