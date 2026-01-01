@@ -21,3 +21,23 @@ enum TrackAction: Hashable {
     case showInLibrary     // Переход к треку в фонотеке
     case moveToFolder      // Переместить в другую папку
 }
+
+// MARK: - Правила доступности глобальных действий
+
+extension TrackAction {
+
+    /// Возвращает список глобальных действий,
+    /// доступных для заданного контекста.
+    static func available(for context: TrackContext) -> [TrackAction] {
+        switch context {
+        case .library:
+            return [.moveToFolder]
+
+        case .player:
+            return [.showInLibrary, .moveToFolder]
+
+        case .tracklist:
+            return [.showInLibrary, .moveToFolder]
+        }
+    }
+}

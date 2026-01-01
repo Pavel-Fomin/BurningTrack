@@ -110,58 +110,59 @@ struct LibraryTrackRowWrapper: View {
 
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
 
-            // В ПЛЕЕР
-            Button {
-                Task {
-                    guard let resolved = await BookmarkResolver.url(forTrack: track.id) else { return }
+                    // Добавить в плеер
+                    Button {
+                        Task {
+                            guard let resolved = await BookmarkResolver.url(forTrack: track.id) else { return }
 
-                    let playerTrack = PlayerTrack(
-                        id: track.id,
-                        title: track.title,
-                        artist: track.artist,
-                        duration: track.duration,
-                        fileName: resolved.lastPathComponent,
-                        isAvailable: true
-                    )
+                            let playerTrack = PlayerTrack(
+                                id: track.id,
+                                title: track.title,
+                                artist: track.artist,
+                                duration: track.duration,
+                                fileName: resolved.lastPathComponent,
+                                isAvailable: true
+                            )
 
-                    PlaylistManager.shared.tracks.append(playerTrack)
-                    PlaylistManager.shared.saveToDisk()
+                            PlaylistManager.shared.tracks.append(playerTrack)
+                            PlaylistManager.shared.saveToDisk()
 
-                    toast.show(
-                        ToastData(
-                            style: .track(
-                                title: track.title ?? track.fileName,
-                                artist: track.artist ?? ""
-                            ),
-                            artwork: track.artwork
+                            toast.show(
+                                ToastData(
+                                    style: .track(
+                                        title: track.title ?? track.fileName,
+                                        artist: track.artist ?? ""
+                                    ),
+                                    artwork: track.artwork
+                                )
+                            )
+                        }
+
+                    } label: { Label("В плеер", systemImage: "waveform")
+                    }
+                    .tint(.blue)
+
+                    // Добавить в треклист
+                    Button {
+                        sheetManager.present(
+                            .addToTrackList(
+                                AddToTrackListSheetData(track: track)
+                            )
                         )
-                    )
-                }
-            
-            } label: {
-                Label("В плеер", systemImage: "waveform")
-            }
-            .tint(.blue)
+                    } label: { Label("В треклист", systemImage: "list.star")
+                    }
+                    .tint(.green)
 
-            // В ТРЕКЛИСТ
-            Button {
-                sheetManager.present(
-                    .addToTrackList(
-                        AddToTrackListSheetData(track: track))
-                )
-            } label: {
-                Label("В треклист", systemImage: "list.star")
+                    // Переместить
+                    Button {
+                        SheetActionCoordinator.shared.handle(
+                            action: .moveToFolder,
+                            track: track,
+                            context: .library
+                        )
+                    } label: { Label("Переместить", systemImage: "arrow.right.doc.on.clipboard")
+                    }
+                    .tint(.gray)
+                }
             }
-            .tint(.green)
-            
-            // ЕЩЁ
-            Button {
-                sheetManager.highlightedTrackID = track.id
-                sheetManager.presentTrackActions(track: track, context: .library)
-            } label: {
-                Label("Ещё", systemImage: "ellipsis")
-            }
-            .tint(.gray)
         }
-    }
-}

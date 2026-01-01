@@ -24,48 +24,70 @@ struct PlayerTrackRowWrapper: View {
     }
     
     var body: some View {
-        TrackRowView(
-            track: track,
-            isCurrent: isCurrent,
-            isPlaying: isPlaying,
-            isHighlighted: sheetManager.highlightedTrackID == track.id,
-            artwork: artwork,
-            title: metadata?.title ?? track.title ?? track.fileName,
-            artist: metadata?.artist ?? track.artist ?? "",
-            duration: metadata?.duration ?? track.duration,
+            TrackRowView(
+                track: track,
+                isCurrent: isCurrent,
+                isPlaying: isPlaying,
+                isHighlighted: sheetManager.highlightedTrackID == track.id,
+                artwork: artwork,
+                title: metadata?.title ?? track.title ?? track.fileName,
+                artist: metadata?.artist ?? track.artist ?? "",
+                duration: metadata?.duration ?? track.duration,
 
-            // Правая зона — как и раньше
-            onRowTap: onTap,
+                // Правая зона — как и раньше
+                onRowTap: onTap,
 
-            // Левая зона — экран "О треке"
-            onArtworkTap: { sheetManager.present(.trackDetail(track))
-            }
-        )
-        .task(id: track.id) {
-            artwork = await ArtworkLoader.loadIfNeeded(
-                current: artwork,
-                trackId: track.id
-            )
-        }
-        .task(id: track.id) {
-            playerViewModel.requestMetadataIfNeeded(for: track.id)
-            }
-        
-        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            Button(role: .destructive) {
-                if let index = PlaylistManager.shared.tracks.firstIndex(where: { $0.id == track.id }) {
-                    PlaylistManager.shared.remove(at: index)
+                // Левая зона — экран "О треке"
+                onArtworkTap: {
+                    sheetManager.present(.trackDetail(track))
                 }
-            } label: {
-                Label("Удалить", systemImage: "trash")
+            )
+            .task(id: track.id) {
+                artwork = await ArtworkLoader.loadIfNeeded(
+                    current: artwork,
+                    trackId: track.id
+                )
             }
-            
-            Button {
-                SheetManager.shared.presentTrackActions(track: track, context: .player)
-            } label: {
-                Label("Ещё", systemImage: "ellipsis")
+            .task(id: track.id) {
+                playerViewModel.requestMetadataIfNeeded(for: track.id)
             }
-            .tint(.gray)
+
+            // MARK: - Свайпы плеера
+
+            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+
+                // Удалить
+                Button(role: .destructive) {
+                    if let index = PlaylistManager.shared.tracks.firstIndex(where: { $0.id == track.id }) {
+                        PlaylistManager.shared.remove(at: index)
+                    }
+                } label: {
+                    Label("Удалить", systemImage: "trash")
+                }
+
+                // Показать в фонотеке
+                Button {
+                    SheetActionCoordinator.shared.handle(
+                        action: .showInLibrary,
+                        track: track,
+                        context: .player
+                    )
+                } label: {
+                    Label("Показать", systemImage: "scope")
+                }
+                .tint(.gray)
+
+                // Переместить
+                Button {
+                    SheetActionCoordinator.shared.handle(
+                        action: .moveToFolder,
+                        track: track,
+                        context: .player
+                    )
+                } label: {
+                    Label("Переместить", systemImage: "arrow.right.doc.on.clipboard")
+                }
+                .tint(.blue)
+            }
         }
     }
-}

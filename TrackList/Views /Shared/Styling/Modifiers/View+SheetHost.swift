@@ -51,16 +51,6 @@ struct SheetHostModifier: ViewModifier {
                     }
                     .appSheet(detents: [.height(208)])
                     
-                /// Действия над треком
-                case .trackActions(let data):
-                    TrackActionSheet(
-                        track: data.track,
-                        context: data.context,
-                        actions: data.actions
-                    )
-                    .appSheet( detents: [.height(CGFloat(data.actions.count * 56 + 40))]
-                    )
-                    
                 /// Перемещение трека
                 case .moveToFolder(let data):
                     NavigationStack {

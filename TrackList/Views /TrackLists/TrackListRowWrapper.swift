@@ -4,9 +4,6 @@
 //
 //  Created by Pavel Fomin on 13.12.2025.
 //
-//
-//
-
 
 import SwiftUI
 import Foundation
@@ -50,6 +47,42 @@ struct TrackListRowWrapper: View {
         )
         .task(id: track.id) {
             metadataProvider.requestMetadataIfNeeded(for: track.id)
+        }
+
+        // MARK: - Свайпы треклиста
+
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+
+            // Локальное действие — удалить из треклиста
+            Button(role: .destructive) {
+                onDelete(IndexSet(integer: index))
+            } label: {
+                Label("Удалить", systemImage: "trash")
+            }
+
+            // Глобальное действие — показать в фонотеке
+            Button {
+                SheetActionCoordinator.shared.handle(
+                    action: .showInLibrary,
+                    track: track,
+                    context: .tracklist
+                )
+            } label: {
+                Label("В фонотеке", systemImage: "scope")
+            }
+            .tint(.gray)
+
+            // Глобальное действие — переместить
+            Button {
+                SheetActionCoordinator.shared.handle(
+                    action: .moveToFolder,
+                    track: track,
+                    context: .tracklist
+                )
+            } label: {
+                Label("Переместить", systemImage: "arrow.right.doc.on.clipboard")
+            }
+            .tint(.blue)
         }
     }
 }

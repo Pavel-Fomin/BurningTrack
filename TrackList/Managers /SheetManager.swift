@@ -8,30 +8,6 @@
 import SwiftUI
 import Foundation
 
-// MARK: - Данные для ActionSheet
-
-struct TrackActionsSheetData: Identifiable, Equatable {
-    let id = UUID()
-    let track: any TrackDisplayable
-    let context: TrackContext
-
-    var actions: [TrackAction] {
-        switch context {
-        case .library:
-            return [.moveToFolder]
-
-        case .player:
-            return [.showInLibrary, .moveToFolder]
-
-        case .tracklist:
-            return [.showInLibrary, .moveToFolder]
-        }
-    }
-
-    static func == (lhs: TrackActionsSheetData, rhs: TrackActionsSheetData) -> Bool {
-        lhs.id == rhs.id
-    }
-}
 
 // MARK: - Данные для MoveToFolderSheet
 
@@ -39,8 +15,7 @@ struct MoveToFolderSheetData: Identifiable, Equatable {
     let id = UUID()
     let track: any TrackDisplayable
 
-    static func == (lhs: MoveToFolderSheetData, rhs: MoveToFolderSheetData) -> Bool {
-        lhs.id == rhs.id
+    static func == (lhs: MoveToFolderSheetData, rhs: MoveToFolderSheetData) -> Bool { lhs.id == rhs.id
     }
 }
 
@@ -51,8 +26,7 @@ struct RenameTrackListSheetData: Identifiable, Equatable {
     let trackListId: UUID
     let currentName: String
 
-    static func == (lhs: RenameTrackListSheetData, rhs: RenameTrackListSheetData) -> Bool {
-        lhs.id == rhs.id
+    static func == (lhs: RenameTrackListSheetData, rhs: RenameTrackListSheetData) -> Bool { lhs.id == rhs.id
     }
 }
 
@@ -88,7 +62,6 @@ struct AddToTrackListSheetData: Identifiable, Equatable {
 // MARK: - Перечень шитов
 
 enum AppSheet: Identifiable, Equatable {
-    case trackActions(TrackActionsSheetData)
     case moveToFolder(MoveToFolderSheetData)
     case trackDetail(any TrackDisplayable)
     case addToTrackList(AddToTrackListSheetData)
@@ -98,7 +71,6 @@ enum AppSheet: Identifiable, Equatable {
 
     var id: String {
         switch self {
-        case .trackActions(let data): return "trackActions_\(data.id)"
         case .moveToFolder(let data): return "moveToFolder_\(data.id)"
         case .trackDetail(let track): return "trackDetail_\(track.id)"
         case .addToTrackList(let data): return "addToTrackList_\(data.id)"
@@ -168,11 +140,6 @@ final class SheetManager: ObservableObject {
     
     // MARK: - Хелперы для вызова конкретных шитов
 
-    func presentTrackActions(track: any TrackDisplayable, context: TrackContext) {
-        let data = TrackActionsSheetData(track: track, context: context)
-        present(.trackActions(data))
-    }
-
     func presentMoveToFolder(for track: any TrackDisplayable) {
         let data = MoveToFolderSheetData(track: track)
         present(.moveToFolder(data))
@@ -214,7 +181,6 @@ final class SheetManager: ObservableObject {
 private extension AppSheet {
     var relatedTrackId: UUID? {
         switch self {
-        case .trackActions(let d): return d.track.id
         case .moveToFolder(let d): return d.track.id
         case .trackDetail(let t): return t.id
         case .addToTrackList(let data): return data.track.id
