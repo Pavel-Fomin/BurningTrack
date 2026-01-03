@@ -24,7 +24,6 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
     @Published var name: String = ""
     @Published var tracks: [Track] = []
     @Published var currentListId: UUID?
-    @Published var toastData: ToastData? = nil
     @Published private(set) var metadataByTrackId: [UUID: TrackMetadataCacheManager.CachedMetadata] = [:]
 
     // MARK: - Init
@@ -100,11 +99,24 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
     // MARK: - Remove
 
     func removeTrack(at offsets: IndexSet) {
-        tracks.remove(atOffsets: offsets)
-        save()
-        print("🗑️ Трек удалён")
-    }
+        guard
+            let index = offsets.first,
+            let listId = currentListId
+        else { return }
 
+        let trackId = tracks[index].id
+
+        Task {
+            try await AppCommandExecutor.shared.removeTrackFromTrackList(
+                trackId: trackId,
+                trackListId: listId
+            )
+
+            await MainActor.run {
+                self.tracks.remove(atOffsets: offsets)
+            }
+        }
+    }
 
     // MARK: - Clear
 
@@ -181,23 +193,6 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
         }
 
         ExportManager.shared.exportViaTempAndPicker(tracks, presenter: topVC)
-    }
-
-
-    // MARK: - Toast
-
-    func showToast(
-        message: String,
-        duration: TimeInterval = 2.0
-    ) {
-        self.toastData = ToastData(
-            style: .trackList(name: message),
-            artwork: nil
-        )
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
-            withAnimation { self.toastData = nil }
-        }
     }
 }
 

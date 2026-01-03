@@ -18,9 +18,6 @@ struct TrackListApp: App {
     let trackListViewModel: TrackListViewModel
     let playerViewModel: PlayerViewModel
     
-    @StateObject private var toast = ToastManager()
-
-
     init() {
         let trackListVM = TrackListViewModel()
         self.trackListViewModel = trackListVM
@@ -33,7 +30,6 @@ struct TrackListApp: App {
                 playerViewModel: playerViewModel,
                 trackListViewModel: trackListViewModel
             )
-            .environmentObject(toast)
             .environmentObject(SheetManager.shared)
         }
     }

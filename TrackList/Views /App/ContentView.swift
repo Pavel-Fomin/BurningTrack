@@ -24,8 +24,6 @@ struct ContentView: View {
     @StateObject private var sheetManager = SheetManager.shared
     @StateObject private var trackDetailManager = TrackDetailManager.shared
     
-    @EnvironmentObject var toast: ToastManager
-
     @ObservedObject private var navigation = NavigationCoordinator.shared
     @ObservedObject private var scene = ScenePhaseHandler.shared
 
@@ -66,38 +64,14 @@ struct ContentView: View {
                 .padding(.bottom, safeTabBarInset)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
-
-            // MARK: - Тосты
-            if let data = toast.data {
-                VStack(spacing: 8) {
-                    ToastView(data: data)
-                }
-                .padding(.horizontal, 16)
-                .padding(.bottom, toastBottomPadding)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-                .animation(.easeInOut(duration: 0.3), value: data.id)
-            }
         }
 
         // MARK: - Подключение SheetHost
         
-               .sheetHost(playerManager: playerViewModel.playerManager)
-           }
-    
-    // MARK: - Паддинг для тоста
-    
-    private var toastBottomPadding: CGFloat {
-        let hasMiniPlayer =
-        playerViewModel.currentTrackDisplayable != nil
-        && scene.activeTab != .tracklists
-
-        let miniPlayerHeight: CGFloat = hasMiniPlayer ? 88 : 0
-        let tabBarHeight: CGFloat = 49
-        let toastGap: CGFloat = hasMiniPlayer ? 8 : 0
-        let spacing: CGFloat = 12
-
-        return miniPlayerHeight + toastGap + tabBarHeight + spacing
+        .sheetHost(playerManager: playerViewModel.playerManager)
+        .toastHost()
     }
+}
 
     // MARK: - Safe area для мини-плеера (Dynamic Island / Face ID / SE)
     private var safeTabBarInset: CGFloat {
@@ -106,4 +80,4 @@ struct ContentView: View {
             .first?
             .safeAreaInsets.bottom ?? 49
     }
-}
+

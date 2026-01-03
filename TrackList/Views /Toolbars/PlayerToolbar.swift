@@ -35,9 +35,12 @@ struct PlayerToolbar: ViewModifier {
                             }
                         }
                         
-                        Button("Очистить треклист", role: .destructive, action: onClear)
-                    } label: {
-                        Image(systemName: "ellipsis")
+                        Button("Очистить треклист", role: .destructive) {
+                            Task { await AppCommandExecutor.shared.clearPlayer()
+                            }
+                        }
+                        
+                    } label: { Image(systemName: "ellipsis")
                             .font(.system(size: 18, weight: .semibold))
                     }
                 }

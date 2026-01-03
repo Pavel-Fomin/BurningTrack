@@ -58,8 +58,10 @@ struct PlayerTrackRowWrapper: View {
 
                 // Удалить
                 Button(role: .destructive) {
-                    if let index = PlaylistManager.shared.tracks.firstIndex(where: { $0.id == track.id }) {
-                        PlaylistManager.shared.remove(at: index)
+                    Task {
+                        try await AppCommandExecutor.shared.removeTrackFromPlayer(
+                            trackId: track.id
+                        )
                     }
                 } label: {
                     Label("Удалить", systemImage: "trash")

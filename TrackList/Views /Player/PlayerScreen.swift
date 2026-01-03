@@ -16,8 +16,6 @@ struct PlayerScreen: View {
     @State private var isShowingSaveSheet = false
     @State private var trackListName: String = defaultTrackListName()
     
-    @EnvironmentObject var toast: ToastManager
-    
     var body: some View {
         NavigationStack {
             ZStack(alignment: .bottom) {

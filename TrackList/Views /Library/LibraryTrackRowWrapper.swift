@@ -26,7 +26,6 @@ struct LibraryTrackRowWrapper: View {
 
     @ObservedObject var playerViewModel: PlayerViewModel
 
-    @EnvironmentObject var toast: ToastManager
     @EnvironmentObject var sheetManager: SheetManager
 
     @State private var artwork: CGImage? = nil
@@ -109,38 +108,22 @@ struct LibraryTrackRowWrapper: View {
         // MARK: - Системные свайпы (В плеер / В треклист / Ещё)
 
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-
-                    // Добавить в плеер
-                    Button {
-                        Task {
-                            guard let resolved = await BookmarkResolver.url(forTrack: track.id) else { return }
-
-                            let playerTrack = PlayerTrack(
-                                id: track.id,
-                                title: track.title,
-                                artist: track.artist,
-                                duration: track.duration,
-                                fileName: resolved.lastPathComponent,
-                                isAvailable: true
-                            )
-
-                            PlaylistManager.shared.tracks.append(playerTrack)
-                            PlaylistManager.shared.saveToDisk()
-
-                            toast.show(
-                                ToastData(
-                                    style: .track(
-                                        title: track.title ?? track.fileName,
-                                        artist: track.artist ?? ""
-                                    ),
-                                    artwork: track.artwork
-                                )
-                            )
-                        }
-
-                    } label: { Label("В плеер", systemImage: "waveform")
+            
+            // Добавить в плеер
+            Button {
+                Task {
+                    do {
+                        try await AppCommandExecutor.shared.addTrackToPlayer(
+                            trackId: track.id
+                        )
+                    } catch {
+                        print("❌ Ошибка добавления в плеер: \(error)")
                     }
-                    .tint(.blue)
+                }
+            } label: {
+                Label("В плеер", systemImage: "waveform")
+            }
+            .tint(.blue)
 
                     // Добавить в треклист
                     Button {

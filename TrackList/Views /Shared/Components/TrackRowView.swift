@@ -131,7 +131,7 @@ struct TrackRowView: View {
                 Text("уже в: \(trackListNames.joined(separator: ", "))")
                     .font(.caption)
                     .foregroundColor(.secondary)
-                    .lineLimit(1)
+                    .lineLimit(4)
                     .padding(.top, 4)
             }
         }

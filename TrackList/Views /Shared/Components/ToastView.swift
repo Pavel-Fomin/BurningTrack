@@ -10,54 +10,90 @@
 import SwiftUI
 
 struct ToastView: View {
+    
     let data: ToastData
-
+    private let height: CGFloat = 64
+    private let rightWidth: CGFloat = 120
+    
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-
-// MARK: - Обложка (только для .track)
+        HStack(spacing: 12) {
             
-            if case .track = data.style, let image = data.artwork {
-                Image(uiImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: 44, height: 44)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-            }
+            // MARK: - Left block (50%)
             
-            
-// MARK: - Текстовая часть
-            
-            VStack(alignment: .leading, spacing: 2) {
-                switch data.style {
-                case let .track(title, artist):
-                    Text(title)
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.8))
-                        .lineLimit(1)
-
-                    Text(artist)
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.7))
-                        .lineLimit(1)
-
-                case .trackList:
-                    EmptyView()
+            HStack(spacing: 12) {
+                
+                if let artwork = data.artwork {
+                    Image(uiImage: artwork)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 32, height: 32)
+                        .clipShape(RoundedRectangle(cornerRadius: 64, style: .continuous))
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(titleText)
+                            .font(.subheadline.weight(.semibold))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                        
+                        Text(artistText)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                    
+                } else {
+                    Text(data.message)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(2)
+                        .truncationMode(.tail)
                 }
-
-                Text(data.message)
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.white)
-                    .lineLimit(2)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)   // ← ВАЖНО
+            
+            // MARK: - Right block (50%)
+            
+            VStack(alignment: .trailing, spacing: 4) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.title3)
+                    .foregroundColor(.green)
+                
+                if data.artwork != nil {
+                    Text(data.message)
+                        .font(.caption2)
+                        .foregroundColor(.green)
+                        .lineLimit(1)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .trailing)  // ← ВАЖНО
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .frame(height: height)
         .background(.ultraThinMaterial)
-        .background(Color.black.opacity(0.85))
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .shadow(color: .black.opacity(0.12), radius: 12, y: 4)
         .padding(.horizontal, 16)
-        .frame(minHeight: 60)
+    }
+    
+    
+    // MARK: - Text mapping
+    
+    private var titleText: String {
+        switch data.style {
+        case let .track(title, _):
+            return title
+        case let .trackList(name):
+            return name
+        }
+    }
+    
+    private var artistText: String {
+        switch data.style {
+        case let .track(_, artist):
+            return artist.isEmpty ? " " : artist
+        case .trackList:
+            return " "
+        }
     }
 }

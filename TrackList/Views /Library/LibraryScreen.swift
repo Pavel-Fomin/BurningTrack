@@ -24,8 +24,7 @@ struct LibraryScreen: View {
 
     let playerViewModel: PlayerViewModel
     let trackListViewModel: TrackListViewModel
-
-    @EnvironmentObject var toast: ToastManager
+    
     @ObservedObject private var nav = NavigationCoordinator.shared
 
     @State private var isShowingFolderPicker = false

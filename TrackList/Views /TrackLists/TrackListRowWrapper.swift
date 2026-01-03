@@ -68,7 +68,7 @@ struct TrackListRowWrapper: View {
                     context: .tracklist
                 )
             } label: {
-                Label("В фонотеке", systemImage: "scope")
+                Label("Показать", systemImage: "scope")
             }
             .tint(.gray)
 

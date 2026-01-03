@@ -11,14 +11,14 @@
 import SwiftUI
 
 struct SaveTrackListSheet: View {
-
+    
     @Environment(\.dismiss) private var dismiss
     @State private var name: String = ""
-
+    
     var body: some View {
         NavigationStack {
             ZStack(alignment: .bottom) {
-
+                
                 List {
                     Section {
                         TextField("Название", text: $name)
@@ -31,7 +31,7 @@ struct SaveTrackListSheet: View {
                 .scrollDisabled(true)
                 .navigationTitle("Сохранить треклист")
                 .navigationBarTitleDisplayMode(.inline)
-
+                
                 HStack(spacing: 16) {
                     Button {
                         Task {
@@ -44,7 +44,7 @@ struct SaveTrackListSheet: View {
                     .primaryButtonStyle()
                     .disabled(!TrackListManager.shared.validateName(name))
                     .opacity(TrackListManager.shared.validateName(name) ? 1 : 0.5)
-
+                    
                     Button {
                         dismiss()
                     } label: {
@@ -61,13 +61,15 @@ struct SaveTrackListSheet: View {
             }
         }
     }
-
+    
     private func create() async {
         do {
             try await AppCommandExecutor.shared.createTrackList(name: name)
-            await MainActor.run { dismiss() }
+            await MainActor.run {
+                dismiss()
+            }
         } catch {
-            print("❌ Ошибка создания треклиста: \(error.localizedDescription)")
+            print("❌ Ошибка сохранения треклиста: \(error)")
         }
     }
 }
