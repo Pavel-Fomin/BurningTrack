@@ -10,7 +10,7 @@
 
 #import <Foundation/Foundation.h>
 #import "TLTagLibFile.h"
-#import <tag_c/tag_c.h>
+#import <tag_c.h>
 
 
 static inline void TLTagLibSetup(void) {

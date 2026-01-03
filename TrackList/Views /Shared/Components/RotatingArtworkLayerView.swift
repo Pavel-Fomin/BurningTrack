@@ -253,7 +253,7 @@ struct RotatingArtworkView: UIViewRepresentable {
     /// Создаёт круговую обложку из изображения без использования cornerRadius/masks
     private func bakeCircle(_ image: UIImage, size: CGFloat) -> UIImage {
         let fmt = UIGraphicsImageRendererFormat()
-        fmt.scale = UIScreen.main.scale
+        fmt.scale = image.scale
         fmt.opaque = false // ← вот здесь ключевое изменение
         return UIGraphicsImageRenderer(size: .init(width: size, height: size), format: fmt).image { _ in
             let rect = CGRect(x: 0, y: 0, width: size, height: size)

@@ -8,10 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		A912E3B52DA911BD0046A8B6 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = A912E3B42DA911BD0046A8B6 /* LaunchScreen.storyboard */; };
-		A97F996E2E05ABDD000BCB2E /* libtag.a in Frameworks */ = {isa = PBXBuildFile; fileRef = A97F996D2E05ABDD000BCB2E /* libtag.a */; };
-		A97F99752E05B541000BCB2E /* libz.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = A97F99742E05B541000BCB2E /* libz.tbd */; };
-		A97F99762E05DBF7000BCB2E /* tag_c.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A97F995C2E05A843000BCB2E /* tag_c.framework */; };
-		A97F99772E05DBF7000BCB2E /* tag_c.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = A97F995C2E05A843000BCB2E /* tag_c.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		A9BCE0F82F09B99F000DDCD3 /* libz.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = A9BCE0F72F09B99F000DDCD3 /* libz.tbd */; };
+		A9BCE0FA2F09BA3C000DDCD3 /* libc++.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = A9BCE0F92F09BA3C000DDCD3 /* libc++.tbd */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -38,7 +36,6 @@
 			dstPath = "";
 			dstSubfolderSpec = 10;
 			files = (
-				A97F99772E05DBF7000BCB2E /* tag_c.framework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -50,13 +47,19 @@
 		A90C56032E0DF38300AAA02B /* TrackListTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TrackListTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A90C56042E0DF38300AAA02B /* TrackListUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TrackListUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A912E3B42DA911BD0046A8B6 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
-		A97F995C2E05A843000BCB2E /* tag_c.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = tag_c.framework; path = "taglib-build-ios/tag_c.framework"; sourceTree = "<group>"; };
-		A97F996D2E05ABDD000BCB2E /* libtag.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libtag.a; path = "taglib-build-ios/install/lib/libtag.a"; sourceTree = "<group>"; };
-		A97F99742E05B541000BCB2E /* libz.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libz.tbd; path = usr/lib/libz.tbd; sourceTree = SDKROOT; };
 		A992A15C2E04ADE800BA637D /* TrackList-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TrackList-Bridging-Header.h"; sourceTree = "<group>"; };
+		A9BCE0F72F09B99F000DDCD3 /* libz.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libz.tbd; path = usr/lib/libz.tbd; sourceTree = SDKROOT; };
+		A9BCE0F92F09BA3C000DDCD3 /* libc++.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = "libc++.tbd"; path = "usr/lib/libc++.tbd"; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		A9BCE0F62F09B67C000DDCD3 /* Exceptions for "Libraries" folder in "TrackList" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Taglib/taglib.xcframework,
+			);
+			target = A97C86272DA326C000ED2E99 /* TrackList */;
+		};
 		A9D1A1FD2DA8775900C2FD21 /* Exceptions for "TrackList" folder in "TrackList" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -96,6 +99,14 @@
 			path = TrackListUITests;
 			sourceTree = "<group>";
 		};
+		A9B8BF8D2F0986F1004E4000 /* Libraries */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				A9BCE0F62F09B67C000DDCD3 /* Exceptions for "Libraries" folder in "TrackList" target */,
+			);
+			path = Libraries;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -103,9 +114,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A97F99752E05B541000BCB2E /* libz.tbd in Frameworks */,
-				A97F99762E05DBF7000BCB2E /* tag_c.framework in Frameworks */,
-				A97F996E2E05ABDD000BCB2E /* libtag.a in Frameworks */,
+				A9BCE0FA2F09BA3C000DDCD3 /* libc++.tbd in Frameworks */,
+				A9BCE0F82F09B99F000DDCD3 /* libz.tbd in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -129,6 +139,7 @@
 		A97C861F2DA326C000ED2E99 = {
 			isa = PBXGroup;
 			children = (
+				A9B8BF8D2F0986F1004E4000 /* Libraries */,
 				A912E3B42DA911BD0046A8B6 /* LaunchScreen.storyboard */,
 				A97C862A2DA326C000ED2E99 /* TrackList */,
 				A97C86382DA326C200ED2E99 /* TrackListTests */,
@@ -144,9 +155,8 @@
 		A992A1662E05829B00BA637D /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				A97F99742E05B541000BCB2E /* libz.tbd */,
-				A97F996D2E05ABDD000BCB2E /* libtag.a */,
-				A97F995C2E05A843000BCB2E /* tag_c.framework */,
+				A9BCE0F92F09BA3C000DDCD3 /* libc++.tbd */,
+				A9BCE0F72F09B99F000DDCD3 /* libz.tbd */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -372,6 +382,7 @@
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				FRAMEWORK_SEARCH_PATHS = "$(PROJECT_DIR)/Libraries/Taglib";
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -437,6 +448,7 @@
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				FRAMEWORK_SEARCH_PATHS = "$(PROJECT_DIR)/Libraries/Taglib";
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -468,13 +480,9 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 3NQUU7Y5T7;
 				ENABLE_PREVIEWS = YES;
-				FRAMEWORK_SEARCH_PATHS = (
-					"$(PROJECT_DIR)/taglib-build-ios/**",
-					"$(PROJECT_DIR)",
-					"$(PROJECT_DIR)/taglib-build-ios",
-				);
+				FRAMEWORK_SEARCH_PATHS = "";
 				GENERATE_INFOPLIST_FILE = NO;
-				HEADER_SEARCH_PATHS = "$(PROJECT_DIR)/taglib-build-ios/tag_c.framework/Headers/**";
+				HEADER_SEARCH_PATHS = "";
 				INFOPLIST_FILE = TrackList/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -482,27 +490,25 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				LIBRARY_SEARCH_PATHS = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/taglib-build-ios/install/lib",
-				);
+				LIBRARY_SEARCH_PATHS = "";
 				MARKETING_VERSION = 1.0;
 				OTHER_CPLUSPLUSFLAGS = (
 					"$(OTHER_CFLAGS)",
 					"-DTAGLIB_DISABLE_TFILE",
 				);
-				OTHER_LDFLAGS = "-lc++";
+				OTHER_LDFLAGS = "";
 				PRODUCT_BUNDLE_IDENTIFIER = "Pavel-Fomin.TrackList";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OBJC_BRIDGING_HEADER = "TrackList-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
-				SYSTEM_HEADER_SEARCH_PATHS = "$(PROJECT_DIR)/taglib-build-ios/tag_c.framework/Headers/**";
+				SYSTEM_HEADER_SEARCH_PATHS = "";
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
@@ -519,13 +525,9 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 3NQUU7Y5T7;
 				ENABLE_PREVIEWS = YES;
-				FRAMEWORK_SEARCH_PATHS = (
-					"$(PROJECT_DIR)/taglib-build-ios/**",
-					"$(PROJECT_DIR)",
-					"$(PROJECT_DIR)/taglib-build-ios",
-				);
+				FRAMEWORK_SEARCH_PATHS = "";
 				GENERATE_INFOPLIST_FILE = NO;
-				HEADER_SEARCH_PATHS = "$(PROJECT_DIR)/taglib-build-ios/tag_c.framework/Headers/**";
+				HEADER_SEARCH_PATHS = "";
 				INFOPLIST_FILE = TrackList/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -533,26 +535,24 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				LIBRARY_SEARCH_PATHS = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/taglib-build-ios/install/lib",
-				);
+				LIBRARY_SEARCH_PATHS = "";
 				MARKETING_VERSION = 1.0;
 				OTHER_CPLUSPLUSFLAGS = (
 					"$(OTHER_CFLAGS)",
 					"-DTAGLIB_DISABLE_TFILE",
 				);
-				OTHER_LDFLAGS = "-lc++";
+				OTHER_LDFLAGS = "";
 				PRODUCT_BUNDLE_IDENTIFIER = "Pavel-Fomin.TrackList";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OBJC_BRIDGING_HEADER = "TrackList-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
-				SYSTEM_HEADER_SEARCH_PATHS = "$(PROJECT_DIR)/taglib-build-ios/tag_c.framework/Headers/**";
+				SYSTEM_HEADER_SEARCH_PATHS = "";
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;

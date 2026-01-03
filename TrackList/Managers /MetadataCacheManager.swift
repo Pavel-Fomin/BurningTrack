@@ -74,7 +74,7 @@ final class TrackMetadataCacheManager: @unchecked Sendable {
     private func convertAndCache(_ metadata: TrackMetadata,
                                  for nsurl: NSURL,
                                  includeArtwork: Bool) -> CachedMetadata {
-        let maxPixel = Int(ceil(48 * UIScreen.main.scale))
+        let maxPixel = 48
 
         // 1) Если просили арт и он есть — даунсемплим
         if includeArtwork, let data = metadata.artworkData,

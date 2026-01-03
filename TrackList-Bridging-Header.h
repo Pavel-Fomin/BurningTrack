@@ -8,8 +8,7 @@
 //
 
 // Подключение C-интерфейса библиотеки TagLib
-#import <tag_c/tag_c.h>
+#import <tag_c.h>
 
 // Подключение обёртки над TagLib
 #import "TLTagLibFile.h"
-
