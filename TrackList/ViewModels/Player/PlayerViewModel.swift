@@ -31,6 +31,9 @@ final class PlayerViewModel: ObservableObject {
     @Published var currentContext: PlaybackContext?                  /// Контекст воспроизведения (плеер / треклист / фонотека)
     @Published private(set) var metadataByTrackId: [UUID: TrackMetadataCacheManager.CachedMetadata] = [:]
     
+    private var nowPlayingArtworkByTrackId: [UUID: CGImage] = [:]
+
+    
     // MARK: - Внутренние зависимости
     
     let playerManager = PlayerManager()
@@ -38,6 +41,24 @@ final class PlayerViewModel: ObservableObject {
     private var trackListContext: [Track] = []              /// Контекст треклиста
     private var libraryTracksContext: [LibraryTrack] = []   /// Контекст фонотеки
     
+    // MARK: - Now Playing Snapshot
+
+    /// Собирает snapshot для Control Center из текущего состояния.
+    /// Источник метаданных — TrackMetadataCacheManager.
+    /// Artwork используется отдельного размера (~512 px).
+    private func makeNowPlayingSnapshot(for track: any TrackDisplayable) -> NowPlayingSnapshot {
+        
+        let metadata = metadataByTrackId[track.id]
+        
+        return NowPlayingSnapshot(
+            title: metadata?.title ?? track.fileName,
+            artist: metadata?.artist ?? "",
+            artwork: nowPlayingArtworkByTrackId[track.id],
+            currentTime: currentTime,
+            duration: metadata?.duration ?? trackDuration,
+            isPlaying: isPlaying
+        )
+    }
     
     // MARK: - Инициализация
     
@@ -50,7 +71,16 @@ final class PlayerViewModel: ObservableObject {
         ) { [weak self] notification in
             if let duration = notification.userInfo?["duration"] as? TimeInterval {
                 Task { @MainActor in
-                    self?.trackDuration = duration
+                    guard let self else { return }
+                    
+                    self.trackDuration = duration
+                    
+                    // Если есть текущий трек — пересобираем snapshot
+                    if let current = self.currentTrackDisplayable {
+                        self.playerManager.applyNowPlaying(
+                            snapshot: self.makeNowPlayingSnapshot(for: current)
+                        )
+                    }
                 }
             }
         }
@@ -100,23 +130,45 @@ final class PlayerViewModel: ObservableObject {
     
     // Реализация запроса загрузки (контракт)
     func requestMetadataIfNeeded(for trackId: UUID) {
-        
-        // уже загружено — выходим
+
         if metadataByTrackId[trackId] != nil { return }
-        
+
         Task {
-            guard
-                let url = await BookmarkResolver.url(forTrack: trackId),
-                let meta = await TrackMetadataCacheManager.shared
-                    .loadMetadata(for: url)
-            else { return }
-            
+            // ✅ URL резолвим ОДИН раз
+            guard let url = await BookmarkResolver.url(forTrack: trackId) else { return }
+
+            // 1. Метаданные (title / artist / duration)
+            if let meta = await TrackMetadataCacheManager.shared.loadMetadata(for: url) {
+                await MainActor.run {
+                    metadataByTrackId[trackId] = meta
+
+                    if let current = currentTrackDisplayable,
+                       current.id == trackId {
+                        playerManager.applyNowPlaying(
+                            snapshot: makeNowPlayingSnapshot(for: current)
+                        )
+                    }
+                }
+            }
+
+            // 2. Большой artwork для Lock Screen
+            let artwork = await TrackMetadataCacheManager.shared
+                .loadNowPlayingArtwork(for: url, maxPixel: 512)
+
             await MainActor.run {
-                metadataByTrackId[trackId] = meta
+                if let artwork {
+                    nowPlayingArtworkByTrackId[trackId] = artwork
+                }
+
+                if let current = currentTrackDisplayable,
+                   current.id == trackId {
+                    playerManager.applyNowPlaying(
+                        snapshot: makeNowPlayingSnapshot(for: current)
+                    )
+                }
             }
         }
     }
-    
     
     // MARK: - Воспроизведение трека
     
@@ -168,32 +220,14 @@ final class PlayerViewModel: ObservableObject {
         playerManager.play(track: track)
         
         // Первичное заполнение Now Playing Info (duration ещё может быть 0)
-        playerManager.updateNowPlayingInfo(
-            track: track,
-            currentTime: 0,
-            duration: trackDuration
+        playerManager.applyNowPlaying(snapshot: makeNowPlayingSnapshot(for: track)
         )
-        
-        // Через полсекунды — ещё одно обновление с актуальной длительностью
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            guard let self = self,
-                  let current = self.currentTrackDisplayable else { return }
-            
-            self.playerManager.updateNowPlayingInfo(
-                track: current,
-                currentTime: self.currentTime,
-                duration: self.trackDuration
-            )
-        }
         
         // Наблюдаем прогресс воспроизведения
         playerManager.observeProgress { [weak self] time in
             guard let self else { return }
             self.currentTime = time
-            self.playerManager.updatePlaybackTimeOnly(
-                currentTime: time,
-                isPlaying: self.isPlaying
-            )
+            self.playerManager.applyPlaybackTime(currentTime: time, isPlaying: self.isPlaying)
         }
         
         isPlaying = true

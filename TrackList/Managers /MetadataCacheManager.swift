@@ -50,6 +50,18 @@ final class TrackMetadataCacheManager: @unchecked Sendable {
         return nil
     }
     
+    // MARK: - Artwork для Now Playing
+
+    func loadNowPlayingArtwork(for url: URL, maxPixel: Int = 512) async -> CGImage? {
+        // Для Now Playing всегда строим отдельный арт нужного размера.
+        // Нельзя использовать cached.artwork, потому что в кэше может лежать UI-арт (например 48px).
+        guard let metadata = try? await MetadataParser.parseMetadata(from: url),
+              let data = metadata.artworkData,
+              let cg = downsampleArtwork(data, maxPixel: maxPixel)
+        else { return nil }
+        
+        return cg
+    }
     
     // MARK: - Загрузка тегов
     
@@ -74,7 +86,7 @@ final class TrackMetadataCacheManager: @unchecked Sendable {
     private func convertAndCache(_ metadata: TrackMetadata,
                                  for nsurl: NSURL,
                                  includeArtwork: Bool) -> CachedMetadata {
-        let maxPixel = 48
+        let maxPixel = 12
 
         // 1) Если просили арт и он есть — даунсемплим
         if includeArtwork, let data = metadata.artworkData,

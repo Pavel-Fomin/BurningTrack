@@ -201,26 +201,46 @@ final class PlayerManager {
             onPrevious()
             return .success
         }
+        
+        center.changePlaybackPositionCommand.addTarget { [weak self] event in
+            guard
+                let self,
+                let event = event as? MPChangePlaybackPositionCommandEvent
+            else { return .commandFailed }
+            
+            let time = event.positionTime
+            self.seek(to: time)
+            
+            return .success
+        }
     }
 
     // MARK: - Now Playing Info
 
-    func updateNowPlayingInfo(track: any TrackDisplayable,
-                              currentTime: TimeInterval,
-                              duration: TimeInterval) {
-
-        let info: [String: Any] = [
-            MPMediaItemPropertyTitle: track.title ?? track.fileName,
-            MPMediaItemPropertyArtist: track.artist ?? "",
-            MPMediaItemPropertyPlaybackDuration: duration,
-            MPNowPlayingInfoPropertyElapsedPlaybackTime: currentTime,
+    /// Применяет полный snapshot в Control Center.
+    /// PlayerManager НЕ решает, какие данные показывать — он только применяет.
+    func applyNowPlaying(snapshot: NowPlayingSnapshot) {
+        var info: [String: Any] = [
+            MPMediaItemPropertyTitle: snapshot.title,
+            MPMediaItemPropertyArtist: snapshot.artist,
+            MPMediaItemPropertyPlaybackDuration: snapshot.duration,
+            MPNowPlayingInfoPropertyElapsedPlaybackTime: snapshot.currentTime,
+            MPNowPlayingInfoPropertyPlaybackRate: snapshot.isPlaying ? 1.0 : 0.0,
             MPNowPlayingInfoPropertyMediaType: MPNowPlayingInfoMediaType.audio.rawValue
         ]
-
+        
+        if let artwork = snapshot.artwork {
+            info[MPMediaItemPropertyArtwork] =
+                MPMediaItemArtwork(boundsSize: CGSize(width: artwork.width, height: artwork.height)) { _ in
+                    UIImage(cgImage: artwork)
+                }
+        }
+        
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
     }
-
-    func updatePlaybackTimeOnly(currentTime: TimeInterval, isPlaying: Bool) {
+    
+    /// Обновляет только время и playbackRate, не трогая остальную карточку.
+    func applyPlaybackTime(currentTime: TimeInterval, isPlaying: Bool) {
         guard var info = MPNowPlayingInfoCenter.default().nowPlayingInfo else { return }
         info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = currentTime
         info[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1.0 : 0.0

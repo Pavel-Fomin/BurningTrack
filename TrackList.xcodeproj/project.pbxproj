@@ -140,7 +140,6 @@
 			isa = PBXGroup;
 			children = (
 				A9B8BF8D2F0986F1004E4000 /* Libraries */,
-				A912E3B42DA911BD0046A8B6 /* LaunchScreen.storyboard */,
 				A97C862A2DA326C000ED2E99 /* TrackList */,
 				A97C86382DA326C200ED2E99 /* TrackListTests */,
 				A97C86422DA326C200ED2E99 /* TrackListUITests */,
@@ -149,6 +148,7 @@
 				A90C56022E0DF38300AAA02B /* TrackList.app */,
 				A90C56032E0DF38300AAA02B /* TrackListTests.xctest */,
 				A90C56042E0DF38300AAA02B /* TrackListUITests.xctest */,
+				A912E3B42DA911BD0046A8B6 /* LaunchScreen.storyboard */,
 			);
 			sourceTree = "<group>";
 		};
