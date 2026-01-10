@@ -110,11 +110,12 @@ struct MoveToFolderSheet: View {
                 }
                 .overlay(alignment: .trailing) {
                     
-                    // Бейдж "Текущая" — справа, рядом с radio
+                    // Бейдж "Текущая"
                     if row.id == trackCurrentFolderId {
-                        Text("Текущая")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.title3)
+                            .foregroundStyle(.green)
+                            .frame(width: 28, height: 28)
                     }
                 }
                 .listRowBackground(Color(.tertiarySystemBackground))

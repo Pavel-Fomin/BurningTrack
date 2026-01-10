@@ -16,14 +16,17 @@ struct ToastView: View {
     private let height: CGFloat = 64
     private let rightWidth: CGFloat = 120
     
+    
+    // MARK: - UI
     var body: some View {
         HStack(spacing: 12) {
             
-            // MARK: - Left block (50%)
-            
+            // Left block (50%)
             HStack(spacing: 12) {
                 
                 if let artworkImage = data.artworkImage {
+                    
+                    // Обложка
                     artworkImage
                         .resizable()
                         .scaledToFill()
@@ -31,17 +34,20 @@ struct ToastView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 64, style: .continuous))
                     
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(titleText)
-                            .font(.subheadline.weight(.semibold))
-                            .lineLimit(1)
-                            .truncationMode(.tail)
                         
-                        Text(artistText)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                    }
+                           // ARTIST
+                           Text(artistText)
+                               .font(.subheadline.weight(.semibold))
+                               .lineLimit(1)
+                               .truncationMode(.tail)
+
+                           // TITLE
+                           Text(titleText)
+                               .font(.caption)
+                               .foregroundStyle(.background.opacity(0.6))
+                               .lineLimit(1)
+                               .truncationMode(.tail)
+                       }
                     
                 } else {
                     Text(data.message)
@@ -52,8 +58,7 @@ struct ToastView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             
-            // MARK: - Right block (50%)
-            
+            // Right block (50%)
             VStack(alignment: .trailing, spacing: 4) {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.title3)
@@ -68,12 +73,14 @@ struct ToastView: View {
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
         }
+        .foregroundStyle(.background)
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .frame(height: height)
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .shadow(color: .black.opacity(0.12), radius: 12, y: 4)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(.primary)
+        )
         .padding(.horizontal, 16)
     }
     
