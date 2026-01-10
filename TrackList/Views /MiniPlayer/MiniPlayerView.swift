@@ -2,7 +2,7 @@
 //  MiniPlayerView.swift
 //  TrackList
 //
-//  Отображает текущий трек, обложку, название, прогресс и кнопки управления
+//  Мини-плеер
 //
 //  Created by Pavel Fomin on 28.04.2025.
 //
@@ -10,7 +10,6 @@
 import Foundation
 import SwiftUI
 import AVKit
-
 
 struct AVRoutePickerViewWrapper: UIViewRepresentable {
     func makeUIView(context: Context) -> AVRoutePickerView {
@@ -30,23 +29,48 @@ struct MiniPlayerView: View {
     
     @ObservedObject var playerViewModel: PlayerViewModel
     @State private var dragOffsetX: CGFloat = 0
-    @State private var artwork: UIImage? = nil
-    @State private var title: String = ""
-    @State private var artist: String = ""
-    @State private var metadataToken: UUID = .init()
+    
+    
+    // MARK: - Metadata
+    
+    private var metadata: TrackMetadataCacheManager.CachedMetadata? {
+        guard let track = playerViewModel.currentTrackDisplayable else { return nil }
+        return playerViewModel.metadata(for: track.id)
+    }
+
+    // Обложка
+    private var artwork: UIImage? {
+        guard let track = playerViewModel.currentTrackDisplayable,
+              let data = metadata?.artworkData
+        else { return nil }
+
+        return ArtworkProvider.shared.image(
+            trackId: track.id,
+            artworkData: data,
+            purpose: .miniPlayer
+        )
+    }
+
+    // Название
+    private var title: String {
+        metadata?.title ?? playerViewModel.currentTrackDisplayable?.fileName ?? ""
+    }
+
+    // Артист
+    private var artist: String {
+        metadata?.artist ?? ""
+    }
+    
+// MARK: - UI
     
     var body: some View {
         if let track = playerViewModel.currentTrackDisplayable {
             VStack {
                 
-                
-// MARK: - Верхняя часть: обложка + информация + кнопки
-                
+              //Верхняя часть: обложка + информация + кнопки
                 HStack(spacing: 12) {
-                    
                     // Анимируемая часть
                     HStack(spacing: 12) {
-                        
                         // Обложка
                         if let artwork = artwork {
                             Image(uiImage: artwork)
@@ -103,12 +127,8 @@ struct MiniPlayerView: View {
                             withAnimation(.spring()) { dragOffsetX = 0 }
                         }
                 )
-                .id(metadataToken)
                 
-               
-                
-// MARK: - Прогресс трека
-                
+                // Прогресс трека
                 HStack(alignment: .center, spacing: 12) {
                     
                     // Текущее время
@@ -137,13 +157,16 @@ struct MiniPlayerView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.horizontal, 4) /// выравнивание по краям
                     
-                    // Оставшееся время
+                    /// Оставшееся время
                     Text("-\(formatTimeSmart(playerViewModel.trackDuration - playerViewModel.currentTime))")
                         .font(.caption2)
                         .frame(width: 40, alignment: .trailing)
                 }
                 .padding(.top, 8) /// отступ между строками
                 
+            }
+            .task(id: track.id) {
+                playerViewModel.requestMetadataIfNeeded(for: track.id)
             }
             
             .background(
@@ -158,30 +181,6 @@ struct MiniPlayerView: View {
             .cornerRadius(12)
             .shadow(radius: 4)
            
-            
-            .task(id: track.id) {
-                guard let url = await BookmarkResolver.url(forTrack: track.id),
-                      let meta = await TrackMetadataCacheManager.shared.loadMetadata(for: url)
-                else { return }
-
-                let newArtwork: UIImage? = {
-                    if let cgImage = meta.artwork {
-                        return UIImage(cgImage: cgImage)
-                    }
-                    return nil
-                }()
-
-                let newTitle = meta.title ?? ""
-                let newArtist = meta.artist ?? ""
-
-                withAnimation(.easeOut(duration: 0.20)) {
-                    artwork = newArtwork
-                    title = newTitle
-                    artist = newArtist
-                    metadataToken = UUID()
-                }
-            }
-            
             .padding(.horizontal, 16)
             .padding(.bottom, 24) /// отступ между плеером и меню
         }

@@ -134,11 +134,13 @@ final class PlayerViewModel: ObservableObject {
         if metadataByTrackId[trackId] != nil { return }
 
         Task {
-            // ✅ URL резолвим ОДИН раз
+            // URL резолвим ОДИН раз
             guard let url = await BookmarkResolver.url(forTrack: trackId) else { return }
 
             // 1. Метаданные (title / artist / duration)
-            if let meta = await TrackMetadataCacheManager.shared.loadMetadata(for: url) {
+            let meta = await TrackMetadataCacheManager.shared.loadMetadata(for: url)
+
+            if let meta {
                 await MainActor.run {
                     metadataByTrackId[trackId] = meta
 
@@ -151,13 +153,16 @@ final class PlayerViewModel: ObservableObject {
                 }
             }
 
-            // 2. Большой artwork для Lock Screen
-            let artwork = await TrackMetadataCacheManager.shared
-                .loadNowPlayingArtwork(for: url, maxPixel: 512)
+            // 2. Большой artwork для Lock Screen / Control Center (512px)
+            // Берём СЫРЫЕ данные из кэша метаданных и строим CGImage через ImageDownsampler.
+            let nowPlayingCGImage: CGImage? = {
+                guard let data = meta?.artworkData else { return nil }
+                return makeThumbnail(from: data, maxPixel: ArtworkPurposeSizes.maxPixel(for: .nowPlaying))
+            }()
 
             await MainActor.run {
-                if let artwork {
-                    nowPlayingArtworkByTrackId[trackId] = artwork
+                if let nowPlayingCGImage {
+                    nowPlayingArtworkByTrackId[trackId] = nowPlayingCGImage
                 }
 
                 if let current = currentTrackDisplayable,

@@ -15,6 +15,7 @@
 //  Created by Pavel Fomin on 20.12.2025.
 //
 
+import SwiftUI
 import Foundation
 import UIKit
 
@@ -63,7 +64,13 @@ actor AppCommandExecutor {
         let event = ToastEvent.trackMovedInLibrary(
             title: metadata?.title ?? url.lastPathComponent,
             artist: metadata?.artist ?? "",
-            artwork: metadata?.artwork.map { UIImage(cgImage: $0) },
+            artwork: metadata.flatMap {
+                ArtworkProvider.shared.image(
+                    trackId: trackId,
+                    artworkData: $0.artworkData,
+                    purpose: .toast
+                ).map { Image(uiImage: $0) }
+            },
             folderName: folderName
         )
 
@@ -125,7 +132,13 @@ actor AppCommandExecutor {
         let event = ToastEvent.trackAddedToTrackList(
             title: metadata?.title ?? imported.fileName,
             artist: metadata?.artist ?? "",
-            artwork: metadata?.artwork.map { UIImage(cgImage: $0) },
+            artwork: metadata.flatMap {
+                ArtworkProvider.shared.image(
+                    trackId: trackId,
+                    artworkData: $0.artworkData,
+                    purpose: .toast
+                ).map { Image(uiImage: $0) }
+            },
             trackListName: list.name
         )
 
@@ -222,7 +235,13 @@ actor AppCommandExecutor {
         let event = ToastEvent.trackRemovedFromTrackList(
             title: metadata?.title ?? url.lastPathComponent,
             artist: metadata?.artist ?? "",
-            artwork: metadata?.artwork.map { UIImage(cgImage: $0) }
+            artwork: metadata.flatMap {
+                ArtworkProvider.shared.image(
+                    trackId: trackId,
+                    artworkData: $0.artworkData,
+                    purpose: .toast
+                ).map { Image(uiImage: $0) }
+            }
         )
 
         /// 7. Показ тоста
@@ -267,7 +286,13 @@ actor AppCommandExecutor {
         let event = ToastEvent.trackAddedToPlayer(
             title: metadata?.title ?? track.fileName,
             artist: metadata?.artist ?? "",
-            artwork: metadata?.artwork.map { UIImage(cgImage: $0) }
+            artwork: metadata.flatMap {
+                ArtworkProvider.shared.image(
+                    trackId: trackId,
+                    artworkData: $0.artworkData,
+                    purpose: .toast
+                ).map { Image(uiImage: $0) }
+            }
         )
         
         await MainActor.run { ToastManager.shared.handle(event)
@@ -300,7 +325,13 @@ actor AppCommandExecutor {
         let event = ToastEvent.trackRemovedFromPlayer(
             title: metadata?.title ?? url?.lastPathComponent ?? "Трек",
             artist: metadata?.artist ?? "",
-            artwork: metadata?.artwork.map { UIImage(cgImage: $0) }
+            artwork: metadata.flatMap {
+                ArtworkProvider.shared.image(
+                    trackId: trackId,
+                    artworkData: $0.artworkData,
+                    purpose: .toast
+                ).map { Image(uiImage: $0) }
+            }
         )
 
         // 5. Показ тоста

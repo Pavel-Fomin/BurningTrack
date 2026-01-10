@@ -12,6 +12,7 @@ import SwiftUI
 struct ToastView: View {
     
     let data: ToastData
+    
     private let height: CGFloat = 64
     private let rightWidth: CGFloat = 120
     
@@ -22,8 +23,8 @@ struct ToastView: View {
             
             HStack(spacing: 12) {
                 
-                if let artwork = data.artwork {
-                    Image(uiImage: artwork)
+                if let artworkImage = data.artworkImage {
+                    artworkImage
                         .resizable()
                         .scaledToFill()
                         .frame(width: 32, height: 32)
@@ -49,7 +50,7 @@ struct ToastView: View {
                         .truncationMode(.tail)
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)   // ← ВАЖНО
+            .frame(maxWidth: .infinity, alignment: .leading)
             
             // MARK: - Right block (50%)
             
@@ -58,14 +59,14 @@ struct ToastView: View {
                     .font(.title3)
                     .foregroundColor(.green)
                 
-                if data.artwork != nil {
+                if data.artworkImage != nil {
                     Text(data.message)
                         .font(.caption2)
                         .foregroundColor(.green)
                         .lineLimit(1)
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .trailing)  // ← ВАЖНО
+            .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
@@ -75,7 +76,6 @@ struct ToastView: View {
         .shadow(color: .black.opacity(0.12), radius: 12, y: 4)
         .padding(.horizontal, 16)
     }
-    
     
     // MARK: - Text mapping
     

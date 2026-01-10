@@ -10,6 +10,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct LibraryTrackRowWrapper: View {
 
@@ -27,8 +28,6 @@ struct LibraryTrackRowWrapper: View {
     @ObservedObject var playerViewModel: PlayerViewModel
 
     @EnvironmentObject var sheetManager: SheetManager
-
-    @State private var artwork: CGImage? = nil
 
     // MARK: - Player state
 
@@ -51,11 +50,21 @@ struct LibraryTrackRowWrapper: View {
     
     // MARK: - Metadata
     
+    /// Теги
     private var metadata: TrackMetadataCacheManager.CachedMetadata? {
         metadataProvider.metadata(for: track.id)
     }
-    
+    /// Обложка
+    private var artwork: UIImage? {
+        guard let data = metadata?.artworkData else { return nil }
 
+        return ArtworkProvider.shared.image(
+            trackId: track.id,
+            artworkData: data,
+            purpose: .trackList
+        )
+    }
+    
     // MARK: - UI
 
     var body: some View {
@@ -71,11 +80,8 @@ struct LibraryTrackRowWrapper: View {
 
             // Правая зона — воспроизведение / пауза
             onRowTap: {
-                if isCurrent {
-                    playerViewModel.togglePlayPause()
-                } else {
-                    playerViewModel.play(track: track, context: allTracks)
-                }
+                if isCurrent { playerViewModel.togglePlayPause()
+                } else { playerViewModel.play(track: track, context: allTracks)}
             },
 
             // Левая зона — экран "О треке"
@@ -84,24 +90,15 @@ struct LibraryTrackRowWrapper: View {
                     .trackDetail(track)
                 )
             },
-
             trackListNames: trackListNames
         )
-
         .task(id: track.id.uuidString + "|" + (isScrollingFast ? "1" : "0")) {
+            metadataProvider.requestMetadataIfNeeded(for: track.id)
 
             // Обложка
-            if !isScrollingFast && artwork == nil {
-                let img = await ArtworkLoader.loadIfNeeded(
-                    current: artwork,
-                    trackId: track.id
-                )
-                if let img {
-                    await MainActor.run { artwork = img }
-                }
-            }
+            metadataProvider.requestMetadataIfNeeded(for: track.id)
 
-            // Metadata
+            // Теги
             metadataProvider.requestMetadataIfNeeded(for: track.id)
         }
 

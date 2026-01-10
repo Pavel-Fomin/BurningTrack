@@ -24,8 +24,7 @@ final class ToastManager: ObservableObject {
 
     // MARK: - Public state
 
-    /// Текущий тост (nil — ничего не отображается)
-    @Published private(set) var data: ToastData?
+    @Published private(set) var data: ToastData?   /// Текущий тост (nil — ничего не отображается)
 
     // MARK: - Private
 
@@ -73,35 +72,35 @@ final class ToastManager: ObservableObject {
         case let .trackMovedToPlayer(title, artist, artwork):
             return ToastData(
                 style: .track(title: title, artist: artist),
-                artwork: artwork,
+                artworkImage: artwork,
                 message: "Добавлен в плеер"
             )
 
         case let .trackRemovedFromPlayer(title, artist, artwork):
             return ToastData(
                 style: .track(title: title, artist: artist),
-                artwork: artwork,
+                artworkImage: artwork,
                 message: "Удалён из плеера"
             )
             
         case .playerCleared:
             return ToastData(
                 style: .trackList(name: ""),
-                artwork: nil,
+                artworkImage: nil,
                 message: "Плеер очищен"
             )
 
         case let .trackListSaved(name):
             return ToastData(
                 style: .trackList(name: name),
-                artwork: nil,
+                artworkImage: nil,
                 message: "Треклист «\(name)» сохранён"
             )
 
         case let .exportFinished(targetName):
             return ToastData(
                 style: .trackList(name: targetName),
-                artwork: nil,
+                artworkImage: nil,
                 message: "Экспорт завершён"
             )
 
@@ -110,21 +109,21 @@ final class ToastManager: ObservableObject {
         case let .trackAddedToPlayer(title, artist, artwork):
             return ToastData(
                 style: .track(title: title, artist: artist),
-                artwork: artwork,
+                artworkImage: artwork,
                 message: "Добавлен в плеер"
             )
 
         case let .trackAddedToTrackList(title, artist, artwork, trackListName):
             return ToastData(
                 style: .track(title: title, artist: artist),
-                artwork: artwork,
+                artworkImage: artwork,
                 message: "Добавлен в «\(trackListName)»"
             )
 
         case let .trackMovedInLibrary(title, artist, artwork, folderName):
             return ToastData(
                 style: .track(title: title, artist: artist),
-                artwork: artwork,
+                artworkImage: artwork,
                 message: "Перемещён в «\(folderName)»"
             )
 
@@ -133,14 +132,14 @@ final class ToastManager: ObservableObject {
         case let .trackRemovedFromTrackList(title, artist, artwork):
             return ToastData(
                 style: .track(title: title, artist: artist),
-                artwork: artwork,
+                artworkImage: artwork,
                 message: "Удалён из треклиста"
             )
 
         case let .trackListRenamed(newName):
             return ToastData(
                 style: .trackList(name: newName),
-                artwork: nil,
+                artworkImage: nil,
                 message: "Треклист переименован"
             )
 
@@ -149,14 +148,14 @@ final class ToastManager: ObservableObject {
         case let .tagsUpdated(title, artist):
             return ToastData(
                 style: .track(title: title, artist: artist),
-                artwork: nil,
+                artworkImage: nil,
                 message: "Теги обновлены"
             )
 
         case let .fileRenamed(newName):
             return ToastData(
                 style: .trackList(name: newName),
-                artwork: nil,
+                artworkImage: nil,
                 message: "Файл переименован"
             )
         }

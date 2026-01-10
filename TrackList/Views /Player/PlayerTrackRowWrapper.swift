@@ -5,8 +5,8 @@
 //  Created by Pavel Fomin on 03.08.2025.
 //
 
-import Foundation
 import SwiftUI
+import UIKit
 
 struct PlayerTrackRowWrapper: View {
     let track: any TrackDisplayable
@@ -16,12 +16,25 @@ struct PlayerTrackRowWrapper: View {
     
     @ObservedObject var playerViewModel: PlayerViewModel
     
-    @State private var artwork: CGImage? = nil
     @EnvironmentObject var sheetManager: SheetManager
     
+    // MARK: - Metadata
+    
+    /// Теги
     private var metadata: TrackMetadataCacheManager.CachedMetadata? {
         playerViewModel.metadata(for: track.id)
     }
+    /// Обложка
+    private var artwork: UIImage? {
+        guard let data = metadata?.artworkData else { return nil }
+
+        return ArtworkProvider.shared.image(
+            trackId: track.id,
+            artworkData: data,
+            purpose: .trackList)
+    }
+    
+    // MARK: - UI
     
     var body: some View {
             TrackRowView(
@@ -34,20 +47,12 @@ struct PlayerTrackRowWrapper: View {
                 artist: metadata?.artist ?? track.artist ?? "",
                 duration: metadata?.duration ?? track.duration,
 
-                // Правая зона — как и раньше
+                /// Правая зона — как и раньше
                 onRowTap: onTap,
 
-                // Левая зона — экран "О треке"
-                onArtworkTap: {
-                    sheetManager.present(.trackDetail(track))
-                }
+                /// Левая зона — экран "О треке"
+                onArtworkTap: { sheetManager.present(.trackDetail(track)) }
             )
-            .task(id: track.id) {
-                artwork = await ArtworkLoader.loadIfNeeded(
-                    current: artwork,
-                    trackId: track.id
-                )
-            }
             .task(id: track.id) {
                 playerViewModel.requestMetadataIfNeeded(for: track.id)
             }
@@ -56,40 +61,28 @@ struct PlayerTrackRowWrapper: View {
 
             .swipeActions(edge: .trailing, allowsFullSwipe: false) {
 
-                // Удалить
+                /// Удалить
                 Button(role: .destructive) {
                     Task {
-                        try await AppCommandExecutor.shared.removeTrackFromPlayer(
-                            trackId: track.id
-                        )
-                    }
-                } label: {
-                    Label("Удалить", systemImage: "trash")
-                }
+                        try await AppCommandExecutor.shared.removeTrackFromPlayer( trackId: track.id ) }
+                } label: { Label("Удалить", systemImage: "trash")
+}
 
-                // Показать в фонотеке
+                /// Показать в фонотеке
                 Button {
                     SheetActionCoordinator.shared.handle(
                         action: .showInLibrary,
                         track: track,
-                        context: .player
-                    )
-                } label: {
-                    Label("Показать", systemImage: "scope")
-                }
-                .tint(.gray)
+                        context: .player)
+                } label: { Label("Показать", systemImage: "scope") } .tint(.gray)
 
                 // Переместить
                 Button {
                     SheetActionCoordinator.shared.handle(
                         action: .moveToFolder,
                         track: track,
-                        context: .player
-                    )
-                } label: {
-                    Label("Переместить", systemImage: "arrow.right.doc.on.clipboard")
-                }
-                .tint(.blue)
+                        context: .player)
+                } label: { Label("Переместить", systemImage: "arrow.right.doc.on.clipboard") } .tint(.blue)
             }
         }
     }

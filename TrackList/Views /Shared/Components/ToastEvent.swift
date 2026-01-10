@@ -11,7 +11,7 @@
 //  Created by Pavel Fomin on 2026.
 //
 
-import UIKit
+import SwiftUI
 
 enum ToastEvent: Equatable {
 
@@ -21,13 +21,13 @@ enum ToastEvent: Equatable {
     case trackMovedToPlayer(
         title: String,
         artist: String,
-        artwork: UIImage?)
+        artwork: Image?)
     
     /// Удалить из плеера
     case trackRemovedFromPlayer(
         title: String,
         artist: String,
-        artwork: UIImage?)
+        artwork: Image?)
 
     /// Очистить плеер
     case playerCleared
@@ -45,20 +45,20 @@ enum ToastEvent: Equatable {
     case trackAddedToPlayer(
         title: String,
         artist: String,
-        artwork: UIImage?)
+        artwork: Image?)
 
     /// Добавлен в треклист
     case trackAddedToTrackList(
         title: String,
         artist: String,
-        artwork: UIImage?,
+        artwork: Image?,
         trackListName: String)
 
     /// Перемещен
     case trackMovedInLibrary(
         title: String,
         artist: String,
-        artwork: UIImage?,
+        artwork: Image?,
         folderName: String)
     
     
@@ -68,7 +68,7 @@ enum ToastEvent: Equatable {
     case trackRemovedFromTrackList(
         title: String,
         artist: String,
-        artwork: UIImage?)
+        artwork: Image?)
 
     /// Треклист переименован
     case trackListRenamed(newName: String)

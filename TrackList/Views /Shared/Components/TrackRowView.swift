@@ -9,7 +9,6 @@
 
 import SwiftUI
 import UIKit
-import Foundation
 
 struct TrackRowView: View {
 
@@ -19,16 +18,12 @@ struct TrackRowView: View {
     let isCurrent: Bool
     let isPlaying: Bool
     let isHighlighted: Bool
-    let artwork: CGImage?
+    let artwork: UIImage?
     let title: String?
     let artist: String?
     let duration: Double?
-
-    /// Тап по правой части строки (воспроизведение / пауза)
-    let onRowTap: () -> Void
-
-    /// Тап по обложке (например, открытие экрана "О треке")
-    let onArtworkTap: (() -> Void)?
+    let onRowTap: () -> Void        /// Тап по правой части строки (воспроизведение / пауза)
+    let onArtworkTap: (() -> Void)? /// Тап по обложке (например, открытие экрана "О треке")
 
     var trackListNames: [String]? = nil
     var useNativeSwipeActions: Bool = false
@@ -75,7 +70,7 @@ struct TrackRowView: View {
         ZStack {
             if let artwork {
                 RotatingArtworkView(
-                    image: UIImage(cgImage: artwork),
+                    image: artwork,
                     isActive: isCurrent,
                     isPlaying: isPlaying,
                     size: 48,

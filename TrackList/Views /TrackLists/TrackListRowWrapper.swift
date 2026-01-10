@@ -43,7 +43,8 @@ struct TrackListRowWrapper: View {
             isCurrent: isCurrent,
             isPlaying: isPlaying,
             onTap: { onTap(track) },
-            onDelete: { onDelete(IndexSet(integer: index)) }
+            onDelete: { onDelete(IndexSet(integer: index)) },
+            metadataProvider: metadataProvider
         )
         .task(id: track.id) {
             metadataProvider.requestMetadataIfNeeded(for: track.id)

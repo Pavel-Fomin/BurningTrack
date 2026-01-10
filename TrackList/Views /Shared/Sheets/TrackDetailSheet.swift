@@ -11,26 +11,39 @@
 import SwiftUI
 
 struct TrackDetailSheet: View {
+
     let track: any TrackDisplayable
-    
+
+    // MARK: - Runtime state
+
     @State private var resolvedURL: URL?
-    @State private var artwork: UIImage? = nil
+    @State private var artworkImage: Image?
     @State private var tags: [(String, String)] = []
-    
-    
-// MARK: - Обложка+Список
+
+    // MARK: - Future editing support (пока НЕ используется)
+
+    enum EditableField: Hashable {
+        case title, artist, album, genre, comment
+    }
+
+    @State private var editingField: EditableField? = nil
+    @State private var editableValues: [EditableField: String] = [:]
+
+    // MARK: - UI
+
     var body: some View {
         VStack(spacing: 0) {
-            // Обложка
-            if let artwork {
-                Image(uiImage: artwork)
+
+            // MARK: - Artwork
+
+            if let artworkImage {
+                artworkImage
                     .resizable()
                     .aspectRatio(contentMode: .fill)
                     .frame(width: 180, height: 180)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .shadow(radius: 8)
-                    .padding(.top, 20)
-                    .padding(.bottom, 20)
+                    .padding(.vertical, 20)
             } else {
                 RoundedRectangle(cornerRadius: 12)
                     .fill(Color.gray.opacity(0.2))
@@ -40,13 +53,14 @@ struct TrackDetailSheet: View {
                             .font(.system(size: 40))
                             .foregroundColor(.gray)
                     )
-                    .padding(.top, 20)
-                    .padding(.bottom, 20)
+                    .padding(.vertical, 20)
             }
 
-            // Список тегов
+            // MARK: - Info list
+
             List {
-                // 1) Путь к файлу
+
+                // Путь к файлу
                 VStack(alignment: .leading, spacing: 6) {
                     Text("ПУТЬ К ФАЙЛУ")
                         .font(.caption)
@@ -61,12 +75,11 @@ struct TrackDetailSheet: View {
                             .monospaced()
                     } else {
                         Text("—")
-                            .font(.body)
                             .foregroundColor(.secondary)
                     }
                 }
 
-                // 2) Имя файла
+                // Имя файла
                 VStack(alignment: .leading, spacing: 6) {
                     Text("НАЗВАНИЕ ФАЙЛА")
                         .font(.caption)
@@ -79,82 +92,98 @@ struct TrackDetailSheet: View {
                             .lineLimit(3)
                     } else {
                         Text("—")
-                            .font(.body)
                             .foregroundColor(.secondary)
                     }
                 }
 
-                // 3) Теги из TagLib
+                // Теги
                 ForEach(tags, id: \.0) { key, value in
                     VStack(alignment: .leading, spacing: 6) {
                         Text(label(for: key).uppercased())
                             .font(.caption)
                             .foregroundColor(.secondary)
+
                         Text(value.isEmpty ? "—" : value)
                             .font(.body)
                             .foregroundColor(.primary)
                             .lineLimit(4)
-                            .multilineTextAlignment(.leading)
                     }
                 }
             }
             .listStyle(.insetGrouped)
         }
-        .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .background(.clear)
+
+        // MARK: - URL + TagLib (один осознанный IO-проход)
+
         .task {
-            // 1) Резолвим URL через BookmarkResolver
-            if let url = await BookmarkResolver.url(forTrack: track.id) {
-                resolvedURL = url
-            } else {
+            guard let url = await BookmarkResolver.url(forTrack: track.id) else {
                 print("❌ BookmarkResolver: нет URL для трека \(track.id)")
+                return
             }
 
-            // 2) Загружаем теги и обложку
-            await loadMetadata()
+            resolvedURL = url
+            await loadMetadataFromTagLib(url: url)
         }
+
+        // MARK: - Artwork (ТОЛЬКО из cache, без IO)
+
+        .task(id: resolvedURL) {
+            guard
+                let url = resolvedURL,
+                let cached = TrackMetadataCacheManager.shared
+                    .loadMetadataFromCache(url: url)
+            else { return }
+
+            let image = ArtworkProvider.shared.image(
+                trackId: track.id,
+                artworkData: cached.artworkData,
+                purpose: .trackInfoSheet
+            )
+
+            if let image {
+                artworkImage = Image(uiImage: image)
+            }
+        }
+
+        // MARK: - Background
+
         .background(
             ZStack {
-                (artwork?.averageColor ?? Color(.systemGroupedBackground))
-                    .opacity(0.25)       /// базовый цвет обложки
-                Color.black.opacity(0.1) /// мягкая затемняющая подложка
+                Color(.systemGroupedBackground).opacity(0.25)
+                Color.black.opacity(0.1)
             }
             .ignoresSafeArea()
-            .animation(.easeInOut(duration: 0.3), value: artwork)
+            .animation(.easeInOut(duration: 0.3), value: artworkImage)
         )
     }
 
-    
-// MARK: - Загрузка
-    
-    private func loadMetadata() async {
-        guard let url = resolvedURL else { return }
+    // MARK: - TagLib (read-only, подготовлено под inline-edit)
 
+    private func loadMetadataFromTagLib(url: URL) async {
         let tagFile = TLTagLibFile(fileURL: url)
 
-        if let parsed = tagFile.readMetadata() {
-            var result: [(String, String)] = []
+        guard let parsed = tagFile.readMetadata() else {
+            await MainActor.run { tags = [] }
+            return
+        }
 
-            result.append(("title", parsed.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""))
-            result.append(("artist", parsed.artist?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""))
-            result.append(("album", parsed.album?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""))
-            result.append(("genre", parsed.genre?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""))
-            result.append(("comment", parsed.comment?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""))
+        let result: [(String, String)] = [
+            ("title", parsed.title ?? ""),
+            ("artist", parsed.artist ?? ""),
+            ("album", parsed.album ?? ""),
+            ("genre", parsed.genre ?? ""),
+            ("comment", parsed.comment ?? "")
+        ].map { ($0.0, $0.1.trimmingCharacters(in: .whitespacesAndNewlines)) }
 
-            await MainActor.run { self.tags = result }
-
-            if let data = parsed.artworkData,
-               let img = UIImage(data: data) {
-                await MainActor.run { self.artwork = img }
-            }
-        } else {
-            await MainActor.run { self.tags = [] }
+        await MainActor.run {
+            tags = result
         }
     }
-    
-// MARK: - Метки для ключей
-    
+
+    // MARK: - Labels
+
     private func label(for key: String) -> String {
         switch key {
         case "title": return "Название трека"
@@ -165,23 +194,22 @@ struct TrackDetailSheet: View {
         default: return key.capitalized
         }
     }
-    
-    
-// MARK: - Человекочитаемый путь к файлу
+
+    // MARK: - Path formatting
+
     private func displayPath(from url: URL) -> String {
         let path = url.path
 
         if let range = path.range(of: "/File Provider Storage/") {
             let trimmed = String(path[range.upperBound...])
-            let folderURL = URL(fileURLWithPath: trimmed).deletingLastPathComponent()
-            return "iPhone: \(folderURL.path)"
-        } else if let range = path.range(of: "/Mobile Documents/") {
-            let trimmed = String(path[range.upperBound...])
-            let folderURL = URL(fileURLWithPath: trimmed).deletingLastPathComponent()
-            return "iCloud: \(folderURL.path)"
-        } else {
-            // fallback — только папка, без имени файла
-            return url.deletingLastPathComponent().lastPathComponent
+            return "iPhone: \(URL(fileURLWithPath: trimmed).deletingLastPathComponent().path)"
         }
+
+        if let range = path.range(of: "/Mobile Documents/") {
+            let trimmed = String(path[range.upperBound...])
+            return "iCloud: \(URL(fileURLWithPath: trimmed).deletingLastPathComponent().path)"
+        }
+
+        return url.deletingLastPathComponent().lastPathComponent
     }
 }

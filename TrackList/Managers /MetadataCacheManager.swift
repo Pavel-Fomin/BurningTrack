@@ -8,17 +8,13 @@
 //
 
 import Foundation
-import UIKit
-import AVFoundation
-import ImageIO
-
 
 final class TrackMetadataCacheManager: @unchecked Sendable {
     static let shared = TrackMetadataCacheManager()
     
     // Основной кэш для хранения метаданных (NSCache для автоматического сброса при нехватке памяти)
     private let cache = NSCache<NSURL, CachedMetadata>()
- 
+    
     private init() {
         cache.countLimit = 100
         cache.totalCostLimit = 30 * 1024 * 1024 // 30 MB
@@ -31,119 +27,80 @@ final class TrackMetadataCacheManager: @unchecked Sendable {
         cache.object(forKey: url as NSURL)
     }
     
-    // MARK: - Загрузка обложек
-    
-    /// Возвращает UIImage для заданного URL, либо из кэша, либо запрашивает метаданные
-    func loadArtwork(for url: URL) async -> UIImage? {
-        let nsurl = url as NSURL
-        
-        // Если уже есть в кэше — достаём CGImage и оборачиваем в UIImage
-        if let cached = cache.object(forKey: nsurl), let cgImage = cached.artwork {
-            return UIImage(cgImage: cgImage)
-        }
-        
-        // Иначе пробуем загрузить метаданные, в том числе artwork
-        if let metadata = await loadMetadata(for: url), let cgImage = metadata.artwork {
-            return UIImage(cgImage: cgImage)
-        }
-        
-        return nil
-    }
-    
-    // MARK: - Artwork для Now Playing
-
-    func loadNowPlayingArtwork(for url: URL, maxPixel: Int = 512) async -> CGImage? {
-        // Для Now Playing всегда строим отдельный арт нужного размера.
-        // Нельзя использовать cached.artwork, потому что в кэше может лежать UI-арт (например 48px).
-        guard let metadata = try? await MetadataParser.parseMetadata(from: url),
-              let data = metadata.artworkData,
-              let cg = downsampleArtwork(data, maxPixel: maxPixel)
-        else { return nil }
-        
-        return cg
-    }
     
     // MARK: - Загрузка тегов
     
     /// Загружает и кэширует метаданные (теги и обложку)
     func loadMetadata(for url: URL, includeArtwork: Bool = true) async -> CachedMetadata? {
         let nsurl = url as NSURL
-
-        // Если уже есть в кэше — просто вернём (не декодируем заново)
+        
         if let cached = cache.object(forKey: nsurl) {
             return cached
         }
-
-        // Парсим теги (TagLib). Здесь НЕТ декодирования арта.
-        guard let metadata = try? await MetadataParser.parseMetadata(from: url) else { return nil }
-
-        return convertAndCache(metadata, for: nsurl, includeArtwork: includeArtwork)
+        
+        return await _MetadataCoordinator.shared.run(url: url) {
+            guard let metadata = try? await MetadataParser.parseMetadata(from: url) else { return nil }
+            return self.convertAndCache(metadata, for: nsurl, includeArtwork: includeArtwork)
+        }
     }
-   
+    
     
     // MARK: - Обработка и кэширование результата парсинга (с duration)
     
-    private func convertAndCache(_ metadata: TrackMetadata,
-                                 for nsurl: NSURL,
-                                 includeArtwork: Bool) -> CachedMetadata {
-        let maxPixel = 12
-
-        // 1) Если просили арт и он есть — даунсемплим
-        if includeArtwork, let data = metadata.artworkData,
-           let cg = downsampleArtwork(data, maxPixel: maxPixel) {
-            let converted = CachedMetadata(title: metadata.title,
-                                           artist: metadata.artist,
-                                           duration: metadata.duration,
-                                           artwork: cg)
-            cache.setObject(converted, forKey: nsurl, cost: maxPixel * maxPixel * 4)
-            return converted
-        }
-
-        // 2) Без арта: кладём лёгкий объект (artwork = nil), никакого декодирования
-        let light = CachedMetadata(title: metadata.title,
-                                   artist: metadata.artist,
-                                   duration: metadata.duration,
-                                   artwork: nil)
-        cache.setObject(light, forKey: nsurl, cost: 1)
-        return light
+    private func convertAndCache(
+        _ metadata: TrackMetadata,
+        for nsurl: NSURL,
+        includeArtwork: Bool
+    ) -> CachedMetadata {
+        
+        let cached = CachedMetadata(
+            title: metadata.title,
+            artist: metadata.artist,
+            duration: metadata.duration,
+            artworkData: includeArtwork ? metadata.artworkData : nil
+        )
+        
+        // Стоимость считаем по размеру данных, если они есть
+        let cost = metadata.artworkData?.count ?? 1
+        cache.setObject(cached, forKey: nsurl, cost: cost)
+        
+        return cached
     }
     
     
-    // MARK: -   Быстрое даунсемплирование арта
-
-    private func downsampleArtwork(_ data: Data, maxPixel: Int) -> CGImage? {
-        let cfData = data as CFData
-        guard let src = CGImageSourceCreateWithData(cfData, nil) else { return nil }
-        let opts: [CFString: Any] = [
-            kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceThumbnailMaxPixelSize: maxPixel,
-            kCGImageSourceCreateThumbnailWithTransform: true,
-            kCGImageSourceShouldCache: false,
-            kCGImageSourceShouldCacheImmediately: false
-        ]
-        return CGImageSourceCreateThumbnailAtIndex(src, 0, opts as CFDictionary)
-    }
-    
-    
- // MARK: - Внутренний тип, представляющий закэшированные метаданные
+    // MARK: - Внутренний тип, представляющий закэшированные метаданные
     
     final class CachedMetadata: NSObject, @unchecked Sendable {
-        let title: String?
-        let artist: String?
-        let duration: Double?
-        let artwork: CGImage?
-
-        init(title: String?, artist: String?, duration: Double?, artwork: CGImage?) {
+        
+        let title: String?    /// Название
+        let artist: String?   /// Исполнитель
+        let duration: Double? /// Длительность
+        
+        /// Сырые данные обложки (JPEG / PNG и т.п.)
+        /// - единственный источник истины для обложки
+        /// - не декодируется здесь
+        /// - не даунсемплится здесь
+        /// - используется ArtworkProvider'ом
+        let artworkData: Data?
+        
+        init(
+            title: String?,
+            artist: String?,
+            duration: Double?,
+            artworkData: Data?
+        ) {
             self.title = title
             self.artist = artist
             self.duration = duration
-            self.artwork = artwork
+            self.artworkData = artworkData
         }
     }
     
     // MARK: - Встроенный лимитер и дедуп загрузок
     
-    actor _ArtworkSemaphore {
+    /// Семафор для ограничения параллельного парсинга метаданных.
+    /// Используется MetadataCoordinator'ом для дедупликации и троттлинга.
+    actor _MetadataSemaphore {
         private var value: Int
         private var waiters: [CheckedContinuation<Void, Never>] = []
         init(value: Int) { self.value = max(0, value) }
@@ -157,28 +114,36 @@ final class TrackMetadataCacheManager: @unchecked Sendable {
         }
     }
     
-    actor _ArtworkCoordinator {
-        static let shared = _ArtworkCoordinator()
+    actor _MetadataCoordinator {
+        static let shared = _MetadataCoordinator()
         
-        private let sem = _ArtworkSemaphore(value: 6)
-        private var inFlight: [URL: Task<CGImage?, Never>] = [:]
+        private let sem = _MetadataSemaphore(value: 6)
+        private var inFlight: [URL: Task<CachedMetadata?, Never>] = [:]
         
         private func finish(_ url: URL) {
             inFlight[url] = nil
         }
         
-        func run(url: URL, job: @escaping () async -> CGImage?) async -> CGImage? {
-            if let t = inFlight[url] { return await t.value } // дедуп: ждём существующую
+        func run(
+            url: URL,
+            job: @escaping () async -> CachedMetadata?
+        ) async -> CachedMetadata? {
+            
+            if let task = inFlight[url] {
+                return await task.value
+            }
+            
             await sem.acquire()
-            let t = Task<CGImage?, Never> {
+            
+            let task = Task<CachedMetadata?, Never> {
                 let result = await job()
-                self.finish(url)     // свой актор — await не нужен
-                await sem.release()  // чужой актор — await обязателен
+                self.finish(url)
+                await sem.release()
                 return result
             }
             
-            inFlight[url] = t
-            return await t.value
+            inFlight[url] = task
+            return await task.value
         }
         
         func cancel(url: URL) {
@@ -187,14 +152,3 @@ final class TrackMetadataCacheManager: @unchecked Sendable {
         }
     }
 }
-    
-    // MARK: - Фасады внутри кэша:
-    
-    extension TrackMetadataCacheManager {
-        func loadArtworkThrottled(url: URL, build: @escaping () async -> CGImage?) async -> CGImage? {
-            await _ArtworkCoordinator.shared.run(url: url, job: build)
-        }
-        func cancelArtworkLoad(url: URL) {
-            Task { await _ArtworkCoordinator.shared.cancel(url: url) }
-        }
-    }
