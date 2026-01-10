@@ -20,6 +20,8 @@ struct TrackListRowWrapper: View {
     let playerViewModel: PlayerViewModel
     let onTap: (Track) -> Void
     let onDelete: (IndexSet) -> Void
+    
+    @EnvironmentObject var sheetManager: SheetManager
 
     private var displayTrack: Track {
         let meta = metadataProvider.metadata(for: track.id)
@@ -34,6 +36,8 @@ struct TrackListRowWrapper: View {
         )
     }
 
+    // MARK: - UI
+    
     var body: some View {
         let isCurrent = playerViewModel.isCurrent(track, in: .trackList)
         let isPlaying = isCurrent && playerViewModel.isPlaying
@@ -44,24 +48,24 @@ struct TrackListRowWrapper: View {
             isPlaying: isPlaying,
             onTap: { onTap(track) },
             onDelete: { onDelete(IndexSet(integer: index)) },
+            onArtworkTap: {sheetManager.present(.trackDetail(track))},
             metadataProvider: metadataProvider
         )
         .task(id: track.id) {
             metadataProvider.requestMetadataIfNeeded(for: track.id)
         }
 
-        // MARK: - Свайпы треклиста
-
+        // Свайпы треклиста
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
 
-            // Локальное действие — удалить из треклиста
+            /// Локальное дейдалить из треклиста
             Button(role: .destructive) {
                 onDelete(IndexSet(integer: index))
             } label: {
                 Label("Удалить", systemImage: "trash")
             }
 
-            // Глобальное действие — показать в фонотеке
+            /// Глобальное действие — показать в фонотеке
             Button {
                 SheetActionCoordinator.shared.handle(
                     action: .showInLibrary,

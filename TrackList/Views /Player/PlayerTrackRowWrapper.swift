@@ -15,7 +15,6 @@ struct PlayerTrackRowWrapper: View {
     let onTap: () -> Void
     
     @ObservedObject var playerViewModel: PlayerViewModel
-    
     @EnvironmentObject var sheetManager: SheetManager
     
     // MARK: - Metadata
@@ -46,12 +45,8 @@ struct PlayerTrackRowWrapper: View {
                 title: metadata?.title ?? track.title ?? track.fileName,
                 artist: metadata?.artist ?? track.artist ?? "",
                 duration: metadata?.duration ?? track.duration,
-
-                /// Правая зона — как и раньше
-                onRowTap: onTap,
-
-                /// Левая зона — экран "О треке"
-                onArtworkTap: { sheetManager.present(.trackDetail(track)) }
+                onRowTap: onTap,                                            /// Правая зона — как и раньше
+                onArtworkTap: { sheetManager.present(.trackDetail(track)) } /// Левая зона — экран "О треке"
             )
             .task(id: track.id) {
                 playerViewModel.requestMetadataIfNeeded(for: track.id)
@@ -76,7 +71,7 @@ struct PlayerTrackRowWrapper: View {
                         context: .player)
                 } label: { Label("Показать", systemImage: "scope") } .tint(.gray)
 
-                // Переместить
+                /// Переместить
                 Button {
                     SheetActionCoordinator.shared.handle(
                         action: .moveToFolder,

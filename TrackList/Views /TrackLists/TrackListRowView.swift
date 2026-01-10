@@ -21,6 +21,7 @@ struct TrackListRowView: View {
     let isPlaying: Bool
     let onTap: () -> Void     /// Тап по строке (воспроизведение / пауза)
     let onDelete: () -> Void  /// Удаление строки (локальное действие)
+    let onArtworkTap: () -> Void
     let metadataProvider: TrackMetadataProviding
     
     
@@ -53,7 +54,7 @@ struct TrackListRowView: View {
             artist: track.artist ?? "",
             duration: track.duration,
             onRowTap: onTap,                       /// Правая зона — воспроизведение / пауза
-            onArtworkTap: {}                       /// Левая зона — делегируется выше (wrapper решает, что делать)
+            onArtworkTap: onArtworkTap                     /// Левая зона — делегируется выше (wrapper решает, что делать)
         )
         
         .padding(.vertical, 4)
