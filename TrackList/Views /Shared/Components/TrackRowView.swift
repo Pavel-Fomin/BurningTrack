@@ -22,41 +22,98 @@ struct TrackRowView: View {
     let title: String?
     let artist: String?
     let duration: Double?
-    let onRowTap: () -> Void        /// Тап по правой части строки (воспроизведение / пауза)
-    let onArtworkTap: (() -> Void)? /// Тап по обложке (например, открытие экрана "О треке")
-
+    let onRowTap: () -> Void          /// Тап по правой части строки (воспроизведение / пауза)
+    let onArtworkTap: (() -> Void)?   /// Тап по обложке (например, открытие экрана "О треке")
+    let showsSelection: Bool          /// Показывать radio или нет
+    let isSelected: Bool              /// Radio (пустой / выбранный)
+    let onToggleSelection: (() -> Void)?
+    
     var trackListNames: [String]? = nil
     var useNativeSwipeActions: Bool = false
 
+    
+    init(
+        track: any TrackDisplayable,
+        isCurrent: Bool,
+        isPlaying: Bool,
+        isHighlighted: Bool,
+        artwork: UIImage?,
+        title: String?,
+        artist: String?,
+        duration: Double?,
+        onRowTap: @escaping () -> Void,
+        onArtworkTap: (() -> Void)?,
+        showsSelection: Bool = false,
+        isSelected: Bool = false,
+        onToggleSelection: (() -> Void)? = nil,
+        trackListNames: [String]? = nil,
+        useNativeSwipeActions: Bool = false
+    ) {
+        self.track = track
+        self.isCurrent = isCurrent
+        self.isPlaying = isPlaying
+        self.isHighlighted = isHighlighted
+        self.artwork = artwork
+        self.title = title
+        self.artist = artist
+        self.duration = duration
+        self.onRowTap = onRowTap
+        self.onArtworkTap = onArtworkTap
+        self.showsSelection = showsSelection
+        self.isSelected = isSelected
+        self.onToggleSelection = onToggleSelection
+        self.trackListNames = trackListNames
+        self.useNativeSwipeActions = useNativeSwipeActions
+    }
     // MARK: - UI
 
     var body: some View {
         HStack(spacing: 12) {
 
-            // Левая зона — обложка
-            artworkView
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    guard track.isAvailable else {
-                        print("❌ Трек недоступен: \(track.title ?? track.fileName)")
-                        return
-                    }
+            HStack(spacing: 12) {
 
-                    // Если обработчик не передан — ничего не делаем
-                    onArtworkTap?()
+                // Radio (только в режиме выбора)
+                if showsSelection {
+                    Button {
+                        guard !isCurrent else { return }   // на всякий случай
+                        onToggleSelection?()
+                    } label: {
+                        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundColor(
+                                isCurrent
+                                    ? .secondary
+                                    : (isSelected ? .green : .secondary)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .frame(width: 44, height: 44)         // ← фикс: одинаково для всех строк
+                    .contentShape(Rectangle())
+                    .disabled(isCurrent)                  // ← текущий трек не выбирается
                 }
 
-            // Правая зона — информация о треке
-            trackInfoView
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    guard track.isAvailable else {
-                        print("❌ Трек недоступен: \(track.title ?? track.fileName)")
-                        return
+                // Левая зона — обложка
+                artworkView
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        guard track.isAvailable else {
+                            print("❌ Трек недоступен: \(track.title ?? track.fileName)")
+                            return
+                        }
+                        onArtworkTap?()
                     }
 
-                    onRowTap()
-                }
+                // Правая зона — информация о треке
+                trackInfoView
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        guard track.isAvailable else {
+                            print("❌ Трек недоступен: \(track.title ?? track.fileName)")
+                            return
+                        }
+                        onRowTap()
+                    }
+            }
         }
         .padding(.vertical, 0)
         .padding(.horizontal, 4)

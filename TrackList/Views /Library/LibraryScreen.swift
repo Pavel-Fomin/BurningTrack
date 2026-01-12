@@ -92,7 +92,6 @@ struct LibraryScreen: View {
                     playerViewModel: playerViewModel
                 )
                 .environmentObject(folderVM)
-                .libraryToolbar(title: folder.name)
 
             } else {
                 Text("❌ Папка не найдена")

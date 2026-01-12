@@ -14,6 +14,7 @@ import SwiftUI
 struct LibraryTrackSectionView: View {
 
     let title: String
+    
     let tracks: [LibraryTrack]
     let allTracks: [LibraryTrack]
 
@@ -26,6 +27,9 @@ struct LibraryTrackSectionView: View {
 
     let isScrollingFast: Bool
     let revealedTrackID: UUID?
+    
+    let isSelecting: Bool
+    @Binding var selection: Set<UUID>
 
     var body: some View {
         Section(header: Text(title).font(.headline).id(title)) {
@@ -39,6 +43,15 @@ struct LibraryTrackSectionView: View {
                     metadataProvider: metadataProvider,
                     isScrollingFast: isScrollingFast,
                     isRevealed: track.id == revealedTrackID,
+                    showsSelection: isSelecting,
+                    isSelected: selection.contains(track.id),
+                    onToggleSelection: {
+                        if selection.contains(track.id) {
+                            selection.remove(track.id)
+                        } else {
+                            selection.insert(track.id)
+                        }
+                    },
                     playerViewModel: playerViewModel
                 )
                 .id(track.id)

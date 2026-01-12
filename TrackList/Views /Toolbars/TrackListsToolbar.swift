@@ -10,17 +10,21 @@
 import SwiftUI
 
 struct TrackListsToolbar: ViewModifier {
+
+    // MARK: - UI
+    
     func body(content: Content) -> some View {
         content
             .screenToolbar(
                 title: "Треклисты",
-                leading: { EmptyView() },
-                trailing: { EmptyView() }
+                leading: { EmptyView() }
             )
     }
 }
 
+// MARK: - Modifier
 extension View {
+    
     func trackListsToolbar() -> some View {
         self.modifier(TrackListsToolbar())
     }

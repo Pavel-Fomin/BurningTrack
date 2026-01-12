@@ -11,14 +11,23 @@
 import SwiftUI
 
 struct LibraryToolbar: ViewModifier {
-    let title: String
 
+    let title: String
+    let subtitle: String?
+
+    init(title: String, subtitle: String? = nil) {
+        self.title = title
+        self.subtitle = subtitle
+    }
+    
+    // MARK: - UI
+    
     func body(content: Content) -> some View {
         content
             .screenToolbar(
                 title: title,
-                leading: { EmptyView() },
-                trailing: { EmptyView() }
+                subtitle: subtitle,
+                leading: { EmptyView() }
             )
     }
 }
@@ -26,7 +35,16 @@ struct LibraryToolbar: ViewModifier {
 // MARK: - Modifier
 
 extension View {
-    func libraryToolbar(title: String) -> some View {
-        self.modifier(LibraryToolbar(title: title))
+
+    func libraryToolbar(
+        title: String,
+        subtitle: String? = nil
+    ) -> some View {
+        self.modifier(
+            LibraryToolbar(
+                title: title,
+                subtitle: subtitle
+            )
+        )
     }
 }

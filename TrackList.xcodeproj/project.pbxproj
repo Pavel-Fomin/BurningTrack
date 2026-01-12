@@ -67,6 +67,13 @@
 			);
 			target = A97C86272DA326C000ED2E99 /* TrackList */;
 		};
+		A9E247AC2F12D3CE00169DB2 /* Exceptions for "Documentation" folder in "TrackList" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				MULTISELECT_ACTIONS.md,
+			);
+			target = A97C86272DA326C000ED2E99 /* TrackList */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
@@ -107,6 +114,14 @@
 			path = Libraries;
 			sourceTree = "<group>";
 		};
+		A9E247A92F12D3AE00169DB2 /* Documentation */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				A9E247AC2F12D3CE00169DB2 /* Exceptions for "Documentation" folder in "TrackList" target */,
+			);
+			path = Documentation;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -139,6 +154,7 @@
 		A97C861F2DA326C000ED2E99 = {
 			isa = PBXGroup;
 			children = (
+				A9E247A92F12D3AE00169DB2 /* Documentation */,
 				A9B8BF8D2F0986F1004E4000 /* Libraries */,
 				A97C862A2DA326C000ED2E99 /* TrackList */,
 				A97C86382DA326C200ED2E99 /* TrackListTests */,

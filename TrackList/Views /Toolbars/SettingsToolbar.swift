@@ -10,19 +10,23 @@
 import SwiftUI
 
 struct SettingsToolbar: ViewModifier {
+
+// MARK: - UI
+    
     func body(content: Content) -> some View {
         content
             .screenToolbar(
                 title: "Настройки",
-                leading: { EmptyView() },
-                trailing: { EmptyView() }
+                leading: { EmptyView() }
             )
     }
 }
 
+// MARK: - Modifier
+
 extension View {
+
     func settingsToolbar() -> some View {
         self.modifier(SettingsToolbar())
     }
 }
-

@@ -24,7 +24,10 @@ struct LibraryTracksView: View {
     
     @State private var scrollTargetID: UUID?
     @State private var revealedTrackID: UUID?
+    @State private var isSelecting = false
+    @State private var selection = Set<UUID>()
     
+    // MARK: - Init
     
     init(
         folder: LibraryFolder,
@@ -43,6 +46,7 @@ struct LibraryTracksView: View {
 
     var body: some View {
         ZStack {
+
             ScrollViewReader { proxy in
                 List {
                     LibraryTrackSectionsListView(
@@ -53,7 +57,9 @@ struct LibraryTracksView: View {
                         metadataProvider: tracksViewModel,
                         playerViewModel: playerViewModel,
                         isScrollingFast: scrollSpeed.isFast,
-                        revealedTrackID: revealedTrackID
+                        revealedTrackID: revealedTrackID,
+                        isSelecting: isSelecting,
+                        selection: $selection
                     )
                 }
                 .listStyle(.plain)
@@ -61,8 +67,6 @@ struct LibraryTracksView: View {
                 .safeAreaInset(edge: .bottom) {
                     Color.clear.frame(height: 88)
                 }
-
-               
 
                 // Как только появилась цель — скроллим
                 .onChange(of: scrollTargetID) { _, id in
@@ -88,15 +92,25 @@ struct LibraryTracksView: View {
                 .background(Color(.systemBackground).opacity(0.9))
             }
         }
-
+        // ⬇️ ТУЛБАР — ВОТ ЗДЕСЬ, СНАРУЖИ
+        .libraryTracksToolbar(
+            title: folder.name,
+            isSelecting: $isSelecting,
+            selectedCount: selection.count,
+            onTapSelect: {
+                isSelecting = true
+            },
+            onTapCancel: {
+                isSelecting = false
+                selection.removeAll()
+            }
+        )
         .refreshable {
             await tracksViewModel.refresh()
         }
-
         .task {
             await tracksViewModel.loadTracksIfNeeded()
         }
-
         .onChange(of: sheetManager.dismissCounter) { _, _ in
             Task {
                 await tracksViewModel.refresh()

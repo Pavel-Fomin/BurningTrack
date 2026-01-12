@@ -27,6 +27,8 @@ struct LibraryFolderView: View {
 
     @ObservedObject private var nav = NavigationCoordinator.shared
     @EnvironmentObject var viewModel: LibraryFolderViewModel
+    
+    @State private var selection = Set<UUID>()
 
     // MARK: - UI
 
@@ -39,20 +41,21 @@ struct LibraryFolderView: View {
                     folder: viewModel.folder,
                     trackListViewModel: trackListViewModel,
                     playerViewModel: playerViewModel
+                
                 )
 
             case .subfolders:
-                List {
-                    folderSectionView()
-                }
-                .listStyle(.insetGrouped)
+                List { folderSectionView() }
+                    .listStyle(.insetGrouped)
+                    .libraryToolbar(title: viewModel.folder.name)
 
             case .empty:
                 Color.clear
+                    .libraryToolbar(title: viewModel.folder.name)
             }
         }
     }
-
+    
     // MARK: - Секция подпапок
 
     @ViewBuilder

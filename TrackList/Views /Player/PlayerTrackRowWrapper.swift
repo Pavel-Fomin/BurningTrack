@@ -45,8 +45,9 @@ struct PlayerTrackRowWrapper: View {
                 title: metadata?.title ?? track.title ?? track.fileName,
                 artist: metadata?.artist ?? track.artist ?? "",
                 duration: metadata?.duration ?? track.duration,
-                onRowTap: onTap,                                            /// Правая зона — как и раньше
-                onArtworkTap: { sheetManager.present(.trackDetail(track)) } /// Левая зона — экран "О треке"
+                onRowTap: onTap,
+                onArtworkTap: { sheetManager.present(.trackDetail(track)) },
+                
             )
             .task(id: track.id) {
                 playerViewModel.requestMetadataIfNeeded(for: track.id)

@@ -13,36 +13,40 @@ import SwiftUI
 import UIKit
 
 struct LibraryTrackRowWrapper: View {
-
+    
     let track: LibraryTrack
     let allTracks: [LibraryTrack]
-
+    
     let trackListViewModel: TrackListViewModel
     let trackListNamesById: [UUID: [String]]
-
+    
     let metadataProvider: TrackMetadataProviding
-
+    
     let isScrollingFast: Bool
     let isRevealed: Bool
-
+    
+    let showsSelection: Bool
+    let isSelected: Bool
+    
+    let onToggleSelection: () -> Void
+    
     @ObservedObject var playerViewModel: PlayerViewModel
-
     @EnvironmentObject var sheetManager: SheetManager
-
+    
     // MARK: - Player state
-
+    
     private var isCurrent: Bool {
         playerViewModel.isCurrent(track, in: .library)
     }
-
+    
     private var isPlaying: Bool {
         isCurrent && playerViewModel.isPlaying
     }
-
+    
     private var trackListNames: [String] {
         trackListNamesById[track.id] ?? []
     }
-
+    
     private var isHighlighted: Bool {
         sheetManager.highlightedTrackID == track.id
     }
@@ -57,7 +61,7 @@ struct LibraryTrackRowWrapper: View {
     /// Обложка
     private var artwork: UIImage? {
         guard let data = metadata?.artworkData else { return nil }
-
+        
         return ArtworkProvider.shared.image(
             trackId: track.id,
             artworkData: data,
@@ -66,7 +70,7 @@ struct LibraryTrackRowWrapper: View {
     }
     
     // MARK: - UI
-
+    
     var body: some View {
         TrackRowView(
             track: track,
@@ -77,72 +81,75 @@ struct LibraryTrackRowWrapper: View {
             title: metadata?.title ?? track.title,
             artist: metadata?.artist ?? track.artist ?? "",
             duration: metadata?.duration ?? track.duration,
-
-            // Правая зона — воспроизведение / пауза
             onRowTap: {
-                if isCurrent { playerViewModel.togglePlayPause()
-                } else { playerViewModel.play(track: track, context: allTracks)}
+                if isCurrent {
+                    playerViewModel.togglePlayPause()
+                } else {
+                    playerViewModel.play(track: track, context: allTracks)
+                }
             },
-
-            // Левая зона — экран "О треке"
             onArtworkTap: {
-                sheetManager.present(
-                    .trackDetail(track)
-                )
+                sheetManager.present(.trackDetail(track))
             },
+            showsSelection: showsSelection,
+            isSelected: isSelected,
+            onToggleSelection: onToggleSelection,
             trackListNames: trackListNames
         )
         .task(id: track.id.uuidString + "|" + (isScrollingFast ? "1" : "0")) {
             metadataProvider.requestMetadataIfNeeded(for: track.id)
-
-            // Обложка
-            metadataProvider.requestMetadataIfNeeded(for: track.id)
-
-            // Теги
-            metadataProvider.requestMetadataIfNeeded(for: track.id)
         }
-
-        // MARK: - Системные свайпы (В плеер / В треклист / Ещё)
-
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            
-            // Добавить в плеер
-            Button {
-                Task {
-                    do {
-                        try await AppCommandExecutor.shared.addTrackToPlayer(
+            if !showsSelection {
+
+                // Добавить в плеер
+                Button {
+                    Task {
+                        try? await AppCommandExecutor.shared.addTrackToPlayer(
                             trackId: track.id
                         )
-                    } catch {
-                        print("❌ Ошибка добавления в плеер: \(error)")
                     }
+                } label: {
+                    Label("В плеер", systemImage: "waveform")
                 }
-            } label: {
-                Label("В плеер", systemImage: "waveform")
-            }
-            .tint(.blue)
+                .tint(.blue)
 
-                    // Добавить в треклист
-                    Button {
-                        sheetManager.present(
-                            .addToTrackList(
-                                AddToTrackListSheetData(track: track)
-                            )
-                        )
-                    } label: { Label("В треклист", systemImage: "list.star")
-                    }
-                    .tint(.green)
-
-                    // Переместить
-                    Button {
-                        SheetActionCoordinator.shared.handle(
-                            action: .moveToFolder,
-                            track: track,
-                            context: .library
-                        )
-                    } label: { Label("Переместить", systemImage: "arrow.right.doc.on.clipboard")
-                    }
-                    .tint(.gray)
+                // Добавить в треклист
+                Button {
+                    sheetManager.present(
+                        .addToTrackList(AddToTrackListSheetData(track: track))
+                    )
+                } label: {
+                    Label("В треклист", systemImage: "list.star")
                 }
+                .tint(.green)
+
+                // Переместить
+                Button {
+                    SheetActionCoordinator.shared.handle(
+                        action: .moveToFolder,
+                        track: track,
+                        context: .library
+                    )
+                } label: {
+                    Label("Переместить", systemImage: "arrow.right.doc.on.clipboard")
+                }
+                .tint(.gray)
             }
         }
+    }
+}
+
+private extension View {
+        @ViewBuilder
+        func swipeIf(
+            _ enabled: Bool,
+            @ViewBuilder actions: (Self) -> some View
+        ) -> some View {
+            if enabled {
+                actions(self)
+            } else {
+                self
+            }
+        }
+    }

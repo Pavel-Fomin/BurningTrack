@@ -10,22 +10,27 @@
 import SwiftUI
 
 struct PlayerToolbar: ViewModifier {
-    var trackCount: Int
-    var onSave: () -> Void
-    var onExport: () -> Void
-    var onClear: () -> Void
+
+    let trackCount: Int
+    let onSave: () -> Void
+    let onExport: () -> Void
+    let onClear: () -> Void
+
+    // MARK: - UI
     
     func body(content: Content) -> some View {
         content
             .screenToolbar(
                 title: "Плеер",
-                leading: { EmptyView() },
-                trailing: {
+                leading: { EmptyView() }
+            )
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         Button("Сохранить треклист") {
                             SheetManager.shared.presentSaveTrackList()
                         }
-                        
+
                         Button(action: onExport) {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Записать треклист")
@@ -34,32 +39,39 @@ struct PlayerToolbar: ViewModifier {
                                     .foregroundColor(.secondary)
                             }
                         }
-                        
+
                         Button("Очистить треклист", role: .destructive) {
-                            Task { await AppCommandExecutor.shared.clearPlayer()
+                            Task {
+                                await AppCommandExecutor.shared.clearPlayer()
                             }
                         }
-                        
-                    } label: { Image(systemName: "ellipsis")
+
+                    } label: {
+                        Image(systemName: "ellipsis")
                             .font(.system(size: 18, weight: .semibold))
                     }
                 }
-            )
+            }
     }
 }
 
+// MARK: - Modifier
+
 extension View {
+
     func playerToolbar(
         trackCount: Int,
         onSave: @escaping () -> Void,
         onExport: @escaping () -> Void,
         onClear: @escaping () -> Void
     ) -> some View {
-        self.modifier(PlayerToolbar(
-            trackCount: trackCount,
-            onSave: onSave,
-            onExport: onExport,
-            onClear: onClear
-        ))
+        self.modifier(
+            PlayerToolbar(
+                trackCount: trackCount,
+                onSave: onSave,
+                onExport: onExport,
+                onClear: onClear
+            )
+        )
     }
 }

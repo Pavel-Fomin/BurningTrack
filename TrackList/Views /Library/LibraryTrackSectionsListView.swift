@@ -25,6 +25,10 @@ struct LibraryTrackSectionsListView: View {
     
     let isScrollingFast: Bool
     let revealedTrackID: UUID?
+    
+    let isSelecting: Bool
+    
+    @Binding var selection: Set<UUID>
 
     var body: some View {
         ForEach(sections, id: \.id) { section in
@@ -37,7 +41,10 @@ struct LibraryTrackSectionsListView: View {
                 playerViewModel: playerViewModel,
                 metadataProvider: metadataProvider,
                 isScrollingFast: isScrollingFast,
-                revealedTrackID: revealedTrackID
+                revealedTrackID: revealedTrackID,
+                isSelecting: isSelecting,
+                selection: $selection
+               
             )
         }
     }
