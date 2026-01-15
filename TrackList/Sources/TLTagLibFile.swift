@@ -2,28 +2,38 @@
 //  TLTagLibFile.swift
 //  TrackList
 //
-//  Обёртка над C API TagLib для чтения аудиотегов из Swift
-//  Используется внутри MetadataParser, возвращает данные в формате TrackMetadata
+//  Низкоуровневая Swift-обёртка над C API TagLib.
+//  Предоставляет унифицированный доступ к аудиотегам файла
+//  без привязки к конкретному сценарию использования.
+//
+//  Используется различными слоями приложения:
+//  - RuntimeMetadataParser (минимальный runtime-набор тегов)
+//  - TrackTagInspector (расширенный набор тегов для инспекции)
+//
+//  Не содержит UI-логики и не знает о потребителях данных.
+//  Отдаёт «сырые» значения тегов в нейтральном формате.
 //
 //  Created by Pavel Fomin on 21.06.2025.
 //
 
 import Foundation
 
-// Обёртка над C++ API TagLib для чтения тегов
+/// Обёртка над C API TagLib для чтения тегов аудиофайла.
+/// Является общим low-level адаптером для всех read-сценариев.
 public class TLTagLibFile {
     
-    // Путь к аудиофайлу
+    /// Путь к аудиофайлу на диске
     private let filePath: String
     
-    // Инициализация с использованием URL аудиофайла
+    /// Инициализация с использованием URL аудиофайла
     public init(fileURL: URL) {
         self.filePath = fileURL.path
     }
     
-    // MARK: - Структура для хранения считанных тегов
-
-    // Теги, считанные напрямую из TagLib (внутренний формат)
+    // MARK: - Внутреннее представление тегов
+    
+    /// Нейтральная структура с тегами, считанными напрямую из TagLib.
+    /// Не является runtime-моделью и не предназначена для прямого использования в UI.
     public struct ParsedMetadata {
         public let title: String?
         public let artist: String?
@@ -33,17 +43,18 @@ public class TLTagLibFile {
         public let artworkData: Data?
     }
     
-    // MARK: - Основной метод чтения тегов
-
-    // Возвращает сырые метаданные из TagLib
+    // MARK: - Чтение тегов из TagLib
+    
+    /// Считывает доступные теги из файла через TagLib.
+    /// Возвращает «сырые» данные без форматирования и бизнес-логики.
     public func readMetadata() -> ParsedMetadata? {
         
-        // Вызываем C-функцию из обёртки (TLTagLibFile.m)
+        // Вызов C-функции из Objective-C обёртки (TLTagLibFile.m)
         guard let result = _readMetadata(filePath) else {
-               return nil
+            return nil
         }
 
-        // Оборачиваем в структуру Swift
+        // Преобразование в Swift-структуру
         return ParsedMetadata(
             title: result.title,
             artist: result.artist,
@@ -54,12 +65,14 @@ public class TLTagLibFile {
         )
     }
     
-    // MARK: - Преобразование в TrackMetadata
+    // MARK: - Runtime-адаптация
     
-    // Возвращает метаданные в формате TrackMetadata
+    /// Преобразует считанные теги в runtime-модель TrackMetadata.
+    /// Используется runtime-парсером для списка и плеера.
+    /// Не применяется для инспекции или редактирования тегов.
     func readMetadata(duration: TimeInterval?) -> TrackMetadata {
         
-        // Если TagLib не смог прочитать теги — возвращаем пустую структуру
+        // Если TagLib не смог прочитать теги — возвращаем пустую runtime-модель
         guard let parsed = readMetadata() else {
             return TrackMetadata(
                 artist: nil,
@@ -71,7 +84,7 @@ public class TLTagLibFile {
             )
         }
 
-        // Формируем TrackMetadata (с длительностью)
+        // Формирование runtime-модели с учётом длительности
         return TrackMetadata(
             artist: parsed.artist,
             title: parsed.title,
