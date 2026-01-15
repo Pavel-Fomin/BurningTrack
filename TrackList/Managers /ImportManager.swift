@@ -22,7 +22,7 @@ final class ImportManager {
         for url in urls {
 
             // 1. Метаданные (опционально)
-            let metadata = try? await MetadataParser.parseMetadata(from: url)
+            let metadata = try? await RuntimeMetadataParser.parseMetadata(from: url)
 
             // 2. Постоянный trackId через слой идентичности
             let trackId = await TrackIdentityResolver.shared.trackId(for: url)

@@ -39,7 +39,7 @@ final class TrackMetadataCacheManager: @unchecked Sendable {
         }
         
         return await _MetadataCoordinator.shared.run(url: url) {
-            guard let metadata = try? await MetadataParser.parseMetadata(from: url) else { return nil }
+            guard let metadata = try? await RuntimeMetadataParser.parseMetadata(from: url) else { return nil }
             return self.convertAndCache(metadata, for: nsurl, includeArtwork: includeArtwork)
         }
     }

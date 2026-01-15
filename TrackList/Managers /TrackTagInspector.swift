@@ -1,5 +1,5 @@
 //
-//  MetadataReader.swift
+//  TrackTagInspector.swift
 //  TrackList
 //
 //  Читает теги из TagLib(только те, что парсим)
@@ -28,8 +28,8 @@ struct TrackMetadataSection: Identifiable {
 // MARK: - Чтение и форматирование тегов
 
 @MainActor
-final class MetadataReader {
-    static let shared = MetadataReader()
+final class TrackTagInspector {
+    static let shared = TrackTagInspector()
     private init() {}
     
     /// Считывает метаданные из файла и подготавливает их для отображения в шите

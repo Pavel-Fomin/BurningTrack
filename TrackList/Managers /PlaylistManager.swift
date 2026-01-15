@@ -64,7 +64,7 @@ final class PlaylistManager: ObservableObject {
         }
 
         let fileName = url.lastPathComponent
-        let metadata = try? await MetadataParser.parseMetadata(from: url)
+        let metadata = try? await RuntimeMetadataParser.parseMetadata(from: url)
 
         let title = metadata?.title ?? url.deletingPathExtension().lastPathComponent
         let artist = metadata?.artist

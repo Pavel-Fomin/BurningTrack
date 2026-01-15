@@ -71,6 +71,7 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				MULTISELECT_ACTIONS.md,
+				README.md,
 			);
 			target = A97C86272DA326C000ED2E99 /* TrackList */;
 		};

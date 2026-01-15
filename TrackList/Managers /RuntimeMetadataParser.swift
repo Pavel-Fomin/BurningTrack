@@ -1,5 +1,5 @@
 //
-//  MetadataParser.swift
+//  RuntimeMetadataParser.swift
 //  TrackList
 //
 //  Парсер тегов и длительности трека
@@ -29,7 +29,7 @@ struct TrackMetadata {
 
 /// Асинхронный парсер метаданных трека
 /// Получает длительность через AVAsset и передаёт URL в TLTagLibFile для разбора тегов
-final class MetadataParser {
+final class RuntimeMetadataParser {
      
     /// Извлекает длительность (через AVFoundation) и метаданные (через TagLib)
     /// - Parameter url: Путь к аудиофайлу
