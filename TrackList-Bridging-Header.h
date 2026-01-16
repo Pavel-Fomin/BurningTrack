@@ -12,3 +12,5 @@
 
 // Подключение обёртки над TagLib
 #import "TLTagLibFile.h"
+
+#import "TLTagLibTagWriter.h"

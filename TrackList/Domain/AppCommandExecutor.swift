@@ -28,8 +28,9 @@ import UIKit
 ///
 actor AppCommandExecutor {
     
-    // MARK: - Singleton
-    
+    // MARK: - Зависимости
+
+    private let tagsWriter: TagsWriter = TagLibTagsWriter()
     static let shared = AppCommandExecutor()
     private init() {}
     
@@ -354,6 +355,37 @@ actor AppCommandExecutor {
         // 2. ToastEvent
         await MainActor.run {
             ToastManager.shared.handle(.playerCleared)
+        }
+    }
+    
+    
+    // MARK: - Обновить теги трека
+
+    func updateTrackTags(
+        trackId: UUID,
+        patch: TagWritePatch
+    ) async throws {
+
+        // 1. Резолв URL трека через bookmark
+        guard let url = await BookmarkResolver.url(forTrack: trackId) else {
+            throw TagWriteError.fileNotFound
+        }
+
+        // 2. Запись тегов (файл уже с открытым доступом)
+        try await tagsWriter.writeTags(to: url, patch: patch)
+
+        // 3. Инвалидация и обновление кэша метаданных
+        let metadata = await TrackMetadataCacheManager.shared.loadMetadata(for: url)
+
+        // 4. ToastEvent
+        let event = ToastEvent.tagsUpdated(
+            title: metadata?.title ?? url.lastPathComponent,
+            artist: metadata?.artist ?? ""
+        )
+
+        // 5. Показ тоста
+        await MainActor.run {
+            ToastManager.shared.handle(event)
         }
     }
 }

@@ -70,7 +70,9 @@
 		A9E247AC2F12D3CE00169DB2 /* Exceptions for "Documentation" folder in "TrackList" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				METADATA_ARCHITECTURE.md,
 				MULTISELECT_ACTIONS.md,
+				PROJECT_STRUCTURE.md,
 				README.md,
 			);
 			target = A97C86272DA326C000ED2E99 /* TrackList */;
