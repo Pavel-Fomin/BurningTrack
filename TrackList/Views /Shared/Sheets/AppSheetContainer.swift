@@ -23,11 +23,14 @@ struct AppSheetContainer<Content: View>: View {
     }
 
     var body: some View {
-            content
-                .background(.clear)
-                .presentationBackground(.clear)
-                .mask(RoundedRectangle(cornerRadius: 22, style: .continuous))
-                .presentationDetents(detents)
-                .presentationDragIndicator(.hidden)
-        }
+        content
+            .mask(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .presentationDetents(detents)
+            .presentationDragIndicator(.hidden)
+            .presentationBackground(
+                detents.contains(.large)
+                ? Color(.systemGroupedBackground)
+                : .clear
+            )
     }
+}

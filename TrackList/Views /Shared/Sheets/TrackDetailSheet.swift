@@ -33,9 +33,7 @@ struct TrackDetailSheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
-
-            // MARK: - Artwork
-
+            // Artwork
             if let artworkImage {
                 artworkImage
                     .resizable()
@@ -55,17 +53,15 @@ struct TrackDetailSheet: View {
                     )
                     .padding(.vertical, 20)
             }
-
-            // MARK: - Info list
-
+            
+            // Info list
             List {
-
-                // Путь к файлу
+                /// Путь к файлу
                 VStack(alignment: .leading, spacing: 6) {
                     Text("ПУТЬ К ФАЙЛУ")
                         .font(.caption)
                         .foregroundColor(.secondary)
-
+                    
                     if let url = resolvedURL {
                         Text(displayPath(from: url))
                             .font(.body)
@@ -78,13 +74,13 @@ struct TrackDetailSheet: View {
                             .foregroundColor(.secondary)
                     }
                 }
-
-                // Имя файла
+                
+                /// Имя файла
                 VStack(alignment: .leading, spacing: 6) {
                     Text("НАЗВАНИЕ ФАЙЛА")
                         .font(.caption)
                         .foregroundColor(.secondary)
-
+                    
                     if let url = resolvedURL {
                         Text(url.deletingPathExtension().lastPathComponent)
                             .font(.body)
@@ -95,14 +91,14 @@ struct TrackDetailSheet: View {
                             .foregroundColor(.secondary)
                     }
                 }
-
-                // Теги
+                
+                /// Теги
                 ForEach(tags, id: \.0) { key, value in
                     VStack(alignment: .leading, spacing: 6) {
                         Text(label(for: key).uppercased())
                             .font(.caption)
                             .foregroundColor(.secondary)
-
+                        
                         Text(value.isEmpty ? "—" : value)
                             .font(.body)
                             .foregroundColor(.primary)
@@ -111,9 +107,8 @@ struct TrackDetailSheet: View {
                 }
             }
             .listStyle(.insetGrouped)
+           
         }
-        .scrollContentBackground(.hidden)
-        .background(.clear)
 
         // MARK: - URL + TagLib (один осознанный IO-проход)
 
@@ -147,16 +142,6 @@ struct TrackDetailSheet: View {
             }
         }
 
-        // MARK: - Background
-
-        .background(
-            ZStack {
-                Color(.systemGroupedBackground).opacity(0.25)
-                Color.black.opacity(0.1)
-            }
-            .ignoresSafeArea()
-            .animation(.easeInOut(duration: 0.3), value: artworkImage)
-        )
     }
 
     // MARK: - TagLib (read-only, подготовлено под inline-edit)
