@@ -10,7 +10,8 @@
 // Подключение C-интерфейса библиотеки TagLib
 #import <tag_c.h>
 
-// Подключение обёртки над TagLib
+// Подключение обёртки для чтения TagLib
 #import "TLTagLibFile.h"
 
+// Подключение обёртки для записи TagLib (только текстовые тэги)
 #import "TLTagLibTagWriter.h"

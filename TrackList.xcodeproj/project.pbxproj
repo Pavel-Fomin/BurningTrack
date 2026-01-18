@@ -56,7 +56,7 @@
 		A9BCE0F62F09B67C000DDCD3 /* Exceptions for "Libraries" folder in "TrackList" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				Taglib/taglib.xcframework,
+				taglib/taglib.xcframework,
 			);
 			target = A97C86272DA326C000ED2E99 /* TrackList */;
 		};
@@ -84,7 +84,7 @@
 			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
 			buildPhase = A97C86242DA326C000ED2E99 /* Sources */;
 			membershipExceptions = (
-				Sources/TagLibWrapper/TLTagLibFile.h,
+				"Managers /TagLibReader/TLTagLibFile.h",
 			);
 		};
 /* End PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
