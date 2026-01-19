@@ -28,6 +28,8 @@ struct TrackDetailSheet: View {
 
     @State private var editingField: EditableField? = nil
     @State private var editableValues: [EditableField: String] = [:]
+    
+    @StateObject private var keyboard = KeyboardHeightObserver()
 
     // MARK: - UI
 
@@ -99,17 +101,43 @@ struct TrackDetailSheet: View {
                             .font(.caption)
                             .foregroundColor(.secondary)
                         
-                        Text(value.isEmpty ? "—" : value)
-                            .font(.body)
-                            .foregroundColor(.primary)
-                            .lineLimit(4)
+                        if let field = editableField(for: key) {
+                            InlineEditableValue(
+                                field: EditableTrackField(
+                                    id: field,
+                                    title: label(for: key),
+                                    kind: .text(multiline: field == .comment)
+                                ),
+                                value: Binding(
+                                    get: { editableValues[field] ?? "" },
+                                    set: { editableValues[field] = $0 }
+                                ),
+                                isEditing: editingField == field,
+                                onBeginEditing: {
+                                    editingField = field
+                                }
+                            )
+                        } else {
+                            Text(value.isEmpty ? "—" : value)
+                                .font(.body)
+                                .foregroundColor(.primary)
+                                .lineLimit(4)
+                        }
                     }
                 }
             }
             .listStyle(.insetGrouped)
-           
         }
-
+            .safeAreaInset(edge: .bottom) {
+                if editingField != nil {
+                    KeyboardEditBar(
+                        onCancel: { editingField = nil },
+                        onDone: { editingField = nil
+                        }
+                    )
+                }
+            }
+        
         // MARK: - URL + TagLib (один осознанный IO-проход)
 
         .task {
@@ -141,8 +169,8 @@ struct TrackDetailSheet: View {
                 artworkImage = Image(uiImage: image)
             }
         }
-
     }
+    
 
     // MARK: - TagLib (read-only, подготовлено под inline-edit)
 
@@ -165,7 +193,19 @@ struct TrackDetailSheet: View {
         await MainActor.run {
             tags = result
         }
+        await MainActor.run {
+            tags = result
+
+            // подготовка значений для inline-редактирования
+            editableValues = Dictionary(
+                uniqueKeysWithValues: result.compactMap { key, value in
+                    guard let field = editableField(for: key) else { return nil }
+                    return (field, value)
+                }
+            )
+        }
     }
+    
 
     // MARK: - Labels
 
@@ -196,5 +236,16 @@ struct TrackDetailSheet: View {
         }
 
         return url.deletingLastPathComponent().lastPathComponent
+    }
+    
+    private func editableField(for key: String) -> EditableField? {
+        switch key {
+        case "title": return .title
+        case "artist": return .artist
+        case "album": return .album
+        case "genre": return .genre
+        case "comment": return .comment
+        default: return nil
+        }
     }
 }
