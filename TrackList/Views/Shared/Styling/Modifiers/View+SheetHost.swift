@@ -45,14 +45,12 @@ struct SheetHostModifier: ViewModifier {
                     .appSheet(detents: [.height(160)])
                     
                 /// Перемещение трека
-                case .moveToFolder(let data):
-                    NavigationStack {
-                        MoveToFolderSheet(
-                            trackId: data.track.id,
-                            playerManager: playerManager
-                        )
-                    }
-                    .appSheet(detents: [.fraction(0.6), .medium])
+            case .moveToFolder(let data):
+                MoveToFolderContainer(
+                    data: data,
+                    playerManager: playerManager
+                )
+                .appSheet(detents: [.fraction(0.6), .medium])
                     
                 /// О треке
                 case .trackDetail(let track):

@@ -2,8 +2,18 @@
 //  MoveToFolderSheet.swift
 //  TrackList
 //
-//  Экран выбора папки для перемещения трека.
-//  Является UI-формой и не содержит бизнес-логики.
+//  UI-форма выбора папки для перемещения трека.
+//
+//  Роль компонента:
+//  - отображает дерево папок
+//  - позволяет выбрать папку назначения
+//  - управляет локальной навигацией внутри дерева папок
+//
+//  Архитектурные принципы:
+//  - не содержит бизнес-логики
+//  - не выполняет команд перемещения
+//  - не управляет закрытием sheet’а
+//  - подтверждение и отмена обрабатываются контейнером
 //
 //  Created by Pavel Fomin on 07.12.2025.
 //
@@ -13,20 +23,33 @@ import Foundation
 
 struct MoveToFolderSheet: View {
 
-    // MARK: - Входные параметры
+    // MARK: - Input
 
+    /// Идентификатор трека, для которого выполняется перемещение.
+    /// Используется ТОЛЬКО для определения текущей папки (бейдж "Текущая").
     let trackId: UUID
-    let playerManager: PlayerManager
 
-    // MARK: - Состояние
+    /// Выбранная папка назначения.
+    /// Источник истины находится в контейнере.
+    @Binding var selectedFolderId: UUID?
 
-    @Environment(\.dismiss) private var dismiss
-    @StateObject private var nav = MoveToFolderNavigationContext(library: MusicLibraryManager.shared)
-    @State private var trackCurrentFolderId: UUID? /// Текущая папка трека (для бейджа "Текущая")
-    @State private var selectedFolderId: UUID?     /// Выбранная папка назначения (radio button)
-    
-    // MARK: - Строки папок для отображения в списке
-    
+    /// Текущая папка трека.
+    /// Используется для бейджа "Текущая" и валидации.
+    @Binding var trackCurrentFolderId: UUID?
+
+    // MARK: - State
+
+    /// Контекст навигации по дереву папок.
+    /// Управляет переходами внутрь подпапок и возвратами назад.
+    @StateObject private var nav = MoveToFolderNavigationContext(
+        library: MusicLibraryManager.shared
+    )
+
+    // MARK: - Rows
+
+    /// Строки папок для отображения в списке.
+    ///
+    /// Правила:
     /// - текущая папка трека показывается виртуально ТОЛЬКО на корневом уровне
     /// - внутри дерева отображается только естественным образом
     private var orderedRows: [MoveToFolderNavigationContext.FolderRow] {
@@ -52,7 +75,6 @@ struct MoveToFolderSheet: View {
             return rows
         }
 
-        // Добавляем текущую папку сверху
         guard let currentFolder = MusicLibraryManager.shared.folder(for: currentId) else {
             return rows
         }
@@ -69,57 +91,58 @@ struct MoveToFolderSheet: View {
     // MARK: - UI
 
     var body: some View {
-        VStack(spacing: 0) {
+        List(orderedRows) { row in
+            HStack(spacing: 12) {
 
-            List(orderedRows) { row in
-                HStack(spacing: 12) {
+                // Левая зона — навигация (переход в подпапку)
+                Button {
+                    nav.enter(row.id)
+                } label: {
+                    HStack(spacing: 10) {
+                        Text(row.name)
+                            .lineLimit(1)
 
-                    // Левая зона — навигация (переход в подпапку)
+                        Spacer()
+                    }
+                }
+                .buttonStyle(.plain)
+
+                // Правая зона — выбор папки назначения (radio)
+                // Показывается ТОЛЬКО для папок без подпапок и не для текущей папки
+                if row.id != trackCurrentFolderId && row.hasSubfolders == false {
                     Button {
-                        nav.enter(row.id)
+                        selectedFolderId =
+                            (selectedFolderId == row.id) ? nil : row.id
                     } label: {
-                        HStack(spacing: 10) {
-                            Text(row.name).lineLimit(1)
-
-                            Spacer()
-                        }
+                        Image(
+                            systemName:
+                                selectedFolderId == row.id
+                                ? "largecircle.fill.circle"
+                                : "circle"
+                        )
+                        .font(.title3)
+                        .foregroundColor(.secondary)
+                        .frame(width: 28, height: 28)
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-
-                    // Правая зона — выбор папки назначения (radio)
-                    // Показывается ТОЛЬКО для папок без подпапок и не для текущей папки
-                    if row.id != trackCurrentFolderId && row.hasSubfolders == false {
-                        Button {
-                            selectedFolderId = (selectedFolderId == row.id) ? nil : row.id
-                        } label: {
-                            Image(systemName: selectedFolderId == row.id
-                                  ? "largecircle.fill.circle"
-                                  : "circle")
-                                .font(.title3)
-                                .foregroundColor(.secondary)
-                                .frame(width: 28, height: 28)
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                    } else {
-                        // Пустое место под radio, чтобы не ломать layout
-                        Spacer()
-                            .frame(width: 28)
-                    }
-                    
+                } else {
+                    // Пустое место под radio, чтобы не ломать layout
+                    Spacer()
+                        .frame(width: 28)
                 }
-                .overlay(alignment: .trailing) {
-                    
-                    // Бейдж "Текущая"
-                    if row.id == trackCurrentFolderId {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.title3)
-                            .foregroundStyle(.green)
-                            .frame(width: 28, height: 28)
-                    }
-                }
-                .listRowBackground(Color(.tertiarySystemBackground))
             }
+            .overlay(alignment: .trailing) {
+
+                // Бейдж "Текущая"
+                if row.id == trackCurrentFolderId {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.title3)
+                        .foregroundStyle(.green)
+                        .frame(width: 28, height: 28)
+                }
+            }
+            .listRowBackground(Color(.tertiarySystemBackground))
         }
         .navigationTitle(nav.title)
         .navigationBarTitleDisplayMode(.inline)
@@ -135,51 +158,6 @@ struct MoveToFolderSheet: View {
                     }
                 }
             }
-        }
-        .safeAreaInset(edge: .bottom) {
-            Button("Переместить") {
-                Task { await moveSelected() }
-            }
-            .disabled(selectedFolderId == nil || selectedFolderId == trackCurrentFolderId)
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, 16)
-            .padding(.bottom, 8)
-        }
-        .task { await loadCurrentTrackFolder() }
-    }
-}
-
-// MARK: - Вспомогательные методы
-
-private extension MoveToFolderSheet {
-
-    /// Определяем текущую папку трека для бейджа "Текущая".
-    func loadCurrentTrackFolder() async {
-        if let entry = await TrackRegistry.shared.entry(for: trackId) {
-            trackCurrentFolderId = entry.folderId
-        } else {
-            trackCurrentFolderId = nil
-        }
-    }
-
-    /// Инициирует команду перемещения трека в выбранную папку.
-    func moveSelected() async {
-        guard let folderId = selectedFolderId else { return }
-
-        do {
-            try await AppCommandExecutor.shared.moveTrack(
-                trackId: trackId,
-                toFolder: folderId,
-                using: playerManager
-            )
-
-            // После выполнения команды закрываем sheet
-            await MainActor.run { SheetManager.shared.closeActive() }
-
-        } catch {
-            print("❌ Ошибка перемещения трека: \(error.localizedDescription)")
         }
     }
 }
