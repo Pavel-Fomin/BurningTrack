@@ -1,5 +1,5 @@
 //
-//  View+SheetHost.swift
+//  SheetHostModifier.swift
 //  TrackList
 //
 //  Унифицированный контейнер для всех sheet’ов приложения.
@@ -31,19 +31,19 @@ struct SheetHostModifier: ViewModifier {
                     sheetManager.handleDismiss()
                 }
             ) { sheet in switch sheet {
-                    
-// MARK: - Действия над треком
-                    
-               /// Сохранение треклиста
+                
+                // MARK: - Действия над треком
+                
+                /// Сохранение треклиста
             case .saveTrackList:
                 SaveTrackListContainer()
                     .appSheet(detents: [.height(160)])
                 
-                 /// Переименование треклиста
+                /// Переименование треклиста
             case .renameTrackList(let data):
                 RenameTrackListContainer(data: data)
                     .appSheet(detents: [.height(160)])
-                    
+                
                 /// Перемещение трека
             case .moveToFolder(let data):
                 MoveToFolderContainer(
@@ -51,20 +51,18 @@ struct SheetHostModifier: ViewModifier {
                     playerManager: playerManager
                 )
                 .appSheet(detents: [.fraction(0.6), .medium])
-                    
+                
                 /// О треке
-                case .trackDetail(let track):
-                    TrackDetailSheet(track: track)
-                        .appSheet(detents: [.large])
-                    
+            case .trackDetail(let track):
+                TrackDetailSheet(track: track)
+                    .appSheet(detents: [.large])
+                
                 /// Добавить в треклист
-                case .addToTrackList(let data):
-                NavigationStack {
-                    AddToTrackListSheet(track: data.track)
-                }
-                .appSheet(detents: [.fraction(0.6), .medium])
-                }
+            case .addToTrackList(let data):
+                AddToTrackListContainer(data: data)
+                    .appSheet(detents: [.fraction(0.6), .medium])
             }
+        }
     }
 }
 

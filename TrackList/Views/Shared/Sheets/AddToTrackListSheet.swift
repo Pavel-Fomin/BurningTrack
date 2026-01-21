@@ -2,80 +2,74 @@
 //  AddToTrackListSheet.swift
 //  TrackList
 //
-//  Экран выбора треклиста для добавления трека.
-//  Является UI-формой и не содержит бизнес-логики.
+//  UI-форма выбора треклиста для добавления трека.
 //
-//  При выборе треклиста инициирует команду через AppCommandExecutor
-//  и закрывается самостоятельно.
+//  Роль компонента:
+//  - отображает список треклистов
+//  - позволяет выбрать треклист назначения
+//  - визуально отмечает текущий активный треклист
+//
+//  Архитектурные принципы:
+//  - не содержит бизнес-логики
+//  - не выполняет команд добавления
+//  - не управляет закрытием sheet’а
+//  - подтверждение и отмена обрабатываются контейнером
 //
 //  Created by Pavel Fomin on 29.07.2025.
 //
 
-import Foundation
 import SwiftUI
+import Foundation
 
 struct AddToTrackListSheet: View {
-
-    // MARK: - Входные параметры
-
-    let track: any TrackDisplayable
-
-    // MARK: - Состояние
-
-    @Environment(\.dismiss) private var dismiss
-
-    private let trackLists = TrackListsManager.shared.loadTrackListMetas()  /// Список треклистов — read-only данные для UI
-
+    
+    // MARK: - Input
+    
+    let trackLists: [TrackListsManager.TrackListMeta]  /// Список доступных треклистов (read-only).
+    let currentTrackListId: UUID?                      /// Текущий  треклист. Используется для бейджа «Текущий»
+    
+    @Binding var selectedTrackListId: UUID?            /// Выбранный треклист назначения.Источник истины находится в контейнере
+    
+    
     // MARK: - UI
-
+    
     var body: some View {
         List(trackLists) { meta in
             Button {
-                Task {
-                    await addTrack(to: meta.id)
-                }
+                guard meta.id != currentTrackListId else { return }
+                
+                selectedTrackListId =
+                (selectedTrackListId == meta.id) ? nil : meta.id
             } label: {
-                HStack {
+                HStack(spacing: 12) {
+                    
                     Text(meta.name)
                         .lineLimit(1)
-
+                    
                     Spacer()
-
-                    let count = TrackListManager.shared
-                        .getTrackListById(meta.id)
-                        .tracks.count
-
-                    Text("\(count)")
-                        .font(.subheadline)
+                    
+                    if meta.id == currentTrackListId {
+                        // Бейдж "Текущий"
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.title3)
+                            .foregroundStyle(.green)
+                            .frame(width: 28, height: 28)
+                    } else {
+                        Image(
+                            systemName:
+                                selectedTrackListId == meta.id
+                            ? "largecircle.fill.circle"
+                            : "circle"
+                        )
+                        .font(.title3)
                         .foregroundColor(.secondary)
+                        .frame(width: 28, height: 28)
+                    }
                 }
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
             .listRowBackground(Color(.tertiarySystemBackground))
-        }
-        .navigationTitle("Добавить в треклист")
-        .navigationBarTitleDisplayMode(.inline)
-    }
-}
-
-// MARK: - Вспомогательные методы
-
-private extension AddToTrackListSheet {
-
-    /// Инициирует команду добавления трека в треклист.
-    func addTrack(to trackListId: UUID) async {
-        do {
-            try await AppCommandExecutor.shared.addTrackToTrackList(
-                trackId: track.id,
-                trackListId: trackListId
-            )
-
-            /// После выполнения команды закрываем sheet
-            await MainActor.run {
-                dismiss()
-            }
-
-        } catch {
-            print("❌ Ошибка добавления трека в треклист: \(error.localizedDescription)")
         }
     }
 }

@@ -49,6 +49,7 @@ struct SaveTrackListSheetData: Identifiable, Equatable {
 struct AddToTrackListSheetData: Identifiable, Equatable {
     let id = UUID()
     let track: LibraryTrack
+    let sourceTrackListId: UUID?   // ← ВАЖНО
 
     static func == (
         lhs: AddToTrackListSheetData,
@@ -149,8 +150,14 @@ final class SheetManager: ObservableObject {
         present(.trackDetail(track))
     }
 
-    func presentAddToTrackList(for track: LibraryTrack) {
-        let data = AddToTrackListSheetData(track: track)
+    func presentAddToTrackList(
+        for track: LibraryTrack,
+        sourceTrackListId: UUID? = nil
+    ) {
+        let data = AddToTrackListSheetData(
+            track: track,
+            sourceTrackListId: sourceTrackListId
+        )
         present(.addToTrackList(data))
     }
 
