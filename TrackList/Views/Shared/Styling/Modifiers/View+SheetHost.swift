@@ -37,17 +37,12 @@ struct SheetHostModifier: ViewModifier {
                /// Сохранение треклиста
             case .saveTrackList:
                 SaveTrackListContainer()
-                    .appSheet(detents: [.height(208)])
+                    .appSheet(detents: [.height(160)])
                 
                  /// Переименование треклиста
-                case .renameTrackList(let data):
-                    NavigationStack {
-                        RenameTrackListSheet(
-                            trackListId: data.trackListId,
-                            currentName: data.currentName
-                        )
-                    }
-                    .appSheet(detents: [.height(208)])
+            case .renameTrackList(let data):
+                RenameTrackListContainer(data: data)
+                    .appSheet(detents: [.height(160)])
                     
                 /// Перемещение трека
                 case .moveToFolder(let data):

@@ -2,8 +2,18 @@
 //  RenameTrackListSheet.swift
 //  TrackList
 //
-//  Экран переименования треклиста.
-//  Чистая UI-форма ввода имени.
+//  UI-форма для ввода нового имени треклиста.
+//
+//  Роль компонента:
+//  - отображает поле ввода имени
+//  - управляет фокусом TextField
+//  - не содержит бизнес-логики и навигации
+//
+//  Архитектурные принципы:
+//  - не знает о SheetManager
+//  - не знает о командах сохранения
+//  - не управляет закрытием sheet’а
+//  - используется только внутри RenameTrackListContainer
 //
 //  Created by Pavel Fomin on 09.11.2025.
 //
@@ -12,71 +22,34 @@ import SwiftUI
 
 struct RenameTrackListSheet: View {
 
-    let trackListId: UUID
-    let currentName: String
+    // MARK: - Input
 
-    @Environment(\.dismiss) private var dismiss
-    @State private var name: String
+    /// Связанное состояние имени треклиста.
+    /// Источник истины находится в контейнере.
+    @Binding var name: String
 
-    init(trackListId: UUID, currentName: String) {
-        self.trackListId = trackListId
-        self.currentName = currentName
-        self._name = State(initialValue: currentName)
-    }
+    /// Состояние фокуса поля ввода.
+    /// Используется для автоматического показа клавиатуры.
+    @FocusState private var isNameFocused: Bool
+
+    // MARK: - UI
 
     var body: some View {
-        NavigationStack {
-            ZStack(alignment: .bottom) {
-
-                List {
-                    Section {
-                        TextField("Новое название", text: $name)
-                            .clearable($name)
-                    }
-                    .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
-                }
-                .listStyle(.insetGrouped)
-                .contentMargins(.top, 0, for: .scrollContent)
-                .scrollDisabled(true)
-                .navigationTitle("Переименовать треклист")
-                .navigationBarTitleDisplayMode(.inline)
-
-                HStack(spacing: 16) {
-                    Button {
-                        Task {
-                            await rename()
-                        }
-                    } label: {
-                        Text("Сохранить")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .primaryButtonStyle()
-                    .disabled(!TrackListManager.shared.validateName(name))
-                    .opacity(TrackListManager.shared.validateName(name) ? 1 : 0.5)
-
-                    Button {
-                        dismiss()
-                    } label: {
-                        Text("Отмена")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .secondaryButtonStyle()
-                }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 16)
+        Form {
+            Section {
+                TextField("Новое название", text: $name)
+                    .clearable($name)
+                    .focused($isNameFocused)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled(true)
             }
         }
-    }
+        .formStyle(.grouped)
 
-    private func rename() async {
-        do {
-            try await AppCommandExecutor.shared.renameTrackList(
-                trackListId: trackListId,
-                newName: name
-            )
-            await MainActor.run { dismiss() }
-        } catch {
-            print("❌ Ошибка переименования треклиста: \(error.localizedDescription)")
+        /// Автоматически устанавливаем фокус при появлении шита,
+        /// чтобы сразу открыть клавиатуру без дополнительного тапа.
+        .task {
+            isNameFocused = true
         }
     }
 }
