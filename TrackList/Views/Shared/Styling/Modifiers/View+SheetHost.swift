@@ -35,11 +35,9 @@ struct SheetHostModifier: ViewModifier {
 // MARK: - Действия над треком
                     
                /// Сохранение треклиста
-               case .saveTrackList:
-                NavigationStack {
-                    SaveTrackListSheet()
-                }
-                .appSheet(detents: [.height(208)])
+            case .saveTrackList:
+                SaveTrackListContainer()
+                    .appSheet(detents: [.height(208)])
                 
                  /// Переименование треклиста
                 case .renameTrackList(let data):
