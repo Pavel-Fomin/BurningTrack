@@ -54,7 +54,7 @@ struct SheetHostModifier: ViewModifier {
                 
                 /// О треке
             case .trackDetail(let track):
-                TrackDetailSheet(track: track)
+                TrackDetailContainer(track: track)
                     .appSheet(detents: [.large])
                 
                 /// Добавить в треклист

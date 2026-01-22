@@ -73,7 +73,7 @@ struct NavigationBarHost<Content: View>: UIViewControllerRepresentable {
         if onConfirm != nil {
             hosting.navigationItem.rightBarButtonItem = UIBarButtonItem(
                 image: UIImage(systemName: "checkmark"),
-                style: .prominent, // системный стиль iOS 26+
+                style: .prominent, 
                 target: context.coordinator,
                 action: #selector(Coordinator.confirmTapped)
             )

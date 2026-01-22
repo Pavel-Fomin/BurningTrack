@@ -4,6 +4,8 @@
 //
 //  Экран "О треке" — глобальный sheet для просмотра информации о треке
 //  Отображает обложку, имя файла, теги и технические данные
+//  Использует inline-редактирование.
+//  Сохранение выполняется контейнером через кнопку ✓.
 //
 //  Created by Pavel Fomin on 13.10.2025.
 //
@@ -11,28 +13,26 @@
 import SwiftUI
 
 struct TrackDetailSheet: View {
-
+    
     let track: any TrackDisplayable
-
-    // MARK: - Runtime state
-
-    @State private var resolvedURL: URL?
-    @State private var artworkImage: Image?
-    @State private var tags: [(String, String)] = []
-
-    // MARK: - Future editing support (пока НЕ используется)
-
+    
+    // MARK: - Editing (приходит из контейнера)
+    
     enum EditableField: Hashable {
         case title, artist, album, genre, comment
     }
-
-    @State private var editingField: EditableField? = nil
-    @State private var editableValues: [EditableField: String] = [:]
     
-    @StateObject private var keyboard = KeyboardHeightObserver()
-
+    @Binding var editedValues: [EditableField: String]
+    @Binding var editingField: EditableField?
+    
+    // MARK: - Runtime state (только UI)
+    
+    @State private var resolvedURL: URL?
+    @State private var artworkImage: Image?
+    @State private var tags: [(String, String)] = []
+    
     // MARK: - UI
-
+    
     var body: some View {
         VStack(spacing: 0) {
             // Artwork
@@ -109,8 +109,8 @@ struct TrackDetailSheet: View {
                                     kind: .text(multiline: field == .comment)
                                 ),
                                 value: Binding(
-                                    get: { editableValues[field] ?? "" },
-                                    set: { editableValues[field] = $0 }
+                                    get: { editedValues[field] ?? "" },
+                                    set: { editedValues[field] = $0 }
                                 ),
                                 isEditing: editingField == field,
                                 onBeginEditing: {
@@ -128,16 +128,8 @@ struct TrackDetailSheet: View {
             }
             .listStyle(.insetGrouped)
         }
-            .safeAreaInset(edge: .bottom) {
-                if editingField != nil {
-                    KeyboardEditBar(
-                        onCancel: { editingField = nil },
-                        onDone: { editingField = nil
-                        }
-                    )
-                }
-            }
-        
+    
+
         // MARK: - URL + TagLib (один осознанный IO-проход)
 
         .task {
@@ -170,9 +162,8 @@ struct TrackDetailSheet: View {
             }
         }
     }
-    
 
-    // MARK: - TagLib (read-only, подготовлено под inline-edit)
+    // MARK: - TagLib (read-only)
 
     private func loadMetadataFromTagLib(url: URL) async {
         let tagFile = TLTagLibFile(fileURL: url)
@@ -188,16 +179,14 @@ struct TrackDetailSheet: View {
             ("album", parsed.album ?? ""),
             ("genre", parsed.genre ?? ""),
             ("comment", parsed.comment ?? "")
-        ].map { ($0.0, $0.1.trimmingCharacters(in: .whitespacesAndNewlines)) }
+        ]
+        .map { ($0.0, $0.1.trimmingCharacters(in: .whitespacesAndNewlines)) }
 
-        await MainActor.run {
-            tags = result
-        }
         await MainActor.run {
             tags = result
 
             // подготовка значений для inline-редактирования
-            editableValues = Dictionary(
+            editedValues = Dictionary(
                 uniqueKeysWithValues: result.compactMap { key, value in
                     guard let field = editableField(for: key) else { return nil }
                     return (field, value)
@@ -205,7 +194,6 @@ struct TrackDetailSheet: View {
             )
         }
     }
-    
 
     // MARK: - Labels
 
@@ -237,7 +225,7 @@ struct TrackDetailSheet: View {
 
         return url.deletingLastPathComponent().lastPathComponent
     }
-    
+
     private func editableField(for key: String) -> EditableField? {
         switch key {
         case "title": return .title
