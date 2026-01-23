@@ -23,7 +23,7 @@ struct ToastHostModifier: ViewModifier {
                 VStack {
                     ToastView(data: data)
                         .transition(.move(edge: .top).combined(with: .opacity))
-                        .animation(.easeOut(duration: 0.35), value: toastManager.data)
+                        .animation(.easeOut(duration: 0.55), value: toastManager.data)
                         .padding(.top, topInset + 12)
 
                     Spacer()

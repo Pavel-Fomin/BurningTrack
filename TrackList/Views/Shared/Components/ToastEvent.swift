@@ -76,7 +76,11 @@ enum ToastEvent: Equatable {
     // MARK: - Глобальные (на будущее)
 
     /// Теги обновлены
-    case tagsUpdated(title: String, artist: String)
+    case tagsUpdated(
+        title: String,
+        artist: String,
+        artwork: Image?
+    )
     
     /// Файл переименован
     case fileRenamed(newName: String)

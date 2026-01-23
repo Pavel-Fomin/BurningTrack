@@ -380,7 +380,14 @@ actor AppCommandExecutor {
         // 4. ToastEvent
         let event = ToastEvent.tagsUpdated(
             title: metadata?.title ?? url.lastPathComponent,
-            artist: metadata?.artist ?? ""
+            artist: metadata?.artist ?? "",
+            artwork: metadata.flatMap {
+                ArtworkProvider.shared.image(
+                    trackId: trackId,
+                    artworkData: $0.artworkData,
+                    purpose: .toast
+                ).map { Image(uiImage: $0) }
+            }
         )
 
         // 5. Показ тоста

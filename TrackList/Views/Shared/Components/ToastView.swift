@@ -38,13 +38,16 @@ struct ToastView: View {
                            // ARTIST
                            Text(artistText)
                                .font(.subheadline.weight(.semibold))
+                               .foregroundStyle(.primary)
+                               .opacity(0.8)
                                .lineLimit(1)
                                .truncationMode(.tail)
 
                            // TITLE
                            Text(titleText)
                                .font(.caption)
-                               .foregroundStyle(.background.opacity(0.6))
+                               .foregroundStyle(.primary)
+                               .opacity(0.8)
                                .lineLimit(1)
                                .truncationMode(.tail)
                        }
@@ -73,14 +76,11 @@ struct ToastView: View {
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
         }
-        .foregroundStyle(.background)
+        
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .frame(height: height)
-        .background(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(.primary)
-        )
+        .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(.ultraThinMaterial))
         .padding(.horizontal, 16)
     }
     

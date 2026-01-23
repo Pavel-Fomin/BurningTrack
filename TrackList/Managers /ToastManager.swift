@@ -145,10 +145,10 @@ final class ToastManager: ObservableObject {
 
         // MARK: - Глобальные
 
-        case let .tagsUpdated(title, artist):
+        case let .tagsUpdated(title, artist, artwork):
             return ToastData(
                 style: .track(title: title, artist: artist),
-                artworkImage: nil,
+                artworkImage: artwork,
                 message: "Теги обновлены"
             )
 
