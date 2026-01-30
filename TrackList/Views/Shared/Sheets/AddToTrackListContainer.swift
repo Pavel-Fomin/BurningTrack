@@ -29,21 +29,17 @@ struct AddToTrackListContainer: View {
 
     // MARK: - Input
 
-    /// Данные, переданные через SheetManager.
-    /// Содержат трек и контекст открытия (sourceTrackListId).
+    /// Данные, переданные через SheetManager
     let data: AddToTrackListSheetData
 
     // MARK: - State
 
-    /// Выбранный пользователем треклист назначения.
-    /// Источник истины для UI и для кнопки подтверждения (✓).
+    /// Выбранный пользователем треклист назначения
     @State private var selectedTrackListId: UUID?
 
     // MARK: - Data source
 
-    /// Список всех треклистов в том же порядке,
-    /// в каком они отображаются в основном списке треклистов.
-    /// Порядок фиксируется здесь и не вычисляется внутри sheet’а.
+    /// Список всех треклистов в фиксированном порядке
     private let trackLists: [TrackListsManager.TrackListMeta] =
         TrackListsManager.shared
             .loadTrackListMetas()
@@ -55,9 +51,12 @@ struct AddToTrackListContainer: View {
         NavigationBarHost(
             title: "Добавить в треклист",
 
-            /// Кнопка подтверждения (✓) активна только если:
+            /// Кнопка подтверждения (✓)
+            rightButtonImage: "checkmark",
+
+            /// Активна только если:
             /// - выбран треклист
-            /// - выбранный треклист отличается от исходного
+            /// - он отличается от исходного
             isRightEnabled: Binding(
                 get: {
                     selectedTrackListId != nil &&
@@ -66,16 +65,17 @@ struct AddToTrackListContainer: View {
                 set: { _ in }
             ),
 
-            /// Закрытие sheet’а без выполнения действий
-            onClose: { SheetManager.shared.closeActive()
+            /// Закрытие sheet’а без действий
+            onClose: {
+                SheetManager.shared.closeActive()
             },
 
             /// Подтверждение добавления трека
-            onConfirm: { Task { await addTrack() }
+            onRightTap: {
+                Task { await addTrack() }
             }
         ) {
-            /// Чистый UI-компонент.
-            /// Получает данные и binding, но не содержит логики.
+            /// Чистый UI-компонент без логики
             AddToTrackListSheet(
                 trackLists: trackLists,
                 currentTrackListId: data.sourceTrackListId,
@@ -86,8 +86,7 @@ struct AddToTrackListContainer: View {
 
     // MARK: - Actions
 
-    /// Выполняет команду добавления трека в выбранный треклист.
-    /// При успешном выполнении закрывает sheet.
+    /// Добавление трека в выбранный треклист
     private func addTrack() async {
         guard let trackListId = selectedTrackListId else { return }
 
@@ -98,8 +97,6 @@ struct AddToTrackListContainer: View {
             )
             SheetManager.shared.closeActive()
         } catch {
-            // Ошибки пока логируются.
-            // UI-обработка ошибок может быть добавлена централизованно позже.
             print("❌ Ошибка добавления трека в треклист: \(error)")
         }
     }

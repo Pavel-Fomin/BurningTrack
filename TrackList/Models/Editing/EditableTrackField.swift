@@ -2,34 +2,40 @@
 //  EditableTrackField.swift
 //  TrackList
 //
-//  Описание редактируемого поля метаданных трека.
-//  Является UI-контрактом для inline-редактирования в TrackDetailSheet.
-//  Не содержит логики сохранения.
+//  Перечень редактируемых полей трека.
+//  Используется во всех edit-формах и контейнерах.
 //
 //  Created by PavelFomin on 19.01.2026.
 //
 
 import Foundation
 
-/// Тип редактируемого поля
-enum EditableTrackFieldKind: Equatable {
-    /// Текстовое поле
-    /// - multiline: допускает многострочный ввод
-    case text(multiline: Bool)
+enum EditableTrackField: Hashable, CaseIterable {
 
-    /// Числовое поле (ввод как String)
-    case number
-}
+    case title
+    case artist
+    case album
+    case genre
+    case comment
 
-/// Описание одного поля метаданных трека
-struct EditableTrackField: Identifiable, Equatable {
+    /// UI-заголовок поля
+    var title: String {
+        switch self {
+        case .title: return "Название трека"
+        case .artist: return "Исполнитель"
+        case .album: return "Альбом"
+        case .genre: return "Жанр"
+        case .comment: return "Комментарий"
+        }
+    }
 
-    /// Уникальный идентификатор поля (универсальный, чтобы UI мог работать с любым enum)
-    let id: AnyHashable
+    /// Многострочное ли поле
+    var isMultiline: Bool {
+        self == .comment
+    }
 
-    /// Отображаемый лейбл (верхняя строка)
-    let title: String
-
-    /// Тип поля и режим ввода
-    let kind: EditableTrackFieldKind
+    /// Используется ли в форме тегов (без имени файла)
+    static var tagFields: [EditableTrackField] {
+        [.title, .artist, .album, .genre, .comment]
+    }
 }

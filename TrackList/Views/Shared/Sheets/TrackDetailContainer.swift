@@ -29,32 +29,40 @@ struct TrackDetailContainer: View {
     
     // MARK: - Editing state
     
-    @State private var originalValues: [TrackDetailSheet.EditableField: String] = [:]
-    @State private var editedValues: [TrackDetailSheet.EditableField: String] = [:]
-    
-    @State private var editingField: TrackDetailSheet.EditableField?
+    @State private var mode: TrackDetailSheet.Mode = .view
+    @State private var editedFileName: String = ""
+    @State private var isEditingFileName: Bool = false
+    @State private var editedValues: [EditableTrackField: String] = [:]
     
     // MARK: - Derived state
     
-    private var hasChanges: Bool { editingField != nil && originalValues != editedValues }
+    private var hasChanges: Bool {!editedValues.isEmpty}
     
     // MARK: - UI
     
     var body: some View {
         NavigationBarHost(
             title: "О треке",
-            isRightEnabled: .constant(hasChanges),
+            rightButtonImage: mode == .view ? "pencil" : "checkmark",
+            isRightEnabled: .constant(
+                mode == .view || hasChanges
+            ),
             onClose: {
                 sheetManager.closeActive()
             },
-            onConfirm: {
-                saveAndClose()
+            onRightTap: {
+                if mode == .view {
+                    mode = .edit
+                } else {
+                    saveAndClose()
+                }
             }
         ) {
             TrackDetailSheet(
                 track: track,
+                mode: mode,
                 editedValues: $editedValues,
-                editingField: $editingField
+                editedFileName: $editedFileName
             )
         }
     }

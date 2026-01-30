@@ -6,16 +6,14 @@
 //
 //  Роль:
 //  - предоставляет НАСТОЯЩИЙ UIKit navigation bar внутри SwiftUI sheet
-//  - создаёт системные UIBarButtonItem (× / ✓)
-//  - управляет состоянием enabled / disabled кнопки подтверждения
+//  - создаёт системные UIBarButtonItem (× / универсальная правая кнопка)
+//  - управляет состоянием enabled / disabled правой кнопки
 //
 //  ВАЖНО:
 //  - использует ТОЛЬКО контрактный API UIKit
 //  - НЕ содержит бизнес-логики
-//  - НЕ знает, что именно делает кнопка (save / rename / apply)
+//  - НЕ знает, что означает кнопка (edit / save / apply)
 //  - НЕ владеет состоянием формы
-//
-//  Является инфраструктурным слоем UI.
 //
 //  Created by Pavel Fomin on 21.01.2026.
 //
@@ -27,39 +25,51 @@ struct NavigationBarHost<Content: View>: UIViewControllerRepresentable {
 
     // MARK: - Configuration
 
-    let title: String?                  /// Заголовок navigation bar. Может быть nil, если заголовок не требуется.
-    let isRightEnabled: Binding<Bool>   /// Управляет доступностью кнопки подтверждения. Значение приходит из контейнера
-    let onClose: (() -> Void)?          /// Действие для кнопки закрытия. Если nil — кнопка не отображается.
-    let onConfirm: (() -> Void)?        /// Действие для кнопки подтверждения. Если nil — кнопка не отображается.
-    let content: Content                /// Контент sheet’а (чистый SwiftUI View).
+    let title: String?
+
+    /// System image name для правой кнопки (pencil / checkmark и т.д.)
+    /// Если nil — кнопка не отображается
+    let rightButtonImage: String?
+
+    /// Управляет доступностью правой кнопки
+    let isRightEnabled: Binding<Bool>
+
+    /// Кнопка закрытия (×)
+    let onClose: (() -> Void)?
+
+    /// Действие правой кнопки
+    let onRightTap: (() -> Void)?
+
+    /// Контент sheet’а (чистый SwiftUI View)
+    let content: Content
 
     // MARK: - Init
 
     init(
         title: String? = nil,
+        rightButtonImage: String?,
         isRightEnabled: Binding<Bool>,
         onClose: (() -> Void)? = nil,
-        onConfirm: (() -> Void)? = nil,
+        onRightTap: (() -> Void)? = nil,
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
+        self.rightButtonImage = rightButtonImage
         self.isRightEnabled = isRightEnabled
         self.onClose = onClose
-        self.onConfirm = onConfirm
+        self.onRightTap = onRightTap
         self.content = content()
     }
 
     // MARK: - UIViewControllerRepresentable
-    
-    // Создаёт UIKit-иерархию для отображения SwiftUI-контента внутри UINavigationController.
-    // Здесь настраивается navigation bar:
+
     func makeUIViewController(context: Context) -> UINavigationController {
 
-        /// SwiftUI-контент, встроенный в UIKit
         let hosting = UIHostingController(rootView: content)
+        context.coordinator.hostingController = hosting
         hosting.navigationItem.title = title
 
-        /// Закрытие sheet’а
+        // Кнопка закрытия (×)
         if onClose != nil {
             hosting.navigationItem.leftBarButtonItem = UIBarButtonItem(
                 image: UIImage(systemName: "xmark"),
@@ -69,37 +79,36 @@ struct NavigationBarHost<Content: View>: UIViewControllerRepresentable {
             )
         }
 
-        /// Подтверждение действия
-        if onConfirm != nil {
+        // Универсальная правая кнопка
+        if let imageName = rightButtonImage {
             hosting.navigationItem.rightBarButtonItem = UIBarButtonItem(
-                image: UIImage(systemName: "checkmark"),
-                style: .prominent, 
+                image: UIImage(systemName: imageName),
+                style: .prominent,
                 target: context.coordinator,
-                action: #selector(Coordinator.confirmTapped)
+                action: #selector(Coordinator.rightTapped)
             )
+            hosting.navigationItem.rightBarButtonItem?.isEnabled = isRightEnabled.wrappedValue
         }
 
-        /// Прозрачный фон, чтобы не появлялась лишняя подложка sheet’а
         hosting.view.backgroundColor = .clear
 
         let nav = UINavigationController(rootViewController: hosting)
         nav.view.backgroundColor = .clear
 
-        /// Пробрасываем действия в Coordinator
         context.coordinator.onClose = onClose
-        context.coordinator.onConfirm = onConfirm
+        context.coordinator.onRightTap = onRightTap
 
         return nav
     }
 
-    // Обновляет уже созданный UIKit-контроллер при изменении входных данных SwiftUI.
-    // Используется для синхронизации enabled-состояния кнопки подтверждения (✓)
-    // на основе Binding isRightEnabled.
     func updateUIViewController(
         _ uiViewController: UINavigationController,
         context: Context
     ) {
-        // Синхронизация enabled-состояния кнопки подтверждения (✓)
+        // обновляем SwiftUI-контент
+        context.coordinator.hostingController?.rootView = content
+
+        // синхронизация кнопки
         uiViewController
             .topViewController?
             .navigationItem
@@ -107,21 +116,17 @@ struct NavigationBarHost<Content: View>: UIViewControllerRepresentable {
             .isEnabled = isRightEnabled.wrappedValue
     }
 
-    // Создаёт Coordinator для связи UIKit target/action с SwiftUI-замыканиями.
-    // Coordinator живёт на стороне UIKit и вызывается через селекторы кнопок.
-    func makeCoordinator() -> Coordinator {
-        Coordinator()
-    }
+    func makeCoordinator() -> Coordinator {Coordinator()}
 
     // MARK: - Coordinator
 
-    // Coordinator используется для связи UIKit target/action с замыканиями из SwiftUI.
     final class Coordinator: NSObject {
-        
-        var onClose: (() -> Void)?     /// Обработчик нажатия на кнопку закрытия (×)
-        var onConfirm: (() -> Void)?   /// Обработчик нажатия на кнопку подтверждения (✓)
 
-        @objc func closeTapped() { onClose?() }     /// Вызывается при нажатии на кнопку закрытия. .Только уведомляет контейнер.
-        @objc func confirmTapped() { onConfirm?() } /// Вызывается при нажатии на кнопку подтверждения.  только уведомляет контейнер.
+        var onClose: (() -> Void)?
+        var onRightTap: (() -> Void)?
+        var hostingController: UIHostingController<Content>?
+
+        @objc func closeTapped() {onClose?()}
+        @objc func rightTapped() {onRightTap?()}
     }
 }

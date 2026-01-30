@@ -19,14 +19,15 @@
 //  Created by Pavel Fomin on 21.01.2026.
 //
 
-import Foundation
 import SwiftUI
+import Foundation
 
 struct SaveTrackListContainer: View {
 
     // MARK: - State
 
-    @State private var name = generateDefaultTrackListName() /// Название нового треклиста. Источником для формы. Передаётся через Binding
+    /// Название нового треклиста. Источник истины для формы.
+    @State private var name = generateDefaultTrackListName()
 
     // MARK: - UI
 
@@ -34,29 +35,32 @@ struct SaveTrackListContainer: View {
         NavigationBarHost(
             title: "Название треклиста",
 
-            /// Управление доступностью кнопки подтверждения. Кнопка активна только при валидном имени.
+            /// Кнопка подтверждения (✓)
+            rightButtonImage: "checkmark",
+
+            /// Активна только при валидном имени
             isRightEnabled: .constant(
                 TrackListManager.shared.validateName(name)
             ),
 
-            /// Закрытие sheet’а без выполнения действий
+            /// Закрытие sheet’а без действий
             onClose: {
                 SheetManager.shared.closeActive()
             },
 
-            /// Подтверждение создания треклиста. Асинхронная команда.
-            onConfirm: {
+            /// Подтверждение создания треклиста
+            onRightTap: {
                 Task { await create() }
             }
         ) {
-            /// Чистый UI-слой формы. Контейнер не знает о внутренней разметке sheet’а.
+            /// Чистый UI-слой формы
             SaveTrackListSheet(name: $name)
         }
     }
 
     // MARK: - Actions
 
-    // Асинхронное создание треклиста. При успехе закрывает текущий sheet. Ошибки логируются, UI-обработка ошибок может быть добавлена позже централизованно.
+    /// Асинхронное создание треклиста
     private func create() async {
         do {
             try await AppCommandExecutor.shared.createTrackList(name: name)

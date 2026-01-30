@@ -19,21 +19,17 @@
 //  Created by Pavel Fomin on 21.01.2026.
 //
 
-import Foundation
 import SwiftUI
+import Foundation
 
 struct RenameTrackListContainer: View {
 
     /// Данные, переданные через SheetManager при открытии sheet’а.
-    /// Содержат идентификатор треклиста и текущее имя.
     let data: RenameTrackListSheetData
 
-    /// Локальное состояние формы.
-    /// Является единственным источником истины для вводимого имени.
+    /// Локальное состояние формы — источник истины
     @State private var name: String
 
-    /// Инициализация контейнера.
-    /// Начальное значение формы берётся из текущего имени треклиста.
     init(data: RenameTrackListSheetData) {
         self.data = data
         self._name = State(initialValue: data.currentName)
@@ -46,34 +42,32 @@ struct RenameTrackListContainer: View {
             /// Заголовок шита
             title: "Переименовать треклист",
 
-            /// Управление доступностью кнопки подтверждения.
-            /// Кнопка активна только при валидном имени треклиста.
+            /// Кнопка подтверждения (✓)
+            rightButtonImage: "checkmark",
+
+            /// Активна только при валидном имени
             isRightEnabled: .constant(
                 TrackListManager.shared.validateName(name)
             ),
 
-            /// Закрытие sheet’а без выполнения действий.
+            /// Закрытие sheet’а без действий
             onClose: {
                 SheetManager.shared.closeActive()
             },
 
-            /// Подтверждение переименования треклиста.
-            /// Асинхронная команда выполняется через AppCommandExecutor.
-            onConfirm: {
+            /// Подтверждение переименования
+            onRightTap: {
                 Task { await rename() }
             }
         ) {
-            /// Чистый UI-слой формы.
-            /// Контейнер не знает о внутренней разметке RenameTrackListSheet.
+            /// Чистый UI-слой формы
             RenameTrackListSheet(name: $name)
         }
     }
 
     // MARK: - Actions
 
-    /// Асинхронная операция переименования треклиста.
-    /// При успешном выполнении закрывает текущий sheet.
-    /// Ошибки логируются, централизованная UI-обработка может быть добавлена позже.
+    /// Асинхронная операция переименования треклиста
     private func rename() async {
         do {
             try await AppCommandExecutor.shared.renameTrackList(

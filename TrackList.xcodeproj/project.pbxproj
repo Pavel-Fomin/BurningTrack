@@ -74,6 +74,7 @@
 				MULTISELECT_ACTIONS.md,
 				PROJECT_STRUCTURE.md,
 				README.md,
+				"Track Edit Session.md",
 			);
 			target = A97C86272DA326C000ED2E99 /* TrackList */;
 		};

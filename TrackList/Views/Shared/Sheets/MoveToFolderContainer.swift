@@ -29,8 +29,7 @@ struct MoveToFolderContainer: View {
     /// Данные sheet’а, переданные через SheetManager
     let data: MoveToFolderSheetData
 
-    /// PlayerManager временно пробрасывается для выполнения команды перемещения.
-    /// Будет удалён после завершения перехода на централизованный контекст плеера.
+    /// PlayerManager временно пробрасывается для выполнения команды перемещения
     let playerManager: PlayerManager
 
     // MARK: - State
@@ -47,6 +46,10 @@ struct MoveToFolderContainer: View {
         NavigationBarHost(
             title: "Переместить в папку",
 
+            /// Кнопка подтверждения (✓)
+            rightButtonImage: "checkmark",
+
+            /// Активна только если папка выбрана и она отличается от текущей
             isRightEnabled: Binding(
                 get: {
                     selectedFolderId != nil &&
@@ -55,11 +58,13 @@ struct MoveToFolderContainer: View {
                 set: { _ in }
             ),
 
+            /// Закрытие sheet’а без действий
             onClose: {
                 SheetManager.shared.closeActive()
             },
 
-            onConfirm: {
+            /// Подтверждение перемещения
+            onRightTap: {
                 Task { await moveTrack() }
             }
         ) {
@@ -76,10 +81,7 @@ struct MoveToFolderContainer: View {
 
     // MARK: - Actions
 
-    /// Загружает текущую папку трека.
-    /// Используется для:
-    /// - бейджа "Текущая" в UI
-    /// - блокировки подтверждения, если папка не меняется
+    /// Загружает текущую папку трека
     private func loadCurrentTrackFolder() async {
         if let entry = await TrackRegistry.shared.entry(for: data.track.id) {
             trackCurrentFolderId = entry.folderId
@@ -88,8 +90,7 @@ struct MoveToFolderContainer: View {
         }
     }
 
-    /// Выполняет команду перемещения трека в выбранную папку.
-    /// При успешном выполнении закрывает sheet.
+    /// Выполняет команду перемещения трека в выбранную папку
     private func moveTrack() async {
         guard let folderId = selectedFolderId else { return }
 
