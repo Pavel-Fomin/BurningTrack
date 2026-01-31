@@ -56,7 +56,8 @@ struct TrackDetailSheet: View {
             case .edit:
                 TrackDetailEditForm(
                     fileName: $editedFileName,
-                    values: $editedValues
+                    values: $editedValues,
+                    artworkUIImage: artworkUIImage
                 )
             }
         }

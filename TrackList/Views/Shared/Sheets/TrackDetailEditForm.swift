@@ -20,15 +20,17 @@
 
 import SwiftUI
 
+
 struct TrackDetailEditForm: View {
 
     // MARK: - Bindings
 
-    /// Имя файла (без расширения)
     @Binding var fileName: String
-
-    /// Значения тегов (доменная модель)
     @Binding var values: [EditableTrackField: String]
+
+    // MARK: - Artwork
+
+    let artworkUIImage: UIImage?
 
     // MARK: - Field configuration
 
@@ -38,36 +40,29 @@ struct TrackDetailEditForm: View {
         let isMultiline: Bool
     }
 
-    private let tagFields: [FieldConfig] = [
-        .init(id: .title,  title: "Название трека", isMultiline: false),
-        .init(id: .artist, title: "Исполнитель",   isMultiline: false),
-        .init(id: .album,  title: "Альбом",        isMultiline: false),
-        .init(id: .genre,  title: "Жанр",          isMultiline: false)
+    private let fields: [FieldConfig] = [
+        .init(id: .title,   title: "Название трека", isMultiline: false),
+        .init(id: .artist,  title: "Исполнитель",   isMultiline: false),
+        .init(id: .album,   title: "Альбом",        isMultiline: false),
+        .init(id: .genre,   title: "Жанр",          isMultiline: false),
+        .init(id: .comment, title: "Комментарий",   isMultiline: true)
     ]
-
-    private let commentField = FieldConfig(
-        id: .comment,
-        title: "Комментарий",
-        isMultiline: true
-    )
 
     // MARK: - UI
 
     var body: some View {
-        List {
+        ScrollView {
+            VStack(spacing: 16) {
 
-            // Название файла
-            Section("НАЗВАНИЕ ФАЙЛА") {
+                artworkBlock
+
                 EditableFieldRow(
                     title: "Название файла",
                     isMultiline: false,
                     value: $fileName
                 )
-            }
 
-            // Теги
-            Section("ТЕГИ") {
-                ForEach(tagFields) { field in
+                ForEach(fields) { field in
                     EditableFieldRow(
                         title: field.title,
                         isMultiline: field.isMultiline,
@@ -75,17 +70,34 @@ struct TrackDetailEditForm: View {
                     )
                 }
             }
+            .padding(.horizontal)
+            .padding(.bottom, 24)
+        }
+    }
 
-            // Комментарий
-            Section("КОММЕНТАРИЙ") {
-                EditableFieldRow(
-                    title: commentField.title,
-                    isMultiline: true,
-                    value: binding(for: commentField.id)
-                )
+    // MARK: - Artwork
+
+    private var artworkBlock: some View {
+        Group {
+            if let artworkUIImage {
+                Image(uiImage: artworkUIImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 180, height: 180)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .shadow(radius: 8)
+            } else {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.gray.opacity(0.2))
+                    .frame(width: 180, height: 180)
+                    .overlay(
+                        Image(systemName: "music.note")
+                            .font(.system(size: 40))
+                            .foregroundColor(.gray)
+                    )
             }
         }
-        .listStyle(.insetGrouped)
+        .padding(.vertical, 20)
     }
 
     // MARK: - Helpers

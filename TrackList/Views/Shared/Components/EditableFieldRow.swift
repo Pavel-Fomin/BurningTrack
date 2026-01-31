@@ -23,7 +23,7 @@ struct EditableFieldRow: View {
 
     // MARK: - Input
 
-    let title: String       /// Текст лейбла (например: "Исполнитель")
+    let title: String       /// Текст лейбла
     let isMultiline: Bool   /// Режим ввода
     
     @Binding var value: String /// Значение поля
@@ -31,11 +31,11 @@ struct EditableFieldRow: View {
     // MARK: - UI
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 4) {
 
             // Лейбл внутри карточки
-            Text(title)
-                .font(.caption)
+            Text(title.uppercased())
+                .font(.caption2)
                 .foregroundColor(.secondary)
 
             if isMultiline {
@@ -44,7 +44,8 @@ struct EditableFieldRow: View {
                 singleLineInput
             }
         }
-        .padding(12)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 16)
         .background(background)
     }
 
@@ -69,7 +70,7 @@ struct EditableFieldRow: View {
     // MARK: - Background
 
     private var background: some View {
-        RoundedRectangle(cornerRadius: 12, style: .continuous)
+        RoundedRectangle(cornerRadius: 26, style: .continuous)
             .fill(Color(.secondarySystemGroupedBackground))
     }
 }
