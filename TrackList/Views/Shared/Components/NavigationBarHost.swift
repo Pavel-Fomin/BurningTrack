@@ -81,13 +81,19 @@ struct NavigationBarHost<Content: View>: UIViewControllerRepresentable {
 
         // Универсальная правая кнопка
         if let imageName = rightButtonImage {
-            hosting.navigationItem.rightBarButtonItem = UIBarButtonItem(
+
+            let style: UIBarButtonItem.Style =
+                imageName == "checkmark" ? .prominent : .plain
+
+            let item = UIBarButtonItem(
                 image: UIImage(systemName: imageName),
-                style: .prominent,
+                style: style,
                 target: context.coordinator,
                 action: #selector(Coordinator.rightTapped)
             )
-            hosting.navigationItem.rightBarButtonItem?.isEnabled = isRightEnabled.wrappedValue
+
+            hosting.navigationItem.rightBarButtonItem = item
+            item.isEnabled = isRightEnabled.wrappedValue
         }
 
         hosting.view.backgroundColor = .clear
@@ -108,12 +114,52 @@ struct NavigationBarHost<Content: View>: UIViewControllerRepresentable {
         // обновляем SwiftUI-контент
         context.coordinator.hostingController?.rootView = content
 
-        // синхронизация кнопки
-        uiViewController
-            .topViewController?
-            .navigationItem
-            .rightBarButtonItem?
-            .isEnabled = isRightEnabled.wrappedValue
+        guard let top = uiViewController.topViewController else { return }
+
+        // если правой кнопки быть не должно
+        guard let imageName = rightButtonImage else {
+            top.navigationItem.rightBarButtonItem = nil
+            return
+        }
+
+        // если кнопки ещё нет — создаём
+        if top.navigationItem.rightBarButtonItem == nil {
+
+            let style: UIBarButtonItem.Style =
+                imageName == "checkmark" ? .prominent : .plain
+
+            let image = UIImage(systemName: imageName)
+            image?.accessibilityIdentifier = imageName
+
+            let item = UIBarButtonItem(
+                image: image,
+                style: style,
+                target: context.coordinator,
+                action: #selector(Coordinator.rightTapped)
+            )
+
+            top.navigationItem.rightBarButtonItem = item
+        }
+
+        // 1️⃣ enabled / disabled
+        top.navigationItem.rightBarButtonItem?.isEnabled =
+            isRightEnabled.wrappedValue
+
+        // 2️⃣ обновляем IMAGE, если сменилась
+        let currentImageName =
+            top.navigationItem.rightBarButtonItem?
+                .image?
+                .accessibilityIdentifier
+
+        if currentImageName != imageName {
+            let image = UIImage(systemName: imageName)
+            image?.accessibilityIdentifier = imageName
+            top.navigationItem.rightBarButtonItem?.image = image
+        }
+
+        // 3️⃣ ОБЯЗАТЕЛЬНО обновляем STYLE
+        top.navigationItem.rightBarButtonItem?.style =
+            imageName == "checkmark" ? .prominent : .plain
     }
 
     func makeCoordinator() -> Coordinator {Coordinator()}

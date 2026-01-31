@@ -22,24 +22,45 @@
 import SwiftUI
 
 struct TrackDetailContainer: View {
-    
+
     let track: any TrackDisplayable
-    
+
     @ObservedObject private var sheetManager = SheetManager.shared
-    
-    // MARK: - Editing state
-    
+
+    // MARK: - Mode
+
     @State private var mode: TrackDetailSheet.Mode = .view
+
+    // MARK: - Editing state (текущее)
+
     @State private var editedFileName: String = ""
-    @State private var isEditingFileName: Bool = false
     @State private var editedValues: [EditableTrackField: String] = [:]
-    
+
+    // MARK: - Initial state (фиксируется при входе в edit)
+
+    @State private var initialFileName: String = ""
+    @State private var initialValues: [EditableTrackField: String] = [:]
+
     // MARK: - Derived state
-    
-    private var hasChanges: Bool {!editedValues.isEmpty}
-    
+
+    /// Имя файла не может быть пустым
+    private var isFileNameValid: Bool {
+        !editedFileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// Есть ли реальные изменения (с учётом trim)
+    private var hasChanges: Bool {
+        guard isFileNameValid else { return false }
+
+        if trimmed(editedFileName) != trimmed(initialFileName) {
+            return true
+        }
+
+        return trimmed(editedValues) != trimmed(initialValues)
+    }
+
     // MARK: - UI
-    
+
     var body: some View {
         NavigationBarHost(
             title: "О треке",
@@ -51,9 +72,10 @@ struct TrackDetailContainer: View {
                 sheetManager.closeActive()
             },
             onRightTap: {
-                if mode == .view {
-                    mode = .edit
-                } else {
+                switch mode {
+                case .view:
+                    enterEditMode()
+                case .edit:
                     saveAndClose()
                 }
             }
@@ -66,66 +88,74 @@ struct TrackDetailContainer: View {
             )
         }
     }
-    
-    
+
+    // MARK: - Edit flow
+
+    private func enterEditMode() {
+        // фиксируем initial state
+        initialFileName = editedFileName
+        initialValues = editedValues
+
+        mode = .edit
+    }
+
     // MARK: - Save
-    
+
     private func saveAndClose() {
-        guard hasChanges else {
-            sheetManager.closeActive()
-            return
-        }
-        
+        guard hasChanges else { return }
+
         let patch = buildTagWritePatch()
-        
+
         Task {
             do {
                 try await AppCommandExecutor.shared.updateTrackTags(
                     trackId: track.id,
                     patch: patch
                 )
-                
+
                 await MainActor.run {
+                    mode = .view
                     sheetManager.closeActive()
                 }
             } catch {
-                // Ошибку пока не глотаем молча — позже сюда ляжет UX
                 print("❌ Failed to update tags:", error)
             }
         }
     }
-    
-    
-    // MARK: - Формирует доменный TagWritePatch на основе текущих inline-изменений
-    
-    /// Используется при нажатии кнопки ✓ в navigation bar.Пустое значение трактуется как удаление тега
+
+    // MARK: - Tag patch
+
     private func buildTagWritePatch() -> TagWritePatch {
         var patch = TagWritePatch()
 
         for (field, value) in editedValues {
-            // пустая строка = удаление тега
-            let normalized: String? = value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                ? nil
-                : value
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            let normalized: String? = trimmed.isEmpty ? nil : trimmed
 
             switch field {
             case .title:
                 patch.title = normalized
-
             case .artist:
                 patch.artist = normalized
-
             case .album:
                 patch.album = normalized
-
             case .genre:
                 patch.genre = normalized
-
             case .comment:
                 patch.comment = normalized
             }
         }
 
         return patch
+    }
+
+    // MARK: - Helpers
+
+    private func trimmed(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func trimmed(_ dict: [EditableTrackField: String]) -> [EditableTrackField: String] {
+        dict.mapValues { trimmed($0) }
     }
 }
