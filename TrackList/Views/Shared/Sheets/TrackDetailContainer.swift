@@ -22,45 +22,52 @@
 import SwiftUI
 
 struct TrackDetailContainer: View {
-
+    
     let track: any TrackDisplayable
-
+    let playerManager: PlayerManager
+    
     @ObservedObject private var sheetManager = SheetManager.shared
-
+    
     // MARK: - Mode
-
+    
     @State private var mode: TrackDetailSheet.Mode = .view
-
+    
     // MARK: - Editing state (текущее)
-
+    
     @State private var editedFileName: String = ""
     @State private var editedValues: [EditableTrackField: String] = [:]
-
+    
     // MARK: - Initial state (фиксируется при входе в edit)
-
+    
     @State private var initialFileName: String = ""
     @State private var initialValues: [EditableTrackField: String] = [:]
-
+    
+    @State private var showStopPlayerAlert = false
+    
+    @State private var initialFileExtension: String = ""
+    @State private var initialFullFileName: String = ""
+    @State private var showFileNameConflictAlert = false
+    
     // MARK: - Derived state
-
+    
     /// Имя файла не может быть пустым
     private var isFileNameValid: Bool {
         !editedFileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
-
+    
     /// Есть ли реальные изменения (с учётом trim)
     private var hasChanges: Bool {
         guard isFileNameValid else { return false }
-
+        
         if trimmed(editedFileName) != trimmed(initialFileName) {
             return true
         }
-
+        
         return trimmed(editedValues) != trimmed(initialValues)
     }
-
+    
     // MARK: - UI
-
+    
     var body: some View {
         NavigationBarHost(
             title: "О треке",
@@ -87,27 +94,72 @@ struct TrackDetailContainer: View {
                 editedFileName: $editedFileName
             )
         }
+        .alert(
+            "Трек сейчас воспроизводится",
+            isPresented: $showStopPlayerAlert
+        ) {
+            Button("Отмена", role: .cancel) {}
+            
+            Button("Остановить и сохранить") {
+                playerManager.pause()
+                playerManager.stopAccessingCurrentTrack()
+                saveAndClose()
+            }
+        } message: {
+            Text("Чтобы переименовать файл, нужно остановить воспроизведение.")
+        }
+        
+        .alert(
+            "Файл с таким именем уже существует",
+            isPresented: $showFileNameConflictAlert
+        ) {
+            Button("Понятно", role: .cancel) {}
+        } message: {
+            Text("Выберите другое имя файла.")
+        }
     }
-
+    
     // MARK: - Edit flow
-
+    
     private func enterEditMode() {
-        // фиксируем initial state
-        initialFileName = editedFileName
         initialValues = editedValues
+
+        Task {
+            if let entry = await TrackRegistry.shared.entry(for: track.id) {
+                await MainActor.run {
+                    initialFullFileName = entry.fileName // ← С РАСШИРЕНИЕМ
+                }
+            }
+        }
 
         mode = .edit
     }
-
+    
     // MARK: - Save
-
+    
     private func saveAndClose() {
-        guard hasChanges else { return }
-
-        let patch = buildTagWritePatch()
+        guard hasChanges else {
+            mode = .view
+            return
+        }
 
         Task {
             do {
+                // Переименование файла
+                let newFullName = buildFullFileName(
+                    editedName: editedFileName
+                )
+
+                if newFullName != initialFullFileName {
+                    try await LibraryFileManager.shared.renameTrack(
+                        id: track.id,
+                        to: newFullName,
+                        using: playerManager
+                    )
+                }
+
+                // Теги
+                let patch = buildTagWritePatch()
                 try await AppCommandExecutor.shared.updateTrackTags(
                     trackId: track.id,
                     patch: patch
@@ -115,23 +167,39 @@ struct TrackDetailContainer: View {
 
                 await MainActor.run {
                     mode = .view
-                    sheetManager.closeActive()
+                }
+
+            } catch let error as LibraryFileError {
+                switch error {
+
+                case .trackIsPlaying:
+                    await MainActor.run {
+                        showStopPlayerAlert = true
+                    }
+
+                case .destinationAlreadyExists:
+                    await MainActor.run {
+                        showFileNameConflictAlert = true
+                    }
+
+                default:
+                    print("❌ File error:", error)
                 }
             } catch {
-                print("❌ Failed to update tags:", error)
+                print("❌ Failed to save:", error)
             }
         }
     }
-
+    
     // MARK: - Tag patch
-
+    
     private func buildTagWritePatch() -> TagWritePatch {
         var patch = TagWritePatch()
-
+        
         for (field, value) in editedValues {
             let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
             let normalized: String? = trimmed.isEmpty ? nil : trimmed
-
+            
             switch field {
             case .title:
                 patch.title = normalized
@@ -145,17 +213,32 @@ struct TrackDetailContainer: View {
                 patch.comment = normalized
             }
         }
-
+        
         return patch
     }
-
+    
     // MARK: - Helpers
-
+    
     private func trimmed(_ value: String) -> String {
         value.trimmingCharacters(in: .whitespacesAndNewlines)
     }
-
+    
     private func trimmed(_ dict: [EditableTrackField: String]) -> [EditableTrackField: String] {
         dict.mapValues { trimmed($0) }
+    }
+    
+    private func buildFullFileName(editedName: String) -> String {
+
+        let name =
+            editedName.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let ext =
+            (initialFullFileName as NSString).pathExtension
+
+        guard !ext.isEmpty else {
+            return name
+        }
+
+        return "\(name).\(ext)"
     }
 }
