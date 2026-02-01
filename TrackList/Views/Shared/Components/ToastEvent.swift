@@ -84,4 +84,11 @@ enum ToastEvent: Equatable {
     
     /// Файл переименован
     case fileRenamed(newName: String)
+    
+    /// Файл и теги обновлены
+    case fileAndTagsUpdated(
+        title: String,
+        artist: String,
+        artwork: Image?
+    )
 }

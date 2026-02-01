@@ -54,10 +54,13 @@ struct SheetHostModifier: ViewModifier {
                 
                 /// О треке
             case .trackDetail(let track):
-                TrackDetailContainer(
-                track: track,
-                playerManager: playerManager)
+                    TrackDetailContainer(
+                        track: track,
+                        playerManager: playerManager
+                    )
                     .appSheet(detents: [.large])
+                    .toastHost()
+
                 
                 /// Добавить в треклист
             case .addToTrackList(let data):

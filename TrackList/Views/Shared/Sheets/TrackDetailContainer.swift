@@ -138,6 +138,11 @@ struct TrackDetailContainer: View {
     // MARK: - Save
     
     private func saveAndClose() {
+
+        let newFullName = buildFullFileName(editedName: editedFileName)
+        let fileChanged = newFullName != initialFullFileName
+        let tagsChanged = trimmed(editedValues) != trimmed(initialValues)
+
         guard hasChanges else {
             mode = .view
             return
@@ -145,25 +150,21 @@ struct TrackDetailContainer: View {
 
         Task {
             do {
-                // Переименование файла
-                let newFullName = buildFullFileName(
-                    editedName: editedFileName
-                )
-
-                if newFullName != initialFullFileName {
-                    try await LibraryFileManager.shared.renameTrack(
-                        id: track.id,
+                if fileChanged {
+                    try await AppCommandExecutor.shared.renameTrack(
+                        trackId: track.id,
                         to: newFullName,
                         using: playerManager
                     )
                 }
 
-                // Теги
-                let patch = buildTagWritePatch()
-                try await AppCommandExecutor.shared.updateTrackTags(
-                    trackId: track.id,
-                    patch: patch
-                )
+                if tagsChanged {
+                    let patch = buildTagWritePatch()
+                    try await AppCommandExecutor.shared.updateTrackTags(
+                        trackId: track.id,
+                        patch: patch
+                    )
+                }
 
                 await MainActor.run {
                     mode = .view
@@ -171,20 +172,16 @@ struct TrackDetailContainer: View {
 
             } catch let error as LibraryFileError {
                 switch error {
-
                 case .trackIsPlaying:
-                    await MainActor.run {
-                        showStopPlayerAlert = true
-                    }
+                    await MainActor.run { showStopPlayerAlert = true }
 
                 case .destinationAlreadyExists:
-                    await MainActor.run {
-                        showFileNameConflictAlert = true
-                    }
+                    await MainActor.run { showFileNameConflictAlert = true }
 
                 default:
                     print("❌ File error:", error)
                 }
+
             } catch {
                 print("❌ Failed to save:", error)
             }

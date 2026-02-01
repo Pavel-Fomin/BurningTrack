@@ -89,7 +89,18 @@ actor AppCommandExecutor {
         to newFileName: String,
         using playerManager: PlayerManager
     ) async throws {
-        fatalError("Команда renameTrack не реализована")
+
+        try await LibraryFileManager.shared.renameTrack(
+            id: trackId,
+            to: newFileName,
+            using: playerManager
+        )
+
+        let event = ToastEvent.fileRenamed(newName: newFileName)
+
+        await MainActor.run {
+            ToastManager.shared.handle(event)
+        }
     }
     
    
