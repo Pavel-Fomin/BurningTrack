@@ -122,12 +122,13 @@ struct TrackDetailContainer: View {
     // MARK: - Edit flow
     
     private func enterEditMode() {
+        initialFileName = editedFileName
         initialValues = editedValues
 
         Task {
             if let entry = await TrackRegistry.shared.entry(for: track.id) {
                 await MainActor.run {
-                    initialFullFileName = entry.fileName // ← С РАСШИРЕНИЕМ
+                    initialFullFileName = entry.fileName
                 }
             }
         }
