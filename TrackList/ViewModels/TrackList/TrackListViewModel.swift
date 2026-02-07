@@ -32,6 +32,19 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
         self.currentListId = trackList.id
         self.name = trackList.name
         self.tracks = trackList.tracks
+        
+        NotificationCenter.default.addObserver(
+            forName: .trackMetadataDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let self else { return }
+            guard let trackId = notification.object as? UUID else { return }
+
+            Task { @MainActor in
+                self.reloadMetadata(for: trackId)
+            }
+        }
     }
     
     // Заглушка. Мы ушли от активного треклиста.
@@ -85,6 +98,11 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
                 metadataByTrackId[trackId] = meta
             }
         }
+    }
+    
+    func reloadMetadata(for trackId: UUID) {
+        metadataByTrackId[trackId] = nil
+        requestMetadataIfNeeded(for: trackId)
     }
 
     // MARK: - Reorder

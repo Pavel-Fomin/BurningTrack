@@ -17,4 +17,7 @@ protocol TrackMetadataProviding: AnyObject {
 
     /// Запрашивает загрузку metadata, если она ещё не выполнена
     func requestMetadataIfNeeded(for trackId: UUID)
+    
+    /// Принудительно перезагружает metadata (используется после редактирования тегов)
+    func reloadMetadata(for trackId: UUID)
 }

@@ -32,6 +32,7 @@ struct LibraryTrackRowWrapper: View {
     
     @ObservedObject var playerViewModel: PlayerViewModel
     @EnvironmentObject var sheetManager: SheetManager
+    @ObservedObject private var metadataCache = TrackMetadataCacheManager.shared
     
     // MARK: - Player state
     
@@ -96,7 +97,7 @@ struct LibraryTrackRowWrapper: View {
             onToggleSelection: onToggleSelection,
             trackListNames: trackListNames
         )
-        .task(id: track.id.uuidString + "|" + (isScrollingFast ? "1" : "0")) {
+        .task(id: track.id.uuidString + "|" + (isScrollingFast ? "1" : "0") + "|" + "\(metadataCache.revision)") {
             metadataProvider.requestMetadataIfNeeded(for: track.id)
         }
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {

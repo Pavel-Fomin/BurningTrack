@@ -26,6 +26,7 @@ struct TrackDetailContainer: View {
     let track: any TrackDisplayable
     let playerManager: PlayerManager
     
+    
     @ObservedObject private var sheetManager = SheetManager.shared
     
     // MARK: - Mode

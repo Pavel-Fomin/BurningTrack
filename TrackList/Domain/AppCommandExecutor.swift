@@ -29,7 +29,7 @@ import UIKit
 actor AppCommandExecutor {
     
     // MARK: - Зависимости
-
+    
     private let tagsWriter: TagsWriter = TagLibTagsWriter()
     static let shared = AppCommandExecutor()
     private init() {}
@@ -41,26 +41,26 @@ actor AppCommandExecutor {
         toFolder folderId: UUID,
         using playerManager: PlayerManager
     ) async throws {
-
+        
         // 1. Перемещение файла
         try await LibraryFileManager.shared.moveTrack(
             id: trackId,
             toFolder: folderId,
             using: playerManager
         )
-
+        
         // 2. Резолв URL (только для тоста)
         guard let url = await BookmarkResolver.url(forTrack: trackId) else { return }
-
+        
         // 3. Метаданные трека
         let metadata = await TrackMetadataCacheManager.shared.loadMetadata(for: url)
-
+        
         // 4. Имя папки назначения (ЕДИНСТВЕННЫЙ валидный способ)
         let folderName = await TrackRegistry.shared
             .allFolders()
             .first(where: { $0.id == folderId })?
             .name ?? "папку"
-
+        
         // 5. ToastEvent
         let event = ToastEvent.trackMovedInLibrary(
             title: metadata?.title ?? url.lastPathComponent,
@@ -74,7 +74,7 @@ actor AppCommandExecutor {
             },
             folderName: folderName
         )
-
+        
         // 6. Показ тоста
         await MainActor.run {
             ToastManager.shared.handle(event)
@@ -89,21 +89,21 @@ actor AppCommandExecutor {
         to newFileName: String,
         using playerManager: PlayerManager
     ) async throws {
-
+        
         try await LibraryFileManager.shared.renameTrack(
             id: trackId,
             to: newFileName,
             using: playerManager
         )
-
+        
         let event = ToastEvent.fileRenamed(newName: newFileName)
-
+        
         await MainActor.run {
             ToastManager.shared.handle(event)
         }
     }
     
-   
+    
     // MARK: - Добавить в треклист
     
     func addTrackToTrackList(
@@ -139,7 +139,7 @@ actor AppCommandExecutor {
         
         /// 5. Загружаем метаданные трека
         let metadata = await TrackMetadataCacheManager.shared.loadMetadata(for: url)
-
+        
         /// 6. ToastEvent
         let event = ToastEvent.trackAddedToTrackList(
             title: metadata?.title ?? imported.fileName,
@@ -153,7 +153,7 @@ actor AppCommandExecutor {
             },
             trackListName: list.name
         )
-
+        
         /// 7. Показ тоста — строго MainActor
         await MainActor.run {
             ToastManager.shared.handle(event)
@@ -202,19 +202,19 @@ actor AppCommandExecutor {
         trackListId: UUID,
         newName: String
     ) async throws {
-
+        
         let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard TrackListManager.shared.validateName(trimmed) else { return }
-
+        
         // 1. Переименование
         TrackListsManager.shared.renameTrackList(
             id: trackListId,
             to: trimmed
         )
-
+        
         // 2. ToastEvent
         let event = ToastEvent.trackListRenamed(newName: trimmed)
-
+        
         // 3. Показ тоста
         await MainActor.run {
             ToastManager.shared.handle(event)
@@ -227,22 +227,22 @@ actor AppCommandExecutor {
         trackId: UUID,
         trackListId: UUID
     ) async throws {
-
+        
         /// 1. Получаем треклист
         var list = TrackListManager.shared.getTrackListById(trackListId)
-
+        
         /// 2. Удаляем трек
         list.tracks.removeAll { $0.id == trackId }
-
+        
         /// 3. Сохраняем
         TrackListManager.shared.saveTracks(list.tracks, for: list.id)
-
+        
         /// 4. Резолв URL (ТОЛЬКО для тоста)
         guard let url = await BookmarkResolver.url(forTrack: trackId) else { return }
-
+        
         /// 5. Метаданные
         let metadata = await TrackMetadataCacheManager.shared.loadMetadata(for: url)
-
+        
         /// 6. ToastEvent
         let event = ToastEvent.trackRemovedFromTrackList(
             title: metadata?.title ?? url.lastPathComponent,
@@ -255,7 +255,7 @@ actor AppCommandExecutor {
                 ).map { Image(uiImage: $0) }
             }
         )
-
+        
         /// 7. Показ тоста
         await MainActor.run { ToastManager.shared.handle(event)
         }
@@ -313,12 +313,12 @@ actor AppCommandExecutor {
     
     
     // MARK: - Удалить трек из плеера
-
+    
     func removeTrackFromPlayer(trackId: UUID) async throws {
-
+        
         // 1. Резолв URL (только для тоста)
         let url = await BookmarkResolver.url(forTrack: trackId)
-
+        
         // 2. Метаданные
         let metadata: TrackMetadataCacheManager.CachedMetadata?
         if let url {
@@ -326,13 +326,13 @@ actor AppCommandExecutor {
         } else {
             metadata = nil
         }
-
+        
         // 3. Мутация плеера — строго MainActor
         await MainActor.run {
             PlaylistManager.shared.tracks.removeAll { $0.id == trackId }
             PlaylistManager.shared.saveToDisk()
         }
-
+        
         // 4. ToastEvent
         let event = ToastEvent.trackRemovedFromPlayer(
             title: metadata?.title ?? url?.lastPathComponent ?? "Трек",
@@ -345,7 +345,7 @@ actor AppCommandExecutor {
                 ).map { Image(uiImage: $0) }
             }
         )
-
+        
         // 5. Показ тоста
         await MainActor.run {
             ToastManager.shared.handle(event)
@@ -354,15 +354,15 @@ actor AppCommandExecutor {
     
     
     // MARK: - Очистить плеер
-
+    
     func clearPlayer() async {
-
+        
         // 1. Очистка — строго MainActor
         await MainActor.run {
             PlaylistManager.shared.tracks.removeAll()
             PlaylistManager.shared.saveToDisk()
         }
-
+        
         // 2. ToastEvent
         await MainActor.run {
             ToastManager.shared.handle(.playerCleared)
@@ -371,24 +371,32 @@ actor AppCommandExecutor {
     
     
     // MARK: - Обновить теги трека
-
+    
     func updateTrackTags(
         trackId: UUID,
         patch: TagWritePatch
     ) async throws {
-
+        
         // 1. Резолв URL трека через bookmark
         guard let url = await BookmarkResolver.url(forTrack: trackId) else {
             throw TagWriteError.fileNotFound
         }
-
+        
         // 2. Запись тегов (файл уже с открытым доступом)
         try await tagsWriter.writeTags(to: url, patch: patch)
-
-        // 3. Инвалидация и обновление кэша метаданных
+        
+        // 3. Инвалидация кэша метаданных
+        TrackMetadataCacheManager.shared.invalidate(url: url)
+        
+        NotificationCenter.default.post(
+            name: .trackMetadataDidChange,
+            object: trackId
+        )
+        
+        // 4. Загрузка обновлённых метаданных (уже после инвалидции)
         let metadata = await TrackMetadataCacheManager.shared.loadMetadata(for: url)
-
-        // 4. ToastEvent
+        
+        // 5. ToastEvent
         let event = ToastEvent.tagsUpdated(
             title: metadata?.title ?? url.lastPathComponent,
             artist: metadata?.artist ?? "",
@@ -400,12 +408,10 @@ actor AppCommandExecutor {
                 ).map { Image(uiImage: $0) }
             }
         )
-
-        // 5. Показ тоста
+        
+        // 6. Показ тоста
         await MainActor.run {
             ToastManager.shared.handle(event)
         }
     }
 }
-    
-  

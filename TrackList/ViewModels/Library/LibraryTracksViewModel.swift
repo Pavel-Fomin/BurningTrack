@@ -41,8 +41,21 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         self.folderId = folderId
         self.tracksProvider = tracksProvider
         self.badgeProvider = badgeProvider
-    }
+        
+        NotificationCenter.default.addObserver(
+            forName: .trackMetadataDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let self else { return }
+            guard let trackId = notification.object as? UUID else { return }
 
+            Task { @MainActor in
+                        self.reloadMetadata(for: trackId)
+                    }
+                }
+            }
+    
     // MARK: - Load
 
     func loadTracksIfNeeded() async {
@@ -100,5 +113,10 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
                 metadataByTrackId[trackId] = meta
             }
         }
+    }
+    
+    func reloadMetadata(for trackId: UUID) {
+        metadataByTrackId[trackId] = nil
+        requestMetadataIfNeeded(for: trackId)
     }
 }

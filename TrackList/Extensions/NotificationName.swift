@@ -1,5 +1,5 @@
 //
-//  Notification+Name.swift
+//  NotificationName.swift
 //  TrackList
 //
 //  Расширение для объявления собственных Notification.Name
@@ -17,6 +17,7 @@ extension Notification.Name {
     static let trackListsDidChange = Notification.Name("trackListsDidChange")   /// Любое изменение списка треклистов (создание/удаление/переименование)
     static let clearTrackList = Notification.Name("clearTrackList")             /// Очистка текущего треклиста
     static let trackListDidRename = Notification.Name("trackListDidRename")     /// Треклист был переименован
+    static let trackMetadataDidChange = Notification.Name("trackMetadataDidChange") /// Обновились метаданные трека (теги/обложка/переименование)
     
     // MARK: - Library
     

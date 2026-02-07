@@ -93,6 +93,21 @@ final class PlayerViewModel: ObservableObject {
         ) { [weak self] _ in
             Task { await self?.playNextTrack() }
         }
+        // Обновление метаданных трека (после редактирования тегов / rename)
+        NotificationCenter.default.addObserver(
+            forName: .trackMetadataDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let self else { return }
+            guard let trackId = notification.object as? UUID else { return }
+
+            Task { @MainActor in
+                self.metadataByTrackId[trackId] = nil
+                self.nowPlayingArtworkByTrackId[trackId] = nil
+                self.requestMetadataIfNeeded(for: trackId)
+            }
+        }
         
         // Настройка Remote Command Center
         playerManager.setupRemoteCommandCenter(

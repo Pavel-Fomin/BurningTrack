@@ -8,13 +8,15 @@
 //
 
 import Foundation
+import Combine
 
-final class TrackMetadataCacheManager: @unchecked Sendable {
+final class TrackMetadataCacheManager: ObservableObject, @unchecked Sendable {
     static let shared = TrackMetadataCacheManager()
-    
-    // Основной кэш для хранения метаданных (NSCache для автоматического сброса при нехватке памяти)
+
+    @Published private(set) var revision: Int = 0
+
     private let cache = NSCache<NSURL, CachedMetadata>()
-    
+
     private init() {
         cache.countLimit = 100
         cache.totalCostLimit = 30 * 1024 * 1024 // 30 MB
@@ -27,6 +29,31 @@ final class TrackMetadataCacheManager: @unchecked Sendable {
         cache.object(forKey: url as NSURL)
     }
     
+    // MARK: - Инвалидация кэша
+
+    /// Удаляет метаданные трека из кэша.
+    /// Используется после изменения тегов или переименования файла.
+    func invalidate(url: URL) {
+        let nsurl = url as NSURL
+        cache.removeObject(forKey: nsurl)
+
+        Task {
+            await _MetadataCoordinator.shared.cancel(url: url)
+
+            await MainActor.run {
+                self.revision += 1
+            }
+        }
+    }
+
+    /// Полная очистка кэша (например, при смене папки фонотеки).
+    func invalidateAll() {
+        cache.removeAllObjects()
+
+        Task { @MainActor in
+            self.revision += 1
+        }
+    }
     
     // MARK: - Загрузка тегов
     
