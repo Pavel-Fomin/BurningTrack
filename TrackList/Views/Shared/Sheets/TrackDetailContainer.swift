@@ -168,6 +168,8 @@ struct TrackDetailContainer: View {
                     )
                 }
 
+                await reloadSheetMetadataFromFile()
+
                 await MainActor.run {
                     mode = .view
                 }
@@ -239,5 +241,39 @@ struct TrackDetailContainer: View {
         }
 
         return "\(name).\(ext)"
+    }
+    
+    // MARK: - Reload from TagLib
+
+    private func reloadSheetMetadataFromFile() async {
+        guard let url = await BookmarkResolver.url(forTrack: track.id) else { return }
+
+        let sections = TrackTagInspector.shared.readMetadata(from: url)
+
+        var newValues: [EditableTrackField: String] = [:]
+
+        for section in sections {
+            for item in section.items {
+                switch item.title {
+                case "Название":
+                    newValues[.title] = item.value
+                case "Исполнитель":
+                    newValues[.artist] = item.value
+                case "Альбом":
+                    newValues[.album] = item.value
+                case "Жанр":
+                    newValues[.genre] = item.value
+                case "Комментарий":
+                    newValues[.comment] = item.value
+                default:
+                    break
+                }
+            }
+        }
+
+        await MainActor.run {
+            editedValues = newValues
+            initialValues = newValues
+        }
     }
 }
