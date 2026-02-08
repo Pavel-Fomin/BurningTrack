@@ -155,7 +155,7 @@ final class PlayerManager {
 
     func observeProgress(update: @escaping (TimeInterval) -> Void) {
         removeTimeObserver()
-        let interval = CMTime(seconds: 0.5, preferredTimescale: 1_000_000_000)
+        let interval = CMTimeMakeWithSeconds(1.0, preferredTimescale: 600)
 
         timeObserverToken = player.addPeriodicTimeObserver(
             forInterval: interval,

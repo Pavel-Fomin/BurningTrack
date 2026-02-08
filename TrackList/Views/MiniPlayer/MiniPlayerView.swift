@@ -23,152 +23,51 @@ struct AVRoutePickerViewWrapper: UIViewRepresentable {
     func updateUIView(_ uiView: AVRoutePickerView, context: Context) {}
 }
 
-
 struct MiniPlayerView: View {
+    
+    let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
+    
     var trackListViewModel: TrackListViewModel?
-    
+
     @ObservedObject var playerViewModel: PlayerViewModel
-    @State private var dragOffsetX: CGFloat = 0
-    
-    
-    // MARK: - Metadata
-    
-    private var metadata: TrackMetadataCacheManager.CachedMetadata? {
-        guard let track = playerViewModel.currentTrackDisplayable else { return nil }
-        return playerViewModel.metadata(for: track.id)
-    }
 
-    // Обложка
-    private var artwork: UIImage? {
-        guard let track = playerViewModel.currentTrackDisplayable,
-              let data = metadata?.artworkData
-        else { return nil }
-
-        return ArtworkProvider.shared.image(
-            trackId: track.id,
-            artworkData: data,
-            purpose: .miniPlayer
-        )
-    }
-
-    // Название
-    private var title: String {
-        metadata?.title ?? playerViewModel.currentTrackDisplayable?.fileName ?? ""
-    }
-
-    // Артист
-    private var artist: String {
-        metadata?.artist ?? ""
-    }
-    
-// MARK: - UI
-    
     var body: some View {
-        if let track = playerViewModel.currentTrackDisplayable {
+
+        guard let track = playerViewModel.currentTrackDisplayable else { return AnyView(EmptyView()) }
+
+        let staticState = playerViewModel.miniPlayerStaticState
+        
+
+        let title = staticState?.title ?? track.fileName
+        let artist = staticState?.artist ?? "Неизвестный артист"
+        let artwork = staticState?.artwork
+
+        return AnyView(
             VStack {
-                
-              //Верхняя часть: обложка + информация + кнопки
-                HStack(spacing: 12) {
-                    // Анимируемая часть
-                    HStack(spacing: 12) {
-                        // Обложка
-                        if let artwork = artwork {
-                            Image(uiImage: artwork)
-                                .resizable()
-                                .aspectRatio(1, contentMode: .fill)
-                                .frame(width: 40, height: 40)
-                                .cornerRadius(5)
-                        } else {
-                            Rectangle()
-                                .fill(Color.gray.opacity(0.3))
-                                .frame(width: 40, height: 40)
-                                .cornerRadius(5)
-                        }
-                        
-                        // Информация
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(artist.isEmpty ? "Неизвестный артист" : artist)
-                                .font(.caption)
-                                .foregroundColor(.primary)
-                                .lineLimit(1)
-                            
-                            Text(title.isEmpty ? track.fileName : title)
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                                .lineLimit(1)
-                        }
-                    }
-                    .offset(x: dragOffsetX)
-                    .animation(.spring(), value: dragOffsetX)
-                    .contentShape(Rectangle()) // чтобы ловился tap по всей ширине
-                    .onTapGesture {
+
+                MiniPlayerHeaderView(
+                    artwork: artwork,
+                    title: title,
+                    artist: artist,
+                    onTap: {
                         playerViewModel.togglePlayPause()
+                    },
+                    onSwipeNext: {
+                        playerViewModel.playNextTrack()
+                    },
+                    onSwipePrevious: {
+                        playerViewModel.playPreviousTrack()
                     }
-                    
-                    Spacer()
-                    
-                    // Airplay
-                    AVRoutePickerViewWrapper()
-                        .frame(width: 24, height: 24)
-                    
-                }
-                .frame(height: 40)
-                .contentShape(Rectangle())
-                .gesture(
-                    DragGesture()
-                        .onChanged { value in dragOffsetX = value.translation.width }
-                        .onEnded { value in
-                            let threshold: CGFloat = 30
-                            if value.translation.width > threshold {
-                                playerViewModel.playNextTrack()
-                            } else if value.translation.width < -threshold {
-                                playerViewModel.playPreviousTrack()
-                            }
-                            withAnimation(.spring()) { dragOffsetX = 0 }
-                        }
                 )
-                
-                // Прогресс трека
-                HStack(alignment: .center, spacing: 12) {
-                    
-                    // Текущее время
-                    Text(formatTimeSmart(playerViewModel.currentTime))
-                        .font(.caption2)
-                        .frame(width: 40, alignment: .leading)
-                    
-                    // Ползунок прогресса
-                    ProgressBar(
-                        progress: {
-                            let ratio = playerViewModel.trackDuration > 0
-                            ? playerViewModel.currentTime / playerViewModel.trackDuration
-                            : 0
-                            return ratio
-                        }(),
-                        onSeek: { ratio in
-                            let newTime = ratio * playerViewModel.trackDuration
-                            playerViewModel.currentTime = newTime
-                            playerViewModel.seek(to: newTime)
-                        },
-                        height: 10
-                    )
-                    
-                    .id(playerViewModel.trackDuration)
-                    
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, 4) /// выравнивание по краям
-                    
-                    /// Оставшееся время
-                    Text("-\(formatTimeSmart(playerViewModel.trackDuration - playerViewModel.currentTime))")
-                        .font(.caption2)
-                        .frame(width: 40, alignment: .trailing)
-                }
-                .padding(.top, 8) /// отступ между строками
-                
+
+                MiniPlayerProgressView(
+                    currentTime: playerViewModel.miniPlayerCurrentTime,
+                    duration: playerViewModel.miniPlayerDuration,
+                    onSeek: { time in
+                        playerViewModel.seek(to: time)
+                    }
+                )
             }
-            .task(id: track.id) {
-                playerViewModel.requestMetadataIfNeeded(for: track.id)
-            }
-            
             .background(
                 GeometryReader { proxy in
                     Color.clear
@@ -177,14 +76,13 @@ struct MiniPlayerView: View {
             )
             .padding(.horizontal, 12)
             .padding(.vertical, 12)
-            .background(.ultraThinMaterial)
-            .cornerRadius(12)
-            .shadow(radius: 4)
-           
+            .background(.ultraThinMaterial, in: shape)
+            .overlay(shape.stroke(Color(uiColor: .separator).opacity(0.7), lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .shadow(color: Color.black.opacity(0.12), radius: 10, x: 0, y: 6)
+            .shadow(color: Color.black.opacity(0.06), radius: 2, x: 0, y: 1)
             .padding(.horizontal, 16)
-            .padding(.bottom, 24) /// отступ между плеером и меню
-        }
-        
+            .padding(.bottom, 24)
+        )
     }
-    
 }

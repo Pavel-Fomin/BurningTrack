@@ -51,5 +51,6 @@ struct ProgressBar: View {
             )
         }
         .frame(height: height)
+        .clipShape(RoundedRectangle(cornerRadius: 48, style: .continuous))
     }
 }
