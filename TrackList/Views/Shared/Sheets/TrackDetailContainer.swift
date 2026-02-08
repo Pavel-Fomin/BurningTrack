@@ -76,15 +76,17 @@ struct TrackDetailContainer: View {
             isRightEnabled: .constant(
                 mode == .view || hasChanges
             ),
+            
             onClose: {
                 switch mode {
                 case .view:
                     sheetManager.closeActive()
 
                 case .edit:
-                    mode = .view
+                    cancelEditing()
                 }
             },
+            
             onRightTap: {
                 switch mode {
                 case .view:
@@ -197,6 +199,14 @@ struct TrackDetailContainer: View {
                 print("❌ Failed to save:", error)
             }
         }
+    }
+    
+    // MARK: - Закрыть в режиме редактирования
+    
+    private func cancelEditing() {
+        editedFileName = initialFileName
+        editedValues = initialValues
+        mode = .view
     }
     
     // MARK: - Tag patch
