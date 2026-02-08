@@ -77,12 +77,19 @@ struct TrackDetailContainer: View {
                 mode == .view || hasChanges
             ),
             onClose: {
-                sheetManager.closeActive()
+                switch mode {
+                case .view:
+                    sheetManager.closeActive()
+
+                case .edit:
+                    mode = .view
+                }
             },
             onRightTap: {
                 switch mode {
                 case .view:
                     enterEditMode()
+
                 case .edit:
                     saveAndClose()
                 }
