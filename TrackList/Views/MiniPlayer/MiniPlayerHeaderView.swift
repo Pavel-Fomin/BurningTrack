@@ -68,7 +68,7 @@ struct MiniPlayerHeaderView: View {
             Spacer()
 
             AVRoutePickerViewWrapper()
-                .frame(width: 24, height: 24)
+                .frame(width: 24, height: 28)
         }
         .frame(height: 40)
         .contentShape(Rectangle())
