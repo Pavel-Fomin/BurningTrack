@@ -35,7 +35,7 @@ struct TrackDetailSheet: View {
 
     @State private var resolvedURL: URL?
     @State private var artworkUIImage: UIImage?
-    @State private var tags: [(key: String, value: String)] = []
+
 
     // MARK: - Body
 
@@ -49,8 +49,14 @@ struct TrackDetailSheet: View {
                     filePath: resolvedURL.map {
                         displayPath(from: $0.deletingLastPathComponent())
                     },
-                    fileName: resolvedURL?.deletingPathExtension().lastPathComponent,
-                    tags: tags
+                    fileName: editedFileName,
+                    tags: [
+                        ("Название трека", editedValues[.title] ?? ""),
+                        ("Исполнитель", editedValues[.artist] ?? ""),
+                        ("Альбом", editedValues[.album] ?? ""),
+                        ("Жанр", editedValues[.genre] ?? ""),
+                        ("Комментарий", editedValues[.comment] ?? "")
+                    ]
                 )
 
             case .edit:
@@ -86,22 +92,10 @@ struct TrackDetailSheet: View {
         let tagFile = TLTagLibFile(fileURL: url)
 
         guard let parsed = tagFile.readMetadata() else {
-            await MainActor.run { tags = [] }
             return
         }
 
-        let tagPairs: [(String, String)] = [
-            ("Название трека", parsed.title),
-            ("Исполнитель", parsed.artist),
-            ("Альбом", parsed.album),
-            ("Жанр", parsed.genre),
-            ("Комментарий", parsed.comment)
-        ].map {
-            ($0.0, ($0.1 ?? "").trimmingCharacters(in: .whitespacesAndNewlines))
-        }
-
         await MainActor.run {
-            tags = tagPairs
 
             editedValues = [
                 .title: parsed.title ?? "",
