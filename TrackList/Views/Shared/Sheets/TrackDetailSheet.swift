@@ -87,42 +87,45 @@ struct TrackDetailSheet: View {
         resolvedURL = url
         editedFileName = url.deletingPathExtension().lastPathComponent
 
-        await loadMetadata(from: url)
-        loadArtwork(from: url)
+        await loadMetadataAndArtwork(from: url)
     }
 
-    private func loadMetadata(from url: URL) async {
+
+    private func loadMetadataAndArtwork(from url: URL) async {
+        
+        let ok = url.startAccessingSecurityScopedResource()
+        defer { if ok { url.stopAccessingSecurityScopedResource() } }
+
+        // 1) Читаем метаданные один раз
         let tagFile = TLTagLibFile(fileURL: url)
 
         guard let parsed = tagFile.readMetadata() else {
             return
         }
 
-        await MainActor.run {
+        // 2) Собираем теги
+        let values: [EditableTrackField: String] = [
+            .title: parsed.title ?? "",
+            .artist: parsed.artist ?? "",
+            .album: parsed.album ?? "",
+            .genre: parsed.genre ?? "",
+            .comment: parsed.comment ?? ""
+        ]
 
-            editedValues = [
-                .title: parsed.title ?? "",
-                .artist: parsed.artist ?? "",
-                .album: parsed.album ?? "",
-                .genre: parsed.genre ?? "",
-                .comment: parsed.comment ?? ""
-            ]
+        // 3) Собираем обложку (с учётом твоего пайплайна)
+        let image = ArtworkProvider.shared.image(
+            trackId: track.id,
+            artworkData: parsed.artworkData,
+            purpose: .trackInfoSheet
+        )
+
+        // 4) Применяем в UI одним апдейтом
+        await MainActor.run {
+            editedValues = values
+            artworkUIImage = image
         }
     }
-
-    private func loadArtwork(from url: URL) {
-        guard
-            let cached = TrackMetadataCacheManager.shared.loadMetadataFromCache(url: url),
-            let image = ArtworkProvider.shared.image(
-                trackId: track.id,
-                artworkData: cached.artworkData,
-                purpose: .trackInfoSheet
-            )
-        else { return }
-
-        artworkUIImage = image
-    }
-
+    
     // MARK: - Helpers
 
     private func displayPath(from url: URL) -> String {
