@@ -38,7 +38,7 @@ struct LibraryTracksView: View {
         self.trackListViewModel = trackListViewModel
         self._playerViewModel = ObservedObject(wrappedValue: playerViewModel)
         self._tracksViewModel = StateObject(
-            wrappedValue: LibraryTracksViewModel(folderId: folder.url.libraryFolderId)
+            wrappedValue: LibraryTracksViewModel(folderURL: folder.url)
         )
     }
 

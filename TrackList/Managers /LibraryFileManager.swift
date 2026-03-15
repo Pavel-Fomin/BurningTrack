@@ -152,6 +152,7 @@ actor LibraryFileManager {
         await TrackRegistry.shared.upsertTrack(
             id: trackId,
             fileName: fileName,
+            relativePath: entry.relativePath,
             folderId: destinationFolderId,
             rootFolderId: entry.rootFolderId
         )
@@ -238,6 +239,7 @@ actor LibraryFileManager {
         await TrackRegistry.shared.upsertTrack(
             id: trackId,
             fileName: newFileName,
+            relativePath: entry.relativePath,
             folderId: entry.folderId,
             rootFolderId: entry.rootFolderId
         )

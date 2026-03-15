@@ -16,6 +16,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
 
     // MARK: - Входные данные
 
+    let folderURL: URL
     let folderId: UUID
 
     // MARK: - Состояния
@@ -34,14 +35,16 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
     // MARK: - Init
 
     init(
-        folderId: UUID,
+        folderURL: URL,
         tracksProvider: LibraryTracksProvider = DefaultLibraryTracksProvider(),
         badgeProvider: TrackListBadgeProvider = DefaultTrackListBadgeProvider()
     ) {
-        self.folderId = folderId
+        self.folderURL = folderURL
+        self.folderId = folderURL.libraryFolderId
+
         self.tracksProvider = tracksProvider
         self.badgeProvider = badgeProvider
-        
+
         NotificationCenter.default.addObserver(
             forName: .trackMetadataDidChange,
             object: nil,
@@ -51,10 +54,10 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
             guard let trackId = notification.object as? UUID else { return }
 
             Task { @MainActor in
-                        self.reloadMetadata(for: trackId)
-                    }
-                }
+                self.reloadMetadata(for: trackId)
             }
+        }
+    }
     
     // MARK: - Load
 
@@ -79,9 +82,17 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
 
         // 1. Гарантируем актуальность реестров перед чтением
         await MusicLibraryManager.shared.syncFolderIfNeeded(folderId: folderId)
+        
 
         // 2. Загружаем треки из реестра
+        let all = await TrackRegistry.shared.allTracks()
+        print("📦 TrackRegistry total:", all.count)
+        print("📂 UI folderId:", folderId)
+
         let tracks = await tracksProvider.tracks(inFolder: folderId)
+
+        print("🎵 tracks in folder:", tracks.count)
+        
 
         trackSections = TrackSectionBuilder.build(
             from: tracks,

@@ -63,6 +63,7 @@ final class PlayerManager {
             // 1. resolvedURL — через BookmarkResolver
             guard let resolvedURL = await BookmarkResolver.url(forTrack: trackId) else {
                 print("❌ Нет URL в BookmarksRegistry для \(trackId)")
+                PersistentLogger.log("❌ PlayerManager: no URL for trackId=\(trackId)")
                 return
             }
 
@@ -78,11 +79,17 @@ final class PlayerManager {
             stopAccessingCurrentTrack()
 
             // 4. Открываем новый доступ
-            guard resolvedURL.startAccessingSecurityScopedResource() else {
-                print("⚠️ Нет доступа к файлу \(resolvedURL.lastPathComponent)")
-                return
+            // 4. Пытаемся открыть доступ к файлу.
+            // В iOS 26 (File Provider Storage) startAccessing на файл может вернуть false,
+            // при этом доступ может быть получен через root-scope папки.
+            let started = resolvedURL.startAccessingSecurityScopedResource()
+            if started {
+                currentAccessedURL = resolvedURL
+            } else {
+                currentAccessedURL = nil
+                print("⚠️ startAccessing вернул false для файла, пробуем играть через root-scope:", resolvedURL.lastPathComponent)
+                PersistentLogger.log("⚠️ PlayerManager: startAccessing false file=\(resolvedURL.lastPathComponent)")
             }
-            currentAccessedURL = resolvedURL
 
             // 5. Создаём AVPlayerItem
             let item = AVPlayerItem(url: resolvedURL)
@@ -91,12 +98,14 @@ final class PlayerManager {
                 _ = try await item.asset.load(.isPlayable)
             } catch {
                 print("❌ Трек не проигрывается: \(error)")
+                PersistentLogger.log("❌ PlayerManager: not playable error=\(error)")
                 return
             }
 
             // 6. Подключаем item и играем
             player.replaceCurrentItem(with: item)
             player.play()
+            PersistentLogger.log("▶️ PlayerManager: play started track=\(resolvedURL.lastPathComponent)")
 
             // Обновляем состояние текущего трека
             currentTrackId = trackId

@@ -50,18 +50,39 @@ final class TrackListManager {
     
     /// Сохраняет треки по ID треклиста
     func saveTracks(_ tracks: [Track], for id: UUID) {
-        guard let url = urlForTrackList(id: id) else { return }
-        
+        guard let url = urlForTrackList(id: id) else {
+            PersistentLogger.log("❌ TrackListManager: saveTracks url nil id=\(id)")
+            return
+        }
+
         let encoder = makePrettyJSONEncoder()
-        if let data = try? encoder.encode(tracks) {
-            try? data.write(to: url, options: .atomic)
+
+        guard let data = try? encoder.encode(tracks) else {
+            PersistentLogger.log("❌ TrackListManager: encode failed id=\(id) tracks=\(tracks.count)")
+            return
+        }
+
+        do {
+            try data.write(to: url, options: .atomic)
+            PersistentLogger.log("💾 TrackListManager: saved tracks=\(tracks.count) id=\(id)")
+        } catch {
+            PersistentLogger.log("❌ TrackListManager: write failed id=\(id) error=\(error)")
         }
     }
     
     /// Удаляет файл с треками треклиста (используется при удалении треклиста)
     func deleteTracksFile(for id: UUID) {
-        guard let url = urlForTrackList(id: id) else { return }
-        try? FileManager.default.removeItem(at: url)
+        guard let url = urlForTrackList(id: id) else {
+            PersistentLogger.log("❌ TrackListManager: deleteTracksFile url nil id=\(id)")
+            return
+        }
+
+        do {
+            try FileManager.default.removeItem(at: url)
+            PersistentLogger.log("🗑 TrackListManager: deleted tracklist file id=\(id)")
+        } catch {
+            PersistentLogger.log("❌ TrackListManager: delete failed id=\(id) error=\(error)")
+        }
     }
     
     

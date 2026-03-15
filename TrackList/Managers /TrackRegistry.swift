@@ -24,9 +24,40 @@ actor TrackRegistry {
     struct TrackEntry: Codable, Identifiable {
         var id: UUID
         var fileName: String
-        var folderId: UUID        // FS-папка (подпапка)
-        var rootFolderId: UUID    // Корневая прикреплённая папка
+        var relativePath: String
+        var folderId: UUID
+        var rootFolderId: UUID
         var updatedAt: Date
+
+        enum CodingKeys: String, CodingKey {
+            case id, fileName, relativePath, folderId, rootFolderId, updatedAt
+        }
+
+        init(
+            id: UUID,
+            fileName: String,
+            relativePath: String,
+            folderId: UUID,
+            rootFolderId: UUID,
+            updatedAt: Date
+        ) {
+            self.id = id
+            self.fileName = fileName
+            self.relativePath = relativePath
+            self.folderId = folderId
+            self.rootFolderId = rootFolderId
+            self.updatedAt = updatedAt
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            id = try c.decode(UUID.self, forKey: .id)
+            fileName = try c.decode(String.self, forKey: .fileName)
+            relativePath = (try? c.decode(String.self, forKey: .relativePath)) ?? ""
+            folderId = try c.decode(UUID.self, forKey: .folderId)
+            rootFolderId = try c.decode(UUID.self, forKey: .rootFolderId)
+            updatedAt = try c.decode(Date.self, forKey: .updatedAt)
+        }
     }
 
     struct RegistryFile: Codable {
@@ -128,12 +159,14 @@ actor TrackRegistry {
     func upsertTrack(
         id: UUID,
         fileName: String,
+        relativePath: String,
         folderId: UUID,
         rootFolderId: UUID
     ) {
         let entry = TrackEntry(
             id: id,
             fileName: fileName,
+            relativePath: relativePath,
             folderId: folderId,
             rootFolderId: rootFolderId,
             updatedAt: Date()

@@ -34,6 +34,10 @@ struct LibraryFolderView: View {
 
     var body: some View {
         Group {
+            
+            let _ = print("📌 LibraryFolderView displayMode:", viewModel.displayMode)
+            let _ = print("📌 folder:", viewModel.folder.name, "subfolders:", viewModel.subfolders.count)
+            
             switch viewModel.displayMode {
 
             case .tracks:

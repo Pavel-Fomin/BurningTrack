@@ -33,20 +33,10 @@ final class LibraryFolderViewModel: ObservableObject {
     init(folder: LibraryFolder) {
         self.folder = folder
         self.subfolders = folder.subfolders
-        self.displayMode = Self.resolveDisplayMode(
-            subfolders: folder.subfolders,
-            audioFiles: folder.audioFiles
-        )
+        self.displayMode = folder.subfolders.isEmpty ? .tracks : .subfolders
     }
     
     // MARK: - Helpers
     
-    private static func resolveDisplayMode(
-        subfolders: [LibraryFolder],
-        audioFiles: [URL]   // ← вернуть URL
-    ) -> DisplayMode {
-        if !subfolders.isEmpty { return .subfolders }
-        if !audioFiles.isEmpty { return .tracks }
-        return .empty
-    }
+    
 }

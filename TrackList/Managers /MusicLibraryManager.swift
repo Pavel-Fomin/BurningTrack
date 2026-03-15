@@ -25,24 +25,31 @@ final class MusicLibraryManager: ObservableObject {
 
     // MARK: - Published состояния
 
-    /// Флаг, что восстановление доступа к папкам завершено
-    @Published private(set) var isAccessRestored = false
+    @Published private(set) var isAccessRestored = false       /// Флаг, что восстановление доступа к папкам завершено
+    @Published var attachedFolders: [LibraryFolder] = []       /// Прикреплённые корневые папки (дерево подпапок и файлов для UI)
+    @Published var isInitialFoldersLoadFinished: Bool = false  /// Флаг, что начальная загрузка списка папок завершена
 
-    /// Прикреплённые корневые папки (дерево подпапок и файлов для UI)
-    @Published var attachedFolders: [LibraryFolder] = []
+    enum LibraryAccessState {
+        case booting
+        case ready
+        case failed
+    }
 
-    /// Флаг, что начальная загрузка списка папок завершена
-    @Published var isInitialFoldersLoadFinished: Bool = false
-
+    @Published private(set) var accessState: LibraryAccessState = .booting
+    
     // MARK: - Приватные зависимости
 
     private let scanner = LibraryScanner()
+    
+    // MARK: - Security-scoped доступы (держим открытыми весь runtime)
+
+    private var activeRootFolderAccess: [UUID: URL] = [:]    /// Активные root-доступы: если папка прикреплена — доступ держим открытым.
 
     // MARK: - Инициализация
 
     init() {
-        // Восстанавливаем доступ к папкам и структуру фонотеки
-        Task.detached(priority: .background) { [weak self] in
+        // Восстанавливаем доступ к папкам (быстро) и затем запускаем синк (в фоне)
+        Task { [weak self] in
             await self?.restoreAccessAsync()
         }
     }
@@ -63,16 +70,14 @@ final class MusicLibraryManager: ObservableObject {
     func saveBookmark(for url: URL) {
         Task {
             // 0. Bootstrap-доступ
-            let started = url.startAccessingSecurityScopedResource()
-            if !started {
+            guard url.startAccessingSecurityScopedResource() else {
                 print("❌ saveBookmark: не удалось начать доступ к папке:", url.path)
                 return
             }
 
-            // Гарантированно закрываем доступ после завершения операции
-            defer {
-                url.stopAccessingSecurityScopedResource()
-            }
+            // Держим доступ открытым на весь runtime (как для восстановленных папок)
+            let rootFolderId = url.libraryFolderId
+            activeRootFolderAccess[rootFolderId] = url
 
             // 1. Создание bookmark для корневой папки
             guard let bookmarkBase64 = BookmarkResolver.makeBookmarkBase64(for: url) else {
@@ -80,7 +85,6 @@ final class MusicLibraryManager: ObservableObject {
                 return
             }
 
-            let rootFolderId = url.libraryFolderId
             let rootFolderName = url.lastPathComponent
 
             await BookmarksRegistry.shared.upsertFolderBookmark(
@@ -100,7 +104,8 @@ final class MusicLibraryManager: ObservableObject {
             // 4. Синхронизируем реестры по фактическому состоянию ФС (ТОЛЬКО через sync-модуль)
             await LibrarySyncModule.shared.syncRootFolder(
                 rootFolderId: rootFolderId,
-                rootURL: url
+                rootURL: url,
+                mode: .full
             )
 
             // 5. Обновляем UI
@@ -119,6 +124,10 @@ final class MusicLibraryManager: ObservableObject {
     func removeBookmark(for url: URL) {
         Task {
             let rootFolderId = url.libraryFolderId
+            if let url = activeRootFolderAccess[rootFolderId] {
+                url.stopAccessingSecurityScopedResource()
+                activeRootFolderAccess.removeValue(forKey: rootFolderId)
+            }
 
             // 1. Получаем треки
             let tracksInFolder = await TrackRegistry.shared.tracks(inRootFolder: rootFolderId)
@@ -169,55 +178,113 @@ final class MusicLibraryManager: ObservableObject {
 
     func restoreAccessAsync() async {
         print("🔁 Восстановление доступа к папкам…")
-
-        // 1) Загружаем информацию из реестров
+        PersistentLogger.log("🔁 Восстановление доступа к папкам…")
+        PersistentLogger.log("🔁 restoreAccessAsync: start")
+        
+        accessState = .booting
+        
+        // Сбрасываем предыдущее состояние (на случай повторного вызова)
+        for (_, url) in activeRootFolderAccess {
+            url.stopAccessingSecurityScopedResource()
+        }
+        activeRootFolderAccess.removeAll()
+        attachedFolders = []
+        isAccessRestored = false
+        isInitialFoldersLoadFinished = false
+        
+        // 1) Загружаем реестры (синхронные методы в actor'ах)
         await TrackRegistry.shared.load()
         await BookmarksRegistry.shared.load()
-
-        // 2) Получаем список всех сохранённых папок
+        
+        PersistentLogger.log("📘 TrackRegistry loaded")
+        PersistentLogger.log("🔑 BookmarksRegistry loaded")
+        
+        // 2) Берём мета папок
         let foldersMeta = await TrackRegistry.shared.allFolders()
-
         if foldersMeta.isEmpty {
             print("ℹ️ Нет сохранённых папок")
-            self.isAccessRestored = true
-            self.isInitialFoldersLoadFinished = true
+            PersistentLogger.log("ℹ️ restoreAccessAsync: no foldersMeta")
+            
+            accessState = .ready
+            isAccessRestored = true
+            isInitialFoldersLoadFinished = true
+            PersistentLogger.log("✅ restoreAccessAsync: ready (no folders)")
+            
+            NotificationCenter.default.post(name: .libraryAccessRestored, object: nil)
             return
         }
-
-        var restoredTrees: [LibraryFolder] = []
-
-        // 3) Восстанавливаем только те папки, у которых есть bookmark
+        
+        // 3) Быстрый restore: резолвим URL, открываем доступ, строим lite-модель (без рекурсии)
+        var liteFolders: [LibraryFolder] = []
+        var rootsToSync: [(id: UUID, url: URL, name: String)] = []
+        
         for folder in foldersMeta {
             guard let url = await BookmarkResolver.url(forFolder: folder.id) else {
                 print("⚠️ Не удалось восстановить URL папки:", folder.name)
+                PersistentLogger.log("⚠️ restoreAccessAsync: folder url not resolved: \(folder.name)")
                 continue
             }
-
-            // 4) Строим дерево папки для UI
-            let tree = await buildFolderTree(from: url)
-            restoredTrees.append(tree)
-
-            // 5) Синхронизируем реестры по фактическому состоянию ФС
-            await LibrarySyncModule.shared.syncRootFolder(
-                rootFolderId: folder.id,
-                rootURL: url
-            )
-
-            print(
-                "🌳 BUILT TREE:", tree.name,
-                "subfolders:", tree.subfolders.count,
-                "audio:", tree.audioFiles.count
-            )
-
-            print("✅ Доступ к папке восстановлен:", folder.name)
+            
+            guard url.startAccessingSecurityScopedResource() else {
+                print("❌ restoreAccessAsync: нет доступа к папке:", folder.name)
+                PersistentLogger.log("❌ restoreAccessAsync: startAccessing failed: \(folder.name)")
+                continue
+            }
+            
+            activeRootFolderAccess[folder.id] = url
+            liteFolders.append(liteFolder(from: url))
+            rootsToSync.append((folder.id, url, folder.name))
+            
+            print("✅ Root-доступ открыт:", folder.name)
+            PersistentLogger.log("✅ restoreAccessAsync: root access opened: \(folder.name)")
         }
-
-        // 6) Обновляем UI
-        self.attachedFolders = restoredTrees
-        self.isAccessRestored = true
-        self.isInitialFoldersLoadFinished = true
-
-        print("✅ Восстановление доступа завершено")
+        
+        if rootsToSync.isEmpty {
+            accessState = .failed
+            isAccessRestored = true
+            isInitialFoldersLoadFinished = true
+            
+            PersistentLogger.log("❌ restoreAccessAsync: no root access opened")
+            print("❌ restoreAccessAsync: не удалось открыть ни одну корневую папку")
+            return
+        }
+        
+        // 4) Обновляем UI сразу
+        attachedFolders = liteFolders
+        
+        /// Доступ к библиотеке подтверждён:
+        /// хотя бы одна корневая папка успешно открыта.
+        accessState = .ready
+        PersistentLogger.log("🔄 restoreAccessAsync: sync roots count = \(rootsToSync.count)")
+        
+        /// Сначала выполняем безопасную синхронизацию без удалений.
+        for root in rootsToSync {
+            await LibrarySyncModule.shared.syncRootFolder(
+                rootFolderId: root.id,
+                rootURL: root.url,
+                mode: .safe
+            )
+            print("🔄 Safe sync завершён:", root.name)
+        }
+        
+        /// После безопасной синхронизации выполняем полную.
+        for root in rootsToSync {
+            await LibrarySyncModule.shared.syncRootFolder(
+                rootFolderId: root.id,
+                rootURL: root.url,
+                mode: .full
+            )
+            print("🔄 Full sync завершён:", root.name)
+        }
+        
+        PersistentLogger.log("✅ restoreAccessAsync: sync finished")
+        isAccessRestored = true
+        isInitialFoldersLoadFinished = true
+        print("✅ Восстановление доступа завершено (ready)")
+        PersistentLogger.log("✅ Восстановление доступа завершено (ready)")
+        PersistentLogger.log("✅ restoreAccessAsync: ready")
+        
+        NotificationCenter.default.post(name: .libraryAccessRestored, object: nil)
     }
     
     // MARK: - Sync фасад для ViewModel
@@ -255,7 +322,8 @@ final class MusicLibraryManager: ObservableObject {
         // 3. Запускаем sync
         await LibrarySyncModule.shared.syncRootFolder(
             rootFolderId: rootFolderId,
-            rootURL: rootURL
+            rootURL: rootURL,
+            mode: .full
         )
     }
     
@@ -266,6 +334,8 @@ final class MusicLibraryManager: ObservableObject {
     /// Важно: используется только для UI и навигации по фонотеке.
     private func buildFolderTree(from folderURL: URL) async -> LibraryFolder {
         let scanned = await scanner.scanFolder(folderURL)
+        print("📂 tree folder:", scanned.url.path)
+        print("📂 tree folderId:", scanned.url.libraryFolderId, "audio:", scanned.audioFiles.count)
 
         var subfoldersModels: [LibraryFolder] = []
 

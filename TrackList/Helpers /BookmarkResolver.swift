@@ -4,8 +4,10 @@
 //
 //  Централизованный слой доступа к файлам и папкам через bookmark'и.
 //
-//  Работает ТОЛЬКО со вторичным доступом (после первичного прикрепления).
-//  Первичный доступ всегда открывает MusicLibraryManager.saveBookmark().
+//  ВАЖНО:
+//  - BookmarkResolver НЕ управляет startAccessing/stopAccessing.
+//  - Root-доступ держит MusicLibraryManager (на весь runtime).
+//  - Здесь только восстановление URL из реестров.
 //
 //  Created by Pavel Fomin on 01.12.2025.
 //
@@ -14,16 +16,25 @@ import Foundation
 
 enum BookmarkResolver {
 
-    // MARK: - Активные security-доступы (чтобы не дублировать startAccessing)
-
-    private static var activeAccesses = Set<URL>()
-    private static let accessQueue = DispatchQueue(label: "BookmarkResolver.accessQueue")
-
     // MARK: - URL для трека
 
     static func url(forTrack id: UUID) async -> URL? {
+
+        // 1) Основной путь: rootFolder + relativePath (фонотека)
+        if let entry = await TrackRegistry.shared.entry(for: id),
+           entry.relativePath.isEmpty == false {
+
+            guard let rootURL = await url(forFolder: entry.rootFolderId) else {
+                print("⚠️ BookmarkResolver: не удалось восстановить rootURL для трека \(id)")
+                return nil
+            }
+
+            return rootURL.appendingPathComponent(entry.relativePath)
+        }
+
+        // 2) Fallback: треки вне фонотеки (импорт / документы / старые данные)
         guard let base64 = await BookmarksRegistry.shared.trackBookmark(for: id) else {
-            print("⚠️ BookmarkResolver: нет bookmark для трека \(id)")
+            print("⚠️ BookmarkResolver: нет пути к треку \(id)")
             return nil
         }
 
@@ -32,7 +43,6 @@ enum BookmarkResolver {
             return nil
         }
 
-        startAccessingIfNeeded(url)
         return url
     }
 
@@ -49,7 +59,6 @@ enum BookmarkResolver {
             return nil
         }
 
-        startAccessingIfNeeded(url)
         return url
     }
 
@@ -67,65 +76,28 @@ enum BookmarkResolver {
         do {
             url = try URL(
                 resolvingBookmarkData: data,
-                options: [.withoutUI], // .withSecurityScope больше нет в iOS 26
+                options: [.withoutUI],
                 relativeTo: nil,
                 bookmarkDataIsStale: &stale
             )
         } catch {
             print("❌ BookmarkResolver: ошибка резолва bookmark:", error)
+            PersistentLogger.log("❌ BookmarkResolver: resolveBookmark failed: \(error)")
             return nil
         }
 
         if stale {
             print("⚠️ BookmarkResolver: bookmark устарел →", url.path)
+            PersistentLogger.log("⚠️ BookmarkResolver: bookmark stale url=\(url.path)")
         }
 
         return url
     }
 
-    // MARK: - Старт доступа (централизованный)
-
-    private static func startAccessingIfNeeded(_ url: URL) {
-        accessQueue.sync {
-            if activeAccesses.contains(url) { return }
-
-            if url.startAccessingSecurityScopedResource() {
-                activeAccesses.insert(url)
-            } else {
-                print("""
-                ❌ BookmarkResolver: startAccessingSecurityScopedResource() вернул false
-                URL: \(url.path)
-                Возможные причины:
-                - bookmark создан без security-scope (до фикса)
-                - файл перемещён / удалён
-                - у приложения нет доступа
-                """)
-            }
-        }
-    }
-
-    // MARK: - Явное завершение доступа
-
-    static func stopAccessing(_ url: URL) {
-        accessQueue.sync {
-            guard activeAccesses.contains(url) else { return }
-
-            url.stopAccessingSecurityScopedResource()
-            activeAccesses.remove(url)
-        }
-    }
-
-    // MARK: - Создание bookmarkData (только для bootstrap и индексации файлов)
+    // MARK: - Создание bookmarkData (только для bootstrap и индексации)
 
     static func makeBookmarkBase64(for url: URL) -> String? {
-        // Даже если MusicLibraryManager открыл доступ,
-        // для файлов доступ может не быть открыт → открываем локально.
-        let started = url.startAccessingSecurityScopedResource()
-        defer { if started { url.stopAccessingSecurityScopedResource() } }
-
         do {
-            // На iOS 26 bookmark с security-scope создаётся автоматически
-            // если доступ был открыт.
             let data = try url.bookmarkData(options: [.minimalBookmark])
             return data.base64EncodedString()
         } catch {

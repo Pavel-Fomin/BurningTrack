@@ -15,16 +15,29 @@ final class PlaylistManager: ObservableObject {
     
     @Published var tracks: [PlayerTrack] = []
     var onTracksChanged: (([PlayerTrack]) -> Void)?
-
+    
     static let shared = PlaylistManager()
     private let fileName = "player.json"
-
+    
     private struct PlayerFile: Codable { let trackIds: [UUID]
     }
-
-    private init() { loadFromDisk()
-    }
-
+    
+    private init() {
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(onLibraryAccessRestored),
+                name: .libraryAccessRestored,
+                object: nil
+            )
+            
+            loadFromDisk()
+        }
+        
+        @objc private func onLibraryAccessRestored() {
+            print("🔔 PlaylistManager: libraryAccessRestored → reloadFromDisk")
+            loadFromDisk()
+        }
+    
     // MARK: - Загрузка player.json
 
     func loadFromDisk() {
@@ -34,6 +47,7 @@ final class PlaylistManager: ObservableObject {
         else { return }
 
         guard FileManager.default.fileExists(atPath: url.path) else {
+            PersistentLogger.log("📄 PlaylistManager: player.json missing → creating empty")
             print("📄 player.json не найден — создаём пустой")
             saveEmptyFile()
             return
@@ -42,11 +56,13 @@ final class PlaylistManager: ObservableObject {
         do {
             let data = try Data(contentsOf: url)
             let decoded = try JSONDecoder().decode(PlayerFile.self, from: data)
+            PersistentLogger.log("📥 PlaylistManager: decoded player.json ids=\(decoded.trackIds.count)")
             Task {
                 await loadTracks(from: decoded.trackIds)
             }
         } catch {
             print("⚠️ Ошибка загрузки player.json: \(error)")
+            PersistentLogger.log("⚠️ PlaylistManager: load error \(error)")
             saveEmptyFile()
         }
     }
@@ -58,9 +74,18 @@ final class PlaylistManager: ObservableObject {
 
     // MARK: - Превращение trackId → PlayerTrack
 
-    private func makePlayerTrack(from id: UUID) async -> PlayerTrack? {
+    private func makePlayerTrack(from id: UUID) async -> PlayerTrack {
+
+        // Пытаемся получить URL
         guard let url = await BookmarkResolver.url(forTrack: id) else {
-            return nil
+            return PlayerTrack(
+                id: id,
+                title: "Недоступно",
+                artist: nil,
+                duration: 0,
+                fileName: "Unknown",
+                isAvailable: false
+            )
         }
 
         let fileName = url.lastPathComponent
@@ -70,7 +95,7 @@ final class PlaylistManager: ObservableObject {
         let artist = metadata?.artist
         let duration = metadata?.duration ?? 0
 
-        let isAvailable = FileManager.default.fileExists(atPath: url.path)
+        let isAvailable = true
 
         return PlayerTrack(
             id: id,
@@ -86,17 +111,17 @@ final class PlaylistManager: ObservableObject {
 
     private func loadTracks(from ids: [UUID]) async {
         var result: [PlayerTrack] = []
+
         for id in ids {
-            if let track = await makePlayerTrack(from: id) {
-                result.append(track)
-            }
+            let track = await makePlayerTrack(from: id)
+            result.append(track)
         }
 
-        await MainActor.run {
-            self.tracks = result
-        }
+        self.tracks = result
 
-        print("📥 Загружено \(result.count) треков в плеер")
+        let availableCount = result.filter { $0.isAvailable }.count
+        print("📥 Загружено \(result.count) треков в плеер (доступно: \(availableCount))")
+        PersistentLogger.log("📥 PlaylistManager: loaded tracks=\(result.count)")
     }
 
     // MARK: - Сохранение player.json
@@ -126,9 +151,8 @@ final class PlaylistManager: ObservableObject {
 
     func addTracks(ids: [UUID]) async {
         for id in ids {
-            if let track = await makePlayerTrack(from: id) {
-                tracks.append(track)
-            }
+            let track = await makePlayerTrack(from: id)
+            tracks.append(track)
         }
         saveToDisk()
     }

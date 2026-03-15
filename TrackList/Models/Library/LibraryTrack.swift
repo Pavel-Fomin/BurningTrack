@@ -33,9 +33,7 @@ struct LibraryTrack: Identifiable, TrackDisplayable {
     }
 
     /// UI флаг — доступность файла
-    var isAvailable: Bool {
-        FileManager.default.fileExists(atPath: fileURL.path)
-    }
+    var isAvailable: Bool { true }
 
     var artwork: UIImage? { nil }
 

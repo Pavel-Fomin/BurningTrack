@@ -74,18 +74,10 @@ actor TrackIdentityResolver {
     private func identityKey(for url: URL) -> String? {
 
         let accessed = url.startAccessingSecurityScopedResource()
-        defer {
-            if accessed {
-                url.stopAccessingSecurityScopedResource()
-            }
-        }
+        defer { if accessed { url.stopAccessingSecurityScopedResource() } }
 
-        // 1. Приоритет: fileResourceIdentifier
-        if let resourceId = resourceIdentifier(for: url) {
-            return "rid:\(resourceId)"
-        }
-
-        // 2. Fallback: fingerprint
+        // В File Provider Storage resourceIdentifier может быть нестабильным между reboot.
+        // Поэтому для надёжной идентичности используем только content fingerprint.
         if let fingerprint = fingerprint(for: url) {
             return "fp:\(fingerprint)"
         }
@@ -119,12 +111,10 @@ actor TrackIdentityResolver {
         do {
             let values = try url.resourceValues(forKeys: [
                 .fileSizeKey,
-                .contentModificationDateKey,
                 .nameKey
             ])
 
             let size = values.fileSize ?? 0
-            let modified = values.contentModificationDate?.timeIntervalSince1970 ?? 0
             let name = values.name ?? url.lastPathComponent
 
             let head = try readChunk(from: url, offset: 0, length: 64 * 1024)
@@ -141,7 +131,7 @@ actor TrackIdentityResolver {
             }
 
             var hasher = SHA256()
-            hasher.update(data: Data("\(name)|\(size)|\(modified)".utf8))
+            hasher.update(data: Data("\(name)|\(size)".utf8))
             hasher.update(data: head)
             hasher.update(data: tail)
 
@@ -152,7 +142,7 @@ actor TrackIdentityResolver {
             return nil
         }
     }
-
+    
     private func readChunk(from url: URL, offset: Int, length: Int) throws -> Data {
         let handle = try FileHandle(forReadingFrom: url)
         defer { try? handle.close() }

@@ -14,15 +14,16 @@ extension Notification.Name {
     
     // MARK: - TrackList
     
-    static let trackListsDidChange = Notification.Name("trackListsDidChange")   /// Любое изменение списка треклистов (создание/удаление/переименование)
-    static let clearTrackList = Notification.Name("clearTrackList")             /// Очистка текущего треклиста
-    static let trackListDidRename = Notification.Name("trackListDidRename")     /// Треклист был переименован
+    static let trackListsDidChange = Notification.Name("trackListsDidChange")       /// Любое изменение списка треклистов (создание/удаление/переименование)
+    static let clearTrackList = Notification.Name("clearTrackList")                 /// Очистка текущего треклиста
+    static let trackListDidRename = Notification.Name("trackListDidRename")         /// Треклист был переименован
     static let trackMetadataDidChange = Notification.Name("trackMetadataDidChange") /// Обновились метаданные трека (теги/обложка/переименование)
     
     // MARK: - Library
     
-    static let trackDidMove = Notification.Name("trackDidMove")                 /// Перемещение трека
-   
+    static let trackDidMove = Notification.Name("trackDidMove")                   /// Перемещение трека
+    static let libraryAccessRestored = Notification.Name("libraryAccessRestored") /// Доступ к прикреплённым папкам восстановлен (root-scope открыт)
+    
     // MARK: - Player
     
     static let trackDidFinish = Notification.Name("trackDidFinish")              /// Трек доиграл до конца (AVPlayerItem → PlayerManager → PlayerViewModel)

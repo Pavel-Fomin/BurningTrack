@@ -154,36 +154,22 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
 
             for track in tracks {
                 let trackId = track.id
+                let isAvailable = await BookmarkResolver.url(forTrack: trackId) != nil
 
-                if let url = await BookmarkResolver.url(forTrack: trackId) {
-                    let exists = FileManager.default.fileExists(atPath: url.path)
-
-                    updated.append(
-                        Track(
-                            id: track.id,
-                            title: track.title,
-                            artist: track.artist,
-                            duration: track.duration,
-                            fileName: track.fileName,
-                            isAvailable: exists
-                        )
+                updated.append(
+                    Track(
+                        id: track.id,
+                        title: track.title,
+                        artist: track.artist,
+                        duration: track.duration,
+                        fileName: track.fileName,
+                        isAvailable: isAvailable
                     )
-                } else {
-                    updated.append(
-                        Track(
-                            id: track.id,
-                            title: track.title,
-                            artist: track.artist,
-                            duration: track.duration,
-                            fileName: track.fileName,
-                            isAvailable: false
-                        )
-                    )
-                }
+                )
             }
 
             self.tracks = updated
-            print("♻️ Актуализирована доступность треков через TrackRegistry")
+            print("♻️ Актуализирована доступность треков через BookmarkResolver")
         }
     }
 

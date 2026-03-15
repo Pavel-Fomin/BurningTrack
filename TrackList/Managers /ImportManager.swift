@@ -41,6 +41,7 @@ final class ImportManager {
             await TrackRegistry.shared.upsertTrack(
                 id: trackId,
                 fileName: url.lastPathComponent,
+                relativePath: "",
                 folderId: folderId,
                 rootFolderId: folderId
             )
