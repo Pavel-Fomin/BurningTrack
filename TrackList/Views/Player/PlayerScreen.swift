@@ -10,36 +10,42 @@
 import SwiftUI
 
 struct PlayerScreen: View {
+
     @ObservedObject var playerViewModel: PlayerViewModel
+
     @State private var showImporter = false
     @State private var isShowingExportPicker = false
     @State private var isShowingSaveSheet = false
     @State private var trackListName: String = defaultTrackListName()
-    
+
     var body: some View {
         NavigationStack {
             ZStack(alignment: .bottom) {
                 VStack(spacing: 0) {
-                    
-                    // MARK: - Список треков
-                    
                     PlayerPlaylistView(playerViewModel: playerViewModel)
                 }
             }
-            // MARK: - Тулбар
-            
             .playerToolbar(
                 trackCount: PlaylistManager.shared.tracks.count,
-                onSave: {
-                    PlaylistManager.shared.saveToDisk()
-                },
-                onExport: {
-                    print("⚠️ Экспорт из плеера временно отключён")
-                },
-                onClear: {
-                    PlaylistManager.shared.clear()
-                }
+                onSave: {PlaylistManager.shared.saveToDisk()},
+                onExport: {handleExport()},
+                onClear: {PlaylistManager.shared.clear()}
             )
+        }
+    }
+
+    private func handleExport() {
+        let tracks = PlaylistManager.shared.tracks.map {$0.asTrack()}
+
+        guard !tracks.isEmpty else {
+            print("❌ Нет треков для экспорта")
+            return
+        }
+
+        if let topVC = UIApplication.topViewController() {
+            ExportManager.shared.exportViaTempAndPicker(tracks, presenter: topVC)
+        } else {
+            print("❌ Не удалось получить topViewController")
         }
     }
 }
@@ -51,5 +57,3 @@ private func defaultTrackListName() -> String {
     formatter.dateFormat = "dd.MM.yy, HH:mm"
     return formatter.string(from: Date())
 }
-
-
