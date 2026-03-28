@@ -30,7 +30,8 @@ struct MusicLibraryView: View {
     var body: some View {
 
         // MARK: - Загрузка при первом запуске
-        if !manager.isInitialFoldersLoadFinished {
+        // MARK: - Загрузка при первом запуске
+        if manager.accessState == .booting {
             VStack(spacing: 0) {
                 LibraryFoldersSkeletonView()
             }
@@ -46,6 +47,7 @@ struct MusicLibraryView: View {
                 Spacer()
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+
 
         // MARK: - Папки есть → показываем список
         } else {

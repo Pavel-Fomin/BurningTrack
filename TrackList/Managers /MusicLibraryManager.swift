@@ -27,8 +27,7 @@ final class MusicLibraryManager: ObservableObject {
 
     @Published private(set) var isAccessRestored = false       /// Флаг, что восстановление доступа к папкам завершено
     @Published var attachedFolders: [LibraryFolder] = []       /// Прикреплённые корневые папки (дерево подпапок и файлов для UI)
-    @Published var isInitialFoldersLoadFinished: Bool = false  /// Флаг, что начальная загрузка списка папок завершена
-
+   
     enum LibraryAccessState {
         case booting
         case ready
@@ -190,7 +189,6 @@ final class MusicLibraryManager: ObservableObject {
         activeRootFolderAccess.removeAll()
         attachedFolders = []
         isAccessRestored = false
-        isInitialFoldersLoadFinished = false
         
         // 1) Загружаем реестры (синхронные методы в actor'ах)
         await TrackRegistry.shared.load()
@@ -207,7 +205,6 @@ final class MusicLibraryManager: ObservableObject {
             
             accessState = .ready
             isAccessRestored = true
-            isInitialFoldersLoadFinished = true
             PersistentLogger.log("✅ restoreAccessAsync: ready (no folders)")
             
             NotificationCenter.default.post(name: .libraryAccessRestored, object: nil)
@@ -242,7 +239,6 @@ final class MusicLibraryManager: ObservableObject {
         if rootsToSync.isEmpty {
             accessState = .failed
             isAccessRestored = true
-            isInitialFoldersLoadFinished = true
             
             PersistentLogger.log("❌ restoreAccessAsync: no root access opened")
             print("❌ restoreAccessAsync: не удалось открыть ни одну корневую папку")
@@ -279,7 +275,6 @@ final class MusicLibraryManager: ObservableObject {
         
         PersistentLogger.log("✅ restoreAccessAsync: sync finished")
         isAccessRestored = true
-        isInitialFoldersLoadFinished = true
         print("✅ Восстановление доступа завершено (ready)")
         PersistentLogger.log("✅ Восстановление доступа завершено (ready)")
         PersistentLogger.log("✅ restoreAccessAsync: ready")
