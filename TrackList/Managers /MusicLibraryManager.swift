@@ -318,7 +318,7 @@ final class MusicLibraryManager: ObservableObject {
         await LibrarySyncModule.shared.syncRootFolder(
             rootFolderId: rootFolderId,
             rootURL: rootURL,
-            mode: .full
+            mode: .safe
         )
     }
     

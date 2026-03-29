@@ -26,6 +26,8 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
     @Published private(set) var metadataByTrackId: [UUID: TrackMetadataCacheManager.CachedMetadata] = [:]
     @Published var isLoading = false
     @Published private(set) var didLoad = false
+    
+    private var isRefreshing = false
 
     // MARK: - Зависимости
 
@@ -62,13 +64,10 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
     // MARK: - Load
 
     func loadTracksIfNeeded() async {
-        if !didLoad {
-            didLoad = true
-        }
+        // Если уже загружали — ничего не делаем
+        if didLoad {return}
+        didLoad = true
 
-        // Sync и refresh должны происходить всегда при входе в папку,
-        // так как состояние фонотеки могло измениться извне
-        await MusicLibraryManager.shared.syncFolderIfNeeded(folderId: folderId)
         await refresh()
     }
 
@@ -77,14 +76,13 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
     /// Явное обновление данных.
     /// Вызывается строго из UX-слоя.
     func refresh() async {
+        if isLoading {return}
+
         isLoading = true
         defer { isLoading = false }
 
-        // 1. Гарантируем актуальность реестров перед чтением
         await MusicLibraryManager.shared.syncFolderIfNeeded(folderId: folderId)
-        
 
-        // 2. Загружаем треки из реестра
         let all = await TrackRegistry.shared.allTracks()
         print("📦 TrackRegistry total:", all.count)
         print("📂 UI folderId:", folderId)
@@ -92,7 +90,6 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         let tracks = await tracksProvider.tracks(inFolder: folderId)
 
         print("🎵 tracks in folder:", tracks.count)
-        
 
         trackSections = TrackSectionBuilder.build(
             from: tracks,

@@ -84,15 +84,11 @@ struct LibraryScreen: View {
 
         case .folder(let folderId):
             if let folder = musicLibraryManager.folder(for: folderId) {
-
-                let folderVM = LibraryFolderViewModel(folder: folder)
-
-                LibraryFolderView(
+                LibraryFolderContainer(
+                    folder: folder,
                     trackListViewModel: trackListViewModel,
                     playerViewModel: playerViewModel
                 )
-                .environmentObject(folderVM)
-
             } else {
                 Text("❌ Папка не найдена")
                     .libraryToolbar(title: "Ошибка")

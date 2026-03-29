@@ -15,7 +15,7 @@ struct LibraryTracksView: View {
     let folder: LibraryFolder
     let trackListViewModel: TrackListViewModel
 
-    @ObservedObject var playerViewModel: PlayerViewModel
+    let playerViewModel: PlayerViewModel
     @EnvironmentObject var sheetManager: SheetManager
     @StateObject private var tracksViewModel: LibraryTracksViewModel
     @StateObject private var scrollSpeed = ScrollSpeedModel(thresholdPtPerSec: 1500,debounceMs: 180)
@@ -36,7 +36,7 @@ struct LibraryTracksView: View {
     ) {
         self.folder = folder
         self.trackListViewModel = trackListViewModel
-        self._playerViewModel = ObservedObject(wrappedValue: playerViewModel)
+        self.playerViewModel = playerViewModel
         self._tracksViewModel = StateObject(
             wrappedValue: LibraryTracksViewModel(folderURL: folder.url)
         )
@@ -113,6 +113,7 @@ struct LibraryTracksView: View {
         }
         .onChange(of: sheetManager.dismissCounter) { _, _ in
             Task {
+                if tracksViewModel.isLoading {return}
                 await tracksViewModel.refresh()
             }
         }

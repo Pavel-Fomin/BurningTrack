@@ -21,7 +21,7 @@ struct LibraryFolderView: View {
     // MARK: - Входные данные
 
     let trackListViewModel: TrackListViewModel
-    @ObservedObject var playerViewModel: PlayerViewModel
+    let playerViewModel: PlayerViewModel
 
     // MARK: - Навигация и ViewModel
 
