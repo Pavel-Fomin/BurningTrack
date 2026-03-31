@@ -70,11 +70,7 @@ actor LibraryFileManager {
         using playerManager: PlayerManager
     ) async throws {
 
-        // 1. Проверяем, не занят ли трек плеером
-        if playerManager.isBusy(trackId) {
-            print("🚫 Нельзя переместить трек \(trackId) — он сейчас воспроизводится.")
-            throw LibraryFileError.trackIsPlaying
-        }
+        
 
         // 2. Берём метаданные трека
         guard let entry = await TrackRegistry.shared.entry(for: trackId) else {
@@ -175,11 +171,6 @@ actor LibraryFileManager {
         to newFileName: String,
         using playerManager: PlayerManager
     ) async throws {
-        // 1. Проверяем, не занят ли трек плеером
-        if playerManager.isBusy(trackId) {
-            print("🚫 Нельзя переименовать трек \(trackId) — он сейчас воспроизводится.")
-            throw LibraryFileError.trackIsPlaying
-        }
 
         // 2. Берём метаданные трека
         guard let entry = await TrackRegistry.shared.entry(for: trackId) else {

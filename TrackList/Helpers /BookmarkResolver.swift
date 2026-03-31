@@ -18,6 +18,8 @@ enum BookmarkResolver {
 
     // MARK: - URL для трека
 
+    // MARK: - URL для трека
+
     static func url(forTrack id: UUID) async -> URL? {
 
         // 1) Основной путь: rootFolder + relativePath (фонотека)
@@ -29,10 +31,21 @@ enum BookmarkResolver {
                 return nil
             }
 
-            return rootURL.appendingPathComponent(entry.relativePath)
+            // Собираем путь из root + relativePath
+            let candidateURL = rootURL.appendingPathComponent(entry.relativePath)
+
+            // Если файл реально существует — это валидный путь
+            if FileManager.default.fileExists(atPath: candidateURL.path) {
+                return candidateURL
+            }
+
+            // Если файла по relativePath уже нет, не считаем это фатальной ошибкой.
+            // Такое возможно сразу после move / rename:
+            // bookmark уже обновлён, а relativePath ещё нет.
+            print("⚠️ BookmarkResolver: stale relativePath для трека \(id), пробуем bookmark fallback")
         }
 
-        // 2) Fallback: треки вне фонотеки (импорт / документы / старые данные)
+        // 2) Fallback: bookmark трека
         guard let base64 = await BookmarksRegistry.shared.trackBookmark(for: id) else {
             print("⚠️ BookmarkResolver: нет пути к треку \(id)")
             return nil
