@@ -86,7 +86,7 @@
 			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
 			buildPhase = A97C86242DA326C000ED2E99 /* Sources */;
 			membershipExceptions = (
-				"Managers /TagLibReader/TLTagLibFile.h",
+				Managers/TagLibReader/TLTagLibFile.h,
 			);
 		};
 /* End PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
