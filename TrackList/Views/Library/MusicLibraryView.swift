@@ -26,10 +26,12 @@ struct MusicLibraryView: View {
 
     @ObservedObject private var manager = MusicLibraryManager.shared
     @ObservedObject private var nav = NavigationCoordinator.shared
+    
+    @State private var showDetachAlert = false
+    @State private var pendingDetachURL: URL?
 
     var body: some View {
 
-        // MARK: - Загрузка при первом запуске
         // MARK: - Загрузка при первом запуске
         if manager.accessState == .booting {
             VStack(spacing: 0) {
@@ -70,7 +72,22 @@ struct MusicLibraryView: View {
                     .buttonStyle(.plain)
                     .swipeActions(edge: .trailing) {
                         Button(role: .destructive) {
-                            manager.removeBookmark(for: folder.url)
+                            Task {
+                                let canDetach = await manager.canDetachFolder(
+                                    url: folder.url,
+                                    currentTrackId: playerViewModel.currentTrackDisplayable?.id,
+                                    isPlaying: playerViewModel.isPlaying
+                                )
+
+                                if canDetach {
+                                    manager.removeBookmark(for: folder.url)
+                                } else {
+                                    await MainActor.run {
+                                        pendingDetachURL = folder.url
+                                        showDetachAlert = true
+                                    }
+                                }
+                            }
                         } label: {
                             Image(systemName: "pin.slash.fill")
                         }
@@ -87,6 +104,31 @@ struct MusicLibraryView: View {
                     }
                     .padding(.vertical, 4)
                 }
+            }
+            .alert("Чтобы открепить папку, остановите воспроизведение", isPresented: $showDetachAlert) {
+
+                Button("Остановить и открепить", role: .destructive) {
+                    
+                    // Если трек сейчас играет — ставим его на паузу
+                    if playerViewModel.isPlaying {
+                        playerViewModel.togglePlayPause()
+                    }
+
+                    // После остановки открепляем папку
+                    if let url = pendingDetachURL {
+                        manager.removeBookmark(for: url)
+                    }
+
+                    // Очищаем временно сохранённый URL
+                    pendingDetachURL = nil
+                }
+
+                Button("Закрыть", role: .cancel) {
+                    pendingDetachURL = nil
+                }
+
+            } message: {
+                Text("Сейчас воспроизводится трек из этой папки.")
             }
         }
     }

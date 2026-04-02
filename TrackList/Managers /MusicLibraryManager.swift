@@ -122,38 +122,68 @@ final class MusicLibraryManager: ObservableObject {
 
     func removeBookmark(for url: URL) {
         Task {
+
+            // Получаем id корневой папки из её URL
             let rootFolderId = url.libraryFolderId
-            if let url = activeRootFolderAccess[rootFolderId] {
-                url.stopAccessingSecurityScopedResource()
+
+            // Закрываем активный доступ к папке (security-scoped resource),
+            // если он был открыт ранее при restoreAccess
+            if let activeURL = activeRootFolderAccess[rootFolderId] {
+                activeURL.stopAccessingSecurityScopedResource()
                 activeRootFolderAccess.removeValue(forKey: rootFolderId)
             }
 
-            // 1. Получаем треки
+            // Получаем все треки, принадлежащие этой корневой папке
             let tracksInFolder = await TrackRegistry.shared.tracks(inRootFolder: rootFolderId)
 
-            // 2. Удаляем bookmarks всех треков
+            // Удаляем bookmarks для каждого трека из этой папки
             for track in tracksInFolder {
                 await BookmarksRegistry.shared.removeTrackBookmark(id: track.id)
             }
 
-            // 3. Удаляем bookmark папки
+            // Удаляем bookmark самой папки
             await BookmarksRegistry.shared.removeFolderBookmark(id: rootFolderId)
 
-            // 4. Удаляем папку и треки из TrackRegistry
+            // Удаляем папку и связанные с ней треки из TrackRegistry
             await TrackRegistry.shared.removeFolder(id: rootFolderId)
 
-            // 5. Persist
+            // Сохраняем изменения реестров на диск
             await TrackRegistry.shared.persist()
             await BookmarksRegistry.shared.persist()
 
-            // 6. UI
+            // Обновляем UI-список прикреплённых папок
             await MainActor.run {
                 attachedFolders.removeAll { $0.url == url }
             }
 
+            // Лог для отладки
             print("📁 Папка откреплена:", url.lastPathComponent)
         }
     }
+    
+    // MARK: - Проверка перед откреплением папки
+    
+    func canDetachFolder(
+        url: URL,
+        currentTrackId: UUID?,
+        isPlaying: Bool
+    ) async -> Bool {
+
+        // Если ничего не играет — можно откреплять
+        if !isPlaying {return true}
+
+        let rootFolderId = url.libraryFolderId
+
+        // Проверяем: текущий трек принадлежит этой папке
+        if let currentTrackId,
+           let entry = await TrackRegistry.shared.entry(for: currentTrackId),
+           entry.rootFolderId == rootFolderId {
+            return false
+        }
+
+        return true
+    }
+    
 
     // MARK: - Поиск папки по ID (через дерево attachedFolders)
 
