@@ -213,11 +213,11 @@ struct TrackDetailContainer: View {
     
     private func buildTagWritePatch() -> TagWritePatch {
         var patch = TagWritePatch()
-        
+
         for (field, value) in editedValues {
             let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
             let normalized: String? = trimmed.isEmpty ? nil : trimmed
-            
+
             switch field {
             case .title:
                 patch.title = normalized
@@ -227,11 +227,15 @@ struct TrackDetailContainer: View {
                 patch.album = normalized
             case .genre:
                 patch.genre = normalized
+            case .year:
+                patch.year = normalized.flatMap(Int.init)
+            case .publisher:
+                patch.label = normalized
             case .comment:
                 patch.comment = normalized
             }
         }
-        
+
         return patch
     }
     
@@ -264,29 +268,17 @@ struct TrackDetailContainer: View {
 
     private func reloadSheetMetadataFromFile() async {
         guard let url = await BookmarkResolver.url(forTrack: track.id) else { return }
+        guard let metadata = TrackTagInspector.shared.readMetadata(from: url) else { return }
 
-        let sections = TrackTagInspector.shared.readMetadata(from: url)
-
-        var newValues: [EditableTrackField: String] = [:]
-
-        for section in sections {
-            for item in section.items {
-                switch item.title {
-                case "Название":
-                    newValues[.title] = item.value
-                case "Исполнитель":
-                    newValues[.artist] = item.value
-                case "Альбом":
-                    newValues[.album] = item.value
-                case "Жанр":
-                    newValues[.genre] = item.value
-                case "Комментарий":
-                    newValues[.comment] = item.value
-                default:
-                    break
-                }
-            }
-        }
+        let newValues: [EditableTrackField: String] = [
+            .title: metadata.title ?? "",
+            .artist: metadata.artist ?? "",
+            .album: metadata.album ?? "",
+            .genre: metadata.genre ?? "",
+            .year: metadata.year.map(String.init) ?? "",
+            .publisher: metadata.publisherOrLabel ?? "",
+            .comment: metadata.comment ?? ""
+        ]
 
         await MainActor.run {
             editedValues = newValues

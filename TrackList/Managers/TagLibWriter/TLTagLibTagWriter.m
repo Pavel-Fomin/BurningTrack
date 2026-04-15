@@ -28,6 +28,7 @@ TLTagWriteResult *_writeBasicTags(
     NSString *_Nullable album,
     NSString *_Nullable genre,
     NSString *_Nullable comment,
+    NSString *_Nullable publisher,
     NSNumber *_Nullable year,
     NSNumber *_Nullable trackNumber,
     NSNumber *_Nullable bpm,
@@ -74,6 +75,9 @@ TLTagWriteResult *_writeBasicTags(
     }
     if (comment) {
         taglib_tag_set_comment(tag, comment.UTF8String);
+    }
+    if (publisher) {
+        taglib_property_set(file, "PUBLISHER", publisher.UTF8String);
     }
 
     // Числовые поля

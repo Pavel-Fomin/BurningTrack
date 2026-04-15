@@ -16,6 +16,8 @@ enum EditableTrackField: Hashable, CaseIterable {
     case artist
     case album
     case genre
+    case year
+    case publisher
     case comment
 
     /// UI-заголовок поля
@@ -25,6 +27,8 @@ enum EditableTrackField: Hashable, CaseIterable {
         case .artist: return "Исполнитель"
         case .album: return "Альбом"
         case .genre: return "Жанр"
+        case .year: return "Год выпуска"
+        case .publisher: return "Лейбл / издатель"
         case .comment: return "Комментарий"
         }
     }
@@ -36,6 +40,6 @@ enum EditableTrackField: Hashable, CaseIterable {
 
     /// Используется ли в форме тегов (без имени файла)
     static var tagFields: [EditableTrackField] {
-        [.title, .artist, .album, .genre, .comment]
+        [.title, .artist, .album, .genre, .year, .publisher, .comment]
     }
 }

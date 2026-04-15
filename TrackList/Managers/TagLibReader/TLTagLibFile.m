@@ -54,13 +54,34 @@ TLTagLibFileResult *_readMetadata(NSString *filePath) {
     char *album = taglib_tag_album(tag);
     char *genre = taglib_tag_genre(tag);
     char *comment = taglib_tag_comment(tag);
+    unsigned int year = taglib_tag_year(tag);
 
     if (title && strlen(title) > 0) result.title = [NSString stringWithUTF8String:title];
     if (artist && strlen(artist) > 0) result.artist = [NSString stringWithUTF8String:artist];
     if (album && strlen(album) > 0) result.album = [NSString stringWithUTF8String:album];
     if (genre && strlen(genre) > 0) result.genre = [NSString stringWithUTF8String:genre];
     if (comment && strlen(comment) > 0) result.comment = [NSString stringWithUTF8String:comment];
+    if (year > 0) result.year = @(year);
 
+    // Читаем лейбл / издателя из property-полей.
+    // Проверяем несколько распространённых вариантов ключа.
+    char **publisherValues = taglib_property_get(file, "PUBLISHER");
+    if (!publisherValues || !publisherValues[0] || strlen(publisherValues[0]) == 0) {
+        if (publisherValues) { taglib_property_free(publisherValues); }
+        publisherValues = taglib_property_get(file, "LABEL");
+    }
+    if ((!publisherValues || !publisherValues[0] || strlen(publisherValues[0]) == 0)) {
+        if (publisherValues) { taglib_property_free(publisherValues); }
+        publisherValues = taglib_property_get(file, "ORGANIZATION");
+    }
+
+    if (publisherValues && publisherValues[0] && strlen(publisherValues[0]) > 0) {
+        result.publisher = [NSString stringWithUTF8String:publisherValues[0]];
+    }
+    if (publisherValues) {
+        taglib_property_free(publisherValues);
+    }
+    
     // Обрабатываем обложку ДО освобождения файла
     TagLib_Complex_Property_Attribute ***props = taglib_complex_property_get(file, "PICTURE");
     if (props) {

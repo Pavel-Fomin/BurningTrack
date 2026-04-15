@@ -40,6 +40,12 @@ NS_ASSUME_NONNULL_BEGIN
 // Комментарий
 @property (nonatomic, copy, nullable) NSString *comment;
 
+// Год выпуска
+@property (nonatomic, strong, nullable) NSNumber *year;
+
+// Лейбл или издатель
+@property (nonatomic, copy, nullable) NSString *publisher;
+
 // Двоичные данные изображения обложки (если есть)
 @property (nonatomic, strong, nullable) NSData *artworkData;
 @end

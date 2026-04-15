@@ -41,11 +41,13 @@ struct TrackDetailEditForm: View {
     }
 
     private let fields: [FieldConfig] = [
-        .init(id: .title,   title: "Название трека", isMultiline: false),
-        .init(id: .artist,  title: "Исполнитель",   isMultiline: false),
-        .init(id: .album,   title: "Альбом",        isMultiline: false),
-        .init(id: .genre,   title: "Жанр",          isMultiline: false),
-        .init(id: .comment, title: "Комментарий",   isMultiline: true)
+        .init(id: .title,     title: "Название трека",   isMultiline: false),
+        .init(id: .artist,    title: "Исполнитель",      isMultiline: false),
+        .init(id: .album,     title: "Альбом",           isMultiline: false),
+        .init(id: .genre,     title: "Жанр",             isMultiline: false),
+        .init(id: .year,      title: "Год выпуска",      isMultiline: false),
+        .init(id: .publisher, title: "Лейбл / издатель", isMultiline: false),
+        .init(id: .comment,   title: "Комментарий",      isMultiline: true)
     ]
 
     // MARK: - UI

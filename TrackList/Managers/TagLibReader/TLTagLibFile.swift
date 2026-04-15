@@ -40,6 +40,8 @@ public class TLTagLibFile {
         public let album: String?
         public let genre: String?
         public let comment: String?
+        public let year: Int?
+        public let publisher: String?
         public let artworkData: Data?
     }
     
@@ -61,6 +63,8 @@ public class TLTagLibFile {
             album: result.album,
             genre: result.genre,
             comment: result.comment,
+            year: result.year?.intValue,
+            publisher: result.publisher,
             artworkData: result.artworkData
         )
     }

@@ -57,6 +57,7 @@ FOUNDATION_EXPORT TLTagWriteResult *_Nonnull _writeBasicTags(
     NSString *_Nullable album,
     NSString *_Nullable genre,
     NSString *_Nullable comment,
+    NSString *_Nullable publisher,
     NSNumber *_Nullable year,
     NSNumber *_Nullable trackNumber,
     NSNumber *_Nullable bpm,

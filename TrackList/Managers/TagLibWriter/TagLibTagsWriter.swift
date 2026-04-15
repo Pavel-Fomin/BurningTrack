@@ -61,6 +61,7 @@ final class TagLibTagsWriter: TagsWriter {
             patch.album,
             patch.genre,
             patch.comment,
+            patch.label,
             patch.year.map { NSNumber(value: $0) },
             patch.trackNumber.map { NSNumber(value: $0) },
             patch.bpm.map { NSNumber(value: $0) },

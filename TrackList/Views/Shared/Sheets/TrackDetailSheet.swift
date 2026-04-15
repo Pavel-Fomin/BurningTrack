@@ -56,6 +56,8 @@ struct TrackDetailSheet: View {
                         ("Исполнитель", editedValues[.artist] ?? ""),
                         ("Альбом", editedValues[.album] ?? ""),
                         ("Жанр", editedValues[.genre] ?? ""),
+                        ("Год выпуска", editedValues[.year] ?? ""),
+                        ("Лейбл / издатель", editedValues[.publisher] ?? ""),
                         ("Комментарий", editedValues[.comment] ?? "")
                     ]
                 )
@@ -92,34 +94,35 @@ struct TrackDetailSheet: View {
 
 
     private func loadMetadataAndArtwork(from url: URL) async {
-        
+
         let ok = url.startAccessingSecurityScopedResource()
         defer { if ok { url.stopAccessingSecurityScopedResource() } }
 
-        // 1) Читаем метаданные один раз
-        let tagFile = TLTagLibFile(fileURL: url)
-
-        guard let parsed = tagFile.readMetadata() else {
+        guard let metadata = TrackTagInspector.shared.readMetadata(from: url) else {
             return
         }
 
-        // 2) Собираем теги
         let values: [EditableTrackField: String] = [
-            .title: parsed.title ?? "",
-            .artist: parsed.artist ?? "",
-            .album: parsed.album ?? "",
-            .genre: parsed.genre ?? "",
-            .comment: parsed.comment ?? ""
+            .title: metadata.title ?? "",
+            .artist: metadata.artist ?? "",
+            .album: metadata.album ?? "",
+            .genre: metadata.genre ?? "",
+            .year: metadata.year.map(String.init) ?? "",
+            .publisher: metadata.publisherOrLabel ?? "",
+            .comment: metadata.comment ?? ""
         ]
 
-        // 3) Собираем обложку (с учётом твоего пайплайна)
+        // Обложку пока продолжаем читать отдельно,
+        // потому что TrackSheetMetadata её ещё не хранит.
+        let tagFile = TLTagLibFile(fileURL: url)
+        let parsed = tagFile.readMetadata()
+
         let image = ArtworkProvider.shared.image(
             trackId: track.id,
-            artworkData: parsed.artworkData,
+            artworkData: parsed?.artworkData,
             purpose: .trackInfoSheet
         )
 
-        // 4) Применяем в UI одним апдейтом
         await MainActor.run {
             editedValues = values
             artworkUIImage = image
