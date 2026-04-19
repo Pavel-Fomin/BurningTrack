@@ -382,7 +382,10 @@ actor AppCommandExecutor {
             throw TagWriteError.fileNotFound
         }
         
-        // 2. Запись тегов (файл уже с открытым доступом)
+        let didStartAccess = url.startAccessingSecurityScopedResource()
+        defer { if didStartAccess { url.stopAccessingSecurityScopedResource() } }
+
+        // 2. Запись тегов
         try await tagsWriter.writeTags(to: url, patch: patch)
         
         // 3. Инвалидация кэша метаданных

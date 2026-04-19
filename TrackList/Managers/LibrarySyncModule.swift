@@ -78,12 +78,14 @@ actor LibrarySyncModule {
 
         // 3) Получаем текущее состояние реестра по корню
         let existing = await TrackRegistry.shared.tracks(inRootFolder: rootFolderId)
-        var existingById: [UUID: TrackRegistry.TrackEntry] = [:]
-        for entry in existing { existingById[entry.id] = entry }
+
+        var existingByRelativePath: [String: TrackRegistry.TrackEntry] = [:]
+        for entry in existing {
+            existingByRelativePath[entry.relativePath] = entry
+        }
 
         // 4) Применяем найденные файлы: upsert + bookmark
         var aliveIds = Set<UUID>()
-
         for file in scanned {
 
             let fileURL = file.url.resolvingSymlinksInPath()
@@ -108,8 +110,17 @@ actor LibrarySyncModule {
 
             let relativePath = String(filePath.dropFirst(rootPath.count))
 
-            // Постоянный id физического файла
-            let trackId = await TrackIdentityResolver.shared.trackId(for: fileURL)
+            // Для фонотеки identity строится не из байтов файла,
+            // а из logical path внутри root-папки.
+            // Если запись уже была в реестре, сохраняем её старый trackId.
+            let existingEntry = existingByRelativePath[relativePath]
+
+            let trackId = await TrackIdentityResolver.shared.trackId(
+                forRootFolderId: rootFolderId,
+                relativePath: relativePath,
+                preferredExistingId: existingEntry?.id
+            )
+
             aliveIds.insert(trackId)
 
             await TrackRegistry.shared.upsertTrack(
@@ -132,8 +143,20 @@ actor LibrarySyncModule {
         if mode == .full {
             for entry in existing {
                 if aliveIds.contains(entry.id) { continue }
+
                 await TrackRegistry.shared.removeTrack(id: entry.id)
                 await BookmarksRegistry.shared.removeTrackBookmark(id: entry.id)
+
+                // Трек реально исчез из библиотеки.
+                // Значит его library identity тоже нужно забыть.
+                await TrackIdentityResolver.shared.unbindLibraryTrack(
+                    rootFolderId: entry.rootFolderId,
+                    relativePath: entry.relativePath
+                )
+
+                // И дополнительно очищаем все привязки к этому trackId,
+                // чтобы потом другой файл по старому пути не воскресил старый id.
+                await TrackIdentityResolver.shared.forgetTrack(id: entry.id)
             }
         }
         // 6) Persist выполняется только после валидной синхронизации.

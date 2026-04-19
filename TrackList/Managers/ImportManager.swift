@@ -25,7 +25,9 @@ final class ImportManager {
             let metadata = try? await RuntimeMetadataParser.parseMetadata(from: url)
 
             // 2. Постоянный trackId через слой идентичности
-            let trackId = await TrackIdentityResolver.shared.trackId(for: url)
+            // Для одиночного импорта используем отдельный путь identity,
+            // потому что здесь нет rootFolderId + relativePath.
+            let trackId = await TrackIdentityResolver.shared.trackId(forImportedURL: url)
 
             // 3. Bookmark сохраняем в BookmarksRegistry
             if let bookmarkBase64 = BookmarkResolver.makeBookmarkBase64(for: url) {

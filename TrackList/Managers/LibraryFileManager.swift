@@ -58,7 +58,7 @@ actor LibraryFileManager {
 
     private init() {}
 
-    // MARK: - Перемещает трек в другую папку фонотеки
+    // MARK: - Перемещение файла
 
     /// - Parameters:
     ///   - trackId: ID трека (TrackRegistry / BookmarksRegistry).
@@ -144,23 +144,52 @@ actor LibraryFileManager {
             base64: newBookmarkBase64
         )
 
-        // 9. Обновляем метаданные трека в реестре
+        // 9. Строим новый relativePath
+        // Получаем URL новой корневой папки
+        guard let newRootFolderURL = await BookmarkResolver.url(forFolder: destinationFolderId) else {
+            throw LibraryFileError.moveFailed(
+                underlying: NSError(
+                    domain: "LibraryFileManager",
+                    code: 1002,
+                    userInfo: [NSLocalizedDescriptionKey: "Не удалось получить root URL целевой папки"]
+                )
+            )
+        }
+
+        // Считаем relativePath относительно НОВОГО root
+        let newRelativePath = try makeRelativePath(
+            fileURL: destinationURL,
+            rootFolderURL: newRootFolderURL
+        )
+
+        // 10. Обновляем метаданные трека в реестре
         await TrackRegistry.shared.upsertTrack(
             id: trackId,
             fileName: fileName,
-            relativePath: entry.relativePath,
+            relativePath: newRelativePath,
             folderId: destinationFolderId,
-            rootFolderId: entry.rootFolderId
+            rootFolderId: destinationFolderId
         )
 
-        // 10. Persist
+        // 11. Обновляем library identity:
+        // старый путь убираем, новый путь привязываем к тому же trackId
+        await TrackIdentityResolver.shared.unbindLibraryTrack(
+            rootFolderId: entry.rootFolderId,
+            relativePath: entry.relativePath
+        )
+
+        await TrackIdentityResolver.shared.bindLibraryTrack(
+            id: trackId,
+            rootFolderId: destinationFolderId,
+            relativePath: newRelativePath
+        )
+
+        // 12. Persist
         await BookmarksRegistry.shared.persist()
         await TrackRegistry.shared.persist()
-
-        print("💾 moveTrack: реестры обновлены для трека \(trackId)")
     }
 
-    // MARK: - Переименовываем файл
+    // MARK: - Переименование файла
   
     /// - Parameters:
     ///   - trackId: ID трека.
@@ -171,41 +200,41 @@ actor LibraryFileManager {
         to newFileName: String,
         using playerManager: PlayerManager
     ) async throws {
-
+        
         // 2. Берём метаданные трека
         guard let entry = await TrackRegistry.shared.entry(for: trackId) else {
             print("❌ TrackRegistry: трек \(trackId) не найден")
             throw LibraryFileError.trackNotFound
         }
-
+        
         // 3. URL файла через bookmark трека
         guard let sourceURL = await BookmarkResolver.url(forTrack: trackId) else {
             print("❌ Не удалось восстановить URL файла для трека \(trackId)")
             throw LibraryFileError.sourceURLUnavailable
         }
-
+        
         let folderURL = sourceURL.deletingLastPathComponent()
         let destinationURL = folderURL.appendingPathComponent(newFileName)
-
+        
         // Если имя не поменялось — ничего не делаем
         if sourceURL == destinationURL {
             print("ℹ️ renameTrack: исходный и целевой URL совпадают, операция пропущена")
             return
         }
-
+        
         // Проверяем, нет ли файла с таким именем
         if FileManager.default.fileExists(atPath: destinationURL.path) {
             print("⚠️ В папке уже есть файл \(newFileName)")
             throw LibraryFileError.destinationAlreadyExists
         }
-
+        
         let sourceStarted = sourceURL.startAccessingSecurityScopedResource()
         let folderStarted = folderURL.startAccessingSecurityScopedResource()
         defer {
             if sourceStarted { sourceURL.stopAccessingSecurityScopedResource() }
             if folderStarted { folderURL.stopAccessingSecurityScopedResource() }
         }
-
+        
         // 4. Переименовываем файл (move внутри той же папки)
         do {
             try FileManager.default.moveItem(at: sourceURL, to: destinationURL)
@@ -214,30 +243,80 @@ actor LibraryFileManager {
             print("❌ Ошибка переименования файла: \(error)")
             throw LibraryFileError.moveFailed(underlying: error)
         }
-
+        
         // 5. Новый bookmark для нового имени
         guard let newBookmarkBase64 = BookmarkResolver.makeBookmarkBase64(for: destinationURL) else {
             print("❌ Не удалось создать bookmark для файла:", destinationURL.path)
             return
         }
-
+        
         await BookmarksRegistry.shared.upsertTrackBookmark(
             id: trackId,
             base64: newBookmarkBase64
         )
-
-        // 6. Обновляем реестры
+        
+        // 6. Получаем rootURL, чтобы корректно пересчитать relativePath
+        guard let rootFolderURL = await BookmarkResolver.url(forFolder: entry.rootFolderId) else {
+            print("❌ Не удалось восстановить URL корневой папки для id \(entry.rootFolderId)")
+            throw LibraryFileError.destinationFolderUnavailable
+        }
+        
+        let newRelativePath = try makeRelativePath(
+            fileURL: destinationURL,
+            rootFolderURL: rootFolderURL
+        )
+        
+        // 7. Обновляем реестры
         await TrackRegistry.shared.upsertTrack(
             id: trackId,
             fileName: newFileName,
-            relativePath: entry.relativePath,
+            relativePath: newRelativePath,
             folderId: entry.folderId,
             rootFolderId: entry.rootFolderId
         )
-
+        
+        // 8. Обновляем library identity:
+        // старый путь убираем, новый путь привязываем к тому же trackId
+        await TrackIdentityResolver.shared.unbindLibraryTrack(
+            rootFolderId: entry.rootFolderId,
+            relativePath: entry.relativePath
+        )
+        
+        await TrackIdentityResolver.shared.bindLibraryTrack(
+            id: trackId,
+            rootFolderId: entry.rootFolderId,
+            relativePath: newRelativePath
+        )
+        
         await BookmarksRegistry.shared.persist()
         await TrackRegistry.shared.persist()
+    }
+    
+    // MARK: - Вспомогательное
 
-        print("💾 renameTrack: реестры обновлены для трека \(trackId)")
+    /// Строит relativePath файла относительно корневой папки фонотеки.
+    private func makeRelativePath(
+        fileURL: URL,
+        rootFolderURL: URL
+    ) throws -> String {
+        let rootPath = rootFolderURL.standardizedFileURL.path.hasSuffix("/")
+            ? rootFolderURL.standardizedFileURL.path
+            : rootFolderURL.standardizedFileURL.path + "/"
+
+        let filePath = fileURL.standardizedFileURL.path
+
+        guard filePath.hasPrefix(rootPath) else {
+            throw LibraryFileError.moveFailed(
+                underlying: NSError(
+                    domain: "LibraryFileManager",
+                    code: 1001,
+                    userInfo: [
+                        NSLocalizedDescriptionKey: "Файл оказался вне корневой папки фонотеки."
+                    ]
+                )
+            )
+        }
+
+        return String(filePath.dropFirst(rootPath.count))
     }
 }

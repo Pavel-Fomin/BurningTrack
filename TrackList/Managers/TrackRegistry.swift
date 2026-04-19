@@ -193,4 +193,14 @@ actor TrackRegistry {
     func entry(for id: UUID) -> TrackEntry? {
         tracks[id]
     }
+    
+    func entry(
+        inRootFolder rootFolderId: UUID,
+        relativePath: String
+    ) -> TrackEntry? {
+        tracks.values.first {
+            $0.rootFolderId == rootFolderId &&
+            $0.relativePath == relativePath
+        }
+    }
 }

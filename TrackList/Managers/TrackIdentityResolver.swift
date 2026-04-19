@@ -2,27 +2,18 @@
 //  TrackIdentityResolver.swift
 //  TrackList
 //
-//  Слой идентичности файлов.
-//
-//  Ответственность:
-//  — определить identityKey физического файла
-//  — выдать постоянный trackId для этого файла
-//  — хранить соответствие identityKey → trackId
+//  Слой идентичности треков.
 //
 //  ВАЖНО:
-//  — trackId создаётся ТОЛЬКО здесь
-//  — trackId не зависит от URL, пути или имени файла
-//  — URL рассматривается как временный способ доступа
-//
-//  Приоритет идентичности:
-//  1) fileResourceIdentifier (если доступен)
-//  2) fingerprint (fallback)
+//  - trackId создаётся только здесь
+//  - trackId больше не зависит от тегов, размера файла и байтов содержимого
+//  - для фонотеки identity строится из rootFolderId + relativePath
+//  - для одиночных импортов identity строится из нормализованного пути файла
 //
 //  Created by Pavel Fomin on 30.12.2025.
 //
 
 import Foundation
-import CryptoKit
 
 actor TrackIdentityResolver {
 
@@ -30,7 +21,7 @@ actor TrackIdentityResolver {
 
     // MARK: - Хранилище соответствий
 
-    /// identityKey → trackId
+    /// identityKey -> trackId
     private var identityMap: [String: UUID] = [:]
 
     private var isLoaded = false
@@ -47,108 +38,147 @@ actor TrackIdentityResolver {
 
     // MARK: - Публичный API
 
-    /// Возвращает постоянный trackId для физического файла.
-    /// Если файл встречается впервые — создаёт новый trackId.
-    func trackId(for url: URL) async -> UUID {
+    /// Возвращает постоянный trackId для трека фонотеки.
+    /// Если в реестре уже есть существующий id для этого logical path,
+    /// он будет сохранён и переиспользован.
+    func trackId(
+        forRootFolderId rootFolderId: UUID,
+        relativePath: String,
+        preferredExistingId: UUID? = nil
+    ) async -> UUID {
         await loadIfNeeded()
 
-        guard let identityKey = identityKey(for: url) else {
-            // Крайний случай: если не удалось определить идентичность,
-            // создаём новый trackId, но это считается исключением.
-            return UUID()
+        let key = libraryKey(
+            rootFolderId: rootFolderId,
+            relativePath: relativePath
+        )
+
+        return await upsertIdentityKey(
+            key,
+            preferredExistingId: preferredExistingId
+        )
+    }
+
+    /// Возвращает постоянный trackId для одиночного импортированного файла.
+    /// Используется только там, где нет library root и relativePath.
+    func trackId(forImportedURL url: URL) async -> UUID {
+        await loadIfNeeded()
+
+        let key = importedFileKey(for: url)
+        return await upsertIdentityKey(key, preferredExistingId: nil)
+    }
+
+    /// Привязывает уже известный trackId к библиотечному ключу.
+    /// Нужен после rename / move и при sync, когда id уже известен из реестра.
+    func bindLibraryTrack(
+        id trackId: UUID,
+        rootFolderId: UUID,
+        relativePath: String
+    ) async {
+        await loadIfNeeded()
+
+        let key = libraryKey(
+            rootFolderId: rootFolderId,
+            relativePath: relativePath
+        )
+
+        if identityMap[key] == trackId { return }
+        identityMap[key] = trackId
+        await persist()
+    }
+
+    /// Привязывает уже известный trackId к импортированному файлу.
+    func bindImportedTrack(
+        id trackId: UUID,
+        url: URL
+    ) async {
+        await loadIfNeeded()
+
+        let key = importedFileKey(for: url)
+
+        if identityMap[key] == trackId { return }
+        identityMap[key] = trackId
+        await persist()
+    }
+
+    /// Удаляет только библиотечный ключ.
+    /// Сам trackId при этом не трогаем.
+    func unbindLibraryTrack(
+        rootFolderId: UUID,
+        relativePath: String
+    ) async {
+        await loadIfNeeded()
+
+        let key = libraryKey(
+            rootFolderId: rootFolderId,
+            relativePath: relativePath
+        )
+
+        if identityMap.removeValue(forKey: key) != nil {
+            await persist()
+        }
+    }
+
+    /// Полностью забывает все ключи, которые были привязаны к trackId.
+    /// Используется только когда трек реально исчез из библиотеки.
+    func forgetTrack(id trackId: UUID) async {
+        await loadIfNeeded()
+
+        let oldCount = identityMap.count
+        identityMap = identityMap.filter { $0.value != trackId }
+
+        if identityMap.count != oldCount {
+            await persist()
+        }
+    }
+
+    // MARK: - Внутренняя логика
+
+    private func upsertIdentityKey(
+        _ key: String,
+        preferredExistingId: UUID?
+    ) async -> UUID {
+        if let preferredExistingId {
+            if identityMap[key] != preferredExistingId {
+                identityMap[key] = preferredExistingId
+                await persist()
+            }
+            return preferredExistingId
         }
 
-        if let existing = identityMap[identityKey] {
+        if let existing = identityMap[key] {
             return existing
         }
 
         let newId = UUID()
-        identityMap[identityKey] = newId
+        identityMap[key] = newId
         await persist()
         return newId
     }
 
-    // MARK: - IdentityKey
+    // MARK: - Ключи identity
 
-    /// Определяет identityKey физического файла.
-    private func identityKey(for url: URL) -> String? {
-
-        let accessed = url.startAccessingSecurityScopedResource()
-        defer { if accessed { url.stopAccessingSecurityScopedResource() } }
-
-        // В File Provider Storage resourceIdentifier может быть нестабильным между reboot.
-        // Поэтому для надёжной идентичности используем только content fingerprint.
-        if let fingerprint = fingerprint(for: url) {
-            return "fp:\(fingerprint)"
-        }
-
-        return nil
+    private func libraryKey(
+        rootFolderId: UUID,
+        relativePath: String
+    ) -> String {
+        let normalizedPath = normalizeRelativePath(relativePath)
+        return "lib:\(rootFolderId.uuidString):\(normalizedPath)"
     }
 
-    // MARK: - Resource Identifier
+    private func importedFileKey(for url: URL) -> String {
+        let normalizedPath = url
+            .resolvingSymlinksInPath()
+            .standardizedFileURL
+            .path
 
-    private func resourceIdentifier(for url: URL) -> String? {
-        do {
-            let values = try url.resourceValues(forKeys: [.fileResourceIdentifierKey])
-
-            if let data = values.fileResourceIdentifier as? Data {
-                return data.base64EncodedString()
-            }
-
-            if let any = values.fileResourceIdentifier {
-                return String(describing: any)
-            }
-
-            return nil
-        } catch {
-            return nil
-        }
+        return "imp:\(normalizedPath)"
     }
 
-    // MARK: - Fingerprint
-
-    private func fingerprint(for url: URL) -> String? {
-        do {
-            let values = try url.resourceValues(forKeys: [
-                .fileSizeKey,
-                .nameKey
-            ])
-
-            let size = values.fileSize ?? 0
-            let name = values.name ?? url.lastPathComponent
-
-            let head = try readChunk(from: url, offset: 0, length: 64 * 1024)
-
-            let tail: Data
-            if size > 128 * 1024 {
-                tail = try readChunk(
-                    from: url,
-                    offset: max(0, size - 64 * 1024),
-                    length: 64 * 1024
-                )
-            } else {
-                tail = Data()
-            }
-
-            var hasher = SHA256()
-            hasher.update(data: Data("\(name)|\(size)".utf8))
-            hasher.update(data: head)
-            hasher.update(data: tail)
-
-            let digest = hasher.finalize()
-            return digest.map { String(format: "%02x", $0) }.joined()
-
-        } catch {
-            return nil
-        }
-    }
-    
-    private func readChunk(from url: URL, offset: Int, length: Int) throws -> Data {
-        let handle = try FileHandle(forReadingFrom: url)
-        defer { try? handle.close() }
-
-        try handle.seek(toOffset: UInt64(offset))
-        return try handle.read(upToCount: length) ?? Data()
+    private func normalizeRelativePath(_ relativePath: String) -> String {
+        relativePath
+            .replacingOccurrences(of: "\\", with: "/")
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
     }
 
     // MARK: - Загрузка / сохранение
@@ -170,7 +200,7 @@ actor TrackIdentityResolver {
             let data = try JSONEncoder().encode(identityMap)
             try data.write(to: fileURL, options: .atomic)
         } catch {
-            // Ошибка сохранения не должна валить приложение.
+            print("❌ Ошибка сохранения TrackIdentityRegistry:", error)
         }
     }
 }
