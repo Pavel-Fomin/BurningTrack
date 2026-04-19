@@ -18,13 +18,15 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct EditableFieldRow: View {
 
     // MARK: - Input
 
-    let title: String       /// Текст лейбла
-    let isMultiline: Bool   /// Режим ввода
+    let title: String                /// Текст лейбла
+    let isMultiline: Bool            /// Режим ввода
+    let keyboardType: UIKeyboardType /// Тип клавиатуры
     
     @Binding var value: String /// Значение поля
 
@@ -55,6 +57,7 @@ struct EditableFieldRow: View {
         TextField("", text: $value)
             .font(.body)
             .foregroundColor(.primary)
+        
     }
 
     // MARK: - Multiline

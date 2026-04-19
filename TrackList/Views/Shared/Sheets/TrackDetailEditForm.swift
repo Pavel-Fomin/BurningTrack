@@ -61,6 +61,7 @@ struct TrackDetailEditForm: View {
                 EditableFieldRow(
                     title: "Название файла",
                     isMultiline: false,
+                    keyboardType: .default,
                     value: $fileName
                 )
 
@@ -68,6 +69,7 @@ struct TrackDetailEditForm: View {
                     EditableFieldRow(
                         title: field.title,
                         isMultiline: field.isMultiline,
+                        keyboardType: field.id == .year ? .numberPad : .default,
                         value: binding(for: field.id)
                     )
                 }

@@ -214,28 +214,85 @@ struct TrackDetailContainer: View {
     private func buildTagWritePatch() -> TagWritePatch {
         var patch = TagWritePatch()
 
-        for (field, value) in editedValues {
-            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-            let normalized: String? = trimmed.isEmpty ? nil : trimmed
+        // Локальная функция для строковых тегов.
+        // Сравнивает исходное и текущее значение и возвращает:
+        // - .unchanged, если поле не изменилось
+        // - .clear, если пользователь очистил поле
+        // - .set(...), если введено новое непустое значение
+        func makeStringChange(
+            field: EditableTrackField,
+            initial: String
+        ) -> TagFieldChange<String> {
+            let current = (editedValues[field] ?? "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
 
-            switch field {
-            case .title:
-                patch.title = normalized
-            case .artist:
-                patch.artist = normalized
-            case .album:
-                patch.album = normalized
-            case .genre:
-                patch.genre = normalized
-            case .year:
-                patch.year = normalized.flatMap(Int.init)
-            case .publisher:
-                patch.label = normalized
-            case .comment:
-                patch.comment = normalized
-            }
+            let initialTrimmed = initial.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            if current == initialTrimmed {return .unchanged}
+            if current.isEmpty {return .clear}
+            return .set(current)
         }
 
+        // Локальная функция для числового тега year.
+        // Семантика:
+        // - .unchanged → значение не менялось
+        // - .clear → поле очищено
+        // - .set(Int) → введено корректное число
+        //
+        // Если введено невалидное непустое значение, пока считаем,
+        // что patch не должен маскировать ошибку как clear.
+        // На этом шаге возвращаем .unchanged, чтобы не сломать сборку.
+        // Валидировать ввод будем следующим отдельным шагом.
+        func makeYearChange(initial: String) -> TagFieldChange<Int> {
+            let current = (editedValues[.year] ?? "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+
+            let initialTrimmed = initial.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            if current == initialTrimmed {return .unchanged}
+            if current.isEmpty {return .clear}
+            guard let value = Int(current) else {
+                // Невалидный ввод — пока считаем как clear,
+                // чтобы не возвращалось старое значение
+                return .clear
+            }
+            return .set(value)
+        }
+
+        patch.title = makeStringChange(
+            field: .title,
+            initial: initialValues[.title] ?? ""
+        )
+
+        patch.artist = makeStringChange(
+            field: .artist,
+            initial: initialValues[.artist] ?? ""
+        )
+
+        patch.album = makeStringChange(
+            field: .album,
+            initial: initialValues[.album] ?? ""
+        )
+
+        patch.genre = makeStringChange(
+            field: .genre,
+            initial: initialValues[.genre] ?? ""
+        )
+
+        patch.comment = makeStringChange(
+            field: .comment,
+            initial: initialValues[.comment] ?? ""
+        )
+
+        patch.publisher = makeStringChange(
+            field: .publisher,
+            initial: initialValues[.publisher] ?? ""
+        )
+
+        patch.year = makeYearChange(
+            initial: initialValues[.year] ?? ""
+        )
+        
         return patch
     }
     

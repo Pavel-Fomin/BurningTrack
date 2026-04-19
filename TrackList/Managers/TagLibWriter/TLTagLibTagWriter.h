@@ -39,6 +39,18 @@ typedef NS_ENUM(NSInteger, TLArtworkAction) {
     TLArtworkActionSet
 };
 
+typedef NS_ENUM(NSInteger, TLTagFieldAction) {
+
+    /// Поле не менять
+    TLTagFieldActionUnchanged = 0,
+
+    /// Записать новое значение
+    TLTagFieldActionSet,
+
+    /// Очистить поле
+    TLTagFieldActionClear
+};
+
 /// Результат записи тегов
 @interface TLTagWriteResult : NSObject
 
@@ -51,16 +63,36 @@ typedef NS_ENUM(NSInteger, TLArtworkAction) {
 /// Все параметры optional:
 /// - nil → поле не изменяется
 FOUNDATION_EXPORT TLTagWriteResult *_Nonnull _writeBasicTags(
+
     NSString *filePath,
+
+    TLTagFieldAction titleAction,
     NSString *_Nullable title,
+
+    TLTagFieldAction artistAction,
     NSString *_Nullable artist,
+
+    TLTagFieldAction albumAction,
     NSString *_Nullable album,
+
+    TLTagFieldAction genreAction,
     NSString *_Nullable genre,
+
+    TLTagFieldAction commentAction,
     NSString *_Nullable comment,
+
+    TLTagFieldAction publisherAction,
     NSString *_Nullable publisher,
+
+    TLTagFieldAction yearAction,
     NSNumber *_Nullable year,
+
+    TLTagFieldAction trackNumberAction,
     NSNumber *_Nullable trackNumber,
+
+    TLTagFieldAction bpmAction,
     NSNumber *_Nullable bpm,
+
     TLArtworkAction artworkAction,
     NSData *_Nullable artworkData,
     NSString *_Nullable artworkMime

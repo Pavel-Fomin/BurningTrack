@@ -18,38 +18,38 @@ struct TagWritePatch: Sendable, Equatable {
     // MARK: - Основные текстовые теги
 
     /// Исполнитель
-    var artist: String?
+    var artist: TagFieldChange<String> = .unchanged
 
     /// Название трека
-    var title: String?
+    var title: TagFieldChange<String> = .unchanged
 
     /// Альбом
-    var album: String?
+    var album: TagFieldChange<String> = .unchanged
 
-    /// Лейбл / издатель
-    var label: String?
+    /// Издатель / лейбл
+    var publisher: TagFieldChange<String> = .unchanged
 
     /// Жанр
-    var genre: String?
+    var genre: TagFieldChange<String> = .unchanged
 
     /// Комментарий
-    var comment: String?
+    var comment: TagFieldChange<String> = .unchanged
 
     // MARK: - Числовые теги
 
     /// Год выпуска
-    var year: Int?
+    var year: TagFieldChange<Int> = .unchanged
 
     /// Номер трека
-    var trackNumber: Int?
+    var trackNumber: TagFieldChange<Int> = .unchanged
 
     /// BPM (удары в минуту)
-    var bpm: Int?
+    var bpm: TagFieldChange<Int> = .unchanged
 
     /// Время / длительность
-    /// ⚠️ По умолчанию считается вычисляемым,
+    /// По умолчанию считается вычисляемым,
     /// но предусмотрено для форматов, где тег поддерживается.
-    var duration: TimeInterval?
+    var duration: TagFieldChange<TimeInterval> = .unchanged
 
     // MARK: - Обложка
 
@@ -57,52 +57,25 @@ struct TagWritePatch: Sendable, Equatable {
     /// - nil → не трогаем
     /// - remove → удалить
     /// - set → заменить
-    var artwork: ArtworkPatch?
+    var artwork: ArtworkPatch? = nil
 
-    // MARK: - Init
-
-    init(
-        artist: String? = nil,
-        title: String? = nil,
-        album: String? = nil,
-        label: String? = nil,
-        genre: String? = nil,
-        comment: String? = nil,
-        year: Int? = nil,
-        trackNumber: Int? = nil,
-        bpm: Int? = nil,
-        duration: TimeInterval? = nil,
-        artwork: ArtworkPatch? = nil
-    ) {
-        self.artist = artist
-        self.title = title
-        self.album = album
-        self.label = label
-        self.genre = genre
-        self.comment = comment
-        self.year = year
-        self.trackNumber = trackNumber
-        self.bpm = bpm
-        self.duration = duration
-        self.artwork = artwork
-    }
 }
 
 /// Операции над обложкой трека
+
 enum ArtworkPatch: Sendable, Equatable {
 
     /// Удалить существующую обложку
     case remove
-
     /// Установить новую обложку без преобразований
+
     case set(
         data: Data,
         mime: String?
     )
 
     /// Установить новую обложку с предварительным сжатием
-    ///
-    /// Сжатие выполняется write-реализацией (НЕ здесь).
+    /// Сжатие выполняется write-реализацией (не здесь).
     /// Patch описывает намерение, а не алгоритм.
     case setCompressed(
         data: Data,
