@@ -374,32 +374,52 @@ actor AppCommandExecutor {
     
     func updateTrackTags(
         trackId: UUID,
-        patch: TagWritePatch
+        patch: TagWritePatch,
+        artworkAction: ArtworkWriteAction
     ) async throws {
-        
+
         // 1. Резолв URL трека через bookmark
         guard let url = await BookmarkResolver.url(forTrack: trackId) else {
             throw TagWriteError.fileNotFound
         }
-        
+
         let didStartAccess = url.startAccessingSecurityScopedResource()
         defer { if didStartAccess { url.stopAccessingSecurityScopedResource() } }
 
-        // 2. Запись тегов
-        try await tagsWriter.writeTags(to: url, patch: patch)
-        
-        // 3. Инвалидация кэша метаданных
+        // 2. Собираем финальный patch.
+        // Текстовые теги уже приходят снаружи,
+        // а действие по обложке добавляем здесь.
+        var finalPatch = patch
+
+        switch artworkAction {
+        case .none:
+            break
+
+        case .remove:
+            finalPatch.artwork = .remove
+
+        case .replace(let data):
+            finalPatch.artwork = .set(
+                data: data,
+                mime: artworkMimeType(for: data)
+            )
+        }
+
+        // 3. Запись тегов и обложки
+        try await tagsWriter.writeTags(to: url, patch: finalPatch)
+
+        // 4. Инвалидация кэша метаданных
         TrackMetadataCacheManager.shared.invalidate(url: url)
-        
+
         NotificationCenter.default.post(
             name: .trackMetadataDidChange,
             object: trackId
         )
-        
-        // 4. Загрузка обновлённых метаданных (уже после инвалидции)
+
+        // 5. Загрузка обновлённых метаданных (уже после инвалидции)
         let metadata = await TrackMetadataCacheManager.shared.loadMetadata(for: url)
-        
-        // 5. ToastEvent
+
+        // 6. ToastEvent
         let event = ToastEvent.tagsUpdated(
             title: metadata?.title ?? url.lastPathComponent,
             artist: metadata?.artist ?? "",
@@ -411,10 +431,27 @@ actor AppCommandExecutor {
                 ).map { Image(uiImage: $0) }
             }
         )
-        
-        // 6. Показ тоста
+
+        // 7. Показ тоста
         await MainActor.run {
             ToastManager.shared.handle(event)
         }
     }
+}
+
+// MARK: - Helper
+
+/// Определяет MIME-тип изображения по сигнатуре данных.
+/// Сейчас поддерживаем PNG и JPEG.
+/// Если формат не распознан, по умолчанию считаем его JPEG.
+private func artworkMimeType(for data: Data) -> String {
+    if data.starts(with: [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) {
+        return "image/png"
+    }
+
+    if data.starts(with: [0xFF, 0xD8, 0xFF]) {
+        return "image/jpeg"
+    }
+
+    return "image/jpeg"
 }

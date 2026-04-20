@@ -37,11 +37,13 @@ struct TrackDetailContainer: View {
     
     @State private var editedFileName: String = ""
     @State private var editedValues: [EditableTrackField: String] = [:]
+    @State private var artworkEditState = ArtworkEditState(hadOriginalArtwork: false)
     
     // MARK: - Initial state (фиксируется при входе в edit)
     
     @State private var initialFileName: String = ""
     @State private var initialValues: [EditableTrackField: String] = [:]
+    @State private var initialArtworkEditState = ArtworkEditState(hadOriginalArtwork: false)
     
     @State private var showStopPlayerAlert = false
     
@@ -59,12 +61,16 @@ struct TrackDetailContainer: View {
     /// Есть ли реальные изменения (с учётом trim)
     private var hasChanges: Bool {
         guard isFileNameValid else { return false }
-        
+
         if trimmed(editedFileName) != trimmed(initialFileName) {
             return true
         }
-        
-        return trimmed(editedValues) != trimmed(initialValues)
+
+        if trimmed(editedValues) != trimmed(initialValues) {
+            return true
+        }
+
+        return artworkEditState != initialArtworkEditState
     }
     
     // MARK: - UI
@@ -101,7 +107,8 @@ struct TrackDetailContainer: View {
                 track: track,
                 mode: mode,
                 editedValues: $editedValues,
-                editedFileName: $editedFileName
+                editedFileName: $editedFileName,
+                artworkEditState: $artworkEditState
             )
         }
         .alert(
@@ -134,6 +141,7 @@ struct TrackDetailContainer: View {
     private func enterEditMode() {
         initialFileName = editedFileName
         initialValues = editedValues
+        initialArtworkEditState = artworkEditState
 
         Task {
             if let entry = await TrackRegistry.shared.entry(for: track.id) {
@@ -153,7 +161,9 @@ struct TrackDetailContainer: View {
         let newFullName = buildFullFileName(editedName: editedFileName)
         let fileChanged = newFullName != initialFullFileName
         let tagsChanged = trimmed(editedValues) != trimmed(initialValues)
-
+        let artworkAction = artworkEditState.makeWriteAction()
+        let artworkChanged = artworkAction != .none
+        
         guard hasChanges else {
             mode = .view
             return
@@ -169,17 +179,19 @@ struct TrackDetailContainer: View {
                     )
                 }
 
-                if tagsChanged {
+                if tagsChanged || artworkChanged {
                     let patch = buildTagWritePatch()
                     try await AppCommandExecutor.shared.updateTrackTags(
                         trackId: track.id,
-                        patch: patch
+                        patch: patch,
+                        artworkAction: artworkAction
                     )
                 }
 
                 await reloadSheetMetadataFromFile()
 
                 await MainActor.run {
+                    initialArtworkEditState = artworkEditState
                     mode = .view
                 }
 
@@ -206,6 +218,7 @@ struct TrackDetailContainer: View {
     private func cancelEditing() {
         editedFileName = initialFileName
         editedValues = initialValues
+        artworkEditState = initialArtworkEditState
         mode = .view
     }
     

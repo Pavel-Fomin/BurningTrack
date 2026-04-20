@@ -19,7 +19,7 @@
 //
 
 import SwiftUI
-
+import PhotosUI
 
 struct TrackDetailEditForm: View {
 
@@ -31,6 +31,10 @@ struct TrackDetailEditForm: View {
     // MARK: - Artwork
 
     let artworkUIImage: UIImage?
+
+    @Binding var artworkEditState: ArtworkEditState
+
+    @State private var selectedPhotoItem: PhotosPickerItem?
 
     // MARK: - Field configuration
 
@@ -49,6 +53,24 @@ struct TrackDetailEditForm: View {
         .init(id: .publisher, title: "Лейбл / издатель", isMultiline: false),
         .init(id: .comment,   title: "Комментарий",      isMultiline: true)
     ]
+
+    // MARK: - Derived artwork UI
+
+    /// Картинка, которую нужно показывать в форме прямо сейчас.
+    ///
+    /// Приоритет такой:
+    /// 1. новая выбранная пользователем обложка
+    /// 2. исходная обложка трека
+    /// 3. отсутствие обложки
+    private var previewArtworkUIImage: UIImage? {
+        if let data = artworkEditState.newArtworkData,
+           let image = UIImage(data: data) {
+            return image
+        }
+
+        if artworkEditState.hasArtworkForPreview == false {return nil}
+        return artworkUIImage
+    }
 
     // MARK: - UI
 
@@ -77,28 +99,45 @@ struct TrackDetailEditForm: View {
             .padding(.horizontal)
             .padding(.bottom, 24)
         }
+        .task(id: selectedPhotoItem) {
+            await loadSelectedArtwork()
+        }
     }
 
     // MARK: - Artwork
 
     private var artworkBlock: some View {
-        Group {
-            if let artworkUIImage {
-                Image(uiImage: artworkUIImage)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: 180, height: 180)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .shadow(radius: 8)
-            } else {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.gray.opacity(0.2))
-                    .frame(width: 180, height: 180)
-                    .overlay(
-                        Image(systemName: "music.note")
-                            .font(.system(size: 40))
-                            .foregroundColor(.gray)
-                    )
+        VStack(spacing: 12) {
+            Group {
+                if let previewArtworkUIImage {
+                    Image(uiImage: previewArtworkUIImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 180, height: 180)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .shadow(radius: 8)
+                } else {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.gray.opacity(0.2))
+                        .frame(width: 180, height: 180)
+                        .overlay(
+                            Image(systemName: "music.note")
+                                .font(.system(size: 40))
+                                .foregroundColor(.gray)
+                        )
+                }
+            }
+
+            if artworkEditState.shouldShowRemoveButton {
+                Button("Удалить") {
+                    artworkEditState.removeArtwork()
+                }
+            }
+
+            if artworkEditState.shouldShowAddButton {
+                PhotosPicker(selection: $selectedPhotoItem, matching: .images, photoLibrary: .shared()) {
+                    Text("Добавить")
+                }
             }
         }
         .padding(.vertical, 20)
@@ -111,5 +150,17 @@ struct TrackDetailEditForm: View {
             get: { values[field] ?? "" },
             set: { values[field] = $0 }
         )
+    }
+
+    /// Загружает выбранное изображение из системного пикера
+    /// и сохраняет его в локальное состояние формы.
+    private func loadSelectedArtwork() async {
+        guard let selectedPhotoItem else {return}
+        guard let data = try? await selectedPhotoItem.loadTransferable(type: Data.self) else {return}
+        guard UIImage(data: data) != nil else {return}
+
+        await MainActor.run {
+            artworkEditState.setNewArtwork(data: data)
+        }
     }
 }

@@ -30,13 +30,13 @@ struct TrackDetailSheet: View {
 
     @Binding var editedValues: [EditableTrackField: String]
     @Binding var editedFileName: String
+    @Binding var artworkEditState: ArtworkEditState
 
     // MARK: - Runtime state
 
     @State private var resolvedURL: URL?
     @State private var artworkUIImage: UIImage?
     @State private var didLoad = false
-
 
     // MARK: - Body
 
@@ -66,7 +66,8 @@ struct TrackDetailSheet: View {
                 TrackDetailEditForm(
                     fileName: $editedFileName,
                     values: $editedValues,
-                    artworkUIImage: artworkUIImage
+                    artworkUIImage: artworkUIImage,
+                    artworkEditState: $artworkEditState
                 )
             }
         }
@@ -126,6 +127,7 @@ struct TrackDetailSheet: View {
         await MainActor.run {
             editedValues = values
             artworkUIImage = image
+            artworkEditState = ArtworkEditState(hadOriginalArtwork: image != nil)
         }
     }
     
