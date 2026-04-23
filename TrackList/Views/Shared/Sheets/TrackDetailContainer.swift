@@ -37,6 +37,7 @@ struct TrackDetailContainer: View {
     
     @State private var editedFileName: String = ""
     @State private var editedValues: [EditableTrackField: String] = [:]
+    @State private var artworkUIImage: UIImage?
     @State private var artworkEditState = ArtworkEditState(hadOriginalArtwork: false)
     
     // MARK: - Initial state (фиксируется при входе в edit)
@@ -108,6 +109,7 @@ struct TrackDetailContainer: View {
                 mode: mode,
                 editedValues: $editedValues,
                 editedFileName: $editedFileName,
+                artworkUIImage: $artworkUIImage,
                 artworkEditState: $artworkEditState
             )
         }
@@ -350,9 +352,21 @@ struct TrackDetailContainer: View {
             .comment: metadata.comment ?? ""
         ]
 
+        let tagFile = TLTagLibFile(fileURL: url)
+        let parsed = tagFile.readMetadata()
+
+        let image = ArtworkProvider.shared.image(
+            trackId: track.id,
+            artworkData: parsed?.artworkData,
+            purpose: .trackInfoSheet
+        )
+
         await MainActor.run {
             editedValues = newValues
             initialValues = newValues
+            artworkUIImage = image
+            artworkEditState = ArtworkEditState(hadOriginalArtwork: image != nil)
+            initialArtworkEditState = artworkEditState
         }
     }
 }

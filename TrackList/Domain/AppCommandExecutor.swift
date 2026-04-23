@@ -410,6 +410,7 @@ actor AppCommandExecutor {
 
         // 4. Инвалидация кэша метаданных
         TrackMetadataCacheManager.shared.invalidate(url: url)
+        ArtworkProvider.shared.invalidate(trackId: trackId)
 
         NotificationCenter.default.post(
             name: .trackMetadataDidChange,

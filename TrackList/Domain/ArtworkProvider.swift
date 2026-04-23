@@ -42,6 +42,23 @@ final class ArtworkProvider {
     private let cache = NSCache<WrappedKey, UIImage>()  /// NSCache управляется системой (memory pressure)
     
     private init() {}
+    
+    private let allPurposes: [ArtworkPurpose] = [
+        .trackList,
+        .miniPlayer,
+        .trackInfoSheet,
+        .toast,
+        .nowPlaying
+    ]
+    
+    func invalidate(trackId: UUID) {
+        for purpose in allPurposes {
+            let key = ArtworkCacheKey(trackId: trackId, purpose: purpose)
+            cache.removeObject(forKey: WrappedKey(key))
+        }
+    }
+    
+    
 
     // MARK: - Публичный API
 
