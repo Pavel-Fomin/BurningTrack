@@ -6,7 +6,7 @@
 //
 //  Роль:
 //  - управляет режимами просмотра и редактирования
-//  - загружает данные трека (URL, теги, artwork)
+//  - получает данные трека через TrackRuntimeSnapshot
 //  - собирает экран из read-only и edit форм
 //
 //  Created by Pavel Fomin on 13.10.2025.
@@ -18,25 +18,25 @@ struct TrackDetailSheet: View {
 
     // MARK: - Input
 
-    let track: any TrackDisplayable
-    let mode: Mode
+    let track: any TrackDisplayable  /// Трек, для которого открыт sheet
+    let mode: Mode                   /// Текущий режим sheet
 
     enum Mode: Equatable {
-        case view
-        case edit
+        case view                    /// Режим просмотра
+        case edit                    /// Режим редактирования
     }
 
     // MARK: - Editing state (из контейнера)
 
-    @Binding var editedValues: [EditableTrackField: String]
-    @Binding var editedFileName: String
-    @Binding var artworkUIImage: UIImage?
-    @Binding var artworkEditState: ArtworkEditState
+    @Binding var editedValues: [EditableTrackField: String] /// Значения редактируемых тегов
+    @Binding var editedFileName: String                     /// Редактируемое имя файла без расширения
+    @Binding var artworkUIImage: UIImage?                   /// Обложка для отображения в sheet
+    @Binding var artworkEditState: ArtworkEditState         /// Состояние редактирования обложки
 
     // MARK: - Runtime state
 
-    @State private var resolvedURL: URL?
-    @State private var didLoad = false
+    @State private var resolvedURL: URL?                   /// URL файла для отображения пути
+    @State private var didLoad = false                     /// Флаг первичной загрузки sheet
 
     // MARK: - Body
 
@@ -81,6 +81,9 @@ struct TrackDetailSheet: View {
 
     // MARK: - Load data
 
+    /// Загружает первичные данные sheet.
+    /// URL используется только для отображения пути.
+    /// Метаданные и artwork берутся из TrackRuntimeSnapshot.
     private func load() async {
         guard let url = await BookmarkResolver.url(forTrack: track.id) else {
             print("❌ BookmarkResolver: нет URL для трека \(track.id)")
@@ -88,51 +91,57 @@ struct TrackDetailSheet: View {
         }
 
         resolvedURL = url
-        editedFileName = url.deletingPathExtension().lastPathComponent
 
-        await loadMetadataAndArtwork(from: url)
+        let snapshot = await loadSnapshot()
+        guard let snapshot else { return }
+
+        await MainActor.run {
+            applySnapshotToSheetState(snapshot)
+        }
     }
 
-
-    private func loadMetadataAndArtwork(from url: URL) async {
-
-        let ok = url.startAccessingSecurityScopedResource()
-        defer { if ok { url.stopAccessingSecurityScopedResource() } }
-
-        guard let metadata = TrackTagInspector.shared.readMetadata(from: url) else {
-            return
+    /// Загружает runtime snapshot трека из store или собирает через builder.
+    /// - Returns: TrackRuntimeSnapshot или nil
+    private func loadSnapshot() async -> TrackRuntimeSnapshot? {
+        if let snapshot = TrackRuntimeStore.shared.snapshot(forTrackId: track.id) {
+            return snapshot
         }
 
-        let values: [EditableTrackField: String] = [
-            .title: metadata.title ?? "",
-            .artist: metadata.artist ?? "",
-            .album: metadata.album ?? "",
-            .genre: metadata.genre ?? "",
-            .year: metadata.year.map(String.init) ?? "",
-            .publisher: metadata.publisherOrLabel ?? "",
-            .comment: metadata.comment ?? ""
-        ]
+        return await TrackRuntimeSnapshotBuilder.shared.buildSnapshot(forTrackId: track.id)
+    }
 
-        // Обложку пока продолжаем читать отдельно,
-        // потому что TrackSheetMetadata её ещё не хранит.
-        let tagFile = TLTagLibFile(fileURL: url)
-        let parsed = tagFile.readMetadata()
+    /// Применяет runtime snapshot к состоянию sheet.
+    /// Не читает файл напрямую и не обращается к TagLib.
+    /// - Parameter snapshot: Актуальный runtime snapshot трека
+    private func applySnapshotToSheetState(_ snapshot: TrackRuntimeSnapshot) {
+
+        let values: [EditableTrackField: String] = [
+            .title: snapshot.title ?? "",
+            .artist: snapshot.artist ?? "",
+            .album: snapshot.album ?? "",
+            .genre: snapshot.genre ?? "",
+            .year: snapshot.year.map(String.init) ?? "",
+            .publisher: snapshot.publisherOrLabel ?? "",
+            .comment: snapshot.comment ?? ""
+        ]
 
         let image = ArtworkProvider.shared.image(
             trackId: track.id,
-            artworkData: parsed?.artworkData,
+            artworkData: snapshot.artworkData,
             purpose: .trackInfoSheet
         )
 
-        await MainActor.run {
-            editedValues = values
-            artworkUIImage = image
-            artworkEditState = ArtworkEditState(hadOriginalArtwork: image != nil)
-        }
+        editedFileName = makeFileNameWithoutExtension(snapshot.fileName)
+        editedValues = values
+        artworkUIImage = image
+        artworkEditState = ArtworkEditState(hadOriginalArtwork: image != nil)
     }
     
     // MARK: - Helpers
 
+    /// Возвращает путь для отображения в sheet.
+    /// - Parameter url: URL папки файла
+    /// - Returns: Человекочитаемый путь
     private func displayPath(from url: URL) -> String {
         let path = url.path
 
@@ -145,5 +154,12 @@ struct TrackDetailSheet: View {
         }
 
         return url.deletingLastPathComponent().lastPathComponent
+    }
+
+    /// Возвращает имя файла без расширения.
+    /// - Parameter fileName: Полное имя файла
+    /// - Returns: Имя файла без расширения
+    private func makeFileNameWithoutExtension(_ fileName: String) -> String {
+        (fileName as NSString).deletingPathExtension
     }
 }

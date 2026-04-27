@@ -14,54 +14,60 @@ import UIKit
 
 struct LibraryTrackRowWrapper: View {
     
-    let track: LibraryTrack
-    let allTracks: [LibraryTrack]
+    // MARK: - Input
     
-    let trackListViewModel: TrackListViewModel
-    let trackListNamesById: [UUID: [String]]
+    let track: LibraryTrack                       /// Текущий трек строки
+    let allTracks: [LibraryTrack]                 /// Контекст всех треков (для переключения)
     
-    let metadataProvider: TrackMetadataProviding
+    let trackListViewModel: TrackListViewModel    /// ViewModel треклистов (используется для действий)
+    let trackListNamesById: [UUID: [String]]      /// Названия треклистов, в которые входит трек
     
-    let isScrollingFast: Bool
-    let isRevealed: Bool
+    let metadataProvider: TrackMetadataProviding  /// Провайдер runtime snapshot
     
-    let showsSelection: Bool
-    let isSelected: Bool
+    let isScrollingFast: Bool                     /// Флаг быстрого скролла (для оптимизации загрузки)
+    let isRevealed: Bool                          /// Состояние раскрытия (для свайпов)
     
-    let onToggleSelection: () -> Void
+    let showsSelection: Bool                      /// Включён ли режим выбора
+    let isSelected: Bool                          /// Выбран ли текущий трек
     
-    @ObservedObject var playerViewModel: PlayerViewModel
-    @EnvironmentObject var sheetManager: SheetManager
-    @ObservedObject private var metadataCache = TrackMetadataCacheManager.shared
+    let onToggleSelection: () -> Void             /// Обработчик выбора
+    
+    @ObservedObject var playerViewModel: PlayerViewModel   /// ViewModel плеера
+    @EnvironmentObject var sheetManager: SheetManager      /// Менеджер шитов
     
     // MARK: - Player state
     
+    /// Является ли трек текущим (играющим)
     private var isCurrent: Bool {
         playerViewModel.isCurrent(track, in: .library)
     }
     
+    /// Находится ли трек в состоянии воспроизведения
     private var isPlaying: Bool {
         isCurrent && playerViewModel.isPlaying
     }
     
+    /// Названия треклистов, в которых находится трек
     private var trackListNames: [String] {
         trackListNamesById[track.id] ?? []
     }
     
+    /// Подсветка строки (например при возврате из sheet)
     private var isHighlighted: Bool {
         sheetManager.highlightedTrackID == track.id
     }
     
     
-    // MARK: - Metadata
+    // MARK: - Snapshot
     
-    /// Теги
-    private var metadata: TrackMetadataCacheManager.CachedMetadata? {
-        metadataProvider.metadata(for: track.id)
+    /// Runtime snapshot трека (единый источник метаданных)
+    private var snapshot: TrackRuntimeSnapshot? {
+        metadataProvider.snapshot(for: track.id)
     }
-    /// Обложка
+    
+    /// Обложка трека (строится из snapshot.artworkData)
     private var artwork: UIImage? {
-        guard let data = metadata?.artworkData else { return nil }
+        guard let data = snapshot?.artworkData else { return nil }
         
         return ArtworkProvider.shared.image(
             trackId: track.id,
@@ -79,17 +85,24 @@ struct LibraryTrackRowWrapper: View {
             isPlaying: isPlaying,
             isHighlighted: isRevealed || isHighlighted,
             artwork: artwork,
-            title: metadata?.title ?? track.title,
-            artist: metadata?.artist ?? track.artist ?? "",
-            duration: metadata?.duration ?? track.duration,
+            
+            // Данные отображения берём из snapshot (если он есть),
+            // иначе используем fallback из модели трека
+            title: snapshot?.title ?? track.title,
+            artist: snapshot?.artist ?? track.artist ?? "",
+            duration: snapshot?.duration ?? track.duration,
+            
             onRowTap: {
+                // Если тап по текущему треку — пауза/воспроизведение
                 if isCurrent {
                     playerViewModel.togglePlayPause()
                 } else {
+                    // Иначе запускаем новый трек в контексте
                     playerViewModel.play(track: track, context: allTracks)
                 }
             },
             onArtworkTap: {
+                // Открытие экрана деталей трека
                 sheetManager.present(.trackDetail(track))
             },
             showsSelection: showsSelection,
@@ -97,9 +110,13 @@ struct LibraryTrackRowWrapper: View {
             onToggleSelection: onToggleSelection,
             trackListNames: trackListNames
         )
-        .task(id: track.id.uuidString + "|" + (isScrollingFast ? "1" : "0") + "|" + "\(metadataCache.revision)") {
-            metadataProvider.requestMetadataIfNeeded(for: track.id)
+        
+        // Загружаем snapshot при появлении строки
+        // Больше не используем metadata cache и revision
+        .task(id: track.id.uuidString + "|" + (isScrollingFast ? "1" : "0")) {
+            metadataProvider.requestSnapshotIfNeeded(for: track.id)
         }
+        
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             if !showsSelection {
 
@@ -130,7 +147,7 @@ struct LibraryTrackRowWrapper: View {
                 }
                 .tint(.green)
 
-                // Переместить
+                // Переместить трек в другую папку
                 Button {
                     SheetActionCoordinator.shared.handle(
                         action: .moveToFolder,
@@ -146,16 +163,24 @@ struct LibraryTrackRowWrapper: View {
     }
 }
 
+// MARK: - Helpers
+
 private extension View {
-        @ViewBuilder
-        func swipeIf(
-            _ enabled: Bool,
-            @ViewBuilder actions: (Self) -> some View
-        ) -> some View {
-            if enabled {
-                actions(self)
-            } else {
-                self
-            }
+    
+    // Условное применение swipeActions
+    ///
+    /// - Parameters:
+    ///   - enabled: включены ли свайпы
+    ///   - actions: содержимое свайпов
+    @ViewBuilder
+    func swipeIf(
+        _ enabled: Bool,
+        @ViewBuilder actions: (Self) -> some View
+    ) -> some View {
+        if enabled {
+            actions(self)
+        } else {
+            self
         }
     }
+}

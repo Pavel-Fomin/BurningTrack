@@ -31,7 +31,7 @@ final class PlayerViewModel: ObservableObject {
     @Published var currentTime: TimeInterval = 0.0                   /// Текущее время воспроизведения
     @Published var trackDuration: TimeInterval = 0.0                 /// Длительность текущего трека
     @Published var currentContext: PlaybackContext?                  /// Контекст воспроизведения (плеер / треклист / фонотека)
-    @Published private(set) var metadataByTrackId: [UUID: TrackMetadataCacheManager.CachedMetadata] = [:]
+    @Published private(set) var snapshotsByTrackId: [UUID: TrackRuntimeSnapshot] = [:] /// Runtime snapshot треков по id
     
     private var nowPlayingArtworkByTrackId: [UUID: CGImage] = [:]
     
@@ -60,18 +60,18 @@ final class PlayerViewModel: ObservableObject {
     // MARK: - Now Playing Snapshot
     
     /// Собирает snapshot для Control Center из текущего состояния.
-    /// Источник метаданных — TrackMetadataCacheManager.
+    /// Источник метаданных — TrackRuntimeSnapshot.
     /// Artwork используется отдельного размера (~512 px).
     private func makeNowPlayingSnapshot(for track: any TrackDisplayable) -> NowPlayingSnapshot {
         
-        let metadata = metadataByTrackId[track.id]
+        let snapshot = snapshotsByTrackId[track.id]
         
         return NowPlayingSnapshot(
-            title: metadata?.title ?? track.fileName,
-            artist: metadata?.artist ?? "",
+            title: snapshot?.title ?? track.fileName,
+            artist: snapshot?.artist ?? "",
             artwork: nowPlayingArtworkByTrackId[track.id],
             currentTime: currentTime,
-            duration: metadata?.duration ?? trackDuration,
+            duration: snapshot?.duration ?? trackDuration,
             isPlaying: isPlaying
         )
     }
@@ -110,19 +110,17 @@ final class PlayerViewModel: ObservableObject {
         ) { [weak self] _ in
             Task { await self?.playNextTrack() }
         }
-        // Обновление метаданных трека (после редактирования тегов / rename)
+        // Обновление runtime snapshot трека
         NotificationCenter.default.addObserver(
-            forName: .trackMetadataDidChange,
+            forName: .trackDidUpdate,
             object: nil,
             queue: .main
         ) { [weak self] notification in
             guard let self else { return }
-            guard let trackId = notification.object as? UUID else { return }
+            guard let updateEvent = notification.object as? TrackUpdateEvent else { return }
             
             Task { @MainActor in
-                self.metadataByTrackId[trackId] = nil
-                self.nowPlayingArtworkByTrackId[trackId] = nil
-                self.requestMetadataIfNeeded(for: trackId)
+                self.applyTrackUpdateEvent(updateEvent)
             }
         }
         
@@ -151,55 +149,54 @@ final class PlayerViewModel: ObservableObject {
         )
     }
     
-    // MARK: - Metadata
+    // MARK: - Snapshot
     
-    // Реализация метода чтения (контракт)
-    func metadata(for trackId: UUID)
-    -> TrackMetadataCacheManager.CachedMetadata?
-    {
-        metadataByTrackId[trackId]
+    // Реализация чтения runtime snapshot
+    /// Возвращает runtime snapshot трека по его идентификатору.
+    ///
+    /// - Parameter trackId: Идентификатор трека
+    /// - Returns: TrackRuntimeSnapshot или nil
+    func snapshot(for trackId: UUID) -> TrackRuntimeSnapshot? {
+        snapshotsByTrackId[trackId]
     }
     
-    // Реализация запроса загрузки (контракт)
-    func requestMetadataIfNeeded(for trackId: UUID) {
+    /// Запрашивает runtime snapshot трека, если он ещё не загружен.
+    ///
+    /// - Parameter trackId: Идентификатор трека
+    func requestSnapshotIfNeeded(for trackId: UUID) {
         
-        if metadataByTrackId[trackId] != nil { return }
+        if snapshotsByTrackId[trackId] != nil { return }
         
         Task {
-            // URL резолвим ОДИН раз
-            guard let url = await BookmarkResolver.url(forTrack: trackId) else { return }
+            // 1. Получаем snapshot из store или собираем через builder.
+            let snapshot: TrackRuntimeSnapshot?
             
-            // 1. Метаданные (title / artist / duration)
-            let meta = await TrackMetadataCacheManager.shared.loadMetadata(for: url)
-            
-            if let meta {
-                await MainActor.run {
-                    metadataByTrackId[trackId] = meta
-                    
-                    if let current = currentTrackDisplayable,
-                       current.id == trackId {
-                        self.updateMiniPlayerStaticState(for: current)
-                        playerManager.applyNowPlaying(
-                            snapshot: makeNowPlayingSnapshot(for: current)
-                        )
-                    }
-                }
+            if let storedSnapshot = TrackRuntimeStore.shared.snapshot(forTrackId: trackId) {
+                snapshot = storedSnapshot
+            } else {
+                snapshot = await TrackRuntimeSnapshotBuilder.shared.buildSnapshot(forTrackId: trackId)
             }
             
+            guard let snapshot else { return }
+            
             // 2. Большой artwork для Lock Screen / Control Center (512px)
-            // Берём СЫРЫЕ данные из кэша метаданных и строим CGImage через ImageDownsampler.
+            // Берём СЫРЫЕ данные из snapshot и строим CGImage через ImageDownsampler.
             let nowPlayingCGImage: CGImage? = {
-                guard let data = meta?.artworkData else { return nil }
+                guard let data = snapshot.artworkData else { return nil }
                 return makeThumbnail(from: data, maxPixel: ArtworkPurposeSizes.maxPixel(for: .nowPlaying))
             }()
             
             await MainActor.run {
+                // 3. Сохраняем snapshot локально для плеера.
+                snapshotsByTrackId[trackId] = snapshot
+                
                 if let nowPlayingCGImage {
                     nowPlayingArtworkByTrackId[trackId] = nowPlayingCGImage
                 }
                 
                 if let current = currentTrackDisplayable,
                    current.id == trackId {
+                    self.updateMiniPlayerStaticState(for: current)
                     playerManager.applyNowPlaying(
                         snapshot: makeNowPlayingSnapshot(for: current)
                     )
@@ -208,17 +205,45 @@ final class PlayerViewModel: ObservableObject {
         }
     }
     
+    /// Применяет единое событие обновления трека к состоянию плеера.
+    ///
+    /// - Parameter updateEvent: Событие обновления трека
+    private func applyTrackUpdateEvent(_ updateEvent: TrackUpdateEvent) {
+        
+        let trackId = updateEvent.trackId
+        
+        // 1. Обновляем локальный snapshot.
+        snapshotsByTrackId[trackId] = updateEvent.snapshot
+        
+        // 2. Сбрасываем старую now playing обложку.
+        nowPlayingArtworkByTrackId[trackId] = nil
+        
+        // 3. Пересобираем now playing artwork из нового snapshot.
+        if let data = updateEvent.snapshot.artworkData,
+           let cgImage = makeThumbnail(from: data, maxPixel: ArtworkPurposeSizes.maxPixel(for: .nowPlaying)) {
+            nowPlayingArtworkByTrackId[trackId] = cgImage
+        }
+        
+        // 4. Если обновился текущий трек — обновляем mini player и Now Playing.
+        if let current = currentTrackDisplayable,
+           current.id == trackId {
+            updateMiniPlayerStaticState(for: current)
+            playerManager.applyNowPlaying(
+                snapshot: makeNowPlayingSnapshot(for: current)
+            )
+        }
+    }
+    
     // MARK: - MiniPlayer State Updates
     
-    /// Пересобирает статическое состояние мини-плеера из текущего трека и кэша метаданных.
-    /// ВАЖНО: в Шаге 4 сюда добавим artwork через MiniPlayerStateBuilder.
+    /// Пересобирает статическое состояние мини-плеера из текущего трека и runtime snapshot.
     private func updateMiniPlayerStaticState(for track: any TrackDisplayable) {
         
-        let metadata = metadataByTrackId[track.id]
-        
+        let snapshot = snapshotsByTrackId[track.id]
+
         miniPlayerStaticState = MiniPlayerStateBuilder.buildStaticState(
             track: track,
-            metadata: metadata
+            snapshot: snapshot
         )
     }
     
@@ -253,7 +278,7 @@ final class PlayerViewModel: ObservableObject {
         currentTrackDisplayable = track
         currentTime = 0
         trackDuration = 0
-        requestMetadataIfNeeded(for: track.id)
+        requestSnapshotIfNeeded(for: track.id)
         
         updateMiniPlayerStaticState(for: track)
         updateMiniPlayerProgressState()

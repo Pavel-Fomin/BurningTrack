@@ -24,7 +24,7 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
     @Published var name: String = ""
     @Published var tracks: [Track] = []
     @Published var currentListId: UUID?
-    @Published private(set) var metadataByTrackId: [UUID: TrackMetadataCacheManager.CachedMetadata] = [:]
+    @Published private(set) var snapshotsByTrackId: [UUID: TrackRuntimeSnapshot] = [:] /// Runtime snapshot треков по id
 
     // MARK: - Init
     
@@ -34,15 +34,15 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
         self.tracks = trackList.tracks
         
         NotificationCenter.default.addObserver(
-            forName: .trackMetadataDidChange,
+            forName: .trackDidUpdate,
             object: nil,
             queue: .main
         ) { [weak self] notification in
             guard let self else { return }
-            guard let trackId = notification.object as? UUID else { return }
+            guard let updateEvent = notification.object as? TrackUpdateEvent else { return }
 
             Task { @MainActor in
-                self.reloadMetadata(for: trackId)
+                self.applyTrackUpdateEvent(updateEvent)
             }
         }
     }
@@ -73,36 +73,43 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
     }
     
     
-    // MARK: - Metadata
-    
-    // Реализация чтения metadata
-    func metadata(for trackId: UUID)
-        -> TrackMetadataCacheManager.CachedMetadata?
-    {
-        metadataByTrackId[trackId]
-    }
-    
-    // Реализация загрузки metadata
-    func requestMetadataIfNeeded(for trackId: UUID) {
+    // MARK: - Snapshot
 
-        if metadataByTrackId[trackId] != nil { return }
+    /// Возвращает runtime snapshot трека по его идентификатору.
+    /// - Parameter trackId: Идентификатор трека
+    /// - Returns: TrackRuntimeSnapshot или nil
+    func snapshot(for trackId: UUID) -> TrackRuntimeSnapshot? {
+        snapshotsByTrackId[trackId]
+    }
+
+    /// Запрашивает runtime snapshot трека, если он ещё не загружен.
+    /// - Parameter trackId: Идентификатор трека
+    func requestSnapshotIfNeeded(for trackId: UUID) {
+
+        if snapshotsByTrackId[trackId] != nil { return }
 
         Task {
-            guard
-                let url = await BookmarkResolver.url(forTrack: trackId),
-                let meta = await TrackMetadataCacheManager.shared
-                    .loadMetadata(for: url)
-            else { return }
+            let snapshot: TrackRuntimeSnapshot?
+
+            if let storedSnapshot = TrackRuntimeStore.shared.snapshot(forTrackId: trackId) {
+                snapshot = storedSnapshot
+            } else {
+                snapshot = await TrackRuntimeSnapshotBuilder.shared.buildSnapshot(forTrackId: trackId)
+            }
+
+            guard let snapshot else { return }
 
             await MainActor.run {
-                metadataByTrackId[trackId] = meta
+                snapshotsByTrackId[trackId] = snapshot
             }
         }
     }
-    
-    func reloadMetadata(for trackId: UUID) {
-        metadataByTrackId[trackId] = nil
-        requestMetadataIfNeeded(for: trackId)
+
+    /// Применяет единое событие обновления трека к состоянию треклиста.
+    ///
+    /// - Parameter updateEvent: Событие обновления трека
+    private func applyTrackUpdateEvent(_ updateEvent: TrackUpdateEvent) {
+        snapshotsByTrackId[updateEvent.trackId] = updateEvent.snapshot
     }
 
     // MARK: - Reorder

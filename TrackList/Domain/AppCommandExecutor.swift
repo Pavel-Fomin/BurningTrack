@@ -42,18 +42,23 @@ actor AppCommandExecutor {
         using playerManager: PlayerManager
     ) async throws {
         
-        // 1. Перемещение файла
+        // 1. Запоминаем старый URL до перемещения.
+        let previousURL = await BookmarkResolver.url(forTrack: trackId)
+        
+        // 2. Перемещение файла
         try await LibraryFileManager.shared.moveTrack(
             id: trackId,
             toFolder: folderId,
             using: playerManager
         )
         
-        // 2. Резолв URL (только для тоста)
-        guard let url = await BookmarkResolver.url(forTrack: trackId) else { return }
-        
-        // 3. Метаданные трека
-        let metadata = await TrackMetadataCacheManager.shared.loadMetadata(for: url)
+        // 3. Запускаем единый post-update pipeline.
+        let updateEvent = await TrackUpdateCoordinator.shared.handleTrackUpdate(
+            forTrackId: trackId,
+            reason: .fileMoved,
+            changedFields: [.fileName],
+            previousURL: previousURL
+        )
         
         // 4. Имя папки назначения (ЕДИНСТВЕННЫЙ валидный способ)
         let folderName = await TrackRegistry.shared
@@ -61,11 +66,13 @@ actor AppCommandExecutor {
             .first(where: { $0.id == folderId })?
             .name ?? "папку"
         
-        // 5. ToastEvent
+        // 5. ToastEvent строится из snapshot
+        let snapshot = updateEvent?.snapshot
+        
         let event = ToastEvent.trackMovedInLibrary(
-            title: metadata?.title ?? url.lastPathComponent,
-            artist: metadata?.artist ?? "",
-            artwork: metadata.flatMap {
+            title: snapshot?.title ?? snapshot?.fileName ?? "Трек",
+            artist: snapshot?.artist ?? "",
+            artwork: snapshot.flatMap {
                 ArtworkProvider.shared.image(
                     trackId: trackId,
                     artworkData: $0.artworkData,
@@ -83,21 +90,38 @@ actor AppCommandExecutor {
     
     
     // MARK: -  Переименовать файл
-    
+
     func renameTrack(
         trackId: UUID,
         to newFileName: String,
         using playerManager: PlayerManager
     ) async throws {
         
+        // 1. Запоминаем старый URL до переименования.
+        // Это нужно, чтобы после rename сбросить raw-cache и по старому пути.
+        let previousURL = await BookmarkResolver.url(forTrack: trackId)
+        
+        // 2. Переименовываем физический файл и обновляем реестры.
         try await LibraryFileManager.shared.renameTrack(
             id: trackId,
             to: newFileName,
             using: playerManager
         )
         
-        let event = ToastEvent.fileRenamed(newName: newFileName)
+        // 3. Запускаем единый post-update pipeline.
+        let updateEvent = await TrackUpdateCoordinator.shared.handleTrackUpdate(
+            forTrackId: trackId,
+            reason: .fileRenamed,
+            changedFields: [.fileName],
+            previousURL: previousURL
+        )
         
+        // 4. ToastEvent строится из готового snapshot единого контракта.
+        let event = ToastEvent.fileRenamed(
+            newName: updateEvent?.snapshot.fileName ?? newFileName
+        )
+        
+        // 5. Показ тоста.
         await MainActor.run {
             ToastManager.shared.handle(event)
         }
@@ -137,14 +161,14 @@ actor AppCommandExecutor {
         /// 4. Сохраняем обновлённый треклист
         TrackListManager.shared.saveTracks(list.tracks, for: list.id)
         
-        /// 5. Загружаем метаданные трека
-        let metadata = await TrackMetadataCacheManager.shared.loadMetadata(for: url)
+        /// 5. Получаем snapshot трека
+        let snapshot = await resolveSnapshot(for: trackId)
         
-        /// 6. ToastEvent
+        /// 6. ToastEvent строится из snapshot
         let event = ToastEvent.trackAddedToTrackList(
-            title: metadata?.title ?? imported.fileName,
-            artist: metadata?.artist ?? "",
-            artwork: metadata.flatMap {
+            title: snapshot?.title ?? imported.fileName,
+            artist: snapshot?.artist ?? "",
+            artwork: snapshot.flatMap {
                 ArtworkProvider.shared.image(
                     trackId: trackId,
                     artworkData: $0.artworkData,
@@ -237,17 +261,14 @@ actor AppCommandExecutor {
         /// 3. Сохраняем
         TrackListManager.shared.saveTracks(list.tracks, for: list.id)
         
-        /// 4. Резолв URL (ТОЛЬКО для тоста)
-        guard let url = await BookmarkResolver.url(forTrack: trackId) else { return }
+        /// 4. Получаем snapshot трека
+        let snapshot = await resolveSnapshot(for: trackId)
         
-        /// 5. Метаданные
-        let metadata = await TrackMetadataCacheManager.shared.loadMetadata(for: url)
-        
-        /// 6. ToastEvent
+        /// 5. ToastEvent строится из snapshot
         let event = ToastEvent.trackRemovedFromTrackList(
-            title: metadata?.title ?? url.lastPathComponent,
-            artist: metadata?.artist ?? "",
-            artwork: metadata.flatMap {
+            title: snapshot?.title ?? "Трек",
+            artist: snapshot?.artist ?? "",
+            artwork: snapshot.flatMap {
                 ArtworkProvider.shared.image(
                     trackId: trackId,
                     artworkData: $0.artworkData,
@@ -256,14 +277,14 @@ actor AppCommandExecutor {
             }
         )
         
-        /// 7. Показ тоста
-        await MainActor.run { ToastManager.shared.handle(event)
+        /// 6. Показ тоста
+        await MainActor.run {
+            ToastManager.shared.handle(event)
         }
     }
     
     // MARK: - Добавить в плеер
     
-    /// Добавляет трек в плеер
     func addTrackToPlayer(trackId: UUID) async throws {
         
         /// 1. Резолвим URL
@@ -275,16 +296,16 @@ actor AppCommandExecutor {
             )
         }
         
-        /// 2. Загружаем метаданные
-        let metadata = await TrackMetadataCacheManager.shared.loadMetadata(for: url)
+        /// 2. Получаем snapshot трека
+        let snapshot = await resolveSnapshot(for: trackId)
         
         /// 3. Формируем PlayerTrack
         let track = PlayerTrack(
             id: trackId,
-            title: metadata?.title,
-            artist: metadata?.artist,
-            duration: metadata?.duration ?? 0,
-            fileName: url.lastPathComponent,
+            title: snapshot?.title,
+            artist: snapshot?.artist,
+            duration: snapshot?.duration ?? 0,
+            fileName: snapshot?.fileName ?? url.lastPathComponent,
             isAvailable: true
         )
         
@@ -296,9 +317,9 @@ actor AppCommandExecutor {
         
         /// 5. ToastEvent
         let event = ToastEvent.trackAddedToPlayer(
-            title: metadata?.title ?? track.fileName,
-            artist: metadata?.artist ?? "",
-            artwork: metadata.flatMap {
+            title: snapshot?.title ?? track.fileName,
+            artist: snapshot?.artist ?? "",
+            artwork: snapshot.flatMap {
                 ArtworkProvider.shared.image(
                     trackId: trackId,
                     artworkData: $0.artworkData,
@@ -307,7 +328,8 @@ actor AppCommandExecutor {
             }
         )
         
-        await MainActor.run { ToastManager.shared.handle(event)
+        await MainActor.run {
+            ToastManager.shared.handle(event)
         }
     }
     
@@ -316,28 +338,20 @@ actor AppCommandExecutor {
     
     func removeTrackFromPlayer(trackId: UUID) async throws {
         
-        // 1. Резолв URL (только для тоста)
-        let url = await BookmarkResolver.url(forTrack: trackId)
+        // 1. Получаем snapshot трека (для тоста)
+        let snapshot = await resolveSnapshot(for: trackId)
         
-        // 2. Метаданные
-        let metadata: TrackMetadataCacheManager.CachedMetadata?
-        if let url {
-            metadata = await TrackMetadataCacheManager.shared.loadMetadata(for: url)
-        } else {
-            metadata = nil
-        }
-        
-        // 3. Мутация плеера — строго MainActor
+        // 2. Мутация плеера — строго MainActor
         await MainActor.run {
             PlaylistManager.shared.tracks.removeAll { $0.id == trackId }
             PlaylistManager.shared.saveToDisk()
         }
         
-        // 4. ToastEvent
+        // 3. ToastEvent строится из snapshot
         let event = ToastEvent.trackRemovedFromPlayer(
-            title: metadata?.title ?? url?.lastPathComponent ?? "Трек",
-            artist: metadata?.artist ?? "",
-            artwork: metadata.flatMap {
+            title: snapshot?.title ?? snapshot?.fileName ?? "Трек",
+            artist: snapshot?.artist ?? "",
+            artwork: snapshot.flatMap {
                 ArtworkProvider.shared.image(
                     trackId: trackId,
                     artworkData: $0.artworkData,
@@ -346,7 +360,7 @@ actor AppCommandExecutor {
             }
         )
         
-        // 5. Показ тоста
+        // 4. Показ тоста
         await MainActor.run {
             ToastManager.shared.handle(event)
         }
@@ -408,23 +422,29 @@ actor AppCommandExecutor {
         // 3. Запись тегов и обложки
         try await tagsWriter.writeTags(to: url, patch: finalPatch)
 
-        // 4. Инвалидация кэша метаданных
-        TrackMetadataCacheManager.shared.invalidate(url: url)
-        ArtworkProvider.shared.invalidate(trackId: trackId)
-
-        NotificationCenter.default.post(
-            name: .trackMetadataDidChange,
-            object: trackId
+        // 4. Единый post-update pipeline
+        let changedFields = changedFieldsForTagUpdate(
+            patch: finalPatch,
+            artworkAction: artworkAction
         )
 
-        // 5. Загрузка обновлённых метаданных (уже после инвалидции)
-        let metadata = await TrackMetadataCacheManager.shared.loadMetadata(for: url)
+        let updateReason: TrackUpdateReason = artworkAction == .none
+            ? .metadataUpdated
+            : .artworkUpdated
 
-        // 6. ToastEvent
+        let updateEvent = await TrackUpdateCoordinator.shared.handleTrackUpdate(
+            forTrackId: trackId,
+            reason: updateReason,
+            changedFields: changedFields
+        )
+
+        // 5. ToastEvent строится из готового snapshot единого контракта
+        let snapshot = updateEvent?.snapshot
+
         let event = ToastEvent.tagsUpdated(
-            title: metadata?.title ?? url.lastPathComponent,
-            artist: metadata?.artist ?? "",
-            artwork: metadata.flatMap {
+            title: snapshot?.title ?? url.lastPathComponent,
+            artist: snapshot?.artist ?? "",
+            artwork: snapshot.flatMap {
                 ArtworkProvider.shared.image(
                     trackId: trackId,
                     artworkData: $0.artworkData,
@@ -433,14 +453,14 @@ actor AppCommandExecutor {
             }
         )
 
-        // 7. Показ тоста
+        // 6. Показ тоста
         await MainActor.run {
             ToastManager.shared.handle(event)
         }
     }
 }
 
-// MARK: - Helper
+// MARK: - Helper's
 
 /// Определяет MIME-тип изображения по сигнатуре данных.
 /// Сейчас поддерживаем PNG и JPEG.
@@ -455,4 +475,50 @@ private func artworkMimeType(for data: Data) -> String {
     }
 
     return "image/jpeg"
+}
+
+// Собирает набор изменённых полей для события обновления тегов и обложки.
+///
+/// - Parameters:
+///   - patch: Финальный patch записи тегов
+///   - artworkAction: Действие с обложкой
+/// - Returns: Набор изменённых полей TrackRuntimeSnapshot
+private func changedFieldsForTagUpdate(
+    patch: TagWritePatch,
+    artworkAction: ArtworkWriteAction
+) -> Set<TrackChangedField> {
+    var changedFields: Set<TrackChangedField> = []
+
+    if patch.title != TagFieldChange<String>.unchanged { changedFields.insert(.title) }
+    if patch.artist != TagFieldChange<String>.unchanged { changedFields.insert(.artist) }
+    if patch.album != TagFieldChange<String>.unchanged { changedFields.insert(.album) }
+    if patch.publisher != TagFieldChange<String>.unchanged { changedFields.insert(.publisherOrLabel) }
+    if patch.genre != TagFieldChange<String>.unchanged { changedFields.insert(.genre) }
+    if patch.comment != TagFieldChange<String>.unchanged { changedFields.insert(.comment) }
+
+    if patch.year != TagFieldChange<Int>.unchanged { changedFields.insert(.year) }
+    if patch.trackNumber != TagFieldChange<Int>.unchanged { changedFields.insert(.trackNumber) }
+    if patch.bpm != TagFieldChange<Int>.unchanged { changedFields.insert(.bpm) }
+
+    if patch.duration != TagFieldChange<TimeInterval>.unchanged { changedFields.insert(.duration) }
+
+    if artworkAction != .none { changedFields.insert(.artworkData) }
+
+    return changedFields
+}
+
+/// Возвращает актуальный snapshot трека.
+/// Сначала пытается взять из runtime store, если нет — собирает через builder.
+///
+/// - Parameter trackId: Идентификатор трека
+/// - Returns: TrackRuntimeSnapshot или nil
+private func resolveSnapshot(for trackId: UUID) async -> TrackRuntimeSnapshot? {
+    
+    // 1. Пытаемся взять из store (быстро)
+    if let snapshot = TrackRuntimeStore.shared.snapshot(forTrackId: trackId) {
+        return snapshot
+    }
+    
+    // 2. Fallback: собираем snapshot напрямую
+    return await TrackRuntimeSnapshotBuilder.shared.buildSnapshot(forTrackId: trackId)
 }

@@ -9,76 +9,94 @@ import SwiftUI
 import UIKit
 
 struct PlayerTrackRowWrapper: View {
-    let track: any TrackDisplayable
-    let isCurrent: Bool
-    let isPlaying: Bool
-    let onTap: () -> Void
     
-    @ObservedObject var playerViewModel: PlayerViewModel
-    @EnvironmentObject var sheetManager: SheetManager
+    // MARK: - Input
     
-    // MARK: - Metadata
+    let track: any TrackDisplayable                      /// Трек строки
+    let isCurrent: Bool                                  /// Является ли строка текущим треком
+    let isPlaying: Bool                                  /// Воспроизводится ли текущий трек
+    let onTap: () -> Void                                /// Обработчик тапа по строке
     
-    /// Теги
-    private var metadata: TrackMetadataCacheManager.CachedMetadata? {
-        playerViewModel.metadata(for: track.id)
+    @ObservedObject var playerViewModel: PlayerViewModel /// ViewModel плеера
+    @EnvironmentObject var sheetManager: SheetManager    /// Менеджер шитов
+    
+    // MARK: - Snapshot
+    
+    /// Runtime snapshot трека
+    private var snapshot: TrackRuntimeSnapshot? {
+        playerViewModel.snapshot(for: track.id)
     }
-    /// Обложка
+    
+    /// Обложка трека
     private var artwork: UIImage? {
-        guard let data = metadata?.artworkData else { return nil }
+        guard let data = snapshot?.artworkData else { return nil }
 
         return ArtworkProvider.shared.image(
             trackId: track.id,
             artworkData: data,
-            purpose: .trackList)
+            purpose: .trackList
+        )
     }
     
     // MARK: - UI
     
     var body: some View {
-            TrackRowView(
-                track: track,
-                isCurrent: isCurrent,
-                isPlaying: isPlaying,
-                isHighlighted: sheetManager.highlightedTrackID == track.id,
-                artwork: artwork,
-                title: metadata?.title ?? track.title ?? track.fileName,
-                artist: metadata?.artist ?? track.artist ?? "",
-                duration: metadata?.duration ?? track.duration,
-                onRowTap: onTap,
-                onArtworkTap: { sheetManager.present(.trackDetail(track)) },
-                
-            )
-            .task(id: track.id) {
-                playerViewModel.requestMetadataIfNeeded(for: track.id)
+        TrackRowView(
+            track: track,
+            isCurrent: isCurrent,
+            isPlaying: isPlaying,
+            isHighlighted: sheetManager.highlightedTrackID == track.id,
+            artwork: artwork,
+            title: snapshot?.title ?? track.title ?? track.fileName,
+            artist: snapshot?.artist ?? track.artist ?? "",
+            duration: snapshot?.duration ?? track.duration,
+            onRowTap: onTap,
+            onArtworkTap: {
+                sheetManager.present(.trackDetail(track))
+            }
+        )
+        .task(id: track.id) {
+            playerViewModel.requestSnapshotIfNeeded(for: track.id)
+        }
+
+        // MARK: - Свайпы плеера
+
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+
+            /// Удалить
+            Button(role: .destructive) {
+                Task {
+                    try await AppCommandExecutor.shared.removeTrackFromPlayer(
+                        trackId: track.id
+                    )
+                }
+            } label: {
+                Label("Удалить", systemImage: "trash")
             }
 
-            // MARK: - Свайпы плеера
-
-            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-
-                /// Удалить
-                Button(role: .destructive) {
-                    Task {
-                        try await AppCommandExecutor.shared.removeTrackFromPlayer( trackId: track.id ) }
-                } label: { Label("Удалить", systemImage: "trash")
-}
-
-                /// Показать в фонотеке
-                Button {
-                    SheetActionCoordinator.shared.handle(
-                        action: .showInLibrary,
-                        track: track,
-                        context: .player)
-                } label: { Label("Показать", systemImage: "scope") } .tint(.gray)
-
-                /// Переместить
-                Button {
-                    SheetActionCoordinator.shared.handle(
-                        action: .moveToFolder,
-                        track: track,
-                        context: .player)
-                } label: { Label("Переместить", systemImage: "arrow.right.doc.on.clipboard") } .tint(.blue)
+            /// Показать в фонотеке
+            Button {
+                SheetActionCoordinator.shared.handle(
+                    action: .showInLibrary,
+                    track: track,
+                    context: .player
+                )
+            } label: {
+                Label("Показать", systemImage: "scope")
             }
+            .tint(.gray)
+
+            /// Переместить
+            Button {
+                SheetActionCoordinator.shared.handle(
+                    action: .moveToFolder,
+                    track: track,
+                    context: .player
+                )
+            } label: {
+                Label("Переместить", systemImage: "arrow.right.doc.on.clipboard")
+            }
+            .tint(.blue)
         }
     }
+}

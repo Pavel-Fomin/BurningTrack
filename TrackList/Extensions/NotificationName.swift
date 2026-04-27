@@ -17,7 +17,7 @@ extension Notification.Name {
     static let trackListsDidChange = Notification.Name("trackListsDidChange")       /// Любое изменение списка треклистов (создание/удаление/переименование)
     static let clearTrackList = Notification.Name("clearTrackList")                 /// Очистка текущего треклиста
     static let trackListDidRename = Notification.Name("trackListDidRename")         /// Треклист был переименован
-    static let trackMetadataDidChange = Notification.Name("trackMetadataDidChange") /// Обновились метаданные трека (теги/обложка/переименование)
+    static let trackDidUpdate = Notification.Name("trackDidUpdate")                 /// Единое событие обновления трека с payload TrackUpdateEvent
     
     // MARK: - Library
     
@@ -29,5 +29,3 @@ extension Notification.Name {
     static let trackDidFinish = Notification.Name("trackDidFinish")              /// Трек доиграл до конца (AVPlayerItem → PlayerManager → PlayerViewModel)
     static let trackDurationUpdated = Notification.Name("trackDurationUpdated")  /// Обновилась длительность текущего трека
 }
-
-

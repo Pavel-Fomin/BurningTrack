@@ -11,13 +11,9 @@ import Foundation
 @MainActor
 protocol TrackMetadataProviding: AnyObject {
 
-    /// Возвращает загруженные metadata для трека (если есть)
-    func metadata(for trackId: UUID)
-        -> TrackMetadataCacheManager.CachedMetadata?
+    /// Возвращает runtime snapshot трека (если уже есть)
+    func snapshot(for trackId: UUID) -> TrackRuntimeSnapshot?
 
-    /// Запрашивает загрузку metadata, если она ещё не выполнена
-    func requestMetadataIfNeeded(for trackId: UUID)
-    
-    /// Принудительно перезагружает metadata (используется после редактирования тегов)
-    func reloadMetadata(for trackId: UUID)
+    /// Запрашивает загрузку snapshot, если он ещё не получен
+    func requestSnapshotIfNeeded(for trackId: UUID)
 }

@@ -136,6 +136,12 @@ struct TrackDetailContainer: View {
         } message: {
             Text("Выберите другое имя файла.")
         }
+        .onReceive(NotificationCenter.default.publisher(for: .trackDidUpdate)) { notification in
+            guard let updateEvent = notification.object as? TrackUpdateEvent else { return }
+            guard updateEvent.trackId == track.id else { return }
+
+            applySnapshotToSheetState(updateEvent.snapshot)
+        }
     }
     
     // MARK: - Edit flow
@@ -190,10 +196,11 @@ struct TrackDetailContainer: View {
                     )
                 }
 
-                await reloadSheetMetadataFromFile()
-
                 await MainActor.run {
-                    initialArtworkEditState = artworkEditState
+                    if let snapshot = TrackRuntimeStore.shared.snapshot(forTrackId: track.id) {
+                        applySnapshotToSheetState(snapshot)
+                    }
+
                     mode = .view
                 }
 
@@ -312,6 +319,56 @@ struct TrackDetailContainer: View {
     }
     
     // MARK: - Helpers
+
+    /// Применяет каноничный runtime snapshot к состоянию sheet.
+    ///
+    /// Используется после сохранения и при получении TrackUpdateEvent.
+    /// Не читает файл напрямую и не обращается к TagLib.
+    ///
+    /// - Parameter snapshot: Актуальный runtime snapshot трека
+    private func applySnapshotToSheetState(_ snapshot: TrackRuntimeSnapshot) {
+        
+        // Имя файла храним в поле редактирования без расширения.
+        let fileNameWithoutExtension = makeFileNameWithoutExtension(snapshot.fileName)
+        
+        // Основные редактируемые поля sheet.
+        let newValues: [EditableTrackField: String] = [
+            .title: snapshot.title ?? "",
+            .artist: snapshot.artist ?? "",
+            .album: snapshot.album ?? "",
+            .genre: snapshot.genre ?? "",
+            .year: snapshot.year.map(String.init) ?? "",
+            .publisher: snapshot.publisherOrLabel ?? "",
+            .comment: snapshot.comment ?? ""
+        ]
+        
+        // Обложку строим из artworkData внутри snapshot.
+        let image = ArtworkProvider.shared.image(
+            trackId: track.id,
+            artworkData: snapshot.artworkData,
+            purpose: .trackInfoSheet
+        )
+        
+        editedFileName = fileNameWithoutExtension
+        initialFileName = fileNameWithoutExtension
+        initialFullFileName = snapshot.fileName
+        initialFileExtension = (snapshot.fileName as NSString).pathExtension
+        
+        editedValues = newValues
+        initialValues = newValues
+        
+        artworkUIImage = image
+        artworkEditState = ArtworkEditState(hadOriginalArtwork: image != nil)
+        initialArtworkEditState = artworkEditState
+    }
+
+    /// Возвращает имя файла без расширения.
+    ///
+    /// - Parameter fileName: Полное имя файла
+    /// - Returns: Имя файла без расширения
+    private func makeFileNameWithoutExtension(_ fileName: String) -> String {
+        (fileName as NSString).deletingPathExtension
+    }
     
     private func trimmed(_ value: String) -> String {
         value.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -334,39 +391,5 @@ struct TrackDetailContainer: View {
         }
 
         return "\(name).\(ext)"
-    }
-    
-    // MARK: - Reload from TagLib
-
-    private func reloadSheetMetadataFromFile() async {
-        guard let url = await BookmarkResolver.url(forTrack: track.id) else { return }
-        guard let metadata = TrackTagInspector.shared.readMetadata(from: url) else { return }
-
-        let newValues: [EditableTrackField: String] = [
-            .title: metadata.title ?? "",
-            .artist: metadata.artist ?? "",
-            .album: metadata.album ?? "",
-            .genre: metadata.genre ?? "",
-            .year: metadata.year.map(String.init) ?? "",
-            .publisher: metadata.publisherOrLabel ?? "",
-            .comment: metadata.comment ?? ""
-        ]
-
-        let tagFile = TLTagLibFile(fileURL: url)
-        let parsed = tagFile.readMetadata()
-
-        let image = ArtworkProvider.shared.image(
-            trackId: track.id,
-            artworkData: parsed?.artworkData,
-            purpose: .trackInfoSheet
-        )
-
-        await MainActor.run {
-            editedValues = newValues
-            initialValues = newValues
-            artworkUIImage = image
-            artworkEditState = ArtworkEditState(hadOriginalArtwork: image != nil)
-            initialArtworkEditState = artworkEditState
-        }
     }
 }

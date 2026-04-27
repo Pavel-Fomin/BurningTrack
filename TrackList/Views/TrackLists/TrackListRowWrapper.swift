@@ -11,28 +11,36 @@ import Foundation
 @MainActor
 struct TrackListRowWrapper: View {
 
-    let track: Track
-    let index: Int
-    let tracksContext: [Track]
+    // MARK: - Input
 
-    let metadataProvider: TrackMetadataProviding
+    let track: Track                                  /// Трек строки
+    let index: Int                                    /// Индекс строки в треклисте
+    let tracksContext: [Track]                        /// Контекст всех треков треклиста
 
-    let playerViewModel: PlayerViewModel
-    let onTap: (Track) -> Void
-    let onDelete: (IndexSet) -> Void
+    let metadataProvider: TrackMetadataProviding      /// Провайдер runtime snapshot
+
+    let playerViewModel: PlayerViewModel              /// ViewModel плеера
+    let onTap: (Track) -> Void                        /// Обработчик тапа по строке
+    let onDelete: (IndexSet) -> Void                  /// Обработчик удаления строки
     
-    @EnvironmentObject var sheetManager: SheetManager
+    @EnvironmentObject var sheetManager: SheetManager /// Менеджер шитов
 
+    // MARK: - Snapshot
+
+    /// Runtime snapshot трека
+    private var snapshot: TrackRuntimeSnapshot? {
+        metadataProvider.snapshot(for: track.id)
+    }
+
+    /// Трек для отображения с данными из snapshot
     private var displayTrack: Track {
-        let meta = metadataProvider.metadata(for: track.id)
-
-        return Track(
+        Track(
             id: track.id,
-            title: meta?.title ?? track.title,
-            artist: meta?.artist ?? track.artist,
-            duration: meta?.duration ?? track.duration,
-            fileName: track.fileName,
-            isAvailable: track.isAvailable
+            title: snapshot?.title ?? track.title,
+            artist: snapshot?.artist ?? track.artist,
+            duration: snapshot?.duration ?? track.duration,
+            fileName: snapshot?.fileName ?? track.fileName,
+            isAvailable: snapshot?.isAvailable ?? track.isAvailable
         )
     }
 
@@ -48,17 +56,17 @@ struct TrackListRowWrapper: View {
             isPlaying: isPlaying,
             onTap: { onTap(track) },
             onDelete: { onDelete(IndexSet(integer: index)) },
-            onArtworkTap: {sheetManager.present(.trackDetail(track))},
+            onArtworkTap: { sheetManager.present(.trackDetail(track)) },
             metadataProvider: metadataProvider
         )
         .task(id: track.id) {
-            metadataProvider.requestMetadataIfNeeded(for: track.id)
+            metadataProvider.requestSnapshotIfNeeded(for: track.id)
         }
 
         // Свайпы треклиста
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
 
-            /// Локальное дейдалить из треклиста
+            /// Локальное действие — удалить из треклиста
             Button(role: .destructive) {
                 onDelete(IndexSet(integer: index))
             } label: {

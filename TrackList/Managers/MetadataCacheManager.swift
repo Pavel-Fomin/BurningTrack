@@ -2,7 +2,8 @@
 //  MetadataCacheManager.swift
 //  TrackList
 //
-//  Оптимизированный кэш метаданных с NSCache и защитой доступа
+//  Технический runtime-кэш сырых метаданных с NSCache и защитой доступа.
+//  Используется как внутренний слой чтения для сборки TrackRuntimeSnapshot.
 //
 //  Created by Pavel Fomin on 02.08.2025.
 //
@@ -25,14 +26,19 @@ final class TrackMetadataCacheManager: ObservableObject, @unchecked Sendable {
     
     // MARK: -  Быстрый доступ к кэшу без запуска парсинга
     
+    /// Возвращает сырые метаданные из технического кэша без чтения файла.
+    ///
+    /// Важно:
+    /// - не является источником истины для UI
+    /// - используется только как быстрый доступ к уже загруженным данным
     func loadMetadataFromCache(url: URL) -> CachedMetadata? {
         cache.object(forKey: url as NSURL)
     }
     
     // MARK: - Инвалидация кэша
 
-    /// Удаляет метаданные трека из кэша.
-    /// Используется после изменения тегов или переименования файла.
+    /// Удаляет метаданные трека из технического кэша.
+    /// Используется после изменения тегов, обложки или переименования файла.
     func invalidate(url: URL) {
         let nsurl = url as NSURL
         cache.removeObject(forKey: nsurl)
@@ -57,7 +63,11 @@ final class TrackMetadataCacheManager: ObservableObject, @unchecked Sendable {
     
     // MARK: - Загрузка тегов
     
-    /// Загружает и кэширует метаданные (теги и обложку)
+    /// Загружает и кэширует сырые runtime-метаданные файла.
+    ///
+    /// Важно:
+    /// - этот метод не является UI-контрактом
+    /// - каноничная модель для экранов собирается отдельно в TrackRuntimeSnapshot
     func loadMetadata(for url: URL, includeArtwork: Bool = true) async -> CachedMetadata? {
         let nsurl = url as NSURL
         
@@ -80,15 +90,18 @@ final class TrackMetadataCacheManager: ObservableObject, @unchecked Sendable {
         includeArtwork: Bool
     ) -> CachedMetadata {
         
+        // Обложка сохраняется в технический кэш только если она была запрошена.
+        let cachedArtworkData = includeArtwork ? metadata.artworkData : nil
+        
         let cached = CachedMetadata(
             title: metadata.title,
             artist: metadata.artist,
             duration: metadata.duration,
-            artworkData: includeArtwork ? metadata.artworkData : nil
+            artworkData: cachedArtworkData
         )
         
-        // Стоимость считаем по размеру данных, если они есть
-        let cost = metadata.artworkData?.count ?? 1
+        // Стоимость считаем по размеру реально сохранённых данных, если они есть
+        let cost = cachedArtworkData?.count ?? 1
         cache.setObject(cached, forKey: nsurl, cost: cost)
         
         return cached
@@ -104,10 +117,10 @@ final class TrackMetadataCacheManager: ObservableObject, @unchecked Sendable {
         let duration: Double? /// Длительность
         
         /// Сырые данные обложки (JPEG / PNG и т.п.)
-        /// - единственный источник истины для обложки
+        /// - технический raw-cache, а не главный источник истины для UI
         /// - не декодируется здесь
         /// - не даунсемплится здесь
-        /// - используется ArtworkProvider'ом
+        /// - используется при сборке TrackRuntimeSnapshot и ArtworkProvider'ом
         let artworkData: Data?
         
         init(

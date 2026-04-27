@@ -17,66 +17,37 @@ struct TagWritePatch: Sendable, Equatable {
 
     // MARK: - Основные текстовые теги
 
-    /// Исполнитель
-    var artist: TagFieldChange<String> = .unchanged
-
-    /// Название трека
-    var title: TagFieldChange<String> = .unchanged
-
-    /// Альбом
-    var album: TagFieldChange<String> = .unchanged
-
-    /// Издатель / лейбл
-    var publisher: TagFieldChange<String> = .unchanged
-
-    /// Жанр
-    var genre: TagFieldChange<String> = .unchanged
-
-    /// Комментарий
-    var comment: TagFieldChange<String> = .unchanged
+    var artist: TagFieldChange<String> = .unchanged     /// Исполнитель
+    var title: TagFieldChange<String> = .unchanged      /// Название трека
+    var album: TagFieldChange<String> = .unchanged      /// Альбом
+    var publisher: TagFieldChange<String> = .unchanged  /// Издатель / лейбл
+    var genre: TagFieldChange<String> = .unchanged      /// Жанр
+    var comment: TagFieldChange<String> = .unchanged    /// Комментарий
 
     // MARK: - Числовые теги
 
     /// Год выпуска
-    var year: TagFieldChange<Int> = .unchanged
-
-    /// Номер трека
-    var trackNumber: TagFieldChange<Int> = .unchanged
-
-    /// BPM (удары в минуту)
-    var bpm: TagFieldChange<Int> = .unchanged
-
-    /// Время / длительность
-    /// По умолчанию считается вычисляемым,
-    /// но предусмотрено для форматов, где тег поддерживается.
-    var duration: TagFieldChange<TimeInterval> = .unchanged
+    var year: TagFieldChange<Int> = .unchanged                /// Год выпуска
+    var trackNumber: TagFieldChange<Int> = .unchanged         /// Номер трека
+    var bpm: TagFieldChange<Int> = .unchanged                 /// BPM (удары в минуту)
+    var duration: TagFieldChange<TimeInterval> = .unchanged   /// Длительность. По умолчанию вычесляемое, но предусмотрено для форматов, где тег поддерживается.
 
     // MARK: - Обложка
 
-    /// Патч для обложки:
-    /// - nil → не трогаем
-    /// - remove → удалить
-    /// - set → заменить
-    var artwork: ArtworkPatch? = nil
+    var artwork: ArtworkPatch? = nil  /// Патч для обложки: nil → не трогаем, remove → удалить, set → заменить
 
 }
 
-/// Операции над обложкой трека
-
+// Операции над обложкой трека
 enum ArtworkPatch: Sendable, Equatable {
 
-    /// Удалить существующую обложку
-    case remove
-    /// Установить новую обложку без преобразований
-
-    case set(
+    case remove           /// Удалить существующую обложку
+    case set(             /// Установить новую обложку без преобразований
         data: Data,
         mime: String?
     )
 
-    /// Установить новую обложку с предварительным сжатием
-    /// Сжатие выполняется write-реализацией (не здесь).
-    /// Patch описывает намерение, а не алгоритм.
+    /// Установить новую обложку с предварительным сжатием. Сжатие выполняется write-реализацией (не здесь). Patch описывает намерение, а не алгоритм.
     case setCompressed(
         data: Data,
         mime: String?,

@@ -5,7 +5,7 @@
 //  Builder состояния мини-плеера.
 //
 //  Роль:
-//  - собирает MiniPlayerStaticState из трека и метаданных
+//  - собирает MiniPlayerStaticState из трека и каноничного runtime snapshot
 //  - формирует title / artist
 //  - создаёт artwork UIImage для мини-плеера
 //
@@ -23,19 +23,24 @@ final class MiniPlayerStateBuilder {
 
     static func buildStaticState(
         track: any TrackDisplayable,
-        metadata: TrackMetadataCacheManager.CachedMetadata?
+        snapshot: TrackRuntimeSnapshot?
     ) -> MiniPlayerStaticState {
 
-        let title = (metadata?.title?.isEmpty == false)
-        ? (metadata?.title ?? "")
+        // Название берём из snapshot, если оно есть.
+        // Если в тегах пусто — показываем имя файла.
+        let title = (snapshot?.title?.isEmpty == false)
+        ? (snapshot?.title ?? "")
         : track.fileName
 
-        let artist = (metadata?.artist?.isEmpty == false)
-        ? (metadata?.artist ?? "")
+        // Исполнителя берём из snapshot, если он есть.
+        // Если в тегах пусто — показываем fallback.
+        let artist = (snapshot?.artist?.isEmpty == false)
+        ? (snapshot?.artist ?? "")
         : "Неизвестный артист"
 
+        // Обложку строим из artworkData внутри snapshot.
         let artwork: UIImage? = {
-            guard let data = metadata?.artworkData else { return nil }
+            guard let data = snapshot?.artworkData else { return nil }
 
             return ArtworkProvider.shared.image(
                 trackId: track.id,

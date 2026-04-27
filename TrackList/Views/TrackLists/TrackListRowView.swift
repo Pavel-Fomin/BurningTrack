@@ -16,22 +16,28 @@ import SwiftUI
 import UIKit
 
 struct TrackListRowView: View {
-    let track: Track
-    let isCurrent: Bool
-    let isPlaying: Bool
-    let onTap: () -> Void     /// Тап по строке (воспроизведение / пауза)
-    let onDelete: () -> Void  /// Удаление строки (локальное действие)
-    let onArtworkTap: () -> Void
-    let metadataProvider: TrackMetadataProviding
+    
+    // MARK: - Input
+    
+    let track: Track                             /// Трек строки
+    let isCurrent: Bool                          /// Является ли строка текущим треком
+    let isPlaying: Bool                          /// Воспроизводится ли текущий трек
+    let onTap: () -> Void                        /// Тап по строке (воспроизведение / пауза)
+    let onDelete: () -> Void                     /// Удаление строки (локальное действие)
+    let onArtworkTap: () -> Void                 /// Тап по обложке
+    let metadataProvider: TrackMetadataProviding /// Провайдер runtime snapshot
     
     
-    // MARK: - Metadata
+    // MARK: - Snapshot
     
-    /// Обложка
+    // Runtime snapshot трека
+    private var snapshot: TrackRuntimeSnapshot? {
+        metadataProvider.snapshot(for: track.id)
+    }
+    
+    // Обложка
     private var artwork: UIImage? {
-        guard let meta = metadataProvider.metadata(for: track.id),
-              let data = meta.artworkData
-        else { return nil }
+        guard let data = snapshot?.artworkData else { return nil }
 
         return ArtworkProvider.shared.image(
             trackId: track.id,
@@ -48,13 +54,13 @@ struct TrackListRowView: View {
             track: track,
             isCurrent: isCurrent,
             isPlaying: isPlaying,
-            isHighlighted: false,                   /// Подсветка управляется wrapper'ом
+            isHighlighted: false,                                    /// Подсветка управляется wrapper'ом
             artwork: artwork,
-            title: track.title ?? track.fileName,
-            artist: track.artist ?? "",
-            duration: track.duration,
-            onRowTap: onTap,                       /// Правая зона — воспроизведение / пауза
-            onArtworkTap: onArtworkTap                     /// Левая зона — делегируется выше (wrapper решает, что делать)
+            title: snapshot?.title ?? track.title ?? track.fileName,
+            artist: snapshot?.artist ?? track.artist ?? "",
+            duration: snapshot?.duration ?? track.duration,
+            onRowTap: onTap,                                       /// Правая зона — воспроизведение / пауза
+            onArtworkTap: onArtworkTap                             /// Левая зона — делегируется выше (wrapper решает, что делать)
         )
         
         .padding(.vertical, 4)

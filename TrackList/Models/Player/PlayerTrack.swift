@@ -3,8 +3,10 @@
 //  TrackList
 //
 //  Модель трека для Плеера
-//  Runtime + Codable
-//  Сохраняется в player.json
+//  Runtime display-модель.
+//  Codable сохранён для совместимости, но источником runtime-метаданных является TrackRuntimeSnapshot.
+//  Runtime-модель строки плеера.
+//  В player.json сохраняются только trackId.
 //  URL определяется через TrackRegistry по trackId
 //
 //  Created by Pavel Fomin on 07.08.2025.

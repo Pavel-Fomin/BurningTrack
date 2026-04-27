@@ -10,7 +10,6 @@
 
 import Foundation
 import AVFoundation
-import UIKit
 
 
 // MARK: - Модель для хранения распарсенных метаданных трека
