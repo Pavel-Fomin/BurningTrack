@@ -8,12 +8,19 @@
 //  - Умеет переключать вкладки через ScenePhaseHandler
 //  - Принимает событие "показать трек во фонотеке" (showTrackInLibrary)
 //    и отдаёт его на потребление через consumePendingShowTrackId()
+//  - Хранит одноразовый reveal intent отдельно от маршрута папки
 //
 //  Created by Pavel Fomin on 16.10.2025.
 //
 
 import SwiftUI
 import Foundation
+
+struct LibraryRevealRequest: Equatable {
+    let folderId: UUID
+    let targetTrackId: UUID
+    let requestId: UUID
+}
 
 @MainActor
 final class NavigationCoordinator: ObservableObject {
@@ -30,6 +37,9 @@ final class NavigationCoordinator: ObservableObject {
 
     /// Отложенное событие "показать трек во фонотеке".
     private var pendingShowTrackId: UUID? = nil
+
+    /// Одноразовый intent подсветки трека внутри открытой папки.
+    @Published private(set) var pendingRevealRequest: LibraryRevealRequest?
 
     private init() {}
 
@@ -59,8 +69,8 @@ final class NavigationCoordinator: ObservableObject {
     }
 
     /// Открытие папки ИЗ КОРНЯ (заменяет весь стек).
-    func openFolder(_ id: UUID) {
-        libraryPath = [.folder(id)]
+    func openFolder(_ folderId: UUID) {
+        libraryPath = [.folder(folderId)]
     }
 
     /// Переход внутрь папки (вложенный уровень).
@@ -84,6 +94,19 @@ final class NavigationCoordinator: ObservableObject {
     func consumePendingShowTrackId() -> UUID? {
         defer { pendingShowTrackId = nil }
         return pendingShowTrackId
+    }
+
+    func setPendingRevealRequest(folderId: UUID, targetTrackId: UUID) {
+        pendingRevealRequest = LibraryRevealRequest(
+            folderId: folderId,
+            targetTrackId: targetTrackId,
+            requestId: UUID()
+        )
+    }
+
+    func clearRevealRequest(requestId: UUID) {
+        guard pendingRevealRequest?.requestId == requestId else { return }
+        pendingRevealRequest = nil
     }
 
     // MARK: - Маршруты

@@ -13,6 +13,8 @@ import SwiftUI
 struct LibraryTracksView: View {
 
     let folder: LibraryFolder
+    let revealRequest: LibraryRevealRequest?
+    let onRevealHandled: (UUID) -> Void
     let trackListViewModel: TrackListViewModel
 
     let playerViewModel: PlayerViewModel
@@ -24,6 +26,8 @@ struct LibraryTracksView: View {
     
     @State private var scrollTargetID: UUID?
     @State private var revealedTrackID: UUID?
+    @State private var revealedRequestId: UUID?
+    @State private var pendingRevealRequest: LibraryRevealRequest?
     @State private var isSelecting = false
     @State private var selection = Set<UUID>()
     
@@ -31,12 +35,17 @@ struct LibraryTracksView: View {
     
     init(
         folder: LibraryFolder,
+        revealRequest: LibraryRevealRequest? = nil,
+        onRevealHandled: @escaping (UUID) -> Void = { _ in },
         trackListViewModel: TrackListViewModel,
         playerViewModel: PlayerViewModel
     ) {
         self.folder = folder
+        self.revealRequest = revealRequest
+        self.onRevealHandled = onRevealHandled
         self.trackListViewModel = trackListViewModel
         self.playerViewModel = playerViewModel
+        self._pendingRevealRequest = State(initialValue: revealRequest)
         self._tracksViewModel = StateObject(
             wrappedValue: LibraryTracksViewModel(folderURL: folder.url)
         )
@@ -76,6 +85,9 @@ struct LibraryTracksView: View {
                     }
                     scrollTargetID = nil
                 }
+                .onChange(of: tracksViewModel.trackSections) { _, _ in
+                    revealTrackIfNeeded()
+                }
             }
 
             // Скелетон / лоадер
@@ -110,6 +122,11 @@ struct LibraryTracksView: View {
         }
         .task {
             await tracksViewModel.loadTracksIfNeeded()
+            revealTrackIfNeeded()
+        }
+        .onChange(of: revealRequest?.requestId) { _, _ in
+            pendingRevealRequest = revealRequest
+            revealTrackIfNeeded()
         }
         .onChange(of: sheetManager.dismissCounter) { _, _ in
             Task {
@@ -121,11 +138,41 @@ struct LibraryTracksView: View {
 
     // MARK: - Вспомогательное
 
-    /// Проверяем, есть ли трек с данным id в текущих секциях
-    private func containsTrack(with id: UUID, in sections: [TrackSection]) -> Bool {
-        for section in sections {
-            if section.tracks.contains(where: { $0.id == id }) { return true }
+    /// Проверяем, есть ли трек с данным id в текущих секциях.
+    private func containsTrack(id: UUID) -> Bool {
+        tracksViewModel.trackSections.contains { section in
+            section.tracks.contains { $0.id == id }
         }
-        return false
+    }
+
+    /// Показываем целевой трек только после появления строки в списке.
+    private func revealTrackIfNeeded() {
+        guard let request = pendingRevealRequest else { return }
+        let targetTrackId = request.targetTrackId
+        let revealRequestId = request.requestId
+
+        guard containsTrack(id: targetTrackId) else {
+            guard tracksViewModel.didLoad && !tracksViewModel.isLoading else { return }
+            pendingRevealRequest = nil
+            onRevealHandled(revealRequestId)
+            return
+        }
+
+        pendingRevealRequest = nil
+        revealedTrackID = targetTrackId
+        revealedRequestId = revealRequestId
+
+        Task { @MainActor in
+            // Даём List один проход на создание строки перед scrollTo.
+            await Task.yield()
+            scrollTargetID = targetTrackId
+            onRevealHandled(revealRequestId)
+
+            try? await Task.sleep(nanoseconds: 1_200_000_000)
+            if revealedTrackID == targetTrackId && revealedRequestId == revealRequestId {
+                revealedTrackID = nil
+                revealedRequestId = nil
+            }
+        }
     }
 }

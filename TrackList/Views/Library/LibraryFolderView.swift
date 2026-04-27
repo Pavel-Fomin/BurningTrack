@@ -20,6 +20,8 @@ struct LibraryFolderView: View {
 
     // MARK: - Входные данные
 
+    let revealRequest: LibraryRevealRequest?
+    let onRevealHandled: (UUID) -> Void
     let trackListViewModel: TrackListViewModel
     let playerViewModel: PlayerViewModel
 
@@ -43,6 +45,8 @@ struct LibraryFolderView: View {
             case .tracks:
                 LibraryTracksView(
                     folder: viewModel.folder,
+                    revealRequest: revealRequest,
+                    onRevealHandled: onRevealHandled,
                     trackListViewModel: trackListViewModel,
                     playerViewModel: playerViewModel
                 

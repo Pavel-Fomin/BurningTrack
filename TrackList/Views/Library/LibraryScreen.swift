@@ -86,6 +86,10 @@ struct LibraryScreen: View {
             if let folder = musicLibraryManager.folder(for: folderId) {
                 LibraryFolderContainer(
                     folder: folder,
+                    revealRequest: revealRequest(for: folderId),
+                    onRevealHandled: { requestId in
+                        nav.clearRevealRequest(requestId: requestId)
+                    },
                     trackListViewModel: trackListViewModel,
                     playerViewModel: playerViewModel
                 )
@@ -114,7 +118,13 @@ struct LibraryScreen: View {
                 return
             }
 
+            nav.setPendingRevealRequest(folderId: folderId, targetTrackId: trackId)
             nav.openFolder(folderId)
         }
+    }
+
+    private func revealRequest(for folderId: UUID) -> LibraryRevealRequest? {
+        guard nav.pendingRevealRequest?.folderId == folderId else { return nil }
+        return nav.pendingRevealRequest
     }
 }
