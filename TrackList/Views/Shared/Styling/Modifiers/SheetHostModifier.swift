@@ -66,6 +66,16 @@ struct SheetHostModifier: ViewModifier {
             case .addToTrackList(let data):
                 AddToTrackListContainer(data: data)
                     .appSheet(detents: [.fraction(0.6), .medium])
+
+                /// Выбор треков для нового треклиста
+            case .newTrackListSelection(let data):
+                NewTrackListSelectionContainer(data: data)
+                    .appSheet(detents: [.large])
+
+                /// Создание нового треклиста
+            case .createTrackList:
+                CreateTrackListContainer()
+                    .appSheet(detents: [.height(284)])
             }
         }
     }

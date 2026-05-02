@@ -64,6 +64,10 @@ final class TrackListManager {
 
         do {
             try data.write(to: url, options: .atomic)
+            NotificationCenter.default.post(
+                name: .trackListTracksDidChange,
+                object: id
+            )
             PersistentLogger.log("💾 TrackListManager: saved tracks=\(tracks.count) id=\(id)")
         } catch {
             PersistentLogger.log("❌ TrackListManager: write failed id=\(id) error=\(error)")

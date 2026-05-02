@@ -14,24 +14,28 @@
 
 import SwiftUI
 
-struct ScreenToolbarModifier<Leading: View>: ViewModifier {
+struct ScreenToolbarModifier<Leading: View, Trailing: View>: ViewModifier {
 
     let title: String
     let subtitle: String?
     let isTitleSecondary: Bool
     let leading: () -> Leading
+    let trailing: () -> Trailing
 
     init(
         title: String,
         subtitle: String? = nil,
         isTitleSecondary: Bool = false,
-        @ViewBuilder leading: @escaping () -> Leading
+        @ViewBuilder leading: @escaping () -> Leading,
+        @ViewBuilder trailing: @escaping () -> Trailing
     ) {
         self.title = title
         self.subtitle = subtitle
         self.isTitleSecondary = isTitleSecondary
         self.leading = leading
+        self.trailing = trailing
     }
+    
     
     // MARK: - UI
     
@@ -79,29 +83,52 @@ struct ScreenToolbarModifier<Leading: View>: ViewModifier {
                 ToolbarItem(placement: .topBarLeading) {
                     leading()
                 }
+
+                /// Правая зона
+                ToolbarItem(placement: .topBarTrailing) {
+                    trailing()
+                }
             }
             .toolbarBackground(.hidden, for: .navigationBar)
             .toolbarRole(.editor)
     }
 }
 
+
 // MARK: - View extension
 
 extension View {
     
-    func screenToolbar<Leading: View>(
+    func screenToolbar<LeadingContent: View, TrailingContent: View>(
         title: String,
         subtitle: String? = nil,
         isTitleSecondary: Bool = false,
-        @ViewBuilder leading: @escaping () -> Leading
+        @ViewBuilder leading: @escaping () -> LeadingContent,
+        @ViewBuilder trailing: @escaping () -> TrailingContent
     ) -> some View {
         self.modifier(
             ScreenToolbarModifier(
                 title: title,
                 subtitle: subtitle,
                 isTitleSecondary: isTitleSecondary,
-                leading: leading
+                leading: leading,
+                trailing: trailing
             )
+        )
+    }
+    
+    func screenToolbar<LeadingContent: View>(
+        title: String,
+        subtitle: String? = nil,
+        isTitleSecondary: Bool = false,
+        @ViewBuilder leading: @escaping () -> LeadingContent
+    ) -> some View {
+        self.screenToolbar(
+            title: title,
+            subtitle: subtitle,
+            isTitleSecondary: isTitleSecondary,
+            leading: leading,
+            trailing: { EmptyView() }
         )
     }
 }

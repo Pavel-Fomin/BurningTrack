@@ -33,6 +33,13 @@ struct TrackListScreen: View {
             }
             .trackListToolbar(
                 viewModel: viewModel,
+                onAddTrack: {
+                    guard let trackListId = viewModel.currentListId else { return }
+
+                    SheetManager.shared.presentNewTrackListSelectionForAppend(
+                        trackListId: trackListId
+                    )
+                },
                 onExport: handleExport,
                 onRename: {
                     SheetManager.shared.presentRenameTrackList(
@@ -44,6 +51,14 @@ struct TrackListScreen: View {
         }
         .onChange(of: sheetManager.dismissCounter) { _, _ in
             viewModel.refreshMeta()
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(for: .trackListTracksDidChange)
+        ) { notification in
+            guard let changedId = notification.object as? UUID else { return }
+            guard changedId == viewModel.currentListId else { return }
+
+            viewModel.loadTracks()
         }
     }
     

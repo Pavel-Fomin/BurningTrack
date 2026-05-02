@@ -36,3 +36,18 @@ extension Track: Equatable {
         lhs.id == rhs.id
     }
 }
+
+extension Track {
+    /// Создаёт трек треклиста из трека фонотеки.
+    /// Используется при добавлении треков из прикреплённых папок в новый или существующий треклист.
+    init(libraryTrack: LibraryTrack) {
+        self.init(
+            id: libraryTrack.id,
+            title: libraryTrack.title,
+            artist: libraryTrack.artist,
+            duration: libraryTrack.duration,
+            fileName: libraryTrack.fileName,
+            isAvailable: libraryTrack.isAvailable
+        )
+    }
+}

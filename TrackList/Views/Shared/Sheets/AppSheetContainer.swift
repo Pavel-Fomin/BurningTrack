@@ -24,7 +24,6 @@ struct AppSheetContainer<Content: View>: View {
 
     var body: some View {
         content
-            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
             .presentationDetents(detents)
             .presentationDragIndicator(.hidden)
             .presentationBackground(

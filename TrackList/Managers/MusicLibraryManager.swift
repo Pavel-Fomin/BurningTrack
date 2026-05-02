@@ -320,22 +320,26 @@ final class MusicLibraryManager: ObservableObject {
 
         // 1. Определяем rootFolderId
         // Если folderId — корневая папка, используем его напрямую.
-        // Иначе поднимаемся к корню через реестр треков (если есть).
+        // Иначе поднимаемся к корню через дерево папок.
         let rootFolderId: UUID
 
         if let folder = await TrackRegistry.shared.allFolders()
             .first(where: { $0.id == folderId }) {
             rootFolderId = folder.id
         } else {
-            // Подпапка: ищем любой трек и берём его rootFolderId
-            let entries = await TrackRegistry.shared.tracks(inFolder: folderId)
-            guard let first = entries.first else {
-                // Пустая подпапка без треков — синк всё равно нужен,
-                // но rootFolderId восстановить нельзя без корня.
-                // В этом случае корректнее просто выйти.
+            // Подпапка: ищем root в дереве attachedFolders.
+            guard let root = findRootFolder(for: folderId) else {
+                print("❌ Root folder не найден для folderId: \(folderId)")
                 return
             }
-            rootFolderId = first.rootFolderId
+
+            await LibrarySyncModule.shared.syncRootFolder(
+                rootFolderId: root.id,
+                rootURL: root.url,
+                mode: .safe
+            )
+
+            return
         }
 
         // 2. Резолвим URL корневой папки
@@ -354,6 +358,25 @@ final class MusicLibraryManager: ObservableObject {
     
 
     // MARK: - Приватные помощники: дерево
+
+    /// Ищет root папку, внутри которой находится folderId
+    private func findRootFolder(for folderId: UUID) -> LibraryFolder? {
+        for root in attachedFolders {
+            if contains(folderId: folderId, in: root) {
+                return root
+            }
+        }
+        return nil
+    }
+
+    /// Рекурсивный поиск folderId в дереве
+    private func contains(folderId: UUID, in folder: LibraryFolder) -> Bool {
+        if folder.id == folderId { return true }
+        for sub in folder.subfolders {
+            if contains(folderId: folderId, in: sub) { return true }
+        }
+        return false
+    }
 
     /// Рекурсивно строит дерево LibraryFolder из файловой системы через LibraryScanner.
     /// Важно: используется только для UI и навигации по фонотеке.

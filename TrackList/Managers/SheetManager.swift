@@ -44,6 +44,18 @@ struct SaveTrackListSheetData: Identifiable, Equatable {
     }
 }
 
+// MARK: - Данные для NewTrackListSelectionSheet
+
+enum NewTrackListSelectionMode: Equatable {
+    case create(trackListName: String)
+    case append(trackListId: UUID)
+}
+
+struct NewTrackListSelectionSheetData: Identifiable, Equatable {
+    let id = UUID()
+    let mode: NewTrackListSelectionMode
+}
+
 // MARK: - Данные для AddToTrackListSheet
 
 struct AddToTrackListSheetData: Identifiable, Equatable {
@@ -68,6 +80,8 @@ enum AppSheet: Identifiable, Equatable {
     case addToTrackList(AddToTrackListSheetData)
     case renameTrackList(RenameTrackListSheetData)
     case saveTrackList(SaveTrackListSheetData)
+    case newTrackListSelection(NewTrackListSelectionSheetData)
+    case createTrackList
     
 
     var id: String {
@@ -77,6 +91,8 @@ enum AppSheet: Identifiable, Equatable {
         case .addToTrackList(let data): return "addToTrackList_\(data.id)"
         case .renameTrackList(let data): return "renameTrackList_\(data.id)"
         case .saveTrackList(let data): return "saveTrackList_\(data.id)"
+        case .newTrackListSelection(let data): return "newTrackListSelection_\(data.id)"
+        case .createTrackList: return "createTrackList"
         }
     }
 
@@ -180,6 +196,24 @@ final class SheetManager: ObservableObject {
         let data = SaveTrackListSheetData()
         present(.saveTrackList(data))
     }
+
+    func presentNewTrackListSelectionForCreate(name: String) {
+        let data = NewTrackListSelectionSheetData(
+            mode: .create(trackListName: name)
+        )
+        present(.newTrackListSelection(data))
+    }
+
+    func presentNewTrackListSelectionForAppend(trackListId: UUID) {
+        let data = NewTrackListSelectionSheetData(
+            mode: .append(trackListId: trackListId)
+        )
+        present(.newTrackListSelection(data))
+    }
+
+    func presentCreateTrackList() {
+        activeSheet = .createTrackList
+    }
 }
 
 
@@ -193,6 +227,8 @@ private extension AppSheet {
         case .addToTrackList(let data): return data.track.id
         case .renameTrackList: return nil
         case .saveTrackList: return nil
+        case .newTrackListSelection: return nil
+        case .createTrackList: return nil
         }
     }
 }

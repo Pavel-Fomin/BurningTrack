@@ -12,6 +12,7 @@ import SwiftUI
 struct TrackListToolbar: ViewModifier {
 
     @ObservedObject var viewModel: TrackListViewModel
+    let onAddTrack: () -> Void
     let onExport: () -> Void
     let onRename: () -> Void
 
@@ -26,6 +27,7 @@ struct TrackListToolbar: ViewModifier {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
+                        Button("Добавить трек", action: onAddTrack)
                         Button("Экспорт", action: onExport)
                         Button("Переименовать", action: onRename)
                     } label: {
@@ -43,12 +45,14 @@ extension View {
 
     func trackListToolbar(
         viewModel: TrackListViewModel,
+        onAddTrack: @escaping () -> Void,
         onExport: @escaping () -> Void,
         onRename: @escaping () -> Void
     ) -> some View {
         self.modifier(
             TrackListToolbar(
                 viewModel: viewModel,
+                onAddTrack: onAddTrack,
                 onExport: onExport,
                 onRename: onRename
             )

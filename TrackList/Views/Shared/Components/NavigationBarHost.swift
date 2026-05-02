@@ -40,6 +40,9 @@ struct NavigationBarHost<Content: View>: UIViewControllerRepresentable {
     /// Действие правой кнопки
     let onRightTap: (() -> Void)?
 
+    /// Показывать правую кнопку только на корневом экране NavigationStack
+    let showsRightButtonOnlyOnRoot: Bool
+
     /// Контент sheet’а (чистый SwiftUI View)
     let content: Content
 
@@ -51,6 +54,7 @@ struct NavigationBarHost<Content: View>: UIViewControllerRepresentable {
         isRightEnabled: Binding<Bool>,
         onClose: (() -> Void)? = nil,
         onRightTap: (() -> Void)? = nil,
+        showsRightButtonOnlyOnRoot: Bool = false,
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
@@ -58,6 +62,7 @@ struct NavigationBarHost<Content: View>: UIViewControllerRepresentable {
         self.isRightEnabled = isRightEnabled
         self.onClose = onClose
         self.onRightTap = onRightTap
+        self.showsRightButtonOnlyOnRoot = showsRightButtonOnlyOnRoot
         self.content = content()
     }
 
@@ -65,7 +70,11 @@ struct NavigationBarHost<Content: View>: UIViewControllerRepresentable {
 
     func makeUIViewController(context: Context) -> UINavigationController {
 
-        let hosting = UIHostingController(rootView: content)
+        let hosting = UIHostingController(
+            rootView: AnyView(
+                content.frame(maxWidth: .infinity, maxHeight: .infinity)
+            )
+        )
         context.coordinator.hostingController = hosting
         hosting.navigationItem.title = title
 
@@ -111,19 +120,35 @@ struct NavigationBarHost<Content: View>: UIViewControllerRepresentable {
         _ uiViewController: UINavigationController,
         context: Context
     ) {
-        // обновляем SwiftUI-контент
-        context.coordinator.hostingController?.rootView = content
-
+        guard let root = context.coordinator.hostingController else { return }
         guard let top = uiViewController.topViewController else { return }
+
+        // Обновляем rootView только на корневом экране.
+        // При активном NavigationLink перезапись rootView сбрасывает стек навигации.
+        if top === root {
+            root.rootView =
+                AnyView(
+                    content.frame(maxWidth: .infinity, maxHeight: .infinity)
+                )
+        }
 
         // если правой кнопки быть не должно
         guard let imageName = rightButtonImage else {
-            top.navigationItem.rightBarButtonItem = nil
+            root.navigationItem.rightBarButtonItem = nil
+            if top !== root {
+                top.navigationItem.rightBarButtonItem = nil
+            }
             return
         }
 
+        let isRoot = top === root
+
+        if showsRightButtonOnlyOnRoot && !isRoot {
+            top.navigationItem.rightBarButtonItem = nil
+        }
+
         // если кнопки ещё нет — создаём
-        if top.navigationItem.rightBarButtonItem == nil {
+        if root.navigationItem.rightBarButtonItem == nil {
 
             let style: UIBarButtonItem.Style =
                 imageName == "checkmark" ? .prominent : .plain
@@ -138,27 +163,27 @@ struct NavigationBarHost<Content: View>: UIViewControllerRepresentable {
                 action: #selector(Coordinator.rightTapped)
             )
 
-            top.navigationItem.rightBarButtonItem = item
+            root.navigationItem.rightBarButtonItem = item
         }
 
         // 1️⃣ enabled / disabled
-        top.navigationItem.rightBarButtonItem?.isEnabled =
+        root.navigationItem.rightBarButtonItem?.isEnabled =
             isRightEnabled.wrappedValue
 
         // 2️⃣ обновляем IMAGE, если сменилась
         let currentImageName =
-            top.navigationItem.rightBarButtonItem?
+            root.navigationItem.rightBarButtonItem?
                 .image?
                 .accessibilityIdentifier
 
         if currentImageName != imageName {
             let image = UIImage(systemName: imageName)
             image?.accessibilityIdentifier = imageName
-            top.navigationItem.rightBarButtonItem?.image = image
+            root.navigationItem.rightBarButtonItem?.image = image
         }
 
         // 3️⃣ ОБЯЗАТЕЛЬНО обновляем STYLE
-        top.navigationItem.rightBarButtonItem?.style =
+        root.navigationItem.rightBarButtonItem?.style =
             imageName == "checkmark" ? .prominent : .plain
     }
 
@@ -170,7 +195,7 @@ struct NavigationBarHost<Content: View>: UIViewControllerRepresentable {
 
         var onClose: (() -> Void)?
         var onRightTap: (() -> Void)?
-        var hostingController: UIHostingController<Content>?
+        var hostingController: UIHostingController<AnyView>?
 
         @objc func closeTapped() {onClose?()}
         @objc func rightTapped() {onRightTap?()}

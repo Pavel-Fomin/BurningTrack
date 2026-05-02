@@ -10,6 +10,11 @@
 import SwiftUI
 import UIKit
 
+enum TrackRowSelectionPlacement {
+    case leading
+    case trailing
+}
+
 struct TrackRowView: View {
 
     // MARK: - Входные параметры
@@ -27,6 +32,7 @@ struct TrackRowView: View {
     let showsSelection: Bool          /// Показывать radio или нет
     let isSelected: Bool              /// Radio (пустой / выбранный)
     let onToggleSelection: (() -> Void)?
+    let selectionPlacement: TrackRowSelectionPlacement
     
     var trackListNames: [String]? = nil
     var useNativeSwipeActions: Bool = false
@@ -46,6 +52,7 @@ struct TrackRowView: View {
         showsSelection: Bool = false,
         isSelected: Bool = false,
         onToggleSelection: (() -> Void)? = nil,
+        selectionPlacement: TrackRowSelectionPlacement = .leading,
         trackListNames: [String]? = nil,
         useNativeSwipeActions: Bool = false
     ) {
@@ -62,6 +69,7 @@ struct TrackRowView: View {
         self.showsSelection = showsSelection
         self.isSelected = isSelected
         self.onToggleSelection = onToggleSelection
+        self.selectionPlacement = selectionPlacement
         self.trackListNames = trackListNames
         self.useNativeSwipeActions = useNativeSwipeActions
     }
@@ -73,23 +81,8 @@ struct TrackRowView: View {
             HStack(spacing: 12) {
 
                 // Radio (только в режиме выбора)
-                if showsSelection {
-                    Button {
-                        guard !isCurrent else { return }   // на всякий случай
-                        onToggleSelection?()
-                    } label: {
-                        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                            .font(.system(size: 20, weight: .semibold))
-                            .foregroundColor(
-                                isCurrent
-                                    ? .secondary
-                                    : (isSelected ? .green : .secondary)
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .frame(width: 44, height: 44)         // ← фикс: одинаково для всех строк
-                    .contentShape(Rectangle())
-                    .disabled(isCurrent)                  // ← текущий трек не выбирается
+                if showsSelection && selectionPlacement == .leading {
+                    selectionButton
                 }
 
                 // Левая зона — обложка
@@ -113,12 +106,35 @@ struct TrackRowView: View {
                         }
                         onRowTap()
                     }
+
+                if showsSelection && selectionPlacement == .trailing {
+                    selectionButton
+                }
             }
         }
         .padding(.vertical, 0)
         .padding(.horizontal, 4)
         .opacity(track.isAvailable ? 1 : 0.4)
         .listRowBackground(rowHighlightColor)
+    }
+
+    private var selectionButton: some View {
+        Button {
+            guard !isCurrent else { return }   // на всякий случай
+            onToggleSelection?()
+        } label: {
+            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundColor(
+                    isCurrent
+                        ? .secondary
+                        : (isSelected ? .green : .secondary)
+                )
+        }
+        .buttonStyle(.plain)
+        .frame(width: 44, height: 44)         // ← фикс: одинаково для всех строк
+        .contentShape(Rectangle())
+        .disabled(isCurrent)                  // ← текущий трек не выбирается
     }
 
     // MARK: - Обложка

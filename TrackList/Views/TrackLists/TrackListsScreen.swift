@@ -25,5 +25,10 @@ struct TrackListsScreen: View {
             .background(Color(.systemGroupedBackground))
             .trackListsToolbar()
         }
+        .onReceive(
+            NotificationCenter.default.publisher(for: .trackListsDidChange)
+        ) { _ in
+            trackListsViewModel.refresh()
+        }
     }
 }
