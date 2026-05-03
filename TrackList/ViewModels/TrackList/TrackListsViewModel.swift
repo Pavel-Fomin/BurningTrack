@@ -13,6 +13,7 @@
 
 import Foundation
 import SwiftUI
+import Combine
 
 @MainActor
 final class TrackListsViewModel: ObservableObject {
@@ -20,6 +21,17 @@ final class TrackListsViewModel: ObservableObject {
     // MARK: - Состояния
     @Published var trackLists: [TrackList] = []
     @Published var isEditing: Bool = false
+    private var cancellables = Set<AnyCancellable>()
+
+    // MARK: - Init
+
+    init() {
+        NotificationCenter.default.publisher(for: .trackListsDidChange)
+            .sink { [weak self] _ in
+                self?.refresh()
+            }
+            .store(in: &cancellables)
+    }
 
     // MARK: - Загрузка всех треклистов
 
@@ -46,7 +58,6 @@ final class TrackListsViewModel: ObservableObject {
 
     func deleteTrackList(id: UUID) {
         TrackListsManager.shared.deleteTrackList(id: id)
-        refresh()
         print("🗑️ Треклист \(id) удалён")
     }
 
@@ -55,7 +66,6 @@ final class TrackListsViewModel: ObservableObject {
 
     func renameTrackList(id: UUID, to newName: String) {
         TrackListsManager.shared.renameTrackList(id: id, to: newName)
-        refresh()
         print("✏️ Треклист \(id) переименован в «\(newName)»")
     }
 

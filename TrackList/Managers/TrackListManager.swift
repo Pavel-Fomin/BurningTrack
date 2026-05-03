@@ -49,17 +49,22 @@ final class TrackListManager {
     }
     
     /// Сохраняет треки по ID треклиста
-    func saveTracks(_ tracks: [Track], for id: UUID) {
+    @discardableResult
+    func saveTracks(
+        _ tracks: [Track],
+        for id: UUID,
+        postTrackListsDidChange: Bool = true
+    ) -> Bool {
         guard let url = urlForTrackList(id: id) else {
             PersistentLogger.log("❌ TrackListManager: saveTracks url nil id=\(id)")
-            return
+            return false
         }
 
         let encoder = makePrettyJSONEncoder()
 
         guard let data = try? encoder.encode(tracks) else {
             PersistentLogger.log("❌ TrackListManager: encode failed id=\(id) tracks=\(tracks.count)")
-            return
+            return false
         }
 
         do {
@@ -68,9 +73,17 @@ final class TrackListManager {
                 name: .trackListTracksDidChange,
                 object: id
             )
+            if postTrackListsDidChange, TrackListsManager.shared.trackListExists(id: id) {
+                NotificationCenter.default.post(
+                    name: .trackListsDidChange,
+                    object: nil
+                )
+            }
             PersistentLogger.log("💾 TrackListManager: saved tracks=\(tracks.count) id=\(id)")
+            return true
         } catch {
             PersistentLogger.log("❌ TrackListManager: write failed id=\(id) error=\(error)")
+            return false
         }
     }
     

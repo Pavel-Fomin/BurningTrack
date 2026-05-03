@@ -55,11 +55,41 @@ final class TrackListsManager {
     
     /// Сохраняет список всех треклистов (метаинформацию) в tracklists.json
     func saveTrackListMetas(_ metas: [TrackListMeta]) {
-        guard let url = metasURL else { return }
+        _ = persistTrackListMetas(metas)
+    }
+
+    private func postTrackListsDidChange() {
+        NotificationCenter.default.post(
+            name: .trackListsDidChange,
+            object: nil
+        )
+    }
+
+    @discardableResult
+    private func persistTrackListMetas(
+        _ metas: [TrackListMeta],
+        postDidChange: Bool = true
+    ) -> Bool {
+        guard let url = metasURL else {
+            PersistentLogger.log("❌ TrackListsManager: metas url nil")
+            return false
+        }
         
         let encoder = makePrettyJSONEncoder()
-        if let data = try? encoder.encode(metas) {
-            try? data.write(to: url, options: .atomic)
+        guard let data = try? encoder.encode(metas) else {
+            PersistentLogger.log("❌ TrackListsManager: encode metas failed count=\(metas.count)")
+            return false
+        }
+
+        do {
+            try data.write(to: url, options: .atomic)
+            if postDidChange {
+                postTrackListsDidChange()
+            }
+            return true
+        } catch {
+            PersistentLogger.log("❌ TrackListsManager: write metas failed error=\(error)")
+            return false
         }
     }
     
@@ -79,17 +109,16 @@ final class TrackListsManager {
         let createdAt = Date()
         
         // Сохраняем треки
-        TrackListManager.shared.saveTracks(tracks, for: id)
+        TrackListManager.shared.saveTracks(
+            tracks,
+            for: id,
+            postTrackListsDidChange: false
+        )
         
         // Сохраняем мета
         let meta = TrackListMeta(id: id, name: name, createdAt: createdAt)
         saveTrackListMeta(meta)
 
-        NotificationCenter.default.post(
-            name: .trackListsDidChange,
-            object: nil
-        )
-        
         return TrackList(id: id, name: name, createdAt: createdAt, tracks: tracks)
     }
 
@@ -156,11 +185,6 @@ final class TrackListsManager {
 
         currentTracks.append(contentsOf: newTracks)
         TrackListManager.shared.saveTracks(currentTracks, for: trackListId)
-
-        NotificationCenter.default.post(
-            name: .trackListsDidChange,
-            object: nil
-        )
     }
     
     // MARK: - Удаление и переименование
@@ -174,11 +198,6 @@ final class TrackListsManager {
         var metas = loadTrackListMetas()
         metas.removeAll { $0.id == id }
         saveTrackListMetas(metas)
-
-        NotificationCenter.default.post(
-            name: .trackListsDidChange,
-            object: nil
-        )
         
         print("🗑️ Треклист \(id) удалён")
     }
@@ -189,14 +208,9 @@ final class TrackListsManager {
         guard let index = metas.firstIndex(where: { $0.id == id }) else { return }
         
         metas[index].name = newName
-        saveTrackListMetas(metas)
-
-        NotificationCenter.default.post(
-            name: .trackListsDidChange,
-            object: nil
-        )
-        
-        NotificationCenter.default.post(name: .trackListDidRename, object: id)
+        if persistTrackListMetas(metas) {
+            NotificationCenter.default.post(name: .trackListDidRename, object: id)
+        }
     }
     
     
@@ -204,15 +218,25 @@ final class TrackListsManager {
     
     /// Сохраняет все треклисты (отдельно JSON с треками и tracklists.json с мета)
     func saveTrackLists(_ trackLists: [TrackList]) {
+        var didSaveTracks = false
+
         for list in trackLists {
-            TrackListManager.shared.saveTracks(list.tracks, for: list.id)
+            let didSave = TrackListManager.shared.saveTracks(
+                list.tracks,
+                for: list.id,
+                postTrackListsDidChange: false
+            )
+            didSaveTracks = didSaveTracks || didSave
         }
         
         let metas = trackLists.map {
             TrackListMeta(id: $0.id, name: $0.name, createdAt: $0.createdAt)
         }
         
-        saveTrackListMetas(metas)
+        let didSaveMetas = persistTrackListMetas(metas, postDidChange: false)
+        if didSaveTracks || didSaveMetas {
+            postTrackListsDidChange()
+        }
         
         print("✅ Все треклисты сохранены (треки + мета)")
     }

@@ -17,6 +17,7 @@
 import Foundation
 import SwiftUI
 import UIKit
+import Combine
 
 @MainActor
 final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
@@ -25,6 +26,7 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
     @Published var tracks: [Track] = []
     @Published var currentListId: UUID?
     @Published private(set) var snapshotsByTrackId: [UUID: TrackRuntimeSnapshot] = [:] /// Runtime snapshot треков по id
+    private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Init
     
@@ -45,6 +47,27 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
                 self.applyTrackUpdateEvent(updateEvent)
             }
         }
+
+        NotificationCenter.default.publisher(for: .trackListTracksDidChange)
+            .sink { [weak self] notification in
+                guard let changedId = notification.object as? UUID else { return }
+
+                Task { @MainActor in
+                    guard let self else { return }
+                    guard changedId == self.currentListId else { return }
+
+                    self.loadTracks()
+                }
+            }
+            .store(in: &cancellables)
+
+        NotificationCenter.default.publisher(for: .trackListsDidChange)
+            .sink { [weak self] _ in
+                Task { @MainActor in
+                    self?.refreshMeta()
+                }
+            }
+            .store(in: &cancellables)
     }
     
     // Заглушка. Мы ушли от активного треклиста.
@@ -136,10 +159,6 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
                 trackId: trackId,
                 trackListId: listId
             )
-
-            await MainActor.run {
-                self.tracks.remove(atOffsets: offsets)
-            }
         }
     }
 
@@ -148,7 +167,6 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
     func clearTrackList() {
         guard let id = currentListId else { return }
         TrackListManager.shared.saveTracks([], for: id)
-        self.tracks = []
         print("🧹 Треклист очищен")
     }
 
