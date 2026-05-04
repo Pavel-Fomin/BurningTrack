@@ -49,7 +49,13 @@ struct CreateTrackListContainer: View {
 
         guard TrackListManager.shared.validateName(trimmedName) else { return }
 
-        TrackListsManager.shared.createEmptyTrackList(withName: trimmedName)
+        do {
+            try TrackListsManager.shared.createEmptyTrackList(withName: trimmedName)
+        } catch {
+            PersistentLogger.log("CreateTrackListContainer: create empty tracklist failed error=\(error)")
+            return
+        }
+
         SheetManager.shared.closeActive()
     }
 

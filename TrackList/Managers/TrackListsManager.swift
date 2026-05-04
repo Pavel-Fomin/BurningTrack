@@ -104,16 +104,18 @@ final class TrackListsManager {
     // Базовый метод создания треклиста.
     /// Используется всеми сценариями создания (из фонотеки, из шита и т.д.).
     @discardableResult
-    private func createTrackListInternal(tracks: [Track], name: String) -> TrackList {
+    private func createTrackListInternal(tracks: [Track], name: String) throws -> TrackList {
         let id = UUID()
         let createdAt = Date()
         
         // Сохраняем треки
-        TrackListManager.shared.saveTracks(
+        guard TrackListManager.shared.saveTracks(
             tracks,
             for: id,
             postTrackListsDidChange: false
-        )
+        ) else {
+            throw TrackListStorageError.saveFailed(trackListId: id)
+        }
         
         // Сохраняем мета
         let meta = TrackListMeta(id: id, name: name, createdAt: createdAt)
@@ -124,40 +126,40 @@ final class TrackListsManager {
 
     // Создаёт новый треклист с авто-именем по дате ("dd.MM.yy, HH:mm")
     @discardableResult
-    func createTrackList(from tracks: [Track]) -> TrackList {
+    func createTrackList(from tracks: [Track]) throws -> TrackList {
         let formatter = DateFormatter()
         formatter.dateFormat = "dd.MM.yy, HH:mm"
         let name = formatter.string(from: Date())
         
-        return createTrackListInternal(tracks: tracks, name: name)
+        return try createTrackListInternal(tracks: tracks, name: name)
     }
 
     // Создаёт треклист с заданным именем (используется для ручного ввода)
     @discardableResult
-    func createTrackList(from tracks: [Track], withName name: String) -> TrackList {
-        return createTrackListInternal(tracks: tracks, name: name)
+    func createTrackList(from tracks: [Track], withName name: String) throws -> TrackList {
+        return try createTrackListInternal(tracks: tracks, name: name)
     }
 
     /// Создаёт пустой треклист с заданным именем.
     @discardableResult
-    func createEmptyTrackList(withName name: String) -> TrackList {
-        createTrackList(from: [Track](), withName: name)
+    func createEmptyTrackList(withName name: String) throws -> TrackList {
+        try createTrackList(from: [Track](), withName: name)
     }
 
     // Создаёт новый треклист из треков фонотеки.
     /// Метод конвертирует LibraryTrack в Track и использует общий путь создания треклиста.
     @discardableResult
-    func createTrackList(from libraryTracks: [LibraryTrack]) -> TrackList {
+    func createTrackList(from libraryTracks: [LibraryTrack]) throws -> TrackList {
         let tracks = libraryTracks.map { Track(libraryTrack: $0) }
-        return createTrackList(from: tracks)
+        return try createTrackList(from: tracks)
     }
 
     // Создаёт новый треклист из треков фонотеки с заданным именем.
     /// Метод используется там, где пользователь вручную задаёт название треклиста.
     @discardableResult
-    func createTrackList(from libraryTracks: [LibraryTrack], withName name: String) -> TrackList {
+    func createTrackList(from libraryTracks: [LibraryTrack], withName name: String) throws -> TrackList {
         let tracks = libraryTracks.map { Track(libraryTrack: $0) }
-        return createTrackList(from: tracks, withName: name)
+        return try createTrackList(from: tracks, withName: name)
     }
 
     // Сохраняет один TrackListMeta в общий список (tracklists.json)
@@ -171,8 +173,9 @@ final class TrackListsManager {
 
     /// Добавляет треки из фонотеки в существующий треклист.
     /// Уже добавленные треки повторно не добавляются.
-    func addTracks(_ libraryTracks: [LibraryTrack], to trackListId: UUID) {
-        guard !libraryTracks.isEmpty else { return }
+    @discardableResult
+    func addTracks(_ libraryTracks: [LibraryTrack], to trackListId: UUID) throws -> Bool {
+        guard !libraryTracks.isEmpty else { return true }
 
         var currentTracks = TrackListManager.shared.loadTracks(for: trackListId)
         let existingIds = Set(currentTracks.map(\.id))
@@ -181,10 +184,14 @@ final class TrackListsManager {
             .filter { !existingIds.contains($0.id) }
             .map { Track(libraryTrack: $0) }
 
-        guard !newTracks.isEmpty else { return }
+        guard !newTracks.isEmpty else { return true }
 
         currentTracks.append(contentsOf: newTracks)
-        TrackListManager.shared.saveTracks(currentTracks, for: trackListId)
+        guard TrackListManager.shared.saveTracks(currentTracks, for: trackListId) else {
+            throw TrackListStorageError.saveFailed(trackListId: trackListId)
+        }
+
+        return true
     }
     
     // MARK: - Удаление и переименование
@@ -208,9 +215,7 @@ final class TrackListsManager {
         guard let index = metas.firstIndex(where: { $0.id == id }) else { return }
         
         metas[index].name = newName
-        if persistTrackListMetas(metas) {
-            NotificationCenter.default.post(name: .trackListDidRename, object: id)
-        }
+        persistTrackListMetas(metas)
     }
     
     

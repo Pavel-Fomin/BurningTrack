@@ -90,9 +90,14 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
 
     // MARK: - Save
 
-    private func save() {
-        guard let id = currentListId else { return }
-        TrackListManager.shared.saveTracks(tracks, for: id)
+    private func save() -> Bool {
+        guard let id = currentListId else { return false }
+
+        let didSave = TrackListManager.shared.saveTracks(tracks, for: id)
+        if !didSave {
+            PersistentLogger.log("TrackListViewModel: saveTracks failed id=\(id)")
+        }
+        return didSave
     }
     
     
@@ -138,8 +143,12 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
     // MARK: - Reorder
 
     func moveTrack(from source: IndexSet, to destination: Int) {
+        let previousTracks = tracks
         tracks.move(fromOffsets: source, toOffset: destination)
-        save()
+        guard save() else {
+            tracks = previousTracks
+            return
+        }
         print("↕️ Порядок треков обновлён и сохранён")
     }
 
@@ -166,7 +175,10 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
 
     func clearTrackList() {
         guard let id = currentListId else { return }
-        TrackListManager.shared.saveTracks([], for: id)
+        guard TrackListManager.shared.saveTracks([], for: id) else {
+            PersistentLogger.log("TrackListViewModel: clearTrackList saveTracks failed id=\(id)")
+            return
+        }
         print("🧹 Треклист очищен")
     }
 

@@ -12,6 +12,17 @@
 
 import Foundation
 
+enum TrackListStorageError: Error, LocalizedError {
+    case saveFailed(trackListId: UUID)
+
+    var errorDescription: String? {
+        switch self {
+        case .saveFailed(let trackListId):
+            return "Не удалось сохранить треклист \(trackListId)"
+        }
+    }
+}
+
 final class TrackListManager {
     
     static let shared = TrackListManager()

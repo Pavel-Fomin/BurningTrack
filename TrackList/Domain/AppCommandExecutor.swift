@@ -159,7 +159,9 @@ actor AppCommandExecutor {
         list.tracks.append(imported)
         
         /// 4. Сохраняем обновлённый треклист
-        TrackListManager.shared.saveTracks(list.tracks, for: list.id)
+        guard TrackListManager.shared.saveTracks(list.tracks, for: list.id) else {
+            throw TrackListStorageError.saveFailed(trackListId: list.id)
+        }
         
         /// 5. Получаем snapshot трека
         let snapshot = await resolveSnapshot(for: trackId)
@@ -207,7 +209,7 @@ actor AppCommandExecutor {
             )
         }
         
-        let created = TrackListsManager.shared.createTrackList(
+        let created = try TrackListsManager.shared.createTrackList(
             from: tracks,
             withName: trimmed
         )
@@ -259,7 +261,9 @@ actor AppCommandExecutor {
         list.tracks.removeAll { $0.id == trackId }
         
         /// 3. Сохраняем
-        TrackListManager.shared.saveTracks(list.tracks, for: list.id)
+        guard TrackListManager.shared.saveTracks(list.tracks, for: list.id) else {
+            throw TrackListStorageError.saveFailed(trackListId: list.id)
+        }
         
         /// 4. Получаем snapshot трека
         let snapshot = await resolveSnapshot(for: trackId)

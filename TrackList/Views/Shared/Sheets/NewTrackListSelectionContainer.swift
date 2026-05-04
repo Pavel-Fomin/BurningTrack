@@ -78,16 +78,26 @@ struct NewTrackListSelectionContainer: View {
         switch data.mode {
 
         case .create(let name):
-            _ = TrackListsManager.shared.createTrackList(
-                from: selectedTracks,
-                withName: name
-            )
+            do {
+                _ = try TrackListsManager.shared.createTrackList(
+                    from: selectedTracks,
+                    withName: name
+                )
+            } catch {
+                PersistentLogger.log("NewTrackListSelectionContainer: create tracklist failed error=\(error)")
+                return
+            }
 
         case .append(let trackListId):
-            TrackListsManager.shared.addTracks(
-                selectedTracks,
-                to: trackListId
-            )
+            do {
+                try TrackListsManager.shared.addTracks(
+                    selectedTracks,
+                    to: trackListId
+                )
+            } catch {
+                PersistentLogger.log("NewTrackListSelectionContainer: add tracks failed error=\(error)")
+                return
+            }
         }
 
         SheetManager.shared.closeActive()
