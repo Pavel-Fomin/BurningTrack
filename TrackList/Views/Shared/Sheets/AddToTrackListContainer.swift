@@ -40,10 +40,23 @@ struct AddToTrackListContainer: View {
     // MARK: - Data source
 
     /// Список всех треклистов в фиксированном порядке
-    private let trackLists: [TrackListsManager.TrackListMeta] =
-        TrackListsManager.shared
-            .loadTrackListMetas()
-            .sorted { $0.createdAt > $1.createdAt }
+    private let trackLists: [TrackListsManager.TrackListMeta]
+
+    init(data: AddToTrackListSheetData) {
+        self.data = data
+
+        do {
+            self.trackLists = try TrackListsManager.shared
+                .loadTrackListMetas()
+                .sorted { $0.createdAt > $1.createdAt }
+        } catch let appError as AppError {
+            self.trackLists = []
+            ToastManager.shared.handle(appError)
+        } catch {
+            self.trackLists = []
+            ToastManager.shared.handle(AppError.trackListLoadFailed)
+        }
+    }
 
     // MARK: - UI
 
@@ -96,8 +109,12 @@ struct AddToTrackListContainer: View {
                 trackListId: trackListId
             )
             SheetManager.shared.closeActive()
+        } catch let appError as AppError {
+            print("❌ Ошибка добавления трека в треклист: \(appError)")
+            ToastManager.shared.handle(appError)
         } catch {
             print("❌ Ошибка добавления трека в треклист: \(error)")
+            ToastManager.shared.handle(AppError.trackListSaveFailed)
         }
     }
 }

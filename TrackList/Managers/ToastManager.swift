@@ -40,16 +40,22 @@ final class ToastManager: ObservableObject {
         show(toastData, duration: duration)
     }
 
+    /// Показывает Toast на основе ошибки приложения.
+    /// Использует централизованный маппинг AppError -> ToastEvent.
+    func handle(_ error: AppError) {
+        handle(error.toastEvent)
+    }
+
     // MARK: - Internal logic
 
     private func show(_ newToast: ToastData, duration: TimeInterval) {
-
-        dismissTask?.cancel()
 
         // Защита от дублей
         if data == newToast {
             return
         }
+
+        dismissTask?.cancel()
 
         data = newToast
 
@@ -97,6 +103,34 @@ final class ToastManager: ObservableObject {
                 message: "Треклист «\(name)» сохранён"
             )
 
+        case let .trackListCreated(name):
+            return ToastData(
+                style: .trackList(name: name),
+                artworkImage: nil,
+                message: "Треклист создан"
+            )
+
+        case let .trackListCleared(name):
+            return ToastData(
+                style: .trackList(name: name),
+                artworkImage: nil,
+                message: "Треклист очищен"
+            )
+
+        case let .tracksAddedToTrackList(count, name):
+            return ToastData(
+                style: .trackList(name: name),
+                artworkImage: nil,
+                message: "Добавлено \(count) треков"
+            )
+
+        case .playlistSaved:
+            return ToastData(
+                style: .trackList(name: ""),
+                artworkImage: nil,
+                message: "Плеер сохранён"
+            )
+
         case let .exportFinished(targetName):
             return ToastData(
                 style: .trackList(name: targetName),
@@ -125,6 +159,20 @@ final class ToastManager: ObservableObject {
                 style: .track(title: title, artist: artist),
                 artworkImage: artwork,
                 message: "Перемещён в «\(folderName)»"
+            )
+
+        case let .folderAdded(name):
+            return ToastData(
+                style: .trackList(name: name),
+                artworkImage: nil,
+                message: "Папка добавлена"
+            )
+
+        case let .folderRemoved(name):
+            return ToastData(
+                style: .trackList(name: name),
+                artworkImage: nil,
+                message: "Папка откреплена"
             )
 
         // MARK: - Треклист
@@ -164,6 +212,136 @@ final class ToastManager: ObservableObject {
                 style: .track(title: title, artist: artist),
                 artworkImage: artwork,
                 message: "Обновлены: имя файла, теги"
+            )
+
+        // MARK: - Warning
+
+        case let .trackUnavailable(title):
+            return ToastData(
+                style: .track(title: title, artist: ""),
+                artworkImage: nil,
+                message: "Трек недоступен"
+            )
+
+        case .noTracksToExport:
+            return ToastData(
+                style: .trackList(name: ""),
+                artworkImage: nil,
+                message: "Нет треков для экспорта"
+            )
+
+        case let .partialImport(imported, failed):
+            return ToastData(
+                style: .trackList(name: "Импортировано: \(imported), ошибок: \(failed)"),
+                artworkImage: nil,
+                message: "Импорт выполнен частично"
+            )
+
+        case let .partialExport(exported, failed):
+            return ToastData(
+                style: .trackList(name: "Экспортировано: \(exported), ошибок: \(failed)"),
+                artworkImage: nil,
+                message: "Экспорт выполнен частично"
+            )
+
+        case let .libraryAccessNeedsRestore(folderName):
+            return ToastData(
+                style: .trackList(name: folderName),
+                artworkImage: nil,
+                message: "Нужен доступ к папке"
+            )
+
+        case .showInLibraryTargetMissing:
+            return ToastData(
+                style: .trackList(name: ""),
+                artworkImage: nil,
+                message: "Трек не найден в фонотеке"
+            )
+
+        case .artworkCouldNotBeLoaded:
+            return ToastData(
+                style: .trackList(name: ""),
+                artworkImage: nil,
+                message: "Обложку не удалось загрузить"
+            )
+
+        // MARK: - Error
+
+        case let .operationFailed(message):
+            return ToastData(
+                style: .trackList(name: ""),
+                artworkImage: nil,
+                message: message
+            )
+
+        case let .playbackFailed(title):
+            return ToastData(
+                style: .track(title: title, artist: ""),
+                artworkImage: nil,
+                message: "Не удалось воспроизвести трек"
+            )
+
+        case .trackListSaveFailed:
+            return ToastData(
+                style: .trackList(name: ""),
+                artworkImage: nil,
+                message: "Не удалось сохранить треклист"
+            )
+
+        case .playlistSaveFailed:
+            return ToastData(
+                style: .trackList(name: ""),
+                artworkImage: nil,
+                message: "Не удалось сохранить плеер"
+            )
+
+        case .importFailed:
+            return ToastData(
+                style: .trackList(name: ""),
+                artworkImage: nil,
+                message: "Не удалось импортировать треки"
+            )
+
+        case .exportFailed:
+            return ToastData(
+                style: .trackList(name: ""),
+                artworkImage: nil,
+                message: "Не удалось экспортировать треки"
+            )
+
+        case .fileMoveFailed:
+            return ToastData(
+                style: .trackList(name: ""),
+                artworkImage: nil,
+                message: "Не удалось переместить файл"
+            )
+
+        case .fileRenameFailed:
+            return ToastData(
+                style: .trackList(name: ""),
+                artworkImage: nil,
+                message: "Не удалось переименовать файл"
+            )
+
+        case .tagWriteFailed:
+            return ToastData(
+                style: .trackList(name: ""),
+                artworkImage: nil,
+                message: "Не удалось сохранить изменения"
+            )
+
+        case let .libraryAccessDenied(folderName):
+            return ToastData(
+                style: .trackList(name: folderName),
+                artworkImage: nil,
+                message: "Нет доступа к папке"
+            )
+
+        case .presenterUnavailable:
+            return ToastData(
+                style: .trackList(name: ""),
+                artworkImage: nil,
+                message: "Не удалось открыть системное окно"
             )
         }
     }

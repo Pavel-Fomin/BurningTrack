@@ -15,7 +15,9 @@ import SwiftUI
 
 enum ToastEvent: Equatable {
 
-    // MARK: - Плеер
+    // MARK: - Success
+
+    // MARK: Плеер
 
     /// Добавить в плеер
     case trackMovedToPlayer(
@@ -35,11 +37,19 @@ enum ToastEvent: Equatable {
     /// Сохранить треклист
     case trackListSaved(name: String)
 
+    case trackListCreated(name: String)
+
+    case trackListCleared(name: String)
+
+    case tracksAddedToTrackList(count: Int, name: String)
+
+    case playlistSaved
+
     /// Экспорт завершен
     case exportFinished(targetName: String)
     
 
-    // MARK: - Фонотека
+    // MARK: Фонотека
 
     /// Добавлен в плеер
     case trackAddedToPlayer(
@@ -60,9 +70,13 @@ enum ToastEvent: Equatable {
         artist: String,
         artwork: Image?,
         folderName: String)
+
+    case folderAdded(name: String)
+
+    case folderRemoved(name: String)
     
     
-    // MARK: - Треклист
+    // MARK: Треклист
 
     /// Удален из треклиста
     case trackRemovedFromTrackList(
@@ -73,7 +87,7 @@ enum ToastEvent: Equatable {
     /// Треклист переименован
     case trackListRenamed(newName: String)
 
-    // MARK: - Глобальные (на будущее)
+    // MARK: Глобальные
 
     /// Теги обновлены
     case tagsUpdated(
@@ -91,4 +105,44 @@ enum ToastEvent: Equatable {
         artist: String,
         artwork: Image?
     )
+
+    // MARK: - Warning
+
+    case trackUnavailable(title: String)
+
+    case noTracksToExport
+
+    case partialImport(imported: Int, failed: Int)
+
+    case partialExport(exported: Int, failed: Int)
+
+    case libraryAccessNeedsRestore(folderName: String)
+
+    case showInLibraryTargetMissing
+
+    case artworkCouldNotBeLoaded
+
+    // MARK: - Error
+
+    case operationFailed(message: String)
+
+    case playbackFailed(title: String)
+
+    case trackListSaveFailed
+
+    case playlistSaveFailed
+
+    case importFailed
+
+    case exportFailed
+
+    case fileMoveFailed
+
+    case fileRenameFailed
+
+    case tagWriteFailed
+
+    case libraryAccessDenied(folderName: String)
+
+    case presenterUnavailable
 }

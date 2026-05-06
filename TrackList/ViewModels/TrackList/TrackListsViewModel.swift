@@ -27,6 +27,7 @@ final class TrackListsViewModel: ObservableObject {
 
     init() {
         NotificationCenter.default.publisher(for: .trackListsDidChange)
+            .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.refresh()
             }
@@ -36,12 +37,36 @@ final class TrackListsViewModel: ObservableObject {
     // MARK: - Загрузка всех треклистов
 
     func refresh() {
-        let metas = TrackListsManager.shared.loadTrackListMetas()
+        let metas: [TrackListsManager.TrackListMeta]
+        do {
+            metas = try TrackListsManager.shared.loadTrackListMetas()
+        } catch let appError as AppError {
+            self.trackLists = []
+            ToastManager.shared.handle(appError)
+            return
+        } catch {
+            self.trackLists = []
+            ToastManager.shared.handle(AppError.trackListLoadFailed)
+            return
+        }
+
+        var trackLoadError: AppError?
+        var didFailToLoadTracks = false
 
         self.trackLists = metas
             .sorted { $0.createdAt > $1.createdAt }
             .map { meta in
-                let tracks = TrackListManager.shared.loadTracks(for: meta.id)
+                let tracks: [Track]
+                do {
+                    tracks = try TrackListManager.shared.loadTracks(for: meta.id)
+                } catch let appError as AppError {
+                    trackLoadError = appError
+                    didFailToLoadTracks = true
+                    tracks = []
+                } catch {
+                    didFailToLoadTracks = true
+                    tracks = []
+                }
                 return TrackList(
                     id: meta.id,
                     name: meta.name,
@@ -50,6 +75,10 @@ final class TrackListsViewModel: ObservableObject {
                 )
             }
 
+        if didFailToLoadTracks {
+            ToastManager.shared.handle(trackLoadError ?? AppError.trackListLoadFailed)
+        }
+
         print("📥 Загружено \(trackLists.count) треклистов")
     }
 
@@ -57,15 +86,22 @@ final class TrackListsViewModel: ObservableObject {
     // MARK: - Удаление
 
     func deleteTrackList(id: UUID) {
-        TrackListsManager.shared.deleteTrackList(id: id)
-        print("🗑️ Треклист \(id) удалён")
+        do {
+            try TrackListsManager.shared.deleteTrackList(id: id)
+            refresh()
+            print("🗑️ Треклист \(id) удалён")
+        } catch let appError as AppError {
+            ToastManager.shared.handle(appError)
+        } catch {
+            ToastManager.shared.handle(AppError.trackListSaveFailed)
+        }
     }
 
 
     // MARK: - Переименование
 
-    func renameTrackList(id: UUID, to newName: String) {
-        TrackListsManager.shared.renameTrackList(id: id, to: newName)
+    func renameTrackList(id: UUID, to newName: String) throws {
+        try TrackListsManager.shared.renameTrackList(id: id, to: newName)
         print("✏️ Треклист \(id) переименован в «\(newName)»")
     }
 

@@ -75,8 +75,12 @@ struct RenameTrackListContainer: View {
                 newName: name
             )
             SheetManager.shared.closeActive()
+        } catch let appError as AppError {
+            print("❌ Ошибка переименования треклиста: \(appError)")
+            ToastManager.shared.handle(appError)
         } catch {
             print("❌ Ошибка переименования треклиста: \(error)")
+            ToastManager.shared.handle(AppError.trackListSaveFailed)
         }
     }
 }

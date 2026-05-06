@@ -65,8 +65,12 @@ struct SaveTrackListContainer: View {
         do {
             try await AppCommandExecutor.shared.createTrackList(name: name)
             SheetManager.shared.closeActive()
+        } catch let appError as AppError {
+            print("❌ Ошибка сохранения треклиста: \(appError)")
+            ToastManager.shared.handle(appError)
         } catch {
             print("❌ Ошибка сохранения треклиста: \(error)")
+            ToastManager.shared.handle(AppError.trackListSaveFailed)
         }
     }
 }

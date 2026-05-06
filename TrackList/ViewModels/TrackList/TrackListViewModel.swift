@@ -81,10 +81,17 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
             return
         }
 
-        let loadedTracks = TrackListManager.shared.loadTracks(for: id)
-
-        self.tracks = loadedTracks
-        print("📥 Загружено \(tracks.count) треков из треклиста \(id)")
+        do {
+            let loadedTracks = try TrackListManager.shared.loadTracks(for: id)
+            self.tracks = loadedTracks
+            print("📥 Загружено \(tracks.count) треков из треклиста \(id)")
+        } catch let appError as AppError {
+            tracks = []
+            ToastManager.shared.handle(appError)
+        } catch {
+            tracks = []
+            ToastManager.shared.handle(AppError.trackListLoadFailed)
+        }
     }
 
 
@@ -147,6 +154,7 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
         tracks.move(fromOffsets: source, toOffset: destination)
         guard save() else {
             tracks = previousTracks
+            ToastManager.shared.handle(AppError.trackListSaveFailed)
             return
         }
         print("↕️ Порядок треков обновлён и сохранён")
@@ -164,10 +172,20 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
         let trackId = tracks[index].id
 
         Task {
-            try await AppCommandExecutor.shared.removeTrackFromTrackList(
-                trackId: trackId,
-                trackListId: listId
-            )
+            do {
+                try await AppCommandExecutor.shared.removeTrackFromTrackList(
+                    trackId: trackId,
+                    trackListId: listId
+                )
+            } catch let appError as AppError {
+                await MainActor.run {
+                    ToastManager.shared.handle(appError)
+                }
+            } catch {
+                await MainActor.run {
+                    ToastManager.shared.handle(AppError.trackListSaveFailed)
+                }
+            }
         }
     }
 
@@ -177,8 +195,10 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
         guard let id = currentListId else { return }
         guard TrackListManager.shared.saveTracks([], for: id) else {
             PersistentLogger.log("TrackListViewModel: clearTrackList saveTracks failed id=\(id)")
+            ToastManager.shared.handle(AppError.trackListSaveFailed)
             return
         }
+        ToastManager.shared.handle(.trackListCleared(name: name))
         print("🧹 Треклист очищен")
     }
 
@@ -216,7 +236,17 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
     func refreshMeta() {
         guard let id = currentListId else { return }
 
-        let metas = TrackListsManager.shared.loadTrackListMetas()
+        let metas: [TrackListsManager.TrackListMeta]
+        do {
+            metas = try TrackListsManager.shared.loadTrackListMetas()
+        } catch let appError as AppError {
+            ToastManager.shared.handle(appError)
+            return
+        } catch {
+            ToastManager.shared.handle(AppError.trackListLoadFailed)
+            return
+        }
+
         guard let meta = metas.first(where: { $0.id == id }) else { return }
 
         if name != meta.name {

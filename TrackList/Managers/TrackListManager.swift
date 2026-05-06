@@ -48,15 +48,21 @@ final class TrackListManager {
     // MARK: - Работа с треками (tracklist_<id>.json)
     
     /// Загружает треки по ID треклиста
-    func loadTracks(for id: UUID) -> [Track] {
-        guard
-            let url = urlForTrackList(id: id),
-            let data = try? Data(contentsOf: url),
-            let tracks = try? JSONDecoder().decode([Track].self, from: data)
-        else {
+    func loadTracks(for id: UUID) throws -> [Track] {
+        guard let url = urlForTrackList(id: id) else {
+            throw AppError.trackListLoadFailed
+        }
+
+        guard FileManager.default.fileExists(atPath: url.path) else {
             return []
         }
-        return tracks
+
+        do {
+            let data = try Data(contentsOf: url)
+            return try JSONDecoder().decode([Track].self, from: data)
+        } catch {
+            throw AppError.trackListLoadFailed
+        }
     }
     
     /// Сохраняет треки по ID треклиста
@@ -99,9 +105,13 @@ final class TrackListManager {
     }
     
     /// Удаляет файл с треками треклиста (используется при удалении треклиста)
-    func deleteTracksFile(for id: UUID) {
+    func deleteTracksFile(for id: UUID) throws {
         guard let url = urlForTrackList(id: id) else {
             PersistentLogger.log("❌ TrackListManager: deleteTracksFile url nil id=\(id)")
+            throw AppError.trackListSaveFailed
+        }
+
+        guard FileManager.default.fileExists(atPath: url.path) else {
             return
         }
 
@@ -110,6 +120,7 @@ final class TrackListManager {
             PersistentLogger.log("🗑 TrackListManager: deleted tracklist file id=\(id)")
         } catch {
             PersistentLogger.log("❌ TrackListManager: delete failed id=\(id) error=\(error)")
+            throw AppError.trackListSaveFailed
         }
     }
     
@@ -117,14 +128,14 @@ final class TrackListManager {
     // MARK: - Возвращает объект треклиста
     
     /// Возвращает треклист с треками и метаданными по его ID
-    func getTrackListById(_ id: UUID) -> TrackList {
+    func getTrackListById(_ id: UUID) throws -> TrackList {
         // Получаем метаданные через TrackListsManager
-        let metas = TrackListsManager.shared.loadTrackListMetas()
+        let metas = try TrackListsManager.shared.loadTrackListMetas()
         guard let meta = metas.first(where: { $0.id == id }) else {
-            fatalError("❌ Треклист с id \(id) не найден")
+            throw AppError.trackListNotFound
         }
         
-        let tracks = loadTracks(for: id)
+        let tracks = try loadTracks(for: id)
         return TrackList(
             id: id,
             name: meta.name,

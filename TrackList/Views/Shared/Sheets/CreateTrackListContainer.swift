@@ -47,12 +47,21 @@ struct CreateTrackListContainer: View {
     private func createEmptyTrackList() {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        guard TrackListManager.shared.validateName(trimmedName) else { return }
+        guard TrackListManager.shared.validateName(trimmedName) else {
+            ToastManager.shared.handle(AppError.trackListNameInvalid)
+            return
+        }
 
         do {
-            try TrackListsManager.shared.createEmptyTrackList(withName: trimmedName)
+            let created = try TrackListsManager.shared.createEmptyTrackList(withName: trimmedName)
+            ToastManager.shared.handle(.trackListCreated(name: created.name))
+        } catch let appError as AppError {
+            PersistentLogger.log("CreateTrackListContainer: create empty tracklist failed error=\(appError)")
+            ToastManager.shared.handle(appError)
+            return
         } catch {
             PersistentLogger.log("CreateTrackListContainer: create empty tracklist failed error=\(error)")
+            ToastManager.shared.handle(AppError.trackListSaveFailed)
             return
         }
 
@@ -63,7 +72,10 @@ struct CreateTrackListContainer: View {
     private func openSelectionForCreate() {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        guard TrackListManager.shared.validateName(trimmedName) else { return }
+        guard TrackListManager.shared.validateName(trimmedName) else {
+            ToastManager.shared.handle(AppError.trackListNameInvalid)
+            return
+        }
 
         SheetManager.shared.presentNewTrackListSelectionForCreate(
             name: trimmedName

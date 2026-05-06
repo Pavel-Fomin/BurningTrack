@@ -155,7 +155,7 @@ actor AppCommandExecutor {
         )
         
         /// 3. Загружаем треклист и добавляем трек
-        var list = TrackListManager.shared.getTrackListById(trackListId)
+        var list = try TrackListManager.shared.getTrackListById(trackListId)
         list.tracks.append(imported)
         
         /// 4. Сохраняем обновлённый треклист
@@ -193,7 +193,9 @@ actor AppCommandExecutor {
     ) async throws {
         
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard TrackListManager.shared.validateName(trimmed) else { return }
+        guard TrackListManager.shared.validateName(trimmed) else {
+            throw AppError.trackListNameInvalid
+        }
         
         // PlaylistManager — @MainActor → нужен await
         let playerTracks = await PlaylistManager.shared.tracks
@@ -233,7 +235,7 @@ actor AppCommandExecutor {
         guard TrackListManager.shared.validateName(trimmed) else { return }
         
         // 1. Переименование
-        TrackListsManager.shared.renameTrackList(
+        try TrackListsManager.shared.renameTrackList(
             id: trackListId,
             to: trimmed
         )
@@ -255,7 +257,7 @@ actor AppCommandExecutor {
     ) async throws {
         
         /// 1. Получаем треклист
-        var list = TrackListManager.shared.getTrackListById(trackListId)
+        var list = try TrackListManager.shared.getTrackListById(trackListId)
         
         /// 2. Удаляем трек
         list.tracks.removeAll { $0.id == trackId }
