@@ -304,32 +304,37 @@ final class PlayerViewModel: ObservableObject {
         }
         
         // Стартуем воспроизведение через PlayerManager
-        playerManager.play(track: track)
-        
-        isPlaying = true
-        updateMiniPlayerProgressState()
-        
-        // Первичное заполнение Now Playing Info (duration ещё может быть 0)
-        playerManager.applyNowPlaying(snapshot: makeNowPlayingSnapshot(for: track))
-        
-        // Наблюдаем прогресс воспроизведения
-        playerManager.observeProgress { [weak self] time in
-            guard let self else { return }
-            
-            self.currentTime = time
-            
-            let now = CACurrentMediaTime()
-            
-            // UI прогресс: ~20 Hz
-            if now - self.lastMiniPlayerTick >= 1.0 {
-                self.lastMiniPlayerTick = now
-                self.updateMiniPlayerProgressState()
-            }
-            
-            // Now Playing: 1 Hz
-            if now - self.lastNowPlayingTick >= 1.0 {
-                self.lastNowPlayingTick = now
-                self.playerManager.applyPlaybackTime(currentTime: time, isPlaying: self.isPlaying)
+        Task { @MainActor in
+            do {
+                try await playerManager.play(track: track)
+                isPlaying = true
+                updateMiniPlayerProgressState()
+                // Первичное заполнение Now Playing Info (duration ещё может быть 0)
+                playerManager.applyNowPlaying(snapshot: makeNowPlayingSnapshot(for: track))
+                // Наблюдаем прогресс воспроизведения
+                playerManager.observeProgress { [weak self] time in
+                    guard let self else { return }
+                    self.currentTime = time
+                    let now = CACurrentMediaTime()
+                    // UI прогресс: ~20 Hz
+                    if now - self.lastMiniPlayerTick >= 1.0 {
+                        self.lastMiniPlayerTick = now
+                        self.updateMiniPlayerProgressState()
+                    }
+                    // Now Playing: 1 Hz
+                    if now - self.lastNowPlayingTick >= 1.0 {
+                        self.lastNowPlayingTick = now
+                        self.playerManager.applyPlaybackTime(currentTime: time, isPlaying: self.isPlaying)
+                    }
+                }
+            } catch let appError as AppError {
+                isPlaying = false
+                updateMiniPlayerProgressState()
+                ToastManager.shared.handle(appError)
+            } catch {
+                isPlaying = false
+                updateMiniPlayerProgressState()
+                ToastManager.shared.handle(.playbackFailed(title: track.title ?? track.fileName))
             }
         }
         

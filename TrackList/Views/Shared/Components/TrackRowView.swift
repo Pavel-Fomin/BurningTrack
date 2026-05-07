@@ -90,7 +90,9 @@ struct TrackRowView: View {
                     .contentShape(Rectangle())
                     .onTapGesture {
                         guard track.isAvailable else {
-                            print("❌ Трек недоступен: \(track.title ?? track.fileName)")
+                            ToastManager.shared.handle(
+                                .trackUnavailable(title: track.title ?? track.fileName)
+                            )
                             return
                         }
                         onArtworkTap?()
@@ -101,7 +103,9 @@ struct TrackRowView: View {
                     .contentShape(Rectangle())
                     .onTapGesture {
                         guard track.isAvailable else {
-                            print("❌ Трек недоступен: \(track.title ?? track.fileName)")
+                            ToastManager.shared.handle(
+                                .trackUnavailable(title: track.title ?? track.fileName)
+                            )
                             return
                         }
                         onRowTap()

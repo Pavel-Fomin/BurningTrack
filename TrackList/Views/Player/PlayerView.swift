@@ -54,8 +54,13 @@ struct PlayerView: View {
                 )
             }
             .onMove { from, to in
+                let previousTracks = PlaylistManager.shared.tracks
                 PlaylistManager.shared.tracks.move(fromOffsets: from, toOffset: to)
-                PlaylistManager.shared.saveToDisk()
+                guard PlaylistManager.shared.saveToDisk() else {
+                    PlaylistManager.shared.tracks = previousTracks
+                    ToastManager.shared.handle(.playlistSaveFailed)
+                    return
+                }
             }
         }
     }

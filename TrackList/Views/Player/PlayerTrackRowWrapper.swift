@@ -66,9 +66,19 @@ struct PlayerTrackRowWrapper: View {
             /// Удалить
             Button(role: .destructive) {
                 Task {
-                    try await AppCommandExecutor.shared.removeTrackFromPlayer(
-                        trackId: track.id
-                    )
+                    do {
+                        try await AppCommandExecutor.shared.removeTrackFromPlayer(
+                            trackId: track.id
+                        )
+                    } catch let appError as AppError {
+                        ToastManager.shared.handle(appError)
+                    } catch {
+                        ToastManager.shared.handle(
+                            .operationFailed(
+                                message: "Не удалось удалить трек из плеера"
+                            )
+                        )
+                    }
                 }
             } label: {
                 Label("Удалить", systemImage: "trash")

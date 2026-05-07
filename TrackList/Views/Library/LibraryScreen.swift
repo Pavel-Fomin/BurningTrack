@@ -53,10 +53,25 @@ struct LibraryScreen: View {
             switch result {
             case .success(let urls):
                 if let folderURL = urls.first {
-                    musicLibraryManager.saveBookmark(for: folderURL)
+                    Task {
+                        do {
+                            try await musicLibraryManager.saveBookmark(for: folderURL)
+                            ToastManager.shared.handle(
+                                .folderAdded(name: folderURL.lastPathComponent)
+                            )
+                        } catch let appError as AppError {
+                            ToastManager.shared.handle(appError)
+                        } catch {
+                            ToastManager.shared.handle(
+                                .operationFailed(message: "Не удалось добавить папку")
+                            )
+                        }
+                    }
                 }
-            case .failure(let error):
-                print("❌ Ошибка выбора папки: \(error.localizedDescription)")
+            case .failure:
+                ToastManager.shared.handle(
+                    .operationFailed(message: "Не удалось выбрать папку")
+                )
             }
         }
     }
@@ -94,8 +109,11 @@ struct LibraryScreen: View {
                     playerViewModel: playerViewModel
                 )
             } else {
-                Text("❌ Папка не найдена")
+                Text("Папка не найдена")
                     .libraryToolbar(title: "Ошибка")
+                    .onAppear {
+                        ToastManager.shared.handle(.folderNotFound)
+                    }
             }
         }
     }
@@ -107,14 +125,14 @@ struct LibraryScreen: View {
 
         Task { @MainActor in
             guard let entry = await TrackRegistry.shared.entry(for: trackId) else {
-                print("⚠️ TrackRegistry: не найден trackId = \(trackId)")
+                ToastManager.shared.handle(.showInLibraryTargetMissing)
                 return
             }
 
             let folderId = entry.folderId
 
             guard musicLibraryManager.folder(for: folderId) != nil else {
-                print("⚠️ MusicLibraryManager: не найдена папка \(folderId)")
+                ToastManager.shared.handle(.folderNotFound)
                 return
             }
 

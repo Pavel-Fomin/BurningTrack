@@ -204,20 +204,27 @@ struct TrackDetailContainer: View {
                     mode = .view
                 }
 
-            } catch let error as LibraryFileError {
-                switch error {
-                case .trackIsPlaying:
-                    await MainActor.run { showStopPlayerAlert = true }
-
-                case .destinationAlreadyExists:
-                    await MainActor.run { showFileNameConflictAlert = true }
-
+            } catch let appError as AppError {
+                switch appError {
+                case .fileAccessDenied:
+                    await MainActor.run {
+                        showStopPlayerAlert = true
+                    }
+                case .fileAlreadyExists:
+                    await MainActor.run {
+                        showFileNameConflictAlert = true
+                    }
                 default:
-                    print("❌ File error:", error)
+                    await MainActor.run {
+                        ToastManager.shared.handle(appError)
+                    }
                 }
-
             } catch {
-                print("❌ Failed to save:", error)
+                await MainActor.run {
+                    ToastManager.shared.handle(
+                        .operationFailed(message: "Не удалось сохранить изменения")
+                    )
+                }
             }
         }
     }

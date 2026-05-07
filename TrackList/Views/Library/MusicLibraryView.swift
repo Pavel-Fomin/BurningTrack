@@ -29,6 +29,7 @@ struct MusicLibraryView: View {
     
     @State private var showDetachAlert = false
     @State private var pendingDetachURL: URL?
+    @State private var pendingDetachFolderName: String?
 
     var body: some View {
 
@@ -80,10 +81,20 @@ struct MusicLibraryView: View {
                                 )
 
                                 if canDetach {
-                                    manager.removeBookmark(for: folder.url)
+                                    do {
+                                        try await manager.removeBookmark(for: folder.url)
+                                        ToastManager.shared.handle(.folderRemoved(name: folder.name))
+                                    } catch let appError as AppError {
+                                        ToastManager.shared.handle(appError)
+                                    } catch {
+                                        ToastManager.shared.handle(
+                                            .operationFailed(message: "Не удалось открепить папку")
+                                        )
+                                    }
                                 } else {
                                     await MainActor.run {
                                         pendingDetachURL = folder.url
+                                        pendingDetachFolderName = folder.name
                                         showDetachAlert = true
                                     }
                                 }
@@ -116,15 +127,26 @@ struct MusicLibraryView: View {
 
                     // После остановки открепляем папку
                     if let url = pendingDetachURL {
-                        manager.removeBookmark(for: url)
+                        Task {
+                            do {
+                                try await manager.removeBookmark(for: url)
+                                ToastManager.shared.handle(.folderRemoved(name: pendingDetachFolderName ?? url.lastPathComponent))
+                            } catch let appError as AppError {
+                                ToastManager.shared.handle(appError)
+                            } catch {
+                                ToastManager.shared.handle(
+                                    .operationFailed(message: "Не удалось открепить папку")
+                                )
+                            }
+                            pendingDetachURL = nil
+                            pendingDetachFolderName = nil
+                        }
                     }
-
-                    // Очищаем временно сохранённый URL
-                    pendingDetachURL = nil
                 }
 
                 Button("Закрыть", role: .cancel) {
                     pendingDetachURL = nil
+                    pendingDetachFolderName = nil
                 }
 
             } message: {

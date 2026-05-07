@@ -126,47 +126,56 @@ final class PlaylistManager: ObservableObject {
 
     // MARK: - Сохранение player.json
 
-    private func saveToDisk(trackIds: [UUID]) {
+    @discardableResult
+    private func saveToDisk(trackIds: [UUID]) -> Bool {
         guard let url = FileManager.default.urls(for: .documentDirectory,
                                                  in: .userDomainMask).first?
             .appendingPathComponent(fileName)
-        else { return }
+        else {
+            return false
+        }
 
         let file = PlayerFile(trackIds: trackIds)
         do {
             let data = try JSONEncoder().encode(file)
             try data.write(to: url, options: .atomic)
             print("💾 Сохранён player.json (\(trackIds.count) ids)")
+            return true
         } catch {
             print("❌ Ошибка сохранения player.json: \(error)")
+            return false
         }
     }
 
-    func saveToDisk() {
+    @discardableResult
+    func saveToDisk() -> Bool {
         let ids = tracks.map { $0.id }
-        saveToDisk(trackIds: ids)
+        return saveToDisk(trackIds: ids)
     }
 
     // MARK: - Добавление треков в плеер
 
-    func addTracks(ids: [UUID]) async {
+    @discardableResult
+    func addTracks(ids: [UUID]) async -> Bool {
         for id in ids {
             let track = await makePlayerTrack(from: id)
             tracks.append(track)
         }
-        saveToDisk()
+        return saveToDisk()
     }
 
     // MARK: - Удаление треков
 
-    func remove(at index: Int) {
-        guard index < tracks.count else { return }
+    @discardableResult
+    func remove(at index: Int) -> Bool {
+        guard index < tracks.count else { return false }
         tracks.remove(at: index)
-        saveToDisk()
+        return saveToDisk()
     }
 
-    func clear() {
+    @discardableResult
+    func clear() -> Bool {
         tracks = []
-        saveToDisk()
+        return saveToDisk()
     }
 }

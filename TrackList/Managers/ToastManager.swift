@@ -131,11 +131,11 @@ final class ToastManager: ObservableObject {
                 message: "Плеер сохранён"
             )
 
-        case let .exportFinished(targetName):
+        case let .exportPrepared(targetName):
             return ToastData(
                 style: .trackList(name: targetName),
                 artworkImage: nil,
-                message: "Экспорт завершён"
+                message: "Файлы «\(targetName)» подготовлены к экспорту"
             )
 
         // MARK: - Фонотека
@@ -218,7 +218,7 @@ final class ToastManager: ObservableObject {
 
         case let .trackUnavailable(title):
             return ToastData(
-                style: .track(title: title, artist: ""),
+                style: .track(title: title ?? "", artist: ""),
                 artworkImage: nil,
                 message: "Трек недоступен"
             )
@@ -246,7 +246,7 @@ final class ToastManager: ObservableObject {
 
         case let .libraryAccessNeedsRestore(folderName):
             return ToastData(
-                style: .trackList(name: folderName),
+                style: .trackList(name: folderName ?? ""),
                 artworkImage: nil,
                 message: "Нужен доступ к папке"
             )
@@ -256,6 +256,13 @@ final class ToastManager: ObservableObject {
                 style: .trackList(name: ""),
                 artworkImage: nil,
                 message: "Трек не найден в фонотеке"
+            )
+
+        case .folderNotFound:
+            return ToastData(
+                style: .trackList(name: ""),
+                artworkImage: nil,
+                message: "Папка не найдена"
             )
 
         case .artworkCouldNotBeLoaded:
@@ -276,9 +283,16 @@ final class ToastManager: ObservableObject {
 
         case let .playbackFailed(title):
             return ToastData(
-                style: .track(title: title, artist: ""),
+                style: .track(title: title ?? "", artist: ""),
                 artworkImage: nil,
                 message: "Не удалось воспроизвести трек"
+            )
+
+        case .audioSessionFailed:
+            return ToastData(
+                style: .trackList(name: ""),
+                artworkImage: nil,
+                message: "Не удалось подготовить звук"
             )
 
         case .trackListSaveFailed:
@@ -332,7 +346,7 @@ final class ToastManager: ObservableObject {
 
         case let .libraryAccessDenied(folderName):
             return ToastData(
-                style: .trackList(name: folderName),
+                style: .trackList(name: folderName ?? ""),
                 artworkImage: nil,
                 message: "Нет доступа к папке"
             )

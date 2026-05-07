@@ -13,76 +13,78 @@ import Foundation
 import UniformTypeIdentifiers
 
 final class ExportManager {
-
     static let shared = ExportManager()
-
-    // MARK: - Экспорт через временную папку ExportTemp
-
-    func exportViaTempAndPicker(_ tracks: [Track], presenter: UIViewController) {
-        Task { await self.performExport(tracks, presenter: presenter) }
+    struct ExportResult {
+        let exported: Int
+        let failed: Int
     }
-
-    private func performExport(_ tracks: [Track], presenter: UIViewController) async {
+    // MARK: - Экспорт через временную папку ExportTemp
+    func exportViaTempAndPicker(
+        _ tracks: [Track],
+        presenter: UIViewController
+    ) async throws -> ExportResult {
         let tempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("ExportTemp", isDirectory: true)
-
-        try? FileManager.default.removeItem(at: tempDir)
-        try? FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
-
+        do {
+            try FileManager.default.removeItemIfExists(at: tempDir)
+            try FileManager.default.createDirectory(
+                at: tempDir,
+                withIntermediateDirectories: true
+            )
+        } catch {
+            throw AppError.exportFailed
+        }
         var copiedFiles: [URL] = []
-
+        var failedCount = 0
         for (index, track) in tracks.enumerated() {
             do {
                 guard let sourceURL = await BookmarkResolver.url(forTrack: track.id) else {
-                    print("❌ Не удалось получить URL из BookmarkResolver для \(track.fileName)")
+                    failedCount += 1
                     continue
                 }
-
                 let didStartAccess = sourceURL.startAccessingSecurityScopedResource()
                 defer {
-                    if didStartAccess {sourceURL.stopAccessingSecurityScopedResource()}
+                    if didStartAccess { sourceURL.stopAccessingSecurityScopedResource() }
                 }
-
-                if !didStartAccess {
-                    print("ℹ️ startAccessing вернул false для \(track.fileName), пробуем экспорт через уже восстановленный доступ")
-                }
-
                 guard FileManager.default.fileExists(atPath: sourceURL.path) else {
-                    print("❌ Файл не найден по пути \(sourceURL.lastPathComponent)")
+                    failedCount += 1
                     continue
                 }
-
                 let prefix = String(format: "%02d", index + 1)
                 let exportName = "\(prefix) \(track.fileName)"
                 let dstURL = tempDir.appendingPathComponent(exportName)
-
-                if FileManager.default.fileExists(atPath: dstURL.path) {
-                    try FileManager.default.removeItem(at: dstURL)
-                }
-
+                try FileManager.default.removeItemIfExists(at: dstURL)
                 try FileManager.default.copyItem(at: sourceURL, to: dstURL)
                 copiedFiles.append(dstURL)
-
-                print("✅ Подготовлен к экспорту: \(exportName)")
             } catch {
-                print("❌ Ошибка экспорта \(track.fileName): \(error)")
+                failedCount += 1
             }
         }
-
+        guard !copiedFiles.isEmpty else {
+            throw AppError.exportNoFilesPrepared
+        }
         let filesToExport = copiedFiles
-
         await MainActor.run {
-            guard !filesToExport.isEmpty else {
-                print("⚠️ Нет файлов для экспорта")
-                return
-            }
-
             let picker = UIDocumentPickerViewController(
                 forExporting: filesToExport,
                 asCopy: true
             )
             picker.shouldShowFileExtensions = true
             presenter.present(picker, animated: true)
+        }
+        return ExportResult(
+            exported: filesToExport.count,
+            failed: failedCount
+        )
+    }
+
+}
+
+private extension FileManager {
+    /// Удаляет файл или папку, если они существуют.
+    func removeItemIfExists(at url: URL) throws {
+        if fileExists(atPath: url.path) {
+            try removeItem(at: url)
         }
     }
 }

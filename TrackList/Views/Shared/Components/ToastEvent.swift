@@ -45,8 +45,8 @@ enum ToastEvent: Equatable {
 
     case playlistSaved
 
-    /// Экспорт завершен
-    case exportFinished(targetName: String)
+    /// Файлы подготовлены к экспорту
+    case exportPrepared(targetName: String)
     
 
     // MARK: Фонотека
@@ -108,7 +108,7 @@ enum ToastEvent: Equatable {
 
     // MARK: - Warning
 
-    case trackUnavailable(title: String)
+    case trackUnavailable(title: String?)
 
     case noTracksToExport
 
@@ -116,9 +116,11 @@ enum ToastEvent: Equatable {
 
     case partialExport(exported: Int, failed: Int)
 
-    case libraryAccessNeedsRestore(folderName: String)
+    case libraryAccessNeedsRestore(folderName: String?)
 
     case showInLibraryTargetMissing
+
+    case folderNotFound
 
     case artworkCouldNotBeLoaded
 
@@ -126,7 +128,9 @@ enum ToastEvent: Equatable {
 
     case operationFailed(message: String)
 
-    case playbackFailed(title: String)
+    case playbackFailed(title: String?)
+
+    case audioSessionFailed
 
     case trackListSaveFailed
 
@@ -142,7 +146,7 @@ enum ToastEvent: Equatable {
 
     case tagWriteFailed
 
-    case libraryAccessDenied(folderName: String)
+    case libraryAccessDenied(folderName: String?)
 
     case presenterUnavailable
 }

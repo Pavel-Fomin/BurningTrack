@@ -26,6 +26,7 @@ enum LibraryFileError: LocalizedError {
     case destinationAlreadyExists
     case moveFailed(underlying: Error)
     case bookmarkCreationFailed
+    case relativePathFailed
 
     var errorDescription: String? {
         switch self {
@@ -43,6 +44,8 @@ enum LibraryFileError: LocalizedError {
             return "Не удалось выполнить файловую операцию: \(underlying.localizedDescription)"
         case .bookmarkCreationFailed:
             return "Не удалось создать новый bookmark для файла."
+        case .relativePathFailed:
+            return "Не удалось обновить путь файла в фонотеке."
         }
     }
 }
@@ -70,23 +73,25 @@ actor LibraryFileManager {
         using playerManager: PlayerManager
     ) async throws {
 
+        // 1. Запрещаем перемещение файла, если он сейчас занят плеером.
+        guard !playerManager.isBusy(trackId) else {
+            throw LibraryFileError.trackIsPlaying
+        }
+
         
 
         // 2. Берём метаданные трека
         guard let entry = await TrackRegistry.shared.entry(for: trackId) else {
-            print("❌ TrackRegistry: трек \(trackId) не найден")
             throw LibraryFileError.trackNotFound
         }
 
         // 3. Получаем исходный URL файла через bookmark трека
         guard let sourceURL = await BookmarkResolver.url(forTrack: trackId) else {
-            print("❌ Не удалось восстановить URL файла для трека \(trackId)")
             throw LibraryFileError.sourceURLUnavailable
         }
 
         // 4. Получаем модель целевой папки из структуры фонотеки
         guard let destinationFolder = await MusicLibraryManager.shared.folder(for: destinationFolderId) else {
-            print("❌ MusicLibraryManager: папка \(destinationFolderId) не найдена в дереве фонотеки")
             throw LibraryFileError.destinationFolderUnavailable
         }
 
@@ -102,7 +107,6 @@ actor LibraryFileManager {
 
         // 5. Проверяем, нет ли файла с таким именем в целевой папке
         if FileManager.default.fileExists(atPath: destinationURL.path) {
-            print("⚠️ В целевой папке уже есть файл \(fileName)")
             throw LibraryFileError.destinationAlreadyExists
         }
 
@@ -113,7 +117,6 @@ actor LibraryFileManager {
         let sourceStarted = sourceURL.startAccessingSecurityScopedResource()
 
         guard let rootFolderURL = await BookmarkResolver.url(forFolder: entry.rootFolderId) else {
-            print("❌ Не удалось восстановить URL корневой папки для id \(entry.rootFolderId)")
             throw LibraryFileError.destinationFolderUnavailable
         }
 
@@ -129,13 +132,11 @@ actor LibraryFileManager {
             try FileManager.default.moveItem(at: sourceURL, to: destinationURL)
             print("✅ Файл перемещён:\n    from: \(sourceURL.path)\n      to: \(destinationURL.path)")
         } catch {
-            print("❌ Ошибка перемещения файла: \(error)")
             throw LibraryFileError.moveFailed(underlying: error)
         }
 
         // 8. Создаём новый bookmark для обновлённого пути
         guard let newBookmarkBase64 = BookmarkResolver.makeBookmarkBase64(for: destinationURL) else {
-            print("❌ Не удалось создать bookmark для файла:", destinationURL.path)
             throw LibraryFileError.bookmarkCreationFailed
         }
 
@@ -147,13 +148,7 @@ actor LibraryFileManager {
         // 9. Строим новый relativePath
         // Получаем URL новой корневой папки
         guard let newRootFolderURL = await BookmarkResolver.url(forFolder: destinationFolderId) else {
-            throw LibraryFileError.moveFailed(
-                underlying: NSError(
-                    domain: "LibraryFileManager",
-                    code: 1002,
-                    userInfo: [NSLocalizedDescriptionKey: "Не удалось получить root URL целевой папки"]
-                )
-            )
+            throw LibraryFileError.destinationFolderUnavailable
         }
 
         // Считаем relativePath относительно НОВОГО root
@@ -201,15 +196,18 @@ actor LibraryFileManager {
         using playerManager: PlayerManager
     ) async throws {
         
+        // 1. Запрещаем переименование файла, если он сейчас занят плеером.
+        guard !playerManager.isBusy(trackId) else {
+            throw LibraryFileError.trackIsPlaying
+        }
+
         // 2. Берём метаданные трека
         guard let entry = await TrackRegistry.shared.entry(for: trackId) else {
-            print("❌ TrackRegistry: трек \(trackId) не найден")
             throw LibraryFileError.trackNotFound
         }
         
         // 3. URL файла через bookmark трека
         guard let sourceURL = await BookmarkResolver.url(forTrack: trackId) else {
-            print("❌ Не удалось восстановить URL файла для трека \(trackId)")
             throw LibraryFileError.sourceURLUnavailable
         }
         
@@ -224,7 +222,6 @@ actor LibraryFileManager {
         
         // Проверяем, нет ли файла с таким именем
         if FileManager.default.fileExists(atPath: destinationURL.path) {
-            print("⚠️ В папке уже есть файл \(newFileName)")
             throw LibraryFileError.destinationAlreadyExists
         }
         
@@ -240,14 +237,12 @@ actor LibraryFileManager {
             try FileManager.default.moveItem(at: sourceURL, to: destinationURL)
             print("✅ Файл переименован:\n    from: \(sourceURL.lastPathComponent)\n      to: \(destinationURL.lastPathComponent)")
         } catch {
-            print("❌ Ошибка переименования файла: \(error)")
             throw LibraryFileError.moveFailed(underlying: error)
         }
         
         // 5. Новый bookmark для нового имени
         guard let newBookmarkBase64 = BookmarkResolver.makeBookmarkBase64(for: destinationURL) else {
-            print("❌ Не удалось создать bookmark для файла:", destinationURL.path)
-            return
+            throw LibraryFileError.bookmarkCreationFailed
         }
         
         await BookmarksRegistry.shared.upsertTrackBookmark(
@@ -257,7 +252,6 @@ actor LibraryFileManager {
         
         // 6. Получаем rootURL, чтобы корректно пересчитать relativePath
         guard let rootFolderURL = await BookmarkResolver.url(forFolder: entry.rootFolderId) else {
-            print("❌ Не удалось восстановить URL корневой папки для id \(entry.rootFolderId)")
             throw LibraryFileError.destinationFolderUnavailable
         }
         

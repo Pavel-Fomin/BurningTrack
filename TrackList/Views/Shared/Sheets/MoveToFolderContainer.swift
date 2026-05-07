@@ -101,8 +101,10 @@ struct MoveToFolderContainer: View {
                 using: playerManager
             )
             SheetManager.shared.closeActive()
+        } catch let appError as AppError {
+            ToastManager.shared.handle(appError)
         } catch {
-            print("❌ Ошибка перемещения трека: \(error.localizedDescription)")
+            ToastManager.shared.handle(.fileMoveFailed)
         }
     }
 }

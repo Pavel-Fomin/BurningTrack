@@ -27,9 +27,19 @@ struct PlayerScreen: View {
             }
             .playerToolbar(
                 trackCount: PlaylistManager.shared.tracks.count,
-                onSave: {PlaylistManager.shared.saveToDisk()},
+                onSave: {
+                    if PlaylistManager.shared.saveToDisk() {
+                        ToastManager.shared.handle(.playlistSaved)
+                    } else {
+                        ToastManager.shared.handle(.playlistSaveFailed)
+                    }
+                },
                 onExport: {handleExport()},
-                onClear: {PlaylistManager.shared.clear()}
+                onClear: {
+                    Task {
+                        await AppCommandExecutor.shared.clearPlayer()
+                    }
+                }
             )
         }
     }
@@ -38,14 +48,25 @@ struct PlayerScreen: View {
         let tracks = PlaylistManager.shared.tracks.map {$0.asTrack()}
 
         guard !tracks.isEmpty else {
-            print("❌ Нет треков для экспорта")
+            ToastManager.shared.handle(.noTracksToExport)
             return
         }
 
         if let topVC = UIApplication.topViewController() {
-            ExportManager.shared.exportViaTempAndPicker(tracks, presenter: topVC)
+            Task {
+                do {
+                    _ = try await ExportManager.shared.exportViaTempAndPicker(
+                        tracks,
+                        presenter: topVC
+                    )
+                } catch let appError as AppError {
+                    ToastManager.shared.handle(appError)
+                } catch {
+                    ToastManager.shared.handle(.exportFailed)
+                }
+            }
         } else {
-            print("❌ Не удалось получить topViewController")
+            ToastManager.shared.handle(.presenterUnavailable)
         }
     }
 }

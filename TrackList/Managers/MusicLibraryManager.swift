@@ -66,99 +66,86 @@ final class MusicLibraryManager: ObservableObject {
 
     // MARK: - Добавление папки: сохраняем bookmark, регистрируем, синхронизируем
 
-    func saveBookmark(for url: URL) {
-        Task {
-            // 0. Bootstrap-доступ
-            guard url.startAccessingSecurityScopedResource() else {
-                print("❌ saveBookmark: не удалось начать доступ к папке:", url.path)
-                return
-            }
+    func saveBookmark(for url: URL) async throws {
+        // 0. Bootstrap-доступ
+        guard url.startAccessingSecurityScopedResource() else {
+            throw AppError.libraryFolderAccessDenied
+        }
 
-            // Держим доступ открытым на весь runtime (как для восстановленных папок)
-            let rootFolderId = url.libraryFolderId
-            activeRootFolderAccess[rootFolderId] = url
+        // Держим доступ открытым на весь runtime (как для восстановленных папок)
+        let rootFolderId = url.libraryFolderId
+        activeRootFolderAccess[rootFolderId] = url
 
-            // 1. Создание bookmark для корневой папки
-            guard let bookmarkBase64 = BookmarkResolver.makeBookmarkBase64(for: url) else {
-                print("❌ saveBookmark: не удалось создать bookmark для папки")
-                return
-            }
+        // 1. Создание bookmark для корневой папки
+        guard let bookmarkBase64 = BookmarkResolver.makeBookmarkBase64(for: url) else {
+            activeRootFolderAccess.removeValue(forKey: rootFolderId)
+            url.stopAccessingSecurityScopedResource()
+            throw AppError.bookmarkCreateFailed
+        }
 
-            let rootFolderName = url.lastPathComponent
+        let rootFolderName = url.lastPathComponent
 
-            await BookmarksRegistry.shared.upsertFolderBookmark(
-                id: rootFolderId,
-                base64: bookmarkBase64
-            )
+        await BookmarksRegistry.shared.upsertFolderBookmark(
+            id: rootFolderId,
+            base64: bookmarkBase64
+        )
 
-            // 2. Строим дерево папки для UI (сканер используется только для UI-модели)
-            let rootTree = await buildFolderTree(from: url)
+        // 2. Строим дерево папки для UI (сканер используется только для UI-модели)
+        let rootTree = await buildFolderTree(from: url)
 
-            // 3. Регистрируем саму папку (только метаданные)
-            await TrackRegistry.shared.upsertFolder(
-                id: rootFolderId,
-                name: rootFolderName
-            )
+        // 3. Регистрируем саму папку (только метаданные)
+        await TrackRegistry.shared.upsertFolder(
+            id: rootFolderId,
+            name: rootFolderName
+        )
 
-            // 4. Синхронизируем реестры по фактическому состоянию ФС (ТОЛЬКО через sync-модуль)
-            await LibrarySyncModule.shared.syncRootFolder(
-                rootFolderId: rootFolderId,
-                rootURL: url,
-                mode: .full
-            )
+        // 4. Синхронизируем реестры по фактическому состоянию ФС (ТОЛЬКО через sync-модуль)
+        await LibrarySyncModule.shared.syncRootFolder(
+            rootFolderId: rootFolderId,
+            rootURL: url,
+            mode: .full
+        )
 
-            // 5. Обновляем UI
-            await MainActor.run {
-                if attachedFolders.contains(where: { $0.url == url }) == false {
-                    attachedFolders.insert(rootTree, at: 0)
-                }
-            }
-
-            print("📁 Папка добавлена и синхронизирована:", rootFolderName)
+        // 5. Обновляем UI
+        if attachedFolders.contains(where: { $0.url == url }) == false {
+            attachedFolders.insert(rootTree, at: 0)
         }
     }
 
     // MARK: - Удаление прикреплённой папки
 
-    func removeBookmark(for url: URL) {
-        Task {
+    func removeBookmark(for url: URL) async throws {
 
-            // Получаем id корневой папки из её URL
-            let rootFolderId = url.libraryFolderId
+        // Получаем id корневой папки из её URL
+        let rootFolderId = url.libraryFolderId
 
-            // Закрываем активный доступ к папке (security-scoped resource),
-            // если он был открыт ранее при restoreAccess
-            if let activeURL = activeRootFolderAccess[rootFolderId] {
-                activeURL.stopAccessingSecurityScopedResource()
-                activeRootFolderAccess.removeValue(forKey: rootFolderId)
-            }
-
-            // Получаем все треки, принадлежащие этой корневой папке
-            let tracksInFolder = await TrackRegistry.shared.tracks(inRootFolder: rootFolderId)
-
-            // Удаляем bookmarks для каждого трека из этой папки
-            for track in tracksInFolder {
-                await BookmarksRegistry.shared.removeTrackBookmark(id: track.id)
-            }
-
-            // Удаляем bookmark самой папки
-            await BookmarksRegistry.shared.removeFolderBookmark(id: rootFolderId)
-
-            // Удаляем папку и связанные с ней треки из TrackRegistry
-            await TrackRegistry.shared.removeFolder(id: rootFolderId)
-
-            // Сохраняем изменения реестров на диск
-            await TrackRegistry.shared.persist()
-            await BookmarksRegistry.shared.persist()
-
-            // Обновляем UI-список прикреплённых папок
-            await MainActor.run {
-                attachedFolders.removeAll { $0.url == url }
-            }
-
-            // Лог для отладки
-            print("📁 Папка откреплена:", url.lastPathComponent)
+        // Закрываем активный доступ к папке (security-scoped resource),
+        // если он был открыт ранее при restoreAccess
+        if let activeURL = activeRootFolderAccess[rootFolderId] {
+            activeURL.stopAccessingSecurityScopedResource()
+            activeRootFolderAccess.removeValue(forKey: rootFolderId)
         }
+
+        // Получаем все треки, принадлежащие этой корневой папке
+        let tracksInFolder = await TrackRegistry.shared.tracks(inRootFolder: rootFolderId)
+
+        // Удаляем bookmarks для каждого трека из этой папки
+        for track in tracksInFolder {
+            await BookmarksRegistry.shared.removeTrackBookmark(id: track.id)
+        }
+
+        // Удаляем bookmark самой папки
+        await BookmarksRegistry.shared.removeFolderBookmark(id: rootFolderId)
+
+        // Удаляем папку и связанные с ней треки из TrackRegistry
+        await TrackRegistry.shared.removeFolder(id: rootFolderId)
+
+        // Сохраняем изменения реестров на диск
+        await TrackRegistry.shared.persist()
+        await BookmarksRegistry.shared.persist()
+
+        // Обновляем UI-список прикреплённых папок
+        attachedFolders.removeAll { $0.url == url }
     }
     
     // MARK: - Проверка перед откреплением папки

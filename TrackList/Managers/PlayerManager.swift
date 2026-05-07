@@ -56,71 +56,65 @@ final class PlayerManager {
 
     // MARK: - Main Playback
 
-    func play(track: any TrackDisplayable) {
-        Task {
-            let trackId = track.id
+    func play(track: any TrackDisplayable) async throws {
+        let trackId = track.id
 
-            // 1. resolvedURL — через BookmarkResolver
-            guard let resolvedURL = await BookmarkResolver.url(forTrack: trackId) else {
-                print("❌ Нет URL в BookmarksRegistry для \(trackId)")
-                PersistentLogger.log("❌ PlayerManager: no URL for trackId=\(trackId)")
-                return
-            }
+        // 1. resolvedURL — через BookmarkResolver
+        guard let resolvedURL = await BookmarkResolver.url(forTrack: trackId) else {
+            PersistentLogger.log("❌ PlayerManager: no URL for trackId=\(trackId)")
+            throw AppError.bookmarkResolveFailed
+        }
 
-            // 2. Активация аудиосессии
-            do {
-                try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
-                try AVAudioSession.sharedInstance().setActive(true)
-            } catch {
-                print("❌ Ошибка активации аудиосессии: \(error)")
-            }
+        // 2. Активация аудиосессии
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+            try AVAudioSession.sharedInstance().setActive(true)
+        } catch {
+            PersistentLogger.log("❌ PlayerManager: audio session failed error=\(error)")
+            throw AppError.audioSessionFailed
+        }
 
-            // 3. Закрываем старый доступ
-            stopAccessingCurrentTrack()
+        // 3. Закрываем старый доступ
+        stopAccessingCurrentTrack()
 
-            // 4. Открываем новый доступ
-            // 4. Пытаемся открыть доступ к файлу.
-            // В iOS 26 (File Provider Storage) startAccessing на файл может вернуть false,
-            // при этом доступ может быть получен через root-scope папки.
-            let started = resolvedURL.startAccessingSecurityScopedResource()
-            if started {
-                currentAccessedURL = resolvedURL
-            } else {
-                currentAccessedURL = nil
-                print("⚠️ startAccessing вернул false для файла, пробуем играть через root-scope:", resolvedURL.lastPathComponent)
-                PersistentLogger.log("⚠️ PlayerManager: startAccessing false file=\(resolvedURL.lastPathComponent)")
-            }
+        // 4. Пытаемся открыть доступ к файлу.
+        // В iOS 26 (File Provider Storage) startAccessing на файл может вернуть false,
+        // при этом доступ может быть получен через root-scope папки.
+        let started = resolvedURL.startAccessingSecurityScopedResource()
+        if started {
+            currentAccessedURL = resolvedURL
+        } else {
+            currentAccessedURL = nil
+            print("⚠️ startAccessing вернул false для файла, пробуем играть через root-scope:", resolvedURL.lastPathComponent)
+            PersistentLogger.log("⚠️ PlayerManager: startAccessing false file=\(resolvedURL.lastPathComponent)")
+        }
 
-            // 5. Создаём AVPlayerItem
-            let item = AVPlayerItem(url: resolvedURL)
+        // 5. Создаём AVPlayerItem
+        let item = AVPlayerItem(url: resolvedURL)
+        do {
+            _ = try await item.asset.load(.isPlayable)
+        } catch {
+            PersistentLogger.log("❌ PlayerManager: not playable error=\(error)")
+            throw AppError.fileNotPlayable
+        }
 
-            do {
-                _ = try await item.asset.load(.isPlayable)
-            } catch {
-                print("❌ Трек не проигрывается: \(error)")
-                PersistentLogger.log("❌ PlayerManager: not playable error=\(error)")
-                return
-            }
+        // 6. Подключаем item и играем
+        player.replaceCurrentItem(with: item)
+        player.play()
+        PersistentLogger.log("▶️ PlayerManager: play started track=\(resolvedURL.lastPathComponent)")
 
-            // 6. Подключаем item и играем
-            player.replaceCurrentItem(with: item)
-            player.play()
-            PersistentLogger.log("▶️ PlayerManager: play started track=\(resolvedURL.lastPathComponent)")
+        // Обновляем состояние текущего трека
+        currentTrackId = trackId
+        isPlaying = true
 
-            // Обновляем состояние текущего трека
-            currentTrackId = trackId
-            isPlaying = true
-
-            // 7. Читаем длительность трека
-            let duration = (try? await item.asset.load(.duration))?.seconds ?? 0
-
-            await MainActor.run {
-                NotificationCenter.default.post(
-                    name: .trackDurationUpdated,
-                    object: nil,
-                    userInfo: ["duration": duration]
-                )
-            }
+        // 7. Читаем длительность трека
+        let duration = (try? await item.asset.load(.duration))?.seconds ?? 0
+        await MainActor.run {
+            NotificationCenter.default.post(
+                name: .trackDurationUpdated,
+                object: nil,
+                userInfo: ["duration": duration]
+            )
         }
     }
 

@@ -259,11 +259,22 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
 
     func exportTracks() {
         guard let topVC = UIApplication.topViewController() else {
-            print("❌ Не удалось получить topVC")
+            ToastManager.shared.handle(.presenterUnavailable)
             return
         }
 
-        ExportManager.shared.exportViaTempAndPicker(tracks, presenter: topVC)
+        Task {
+            do {
+                _ = try await ExportManager.shared.exportViaTempAndPicker(
+                    tracks,
+                    presenter: topVC
+                )
+            } catch let appError as AppError {
+                ToastManager.shared.handle(appError)
+            } catch {
+                ToastManager.shared.handle(.exportFailed)
+            }
+        }
     }
 }
 

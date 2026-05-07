@@ -123,9 +123,19 @@ struct LibraryTrackRowWrapper: View {
                 // Добавить в плеер
                 Button {
                     Task {
-                        try? await AppCommandExecutor.shared.addTrackToPlayer(
-                            trackId: track.id
-                        )
+                        do {
+                            try await AppCommandExecutor.shared.addTrackToPlayer(
+                                trackId: track.id
+                            )
+                        } catch let appError as AppError {
+                            ToastManager.shared.handle(appError)
+                        } catch {
+                            ToastManager.shared.handle(
+                                .operationFailed(
+                                    message: "Не удалось добавить трек в плеер"
+                                )
+                            )
+                        }
                     }
                 } label: {
                     Label("В плеер", systemImage: "waveform")

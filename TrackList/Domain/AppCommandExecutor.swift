@@ -46,11 +46,15 @@ actor AppCommandExecutor {
         let previousURL = await BookmarkResolver.url(forTrack: trackId)
         
         // 2. Перемещение файла
-        try await LibraryFileManager.shared.moveTrack(
-            id: trackId,
-            toFolder: folderId,
-            using: playerManager
-        )
+        do {
+            try await LibraryFileManager.shared.moveTrack(
+                id: trackId,
+                toFolder: folderId,
+                using: playerManager
+            )
+        } catch let libraryError as LibraryFileError {
+            throw appError(from: libraryError, fallback: .fileMoveFailed)
+        }
         
         // 3. Запускаем единый post-update pipeline.
         let updateEvent = await TrackUpdateCoordinator.shared.handleTrackUpdate(
@@ -102,11 +106,15 @@ actor AppCommandExecutor {
         let previousURL = await BookmarkResolver.url(forTrack: trackId)
         
         // 2. Переименовываем физический файл и обновляем реестры.
-        try await LibraryFileManager.shared.renameTrack(
-            id: trackId,
-            to: newFileName,
-            using: playerManager
-        )
+        do {
+            try await LibraryFileManager.shared.renameTrack(
+                id: trackId,
+                to: newFileName,
+                using: playerManager
+            )
+        } catch let libraryError as LibraryFileError {
+            throw appError(from: libraryError, fallback: .fileRenameFailed)
+        }
         
         // 3. Запускаем единый post-update pipeline.
         let updateEvent = await TrackUpdateCoordinator.shared.handleTrackUpdate(
@@ -137,11 +145,7 @@ actor AppCommandExecutor {
         
         /// 1. Резолвим URL трека через bookmark
         guard let url = await BookmarkResolver.url(forTrack: trackId) else {
-            throw NSError(
-                domain: "AddToTrackList",
-                code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "Не удалось получить URL трека"]
-            )
+            throw AppError.bookmarkResolveFailed
         }
         
         /// 2. Формируем модель Track для треклиста
@@ -232,7 +236,6 @@ actor AppCommandExecutor {
     ) async throws {
         
         let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard TrackListManager.shared.validateName(trimmed) else { return }
         
         // 1. Переименование
         try TrackListsManager.shared.renameTrackList(
@@ -295,11 +298,7 @@ actor AppCommandExecutor {
         
         /// 1. Резолвим URL
         guard let url = await BookmarkResolver.url(forTrack: trackId) else {
-            throw NSError(
-                domain: "AddToPlayer",
-                code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "Не удалось получить URL трека"]
-            )
+            throw AppError.bookmarkResolveFailed
         }
         
         /// 2. Получаем snapshot трека
@@ -316,9 +315,15 @@ actor AppCommandExecutor {
         )
         
         /// 4. Мутация плеера — строго на MainActor
-        await MainActor.run {
+        let didSave = await MainActor.run {
             PlaylistManager.shared.tracks.append(track)
-            PlaylistManager.shared.saveToDisk()
+            return PlaylistManager.shared.saveToDisk()
+        }
+        guard didSave else {
+            await MainActor.run {
+                PlaylistManager.shared.tracks.removeAll { $0.id == trackId }
+            }
+            throw AppError.playlistSaveFailed
         }
         
         /// 5. ToastEvent
@@ -348,9 +353,17 @@ actor AppCommandExecutor {
         let snapshot = await resolveSnapshot(for: trackId)
         
         // 2. Мутация плеера — строго MainActor
-        await MainActor.run {
+        let didRemove = await MainActor.run {
+            let previousTracks = PlaylistManager.shared.tracks
             PlaylistManager.shared.tracks.removeAll { $0.id == trackId }
-            PlaylistManager.shared.saveToDisk()
+            guard PlaylistManager.shared.saveToDisk() else {
+                PlaylistManager.shared.tracks = previousTracks
+                return false
+            }
+            return true
+        }
+        guard didRemove else {
+            throw AppError.playlistSaveFailed
         }
         
         // 3. ToastEvent строится из snapshot
@@ -378,9 +391,20 @@ actor AppCommandExecutor {
     func clearPlayer() async {
         
         // 1. Очистка — строго MainActor
-        await MainActor.run {
+        let didClear = await MainActor.run {
+            let previousTracks = PlaylistManager.shared.tracks
             PlaylistManager.shared.tracks.removeAll()
-            PlaylistManager.shared.saveToDisk()
+            guard PlaylistManager.shared.saveToDisk() else {
+                PlaylistManager.shared.tracks = previousTracks
+                return false
+            }
+            return true
+        }
+        guard didClear else {
+            await MainActor.run {
+                ToastManager.shared.handle(.playlistSaveFailed)
+            }
+            return
         }
         
         // 2. ToastEvent
@@ -467,6 +491,32 @@ actor AppCommandExecutor {
 }
 
 // MARK: - Helper's
+
+/// Преобразует файловую ошибку фонотеки в ошибку пользовательского уровня.
+///
+/// LibraryFileManager остаётся низкоуровневым файловым слоем.
+/// AppCommandExecutor переводит техническую причину в AppError,
+/// который дальше маппится в ToastEvent.
+private func appError(from error: LibraryFileError, fallback: AppError) -> AppError {
+    switch error {
+    case .trackIsPlaying:
+        return .fileAccessDenied
+    case .trackNotFound:
+        return .trackNotFound
+    case .sourceURLUnavailable:
+        return .bookmarkResolveFailed
+    case .destinationFolderUnavailable:
+        return .libraryFolderUnavailable
+    case .destinationAlreadyExists:
+        return .fileAlreadyExists
+    case .moveFailed:
+        return fallback
+    case .bookmarkCreationFailed:
+        return .bookmarkCreateFailed
+    case .relativePathFailed:
+        return fallback
+    }
+}
 
 /// Определяет MIME-тип изображения по сигнатуре данных.
 /// Сейчас поддерживаем PNG и JPEG.
