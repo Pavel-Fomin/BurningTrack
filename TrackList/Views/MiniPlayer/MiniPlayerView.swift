@@ -68,21 +68,17 @@ struct MiniPlayerView: View {
                     }
                 )
             }
-            .background(
-                GeometryReader { proxy in
-                    Color.clear
-                        .preference(key: MiniPlayerHeightPreferenceKey.self, value: proxy.size.height)
-                }
-            )
-            .padding(.horizontal, 12)
-            .padding(.vertical, 12)
-            .background(.ultraThinMaterial, in: shape)
-            .overlay(shape.stroke(Color(uiColor: .separator).opacity(0.7), lineWidth: 1))
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .shadow(color: Color.black.opacity(0.12), radius: 10, x: 0, y: 6)
-            .shadow(color: Color.black.opacity(0.06), radius: 2, x: 0, y: 1)
-            .padding(.horizontal, 16)
-            .padding(.bottom, 24)
-        )
+                .background(
+                        GeometryReader { proxy in
+                            Color.clear
+                                .preference(key: MiniPlayerHeightPreferenceKey.self, value: proxy.size.height)
+                        }
+                    )
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 12)
+                    .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 24)
+                )
     }
 }

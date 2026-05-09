@@ -26,7 +26,6 @@ struct ToastView: View {
                 
                 if let artworkImage = data.artworkImage {
                     
-                    // Обложка
                     artworkImage
                         .resizable()
                         .scaledToFill()
@@ -34,23 +33,20 @@ struct ToastView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 64, style: .continuous))
                     
                     VStack(alignment: .leading, spacing: 2) {
-                        
-                           // ARTIST
-                           Text(artistText)
-                               .font(.subheadline.weight(.semibold))
-                               .foregroundStyle(.primary)
-                               .opacity(0.8)
-                               .lineLimit(1)
-                               .truncationMode(.tail)
+                        Text(artistText)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.primary)
+                            .opacity(0.8)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
 
-                           // TITLE
-                           Text(titleText)
-                               .font(.caption)
-                               .foregroundStyle(.primary)
-                               .opacity(0.8)
-                               .lineLimit(1)
-                               .truncationMode(.tail)
-                       }
+                        Text(titleText)
+                            .font(.caption)
+                            .foregroundStyle(.primary)
+                            .opacity(0.8)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
                     
                 } else {
                     Text(data.message)
@@ -76,11 +72,10 @@ struct ToastView: View {
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
         }
-        
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .frame(height: height)
-        .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(.ultraThinMaterial))
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         .padding(.horizontal, 16)
     }
     
