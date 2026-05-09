@@ -179,22 +179,17 @@ struct TrackDetailContainer: View {
 
         Task {
             do {
-                if fileChanged {
-                    try await AppCommandExecutor.shared.renameTrack(
-                        trackId: track.id,
-                        to: newFullName,
-                        using: playerManager
-                    )
-                }
-
-                if tagsChanged || artworkChanged {
-                    let patch = buildTagWritePatch()
-                    try await AppCommandExecutor.shared.updateTrackTags(
-                        trackId: track.id,
-                        patch: patch,
-                        artworkAction: artworkAction
-                    )
-                }
+                let patch = buildTagWritePatch()
+                try await AppCommandExecutor.shared.saveTrackEdits(
+                    trackId: track.id,
+                    newFileName: newFullName,
+                    fileChanged: fileChanged,
+                    patch: patch,
+                    tagsChanged: tagsChanged,
+                    artworkAction: artworkAction,
+                    artworkChanged: artworkChanged,
+                    using: playerManager
+                )
 
                 await MainActor.run {
                     if let snapshot = TrackRuntimeStore.shared.snapshot(forTrackId: track.id) {

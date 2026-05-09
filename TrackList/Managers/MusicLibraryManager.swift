@@ -100,7 +100,7 @@ final class MusicLibraryManager: ObservableObject {
         )
 
         // 4. Синхронизируем реестры по фактическому состоянию ФС (ТОЛЬКО через sync-модуль)
-        await LibrarySyncModule.shared.syncRootFolder(
+        try await LibrarySyncModule.shared.syncRootFolder(
             rootFolderId: rootFolderId,
             rootURL: url,
             mode: .full
@@ -140,9 +140,11 @@ final class MusicLibraryManager: ObservableObject {
         // Удаляем папку и связанные с ней треки из TrackRegistry
         await TrackRegistry.shared.removeFolder(id: rootFolderId)
 
-        // Сохраняем изменения реестров на диск
-        await TrackRegistry.shared.persist()
-        await BookmarksRegistry.shared.persist()
+        // Сохраняем оба реестра только после обновления памяти.
+        // Если запись на диск не прошла, ошибка должна дойти до UI,
+        // чтобы success-toast не был показан ложно.
+        try await BookmarksRegistry.shared.persist()
+        try await TrackRegistry.shared.persist()
 
         // Обновляем UI-список прикреплённых папок
         attachedFolders.removeAll { $0.url == url }
@@ -272,22 +274,32 @@ final class MusicLibraryManager: ObservableObject {
         
         /// Сначала выполняем безопасную синхронизацию без удалений.
         for root in rootsToSync {
-            await LibrarySyncModule.shared.syncRootFolder(
-                rootFolderId: root.id,
-                rootURL: root.url,
-                mode: .safe
-            )
-            print("🔄 Safe sync завершён:", root.name)
+            do {
+                try await LibrarySyncModule.shared.syncRootFolder(
+                    rootFolderId: root.id,
+                    rootURL: root.url,
+                    mode: .safe
+                )
+                print("🔄 Safe sync завершён:", root.name)
+            } catch {
+                print("❌ Safe sync не завершён:", root.name, error)
+                PersistentLogger.log("❌ restoreAccessAsync: safe sync failed: \(root.name), error: \(error)")
+            }
         }
         
         /// После безопасной синхронизации выполняем полную.
         for root in rootsToSync {
-            await LibrarySyncModule.shared.syncRootFolder(
-                rootFolderId: root.id,
-                rootURL: root.url,
-                mode: .full
-            )
-            print("🔄 Full sync завершён:", root.name)
+            do {
+                try await LibrarySyncModule.shared.syncRootFolder(
+                    rootFolderId: root.id,
+                    rootURL: root.url,
+                    mode: .full
+                )
+                print("🔄 Full sync завершён:", root.name)
+            } catch {
+                print("❌ Full sync не завершён:", root.name, error)
+                PersistentLogger.log("❌ restoreAccessAsync: full sync failed: \(root.name), error: \(error)")
+            }
         }
         
         PersistentLogger.log("✅ restoreAccessAsync: sync finished")
@@ -320,11 +332,16 @@ final class MusicLibraryManager: ObservableObject {
                 return
             }
 
-            await LibrarySyncModule.shared.syncRootFolder(
-                rootFolderId: root.id,
-                rootURL: root.url,
-                mode: .safe
-            )
+            do {
+                try await LibrarySyncModule.shared.syncRootFolder(
+                    rootFolderId: root.id,
+                    rootURL: root.url,
+                    mode: .safe
+                )
+            } catch {
+                print("❌ syncFolderIfNeeded: sync failed:", error)
+                PersistentLogger.log("❌ syncFolderIfNeeded: sync failed for nested folder: \(folderId), error: \(error)")
+            }
 
             return
         }
@@ -336,11 +353,16 @@ final class MusicLibraryManager: ObservableObject {
         }
 
         // 3. Запускаем sync
-        await LibrarySyncModule.shared.syncRootFolder(
-            rootFolderId: rootFolderId,
-            rootURL: rootURL,
-            mode: .safe
-        )
+        do {
+            try await LibrarySyncModule.shared.syncRootFolder(
+                rootFolderId: rootFolderId,
+                rootURL: rootURL,
+                mode: .safe
+            )
+        } catch {
+            print("❌ syncFolderIfNeeded: sync failed:", error)
+            PersistentLogger.log("❌ syncFolderIfNeeded: sync failed for root folder: \(rootFolderId), error: \(error)")
+        }
     }
     
 

@@ -45,7 +45,7 @@ actor LibrarySyncModule {
         rootFolderId: UUID,
         rootURL: URL,
         mode: SyncMode
-    ) async {
+    ) async throws {
         
         /// Защита от разрушительного sync во время boot процесса.
         /// Если библиотека ещё не перешла в состояние ready,
@@ -115,7 +115,7 @@ actor LibrarySyncModule {
             // Если запись уже была в реестре, сохраняем её старый trackId.
             let existingEntry = existingByRelativePath[relativePath]
 
-            let trackId = await TrackIdentityResolver.shared.trackId(
+            let trackId = try await TrackIdentityResolver.shared.trackId(
                 forRootFolderId: rootFolderId,
                 relativePath: relativePath,
                 preferredExistingId: existingEntry?.id
@@ -149,14 +149,14 @@ actor LibrarySyncModule {
 
                 // Трек реально исчез из библиотеки.
                 // Значит его library identity тоже нужно забыть.
-                await TrackIdentityResolver.shared.unbindLibraryTrack(
+                try await TrackIdentityResolver.shared.unbindLibraryTrack(
                     rootFolderId: entry.rootFolderId,
                     relativePath: entry.relativePath
                 )
 
                 // И дополнительно очищаем все привязки к этому trackId,
                 // чтобы потом другой файл по старому пути не воскресил старый id.
-                await TrackIdentityResolver.shared.forgetTrack(id: entry.id)
+                try await TrackIdentityResolver.shared.forgetTrack(id: entry.id)
             }
         }
         // 6) Persist выполняется только после валидной синхронизации.
@@ -164,8 +164,10 @@ actor LibrarySyncModule {
         // - библиотека находится в состоянии ready
         // - доступ к rootURL успешно открыт
         // - scanner вернул надёжный непустой результат
-        await TrackRegistry.shared.persist()
-        await BookmarksRegistry.shared.persist()
+        // Сохраняем результат синхронизации после обновления памяти.
+        // Если запись реестров не прошла, sync не должен считаться успешным.
+        try await TrackRegistry.shared.persist()
+        try await BookmarksRegistry.shared.persist()
         
         let removedCount = mode == .full ? existing.count - aliveIds.count : 0
         print("✅ syncRootFolder завершён:", rootURL.lastPathComponent, "режим:", mode, "файлов:", scanned.count, "удалено:", removedCount)

@@ -82,19 +82,17 @@ actor BookmarksRegistry {
 
     // MARK: - Сохранение
 
-    func persist() {
+    func persist() throws {
         let file = BookmarkFile(
             folders: folderBookmarks.values.sorted { $0.updatedAt > $1.updatedAt },
             tracks:  trackBookmarks.values.sorted  { $0.updatedAt > $1.updatedAt }
         )
 
-        do {
-            let data = try encoder.encode(file)
-            try data.write(to: fileURL, options: .atomic)
-            print("💾 BookmarksRegistry сохранён")
-        } catch {
-            print("❌ Ошибка сохранения BookmarksRegistry:", error)
-        }
+        // Сохраняем bookmark-реестр на диск и не скрываем ошибку записи.
+        // Вызывающий код должен знать, что операция фактически не была сохранена.
+        let data = try encoder.encode(file)
+        try data.write(to: fileURL, options: .atomic)
+        print(" BookmarksRegistry сохранён")
     }
 
     // MARK: - Папки

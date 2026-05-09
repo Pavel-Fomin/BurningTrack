@@ -116,19 +116,17 @@ actor TrackRegistry {
 
     // MARK: - Сохранение
 
-    func persist() {
+    func persist() throws {
         let file = RegistryFile(
             folders: folders.values.sorted { $0.updatedAt > $1.updatedAt },
             tracks: tracks.values.sorted { $0.updatedAt > $1.updatedAt }
         )
 
-        do {
-            let data = try encoder.encode(file)
-            try data.write(to: fileURL, options: .atomic)
-            print("💾 TrackRegistry сохранён")
-        } catch {
-            print("❌ Ошибка сохранения TrackRegistry:", error)
-        }
+        // Сохраняем реестр на диск и не скрываем ошибку записи.
+        // Вызывающий код должен знать, что операция фактически не была сохранена.
+        let data = try encoder.encode(file)
+        try data.write(to: fileURL, options: .atomic)
+        print(" TrackRegistry сохранён")
     }
 
     // MARK: - Папки

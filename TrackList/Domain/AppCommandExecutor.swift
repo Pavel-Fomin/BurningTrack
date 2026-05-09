@@ -262,10 +262,15 @@ actor AppCommandExecutor {
         /// 1. Получаем треклист
         var list = try TrackListManager.shared.getTrackListById(trackListId)
         
-        /// 2. Удаляем трек
+        /// 2. Проверяем, что трек действительно есть в треклисте
+        let previousCount = list.tracks.count
         list.tracks.removeAll { $0.id == trackId }
         
-        /// 3. Сохраняем
+        guard list.tracks.count < previousCount else {
+            throw AppError.trackNotFound
+        }
+        
+        /// 3. Сохраняем только после фактического удаления
         guard TrackListManager.shared.saveTracks(list.tracks, for: list.id) else {
             throw TrackListStorageError.saveFailed(trackListId: list.id)
         }
@@ -353,16 +358,28 @@ actor AppCommandExecutor {
         let snapshot = await resolveSnapshot(for: trackId)
         
         // 2. Мутация плеера — строго MainActor
-        let didRemove = await MainActor.run {
+        let removeResult = await MainActor.run {
             let previousTracks = PlaylistManager.shared.tracks
             PlaylistManager.shared.tracks.removeAll { $0.id == trackId }
+            
+            guard PlaylistManager.shared.tracks.count < previousTracks.count else {
+                return PlayerTrackRemovalResult.notFound
+            }
+            
             guard PlaylistManager.shared.saveToDisk() else {
                 PlaylistManager.shared.tracks = previousTracks
-                return false
+                return PlayerTrackRemovalResult.saveFailed
             }
-            return true
+            
+            return PlayerTrackRemovalResult.removed
         }
-        guard didRemove else {
+        
+        switch removeResult {
+        case .removed:
+            break
+        case .notFound:
+            throw AppError.trackNotFound
+        case .saveFailed:
             throw AppError.playlistSaveFailed
         }
         
@@ -410,6 +427,109 @@ actor AppCommandExecutor {
         // 2. ToastEvent
         await MainActor.run {
             ToastManager.shared.handle(.playerCleared)
+        }
+    }
+    
+    
+    // MARK: - Сохранить изменения трека
+    
+    func saveTrackEdits(
+        trackId: UUID,
+        newFileName: String,
+        fileChanged: Bool,
+        patch: TagWritePatch,
+        tagsChanged: Bool,
+        artworkAction: ArtworkWriteAction,
+        artworkChanged: Bool,
+        using playerManager: PlayerManager
+    ) async throws {
+        // 1. Запоминаем старый URL до возможного переименования.
+        // Это нужно, чтобы post-update pipeline мог сбросить кэши по старому пути.
+        let previousURL = await BookmarkResolver.url(forTrack: trackId)
+        // 2. Переименовываем файл без промежуточного success-toast.
+        if fileChanged {
+            do {
+                try await LibraryFileManager.shared.renameTrack(
+                    id: trackId,
+                    to: newFileName,
+                    using: playerManager
+                )
+            } catch let libraryError as LibraryFileError {
+                throw appError(from: libraryError, fallback: .fileRenameFailed)
+            }
+        }
+        // 3. Записываем теги и обложку без промежуточного success-toast.
+        if tagsChanged || artworkChanged {
+            guard let url = await BookmarkResolver.url(forTrack: trackId) else {
+                throw TagWriteError.fileNotFound
+            }
+            let didStartAccess = url.startAccessingSecurityScopedResource()
+            defer { if didStartAccess { url.stopAccessingSecurityScopedResource() } }
+            var finalPatch = patch
+            switch artworkAction {
+            case .none:
+                break
+            case .remove:
+                finalPatch.artwork = .remove
+            case .replace(let data):
+                finalPatch.artwork = .set(
+                    data: data,
+                    mime: artworkMimeType(for: data)
+                )
+            }
+            try await tagsWriter.writeTags(to: url, patch: finalPatch)
+        }
+        // 4. Собираем список реально изменённых полей для единого post-update pipeline.
+        var changedFields: Set<TrackChangedField> = []
+        if fileChanged {
+            changedFields.insert(.fileName)
+        }
+        if tagsChanged || artworkChanged {
+            changedFields.formUnion(
+                changedFieldsForTagUpdate(
+                    patch: patch,
+                    artworkAction: artworkAction
+                )
+            )
+        }
+        // 5. Выбираем причину обновления для единого события.
+        let updateReason: TrackUpdateReason
+        if artworkChanged {
+            updateReason = .artworkUpdated
+        } else if tagsChanged {
+            updateReason = .metadataUpdated
+        } else {
+            updateReason = .fileRenamed
+        }
+        // 6. Запускаем единый post-update pipeline после всех успешных операций.
+        let updateEvent = await TrackUpdateCoordinator.shared.handleTrackUpdate(
+            forTrackId: trackId,
+            reason: updateReason,
+            changedFields: changedFields,
+            previousURL: previousURL
+        )
+        let snapshot = updateEvent?.snapshot
+        // 7. Показываем только один итоговый success-toast.
+        let event: ToastEvent
+        if tagsChanged || artworkChanged {
+            event = ToastEvent.tagsUpdated(
+                title: snapshot?.title ?? snapshot?.fileName ?? newFileName,
+                artist: snapshot?.artist ?? "",
+                artwork: snapshot.flatMap {
+                    ArtworkProvider.shared.image(
+                        trackId: trackId,
+                        artworkData: $0.artworkData,
+                        purpose: .toast
+                    ).map { Image(uiImage: $0) }
+                }
+            )
+        } else {
+            event = ToastEvent.fileRenamed(
+                newName: snapshot?.fileName ?? newFileName
+            )
+        }
+        await MainActor.run {
+            ToastManager.shared.handle(event)
         }
     }
     
@@ -491,6 +611,14 @@ actor AppCommandExecutor {
 }
 
 // MARK: - Helper's
+
+/// Результат удаления трека из очереди плеера.
+/// Нужен, чтобы отличать фактическое удаление от ошибки сохранения.
+private enum PlayerTrackRemovalResult {
+    case removed
+    case notFound
+    case saveFailed
+}
 
 /// Преобразует файловую ошибку фонотеки в ошибку пользовательского уровня.
 ///

@@ -45,7 +45,7 @@ actor TrackIdentityResolver {
         forRootFolderId rootFolderId: UUID,
         relativePath: String,
         preferredExistingId: UUID? = nil
-    ) async -> UUID {
+    ) async throws -> UUID {
         await loadIfNeeded()
 
         let key = libraryKey(
@@ -53,7 +53,7 @@ actor TrackIdentityResolver {
             relativePath: relativePath
         )
 
-        return await upsertIdentityKey(
+        return try await upsertIdentityKey(
             key,
             preferredExistingId: preferredExistingId
         )
@@ -61,11 +61,11 @@ actor TrackIdentityResolver {
 
     /// Возвращает постоянный trackId для одиночного импортированного файла.
     /// Используется только там, где нет library root и relativePath.
-    func trackId(forImportedURL url: URL) async -> UUID {
+    func trackId(forImportedURL url: URL) async throws -> UUID {
         await loadIfNeeded()
 
         let key = importedFileKey(for: url)
-        return await upsertIdentityKey(key, preferredExistingId: nil)
+        return try await upsertIdentityKey(key, preferredExistingId: nil)
     }
 
     /// Привязывает уже известный trackId к библиотечному ключу.
@@ -74,7 +74,7 @@ actor TrackIdentityResolver {
         id trackId: UUID,
         rootFolderId: UUID,
         relativePath: String
-    ) async {
+    ) async throws {
         await loadIfNeeded()
 
         let key = libraryKey(
@@ -84,21 +84,21 @@ actor TrackIdentityResolver {
 
         if identityMap[key] == trackId { return }
         identityMap[key] = trackId
-        await persist()
+        try await persist()
     }
 
     /// Привязывает уже известный trackId к импортированному файлу.
     func bindImportedTrack(
         id trackId: UUID,
         url: URL
-    ) async {
+    ) async throws {
         await loadIfNeeded()
 
         let key = importedFileKey(for: url)
 
         if identityMap[key] == trackId { return }
         identityMap[key] = trackId
-        await persist()
+        try await persist()
     }
 
     /// Удаляет только библиотечный ключ.
@@ -106,7 +106,7 @@ actor TrackIdentityResolver {
     func unbindLibraryTrack(
         rootFolderId: UUID,
         relativePath: String
-    ) async {
+    ) async throws {
         await loadIfNeeded()
 
         let key = libraryKey(
@@ -115,20 +115,20 @@ actor TrackIdentityResolver {
         )
 
         if identityMap.removeValue(forKey: key) != nil {
-            await persist()
+            try await persist()
         }
     }
 
     /// Полностью забывает все ключи, которые были привязаны к trackId.
     /// Используется только когда трек реально исчез из библиотеки.
-    func forgetTrack(id trackId: UUID) async {
+    func forgetTrack(id trackId: UUID) async throws {
         await loadIfNeeded()
 
         let oldCount = identityMap.count
         identityMap = identityMap.filter { $0.value != trackId }
 
         if identityMap.count != oldCount {
-            await persist()
+            try await persist()
         }
     }
 
@@ -137,11 +137,11 @@ actor TrackIdentityResolver {
     private func upsertIdentityKey(
         _ key: String,
         preferredExistingId: UUID?
-    ) async -> UUID {
+    ) async throws -> UUID {
         if let preferredExistingId {
             if identityMap[key] != preferredExistingId {
                 identityMap[key] = preferredExistingId
-                await persist()
+                try await persist()
             }
             return preferredExistingId
         }
@@ -152,7 +152,7 @@ actor TrackIdentityResolver {
 
         let newId = UUID()
         identityMap[key] = newId
-        await persist()
+        try await persist()
         return newId
     }
 
@@ -195,12 +195,10 @@ actor TrackIdentityResolver {
         }
     }
 
-    private func persist() async {
-        do {
-            let data = try JSONEncoder().encode(identityMap)
-            try data.write(to: fileURL, options: .atomic)
-        } catch {
-            print("❌ Ошибка сохранения TrackIdentityRegistry:", error)
-        }
+    private func persist() async throws {
+        // Сохраняем карту соответствия треков на диск и не скрываем ошибку записи.
+        // Вызывающий код должен знать, что identity-map фактически не была сохранена.
+        let data = try JSONEncoder().encode(identityMap)
+        try data.write(to: fileURL, options: .atomic)
     }
 }

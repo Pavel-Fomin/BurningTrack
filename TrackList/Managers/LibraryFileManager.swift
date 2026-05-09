@@ -168,20 +168,21 @@ actor LibraryFileManager {
 
         // 11. Обновляем library identity:
         // старый путь убираем, новый путь привязываем к тому же trackId
-        await TrackIdentityResolver.shared.unbindLibraryTrack(
+        try await TrackIdentityResolver.shared.unbindLibraryTrack(
             rootFolderId: entry.rootFolderId,
             relativePath: entry.relativePath
         )
 
-        await TrackIdentityResolver.shared.bindLibraryTrack(
+        try await TrackIdentityResolver.shared.bindLibraryTrack(
             id: trackId,
             rootFolderId: destinationFolderId,
             relativePath: newRelativePath
         )
 
-        // 12. Persist
-        await BookmarksRegistry.shared.persist()
-        await TrackRegistry.shared.persist()
+        // Сохраняем изменения после физического перемещения файла.
+        // Если запись реестров не прошла, операция не должна считаться успешной.
+        try await BookmarksRegistry.shared.persist()
+        try await TrackRegistry.shared.persist()
     }
 
     // MARK: - Переименование файла
@@ -271,19 +272,21 @@ actor LibraryFileManager {
         
         // 8. Обновляем library identity:
         // старый путь убираем, новый путь привязываем к тому же trackId
-        await TrackIdentityResolver.shared.unbindLibraryTrack(
+        try await TrackIdentityResolver.shared.unbindLibraryTrack(
             rootFolderId: entry.rootFolderId,
             relativePath: entry.relativePath
         )
         
-        await TrackIdentityResolver.shared.bindLibraryTrack(
+        try await TrackIdentityResolver.shared.bindLibraryTrack(
             id: trackId,
             rootFolderId: entry.rootFolderId,
             relativePath: newRelativePath
         )
         
-        await BookmarksRegistry.shared.persist()
-        await TrackRegistry.shared.persist()
+        // Сохраняем изменения после физического переименования файла.
+        // Если запись реестров не прошла, операция не должна считаться успешной.
+        try await BookmarksRegistry.shared.persist()
+        try await TrackRegistry.shared.persist()
     }
     
     // MARK: - Вспомогательное

@@ -15,7 +15,7 @@ import AVFoundation
 
 final class ImportManager {
 
-    func importTracks(from urls: [URL], to folderId: UUID) async -> [UUID] {
+    func importTracks(from urls: [URL], to folderId: UUID) async throws -> [UUID] {
 
         var result: [UUID] = []
 
@@ -27,7 +27,7 @@ final class ImportManager {
             // 2. Постоянный trackId через слой идентичности
             // Для одиночного импорта используем отдельный путь identity,
             // потому что здесь нет rootFolderId + relativePath.
-            let trackId = await TrackIdentityResolver.shared.trackId(forImportedURL: url)
+            let trackId = try await TrackIdentityResolver.shared.trackId(forImportedURL: url)
 
             // 3. Bookmark сохраняем в BookmarksRegistry
             if let bookmarkBase64 = BookmarkResolver.makeBookmarkBase64(for: url) {
@@ -53,8 +53,10 @@ final class ImportManager {
         }
 
         // Persist — один раз
-        await TrackRegistry.shared.persist()
-        await BookmarksRegistry.shared.persist()
+        // Сохраняем реестр после обновления импортированных треков.
+        try await TrackRegistry.shared.persist()
+        // Сохраняем bookmark-реестр после обновления импортированных треков.
+        try await BookmarksRegistry.shared.persist()
 
         return result
     }
