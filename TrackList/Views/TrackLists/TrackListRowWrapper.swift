@@ -29,13 +29,14 @@ struct TrackListRowWrapper: View {
 
     /// Runtime snapshot трека
     private var snapshot: TrackRuntimeSnapshot? {
-        metadataProvider.snapshot(for: track.id)
+        metadataProvider.snapshot(for: track.trackId)
     }
 
     /// Трек для отображения с данными из snapshot
     private var displayTrack: Track {
         Track(
-            id: track.id,
+            listItemId: track.listItemId,
+            trackId: track.trackId,
             title: snapshot?.title ?? track.title,
             artist: snapshot?.artist ?? track.artist,
             duration: snapshot?.duration ?? track.duration,
@@ -54,13 +55,14 @@ struct TrackListRowWrapper: View {
             track: displayTrack,
             isCurrent: isCurrent,
             isPlaying: isPlaying,
+            isHighlighted: sheetManager.highlightedRowID == track.id,
             onTap: { onTap(track) },
             onDelete: { onDelete(IndexSet(integer: index)) },
             onArtworkTap: { sheetManager.present(.trackDetail(track)) },
             metadataProvider: metadataProvider
         )
-        .task(id: track.id) {
-            metadataProvider.requestSnapshotIfNeeded(for: track.id)
+        .task(id: track.trackId) {
+            metadataProvider.requestSnapshotIfNeeded(for: track.trackId)
         }
 
         // Свайпы треклиста

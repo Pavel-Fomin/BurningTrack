@@ -150,7 +150,7 @@ actor AppCommandExecutor {
         
         /// 2. Формируем модель Track для треклиста
         let imported = Track(
-            id: trackId,
+            trackId: trackId,
             title: nil,
             artist: nil,
             duration: 0,
@@ -206,7 +206,7 @@ actor AppCommandExecutor {
         
         let tracks: [Track] = playerTracks.map {
             Track(
-                id: $0.id,
+                trackId: $0.trackId,
                 title: $0.title,
                 artist: $0.artist,
                 duration: $0.duration,
@@ -255,32 +255,35 @@ actor AppCommandExecutor {
     // MARK: - Удалить трек из треклиста
     
     func removeTrackFromTrackList(
-        trackId: UUID,
+        listItemId: UUID,
         trackListId: UUID
     ) async throws {
         
         /// 1. Получаем треклист
         var list = try TrackListManager.shared.getTrackListById(trackListId)
         
-        /// 2. Проверяем, что трек действительно есть в треклисте
-        let previousCount = list.tracks.count
-        list.tracks.removeAll { $0.id == trackId }
-        
-        guard list.tracks.count < previousCount else {
+        /// 2. Находим конкретное вхождение трека в треклисте
+        guard let index = list.tracks.firstIndex(where: { $0.id == listItemId }) else {
             throw AppError.trackNotFound
         }
         
-        /// 3. Сохраняем только после фактического удаления
+        let removedTrack = list.tracks[index]
+        let trackId = removedTrack.trackId
+        
+        /// 3. Удаляем только одно конкретное вхождение
+        list.tracks.remove(at: index)
+        
+        /// 4. Сохраняем только после фактического удаления
         guard TrackListManager.shared.saveTracks(list.tracks, for: list.id) else {
             throw TrackListStorageError.saveFailed(trackListId: list.id)
         }
         
-        /// 4. Получаем snapshot трека
+        /// 5. Получаем snapshot трека
         let snapshot = await resolveSnapshot(for: trackId)
         
-        /// 5. ToastEvent строится из snapshot
+        /// 6. ToastEvent строится из snapshot
         let event = ToastEvent.trackRemovedFromTrackList(
-            title: snapshot?.title ?? "Трек",
+            title: snapshot?.title ?? removedTrack.fileName,
             artist: snapshot?.artist ?? "",
             artwork: snapshot.flatMap {
                 ArtworkProvider.shared.image(
@@ -291,7 +294,7 @@ actor AppCommandExecutor {
             }
         )
         
-        /// 6. Показ тоста
+        /// 7. Показ тоста
         await MainActor.run {
             ToastManager.shared.handle(event)
         }
@@ -311,7 +314,7 @@ actor AppCommandExecutor {
         
         /// 3. Формируем PlayerTrack
         let track = PlayerTrack(
-            id: trackId,
+            trackId: trackId,
             title: snapshot?.title,
             artist: snapshot?.artist,
             duration: snapshot?.duration ?? 0,
@@ -326,7 +329,7 @@ actor AppCommandExecutor {
         }
         guard didSave else {
             await MainActor.run {
-                PlaylistManager.shared.tracks.removeAll { $0.id == trackId }
+                PlaylistManager.shared.tracks.removeAll { $0.id == track.id }
             }
             throw AppError.playlistSaveFailed
         }
@@ -352,19 +355,31 @@ actor AppCommandExecutor {
     
     // MARK: - Удалить трек из плеера
     
-    func removeTrackFromPlayer(trackId: UUID) async throws {
+    func removeTrackFromPlayer(queueItemId: UUID) async throws {
         
-        // 1. Получаем snapshot трека (для тоста)
+        // 1. Находим удаляемое вхождение и его trackId для тоста
+        let removedTrack: PlayerTrack? = await MainActor.run {
+            PlaylistManager.shared.tracks.first(where: { $0.id == queueItemId })
+        }
+        
+        guard let removedTrack else {
+            throw AppError.trackNotFound
+        }
+        
+        let trackId = removedTrack.trackId
+        
+        // 2. Получаем snapshot трека (для тоста)
         let snapshot = await resolveSnapshot(for: trackId)
         
-        // 2. Мутация плеера — строго MainActor
+        // 3. Мутация плеера — строго MainActor
         let removeResult = await MainActor.run {
             let previousTracks = PlaylistManager.shared.tracks
-            PlaylistManager.shared.tracks.removeAll { $0.id == trackId }
             
-            guard PlaylistManager.shared.tracks.count < previousTracks.count else {
+            guard let index = PlaylistManager.shared.tracks.firstIndex(where: { $0.id == queueItemId }) else {
                 return PlayerTrackRemovalResult.notFound
             }
+            
+            PlaylistManager.shared.tracks.remove(at: index)
             
             guard PlaylistManager.shared.saveToDisk() else {
                 PlaylistManager.shared.tracks = previousTracks
@@ -383,9 +398,9 @@ actor AppCommandExecutor {
             throw AppError.playlistSaveFailed
         }
         
-        // 3. ToastEvent строится из snapshot
+        // 4. ToastEvent строится из snapshot
         let event = ToastEvent.trackRemovedFromPlayer(
-            title: snapshot?.title ?? snapshot?.fileName ?? "Трек",
+            title: snapshot?.title ?? snapshot?.fileName ?? removedTrack.fileName,
             artist: snapshot?.artist ?? "",
             artwork: snapshot.flatMap {
                 ArtworkProvider.shared.image(
@@ -396,7 +411,7 @@ actor AppCommandExecutor {
             }
         )
         
-        // 4. Показ тоста
+        // 5. Показ тоста
         await MainActor.run {
             ToastManager.shared.handle(event)
         }

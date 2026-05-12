@@ -76,7 +76,7 @@ struct MusicLibraryView: View {
                             Task {
                                 let canDetach = await manager.canDetachFolder(
                                     url: folder.url,
-                                    currentTrackId: playerViewModel.currentTrackDisplayable?.id,
+                                    currentTrackId: playerViewModel.currentTrackDisplayable?.trackId,
                                     isPlaying: playerViewModel.isPlaying
                                 )
 

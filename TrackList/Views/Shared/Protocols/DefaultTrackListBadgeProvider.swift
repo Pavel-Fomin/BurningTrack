@@ -21,8 +21,8 @@ final class DefaultTrackListBadgeProvider: TrackListBadgeProvider {
                 continue
             }
             for track in list.tracks {
-                if trackIds.contains(track.id) {
-                    namesById[track.id, default: []].insert(meta.name)
+                if trackIds.contains(track.trackId) {
+                    namesById[track.trackId, default: []].insert(meta.name)
                 }
             }
         }

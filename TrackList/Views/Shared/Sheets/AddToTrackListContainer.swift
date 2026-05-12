@@ -105,7 +105,7 @@ struct AddToTrackListContainer: View {
 
         do {
             try await AppCommandExecutor.shared.addTrackToTrackList(
-                trackId: data.track.id,
+                trackId: data.track.trackId,
                 trackListId: trackListId
             )
             SheetManager.shared.closeActive()

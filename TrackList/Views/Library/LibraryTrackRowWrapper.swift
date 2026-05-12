@@ -49,12 +49,12 @@ struct LibraryTrackRowWrapper: View {
     
     /// Названия треклистов, в которых находится трек
     private var trackListNames: [String] {
-        trackListNamesById[track.id] ?? []
+        trackListNamesById[track.trackId] ?? []
     }
     
     /// Подсветка строки (например при возврате из sheet)
     private var isHighlighted: Bool {
-        sheetManager.highlightedTrackID == track.id
+        sheetManager.highlightedRowID == track.id
     }
     
     
@@ -62,7 +62,7 @@ struct LibraryTrackRowWrapper: View {
     
     /// Runtime snapshot трека (единый источник метаданных)
     private var snapshot: TrackRuntimeSnapshot? {
-        metadataProvider.snapshot(for: track.id)
+        metadataProvider.snapshot(for: track.trackId)
     }
     
     /// Обложка трека (строится из snapshot.artworkData)
@@ -70,7 +70,7 @@ struct LibraryTrackRowWrapper: View {
         guard let data = snapshot?.artworkData else { return nil }
         
         return ArtworkProvider.shared.image(
-            trackId: track.id,
+            trackId: track.trackId,
             artworkData: data,
             purpose: .trackList
         )
@@ -113,8 +113,8 @@ struct LibraryTrackRowWrapper: View {
         
         // Загружаем snapshot при появлении строки
         // Больше не используем metadata cache и revision
-        .task(id: track.id.uuidString + "|" + (isScrollingFast ? "1" : "0")) {
-            metadataProvider.requestSnapshotIfNeeded(for: track.id)
+        .task(id: track.trackId.uuidString + "|" + (isScrollingFast ? "1" : "0")) {
+            metadataProvider.requestSnapshotIfNeeded(for: track.trackId)
         }
         
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
@@ -125,7 +125,7 @@ struct LibraryTrackRowWrapper: View {
                     Task {
                         do {
                             try await AppCommandExecutor.shared.addTrackToPlayer(
-                                trackId: track.id
+                                trackId: track.trackId
                             )
                         } catch let appError as AppError {
                             ToastManager.shared.handle(appError)

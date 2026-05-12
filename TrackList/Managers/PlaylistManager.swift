@@ -6,10 +6,8 @@
 //
 //  Created by Pavel Fomin on 15.07.2025.
 //
-
 import Foundation
 import SwiftUI
-
 @MainActor
 final class PlaylistManager: ObservableObject {
     
@@ -19,46 +17,51 @@ final class PlaylistManager: ObservableObject {
     static let shared = PlaylistManager()
     private let fileName = "player.json"
     
-    private struct PlayerFile: Codable { let trackIds: [UUID]
+    private struct PlayerFile: Codable {
+        let items: [PlayerFileItem]
+    }
+    private struct PlayerFileItem: Codable {
+        let queueItemId: UUID
+        let trackId: UUID
+    }
+    private struct LegacyPlayerFile: Codable {
+        let trackIds: [UUID]
     }
     
     private init() {
-            NotificationCenter.default.addObserver(
-                self,
-                selector: #selector(onLibraryAccessRestored),
-                name: .libraryAccessRestored,
-                object: nil
-            )
-            
-            loadFromDisk()
-        }
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(onLibraryAccessRestored),
+            name: .libraryAccessRestored,
+            object: nil
+        )
         
-        @objc private func onLibraryAccessRestored() {
-            print("🔔 PlaylistManager: libraryAccessRestored → reloadFromDisk")
-            loadFromDisk()
-        }
+        loadFromDisk()
+    }
+    
+    @objc private func onLibraryAccessRestored() {
+        print("🔔 PlaylistManager: libraryAccessRestored → reloadFromDisk")
+        loadFromDisk()
+    }
     
     // MARK: - Загрузка player.json
-
     func loadFromDisk() {
         guard let url = FileManager.default.urls(for: .documentDirectory,
                                                  in: .userDomainMask).first?
             .appendingPathComponent(fileName)
         else { return }
-
         guard FileManager.default.fileExists(atPath: url.path) else {
             PersistentLogger.log("📄 PlaylistManager: player.json missing → creating empty")
             print("📄 player.json не найден — создаём пустой")
             saveEmptyFile()
             return
         }
-
         do {
             let data = try Data(contentsOf: url)
-            let decoded = try JSONDecoder().decode(PlayerFile.self, from: data)
-            PersistentLogger.log("📥 PlaylistManager: decoded player.json ids=\(decoded.trackIds.count)")
+            let items = try decodePlayerItems(from: data)
+            PersistentLogger.log("📥 PlaylistManager: decoded player.json items=\(items.count)")
             Task {
-                await loadTracks(from: decoded.trackIds)
+                await loadTracks(from: items)
             }
         } catch {
             print("⚠️ Ошибка загрузки player.json: \(error)")
@@ -66,20 +69,27 @@ final class PlaylistManager: ObservableObject {
             saveEmptyFile()
         }
     }
-
+    private func decodePlayerItems(from data: Data) throws -> [PlayerFileItem] {
+        if let file = try? JSONDecoder().decode(PlayerFile.self, from: data) {
+            return file.items
+        }
+        let legacyFile = try JSONDecoder().decode(LegacyPlayerFile.self, from: data)
+        return legacyFile.trackIds.map { trackId in
+            PlayerFileItem(queueItemId: UUID(), trackId: trackId)
+        }
+    }
     private func saveEmptyFile() {
-        saveToDisk(trackIds: [])
+        saveToDisk(items: [])
         self.tracks = []
     }
-
+    
     // MARK: - Превращение trackId → PlayerTrack
-
-    private func makePlayerTrack(from id: UUID) async -> PlayerTrack {
-
+    private func makePlayerTrack(from item: PlayerFileItem) async -> PlayerTrack {
         // Пытаемся получить URL
-        guard let url = await BookmarkResolver.url(forTrack: id) else {
+        guard let url = await BookmarkResolver.url(forTrack: item.trackId) else {
             return PlayerTrack(
-                id: id,
+                queueItemId: item.queueItemId,
+                trackId: item.trackId,
                 title: "Недоступно",
                 artist: nil,
                 duration: 0,
@@ -87,18 +97,15 @@ final class PlaylistManager: ObservableObject {
                 isAvailable: false
             )
         }
-
         let fileName = url.lastPathComponent
         let metadata = try? await RuntimeMetadataParser.parseMetadata(from: url)
-
         let title = metadata?.title ?? url.deletingPathExtension().lastPathComponent
         let artist = metadata?.artist
         let duration = metadata?.duration ?? 0
-
         let isAvailable = true
-
         return PlayerTrack(
-            id: id,
+            queueItemId: item.queueItemId,
+            trackId: item.trackId,
             title: title,
             artist: artist,
             duration: duration,
@@ -106,73 +113,66 @@ final class PlaylistManager: ObservableObject {
             isAvailable: isAvailable
         )
     }
-
-    // MARK: - Загрузка треков по массиву ID
-
-    private func loadTracks(from ids: [UUID]) async {
+    
+    // MARK: - Загрузка треков по элементам очереди
+    private func loadTracks(from items: [PlayerFileItem]) async {
         var result: [PlayerTrack] = []
-
-        for id in ids {
-            let track = await makePlayerTrack(from: id)
+        for item in items {
+            let track = await makePlayerTrack(from: item)
             result.append(track)
         }
-
         self.tracks = result
-
         let availableCount = result.filter { $0.isAvailable }.count
         print("📥 Загружено \(result.count) треков в плеер (доступно: \(availableCount))")
         PersistentLogger.log("📥 PlaylistManager: loaded tracks=\(result.count)")
     }
-
+    
     // MARK: - Сохранение player.json
-
     @discardableResult
-    private func saveToDisk(trackIds: [UUID]) -> Bool {
+    private func saveToDisk(items: [PlayerFileItem]) -> Bool {
         guard let url = FileManager.default.urls(for: .documentDirectory,
                                                  in: .userDomainMask).first?
             .appendingPathComponent(fileName)
         else {
             return false
         }
-
-        let file = PlayerFile(trackIds: trackIds)
+        let file = PlayerFile(items: items)
         do {
             let data = try JSONEncoder().encode(file)
             try data.write(to: url, options: .atomic)
-            print("💾 Сохранён player.json (\(trackIds.count) ids)")
+            print("💾 Сохранён player.json (\(items.count) items)")
             return true
         } catch {
             print("❌ Ошибка сохранения player.json: \(error)")
             return false
         }
     }
-
     @discardableResult
     func saveToDisk() -> Bool {
-        let ids = tracks.map { $0.id }
-        return saveToDisk(trackIds: ids)
+        let items = tracks.map {
+            PlayerFileItem(queueItemId: $0.queueItemId, trackId: $0.trackId)
+        }
+        return saveToDisk(items: items)
     }
-
+    
     // MARK: - Добавление треков в плеер
-
     @discardableResult
     func addTracks(ids: [UUID]) async -> Bool {
-        for id in ids {
-            let track = await makePlayerTrack(from: id)
+        for trackId in ids {
+            let item = PlayerFileItem(queueItemId: UUID(), trackId: trackId)
+            let track = await makePlayerTrack(from: item)
             tracks.append(track)
         }
         return saveToDisk()
     }
-
+    
     // MARK: - Удаление треков
-
     @discardableResult
     func remove(at index: Int) -> Bool {
         guard index < tracks.count else { return false }
         tracks.remove(at: index)
         return saveToDisk()
     }
-
     @discardableResult
     func clear() -> Bool {
         tracks = []

@@ -85,8 +85,8 @@ struct TrackDetailSheet: View {
     /// URL используется только для отображения пути.
     /// Метаданные и artwork берутся из TrackRuntimeSnapshot.
     private func load() async {
-        guard let url = await BookmarkResolver.url(forTrack: track.id) else {
-            print("❌ BookmarkResolver: нет URL для трека \(track.id)")
+        guard let url = await BookmarkResolver.url(forTrack: track.trackId) else {
+            print("❌ BookmarkResolver: нет URL для трека \(track.trackId)")
             return
         }
 
@@ -103,11 +103,11 @@ struct TrackDetailSheet: View {
     /// Загружает runtime snapshot трека из store или собирает через builder.
     /// - Returns: TrackRuntimeSnapshot или nil
     private func loadSnapshot() async -> TrackRuntimeSnapshot? {
-        if let snapshot = TrackRuntimeStore.shared.snapshot(forTrackId: track.id) {
+        if let snapshot = TrackRuntimeStore.shared.snapshot(forTrackId: track.trackId) {
             return snapshot
         }
 
-        return await TrackRuntimeSnapshotBuilder.shared.buildSnapshot(forTrackId: track.id)
+        return await TrackRuntimeSnapshotBuilder.shared.buildSnapshot(forTrackId: track.trackId)
     }
 
     /// Применяет runtime snapshot к состоянию sheet.
@@ -126,7 +126,7 @@ struct TrackDetailSheet: View {
         ]
 
         let image = ArtworkProvider.shared.image(
-            trackId: track.id,
+            trackId: track.trackId,
             artworkData: snapshot.artworkData,
             purpose: .trackInfoSheet
         )

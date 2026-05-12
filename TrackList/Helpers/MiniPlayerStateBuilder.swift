@@ -43,14 +43,14 @@ final class MiniPlayerStateBuilder {
             guard let data = snapshot?.artworkData else { return nil }
 
             return ArtworkProvider.shared.image(
-                trackId: track.id,
+                trackId: track.trackId,
                 artworkData: data,
                 purpose: .miniPlayer
             )
         }()
 
         return MiniPlayerStaticState(
-            trackId: track.id,
+            trackId: track.trackId,
             title: title,
             artist: artist,
             artwork: artwork

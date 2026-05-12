@@ -64,12 +64,12 @@ final class PlayerViewModel: ObservableObject {
     /// Artwork используется отдельного размера (~512 px).
     private func makeNowPlayingSnapshot(for track: any TrackDisplayable) -> NowPlayingSnapshot {
         
-        let snapshot = snapshotsByTrackId[track.id]
+        let snapshot = snapshotsByTrackId[track.trackId]
         
         return NowPlayingSnapshot(
             title: snapshot?.title ?? track.fileName,
             artist: snapshot?.artist ?? "",
-            artwork: nowPlayingArtworkByTrackId[track.id],
+            artwork: nowPlayingArtworkByTrackId[track.trackId],
             currentTime: currentTime,
             duration: snapshot?.duration ?? trackDuration,
             isPlaying: isPlaying
@@ -195,7 +195,7 @@ final class PlayerViewModel: ObservableObject {
                 }
                 
                 if let current = currentTrackDisplayable,
-                   current.id == trackId {
+               current.trackId == trackId {
                     self.updateMiniPlayerStaticState(for: current)
                     playerManager.applyNowPlaying(
                         snapshot: makeNowPlayingSnapshot(for: current)
@@ -226,7 +226,7 @@ final class PlayerViewModel: ObservableObject {
         
         // 4. Если обновился текущий трек — обновляем mini player и Now Playing.
         if let current = currentTrackDisplayable,
-           current.id == trackId {
+           current.trackId == trackId {
             updateMiniPlayerStaticState(for: current)
             playerManager.applyNowPlaying(
                 snapshot: makeNowPlayingSnapshot(for: current)
@@ -239,7 +239,7 @@ final class PlayerViewModel: ObservableObject {
     /// Пересобирает статическое состояние мини-плеера из текущего трека и runtime snapshot.
     private func updateMiniPlayerStaticState(for track: any TrackDisplayable) {
         
-        let snapshot = snapshotsByTrackId[track.id]
+        let snapshot = snapshotsByTrackId[track.trackId]
 
         miniPlayerStaticState = MiniPlayerStateBuilder.buildStaticState(
             track: track,
@@ -278,7 +278,7 @@ final class PlayerViewModel: ObservableObject {
         currentTrackDisplayable = track
         currentTime = 0
         trackDuration = 0
-        requestSnapshotIfNeeded(for: track.id)
+        requestSnapshotIfNeeded(for: track.trackId)
         
         updateMiniPlayerStaticState(for: track)
         updateMiniPlayerProgressState()

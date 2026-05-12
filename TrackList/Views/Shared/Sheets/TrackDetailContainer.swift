@@ -138,7 +138,7 @@ struct TrackDetailContainer: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .trackDidUpdate)) { notification in
             guard let updateEvent = notification.object as? TrackUpdateEvent else { return }
-            guard updateEvent.trackId == track.id else { return }
+            guard updateEvent.trackId == track.trackId else { return }
 
             applySnapshotToSheetState(updateEvent.snapshot)
         }
@@ -152,7 +152,7 @@ struct TrackDetailContainer: View {
         initialArtworkEditState = artworkEditState
 
         Task {
-            if let entry = await TrackRegistry.shared.entry(for: track.id) {
+            if let entry = await TrackRegistry.shared.entry(for: track.trackId) {
                 await MainActor.run {
                     initialFullFileName = entry.fileName
                 }
@@ -181,7 +181,7 @@ struct TrackDetailContainer: View {
             do {
                 let patch = buildTagWritePatch()
                 try await AppCommandExecutor.shared.saveTrackEdits(
-                    trackId: track.id,
+                    trackId: track.trackId,
                     newFileName: newFullName,
                     fileChanged: fileChanged,
                     patch: patch,
@@ -192,7 +192,7 @@ struct TrackDetailContainer: View {
                 )
 
                 await MainActor.run {
-                    if let snapshot = TrackRuntimeStore.shared.snapshot(forTrackId: track.id) {
+                    if let snapshot = TrackRuntimeStore.shared.snapshot(forTrackId: track.trackId) {
                         applySnapshotToSheetState(snapshot)
                     }
 
@@ -346,7 +346,7 @@ struct TrackDetailContainer: View {
         
         // Обложку строим из artworkData внутри snapshot.
         let image = ArtworkProvider.shared.image(
-            trackId: track.id,
+            trackId: track.trackId,
             artworkData: snapshot.artworkData,
             purpose: .trackInfoSheet
         )

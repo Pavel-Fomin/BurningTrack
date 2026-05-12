@@ -24,7 +24,7 @@ struct TrackSelectableRowWrapper: View {
     
     /// Runtime snapshot трека (единый источник метаданных)
     private var snapshot: TrackRuntimeSnapshot? {
-        metadataProvider.snapshot(for: track.id)
+        metadataProvider.snapshot(for: track.trackId)
     }
     
     /// Обложка трека (строится из snapshot.artworkData)
@@ -32,7 +32,7 @@ struct TrackSelectableRowWrapper: View {
         guard let data = snapshot?.artworkData else { return nil }
         
         return ArtworkProvider.shared.image(
-            trackId: track.id,
+            trackId: track.trackId,
             artworkData: data,
             purpose: .trackList
         )
@@ -60,8 +60,8 @@ struct TrackSelectableRowWrapper: View {
             selectionPlacement: .trailing
         )
         .listRowInsets(EdgeInsets(top: 12, leading: 0, bottom: 12, trailing: 0))
-        .task(id: track.id) {
-            metadataProvider.requestSnapshotIfNeeded(for: track.id)
+        .task(id: track.trackId) {
+            metadataProvider.requestSnapshotIfNeeded(for: track.trackId)
         }
     }
 }

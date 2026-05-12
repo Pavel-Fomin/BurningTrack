@@ -24,7 +24,7 @@ struct PlayerTrackRowWrapper: View {
     
     /// Runtime snapshot трека
     private var snapshot: TrackRuntimeSnapshot? {
-        playerViewModel.snapshot(for: track.id)
+        playerViewModel.snapshot(for: track.trackId)
     }
     
     /// Обложка трека
@@ -32,7 +32,7 @@ struct PlayerTrackRowWrapper: View {
         guard let data = snapshot?.artworkData else { return nil }
 
         return ArtworkProvider.shared.image(
-            trackId: track.id,
+            trackId: track.trackId,
             artworkData: data,
             purpose: .trackList
         )
@@ -45,7 +45,7 @@ struct PlayerTrackRowWrapper: View {
             track: track,
             isCurrent: isCurrent,
             isPlaying: isPlaying,
-            isHighlighted: sheetManager.highlightedTrackID == track.id,
+            isHighlighted: sheetManager.highlightedRowID == track.id,
             artwork: artwork,
             title: snapshot?.title ?? track.title ?? track.fileName,
             artist: snapshot?.artist ?? track.artist ?? "",
@@ -55,8 +55,8 @@ struct PlayerTrackRowWrapper: View {
                 sheetManager.present(.trackDetail(track))
             }
         )
-        .task(id: track.id) {
-            playerViewModel.requestSnapshotIfNeeded(for: track.id)
+        .task(id: track.trackId) {
+            playerViewModel.requestSnapshotIfNeeded(for: track.trackId)
         }
 
         // MARK: - Свайпы плеера
@@ -68,7 +68,7 @@ struct PlayerTrackRowWrapper: View {
                 Task {
                     do {
                         try await AppCommandExecutor.shared.removeTrackFromPlayer(
-                            trackId: track.id
+                            queueItemId: track.id
                         )
                     } catch let appError as AppError {
                         ToastManager.shared.handle(appError)

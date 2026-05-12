@@ -22,6 +22,7 @@ struct TrackListRowView: View {
     let track: Track                             /// Трек строки
     let isCurrent: Bool                          /// Является ли строка текущим треком
     let isPlaying: Bool                          /// Воспроизводится ли текущий трек
+    let isHighlighted: Bool                      /// Подсвечена ли строка
     let onTap: () -> Void                        /// Тап по строке (воспроизведение / пауза)
     let onDelete: () -> Void                     /// Удаление строки (локальное действие)
     let onArtworkTap: () -> Void                 /// Тап по обложке
@@ -32,7 +33,7 @@ struct TrackListRowView: View {
     
     // Runtime snapshot трека
     private var snapshot: TrackRuntimeSnapshot? {
-        metadataProvider.snapshot(for: track.id)
+        metadataProvider.snapshot(for: track.trackId)
     }
     
     // Обложка
@@ -40,7 +41,7 @@ struct TrackListRowView: View {
         guard let data = snapshot?.artworkData else { return nil }
 
         return ArtworkProvider.shared.image(
-            trackId: track.id,
+            trackId: track.trackId,
             artworkData: data,
             purpose: .trackList
         )
@@ -54,7 +55,7 @@ struct TrackListRowView: View {
             track: track,
             isCurrent: isCurrent,
             isPlaying: isPlaying,
-            isHighlighted: false,                                    /// Подсветка управляется wrapper'ом
+            isHighlighted: isHighlighted,                            /// Подсветка управляется wrapper'ом
             artwork: artwork,
             title: snapshot?.title ?? track.title ?? track.fileName,
             artist: snapshot?.artist ?? track.artist ?? "",

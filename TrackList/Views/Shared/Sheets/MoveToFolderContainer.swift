@@ -69,7 +69,7 @@ struct MoveToFolderContainer: View {
             }
         ) {
             MoveToFolderSheet(
-                trackId: data.track.id,
+                trackId: data.track.trackId,
                 selectedFolderId: $selectedFolderId,
                 trackCurrentFolderId: $trackCurrentFolderId
             )
@@ -83,7 +83,7 @@ struct MoveToFolderContainer: View {
 
     /// Загружает текущую папку трека
     private func loadCurrentTrackFolder() async {
-        if let entry = await TrackRegistry.shared.entry(for: data.track.id) {
+        if let entry = await TrackRegistry.shared.entry(for: data.track.trackId) {
             trackCurrentFolderId = entry.folderId
         } else {
             trackCurrentFolderId = nil
@@ -96,7 +96,7 @@ struct MoveToFolderContainer: View {
 
         do {
             try await AppCommandExecutor.shared.moveTrack(
-                trackId: data.track.id,
+                trackId: data.track.trackId,
                 toFolder: folderId,
                 using: playerManager
             )

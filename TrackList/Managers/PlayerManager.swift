@@ -57,7 +57,7 @@ final class PlayerManager {
     // MARK: - Main Playback
 
     func play(track: any TrackDisplayable) async throws {
-        let trackId = track.id
+        let trackId = track.trackId
 
         // 1. resolvedURL — через BookmarkResolver
         guard let resolvedURL = await BookmarkResolver.url(forTrack: trackId) else {

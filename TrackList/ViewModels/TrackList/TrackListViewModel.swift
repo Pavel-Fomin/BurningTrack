@@ -169,12 +169,12 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
             let listId = currentListId
         else { return }
 
-        let trackId = tracks[index].id
+        let listItemId = tracks[index].id
 
         Task {
             do {
                 try await AppCommandExecutor.shared.removeTrackFromTrackList(
-                    trackId: trackId,
+                    listItemId: listItemId,
                     trackListId: listId
                 )
             } catch let appError as AppError {
@@ -208,14 +208,12 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
     func refreshTrackAvailability() {
         Task { @MainActor in
             var updated: [Track] = []
-
             for track in tracks {
-                let trackId = track.id
-                let isAvailable = await BookmarkResolver.url(forTrack: trackId) != nil
-
+                let isAvailable = await BookmarkResolver.url(forTrack: track.trackId) != nil
                 updated.append(
                     Track(
-                        id: track.id,
+                        listItemId: track.listItemId,
+                        trackId: track.trackId,
                         title: track.title,
                         artist: track.artist,
                         duration: track.duration,
@@ -224,7 +222,6 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
                     )
                 )
             }
-
             self.tracks = updated
             print("♻️ Актуализирована доступность треков через BookmarkResolver")
         }

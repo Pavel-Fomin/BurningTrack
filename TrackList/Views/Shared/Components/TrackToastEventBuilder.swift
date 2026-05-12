@@ -25,16 +25,16 @@ enum TrackToastEventBuilder {
     ) async -> ToastEvent {
         let snapshot: TrackRuntimeSnapshot?
 
-        if let storedSnapshot = TrackRuntimeStore.shared.snapshot(forTrackId: track.id) {
+        if let storedSnapshot = TrackRuntimeStore.shared.snapshot(forTrackId: track.trackId) {
             snapshot = storedSnapshot
         } else {
-            snapshot = await TrackRuntimeSnapshotBuilder.shared.buildSnapshot(forTrackId: track.id)
+            snapshot = await TrackRuntimeSnapshotBuilder.shared.buildSnapshot(forTrackId: track.trackId)
         }
 
         let artwork: Image?
         if let data = snapshot?.artworkData,
            let uiImage = ArtworkProvider.shared.image(
-               trackId: track.id,
+               trackId: track.trackId,
                artworkData: data,
                purpose: .toast
            ) {

@@ -114,8 +114,8 @@ final class SheetManager: ObservableObject {
     /// Следующий шит, который должен открыться после dismiss текущего
     private var pendingSheet: AppSheet?
 
-    /// ID трека для выделения в списках
-    @Published var highlightedTrackID: UUID?
+    /// ID строки для выделения в списках
+    @Published var highlightedRowID: UUID?
     
     /// Счётчик закрытий sheet’ов.
     /// Используется как единая точка UX-commit после dismiss.
@@ -127,7 +127,7 @@ final class SheetManager: ObservableObject {
     // MARK: - ОСНОВНОЙ МЕТОД ПОКАЗА ШИТОВ
 
     func present(_ sheet: AppSheet) {
-        highlightedTrackID = sheet.relatedTrackId
+        highlightedRowID = sheet.relatedRowId
 
         if activeSheet == nil {
             // Можно открыть сразу
@@ -150,7 +150,7 @@ final class SheetManager: ObservableObject {
             pendingSheet = nil
             activeSheet = next
         } else {
-            highlightedTrackID = nil
+            highlightedRowID = nil
         }
     }
     
@@ -217,10 +217,10 @@ final class SheetManager: ObservableObject {
 }
 
 
-// MARK: - Вспомогательная логика извлечения track.id из enum AppSheet
+// MARK: - Вспомогательная логика извлечения id строки из enum AppSheet
 
 private extension AppSheet {
-    var relatedTrackId: UUID? {
+    var relatedRowId: UUID? {
         switch self {
         case .moveToFolder(let d): return d.track.id
         case .trackDetail(let t): return t.id

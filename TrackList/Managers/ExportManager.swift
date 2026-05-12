@@ -38,7 +38,7 @@ final class ExportManager {
         var failedCount = 0
         for (index, track) in tracks.enumerated() {
             do {
-                guard let sourceURL = await BookmarkResolver.url(forTrack: track.id) else {
+                guard let sourceURL = await BookmarkResolver.url(forTrack: track.trackId) else {
                     failedCount += 1
                     continue
                 }
