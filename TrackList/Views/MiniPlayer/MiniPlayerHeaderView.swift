@@ -47,14 +47,16 @@ struct MiniPlayerHeaderView: View {
 
                 VStack(alignment: .leading, spacing: 2) {
 
-                    Text(artist.isEmpty ? "Неизвестный артист" : artist)
-                        .font(.caption)
-                        .foregroundColor(.primary)
-                        .lineLimit(1)
+                    if !artist.isEmpty {
+                        Text(artist)
+                            .font(.caption)
+                            .foregroundColor(.primary)
+                            .lineLimit(1)
+                    }
 
                     Text(title)
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+                        .font(artist.isEmpty ? .caption : .caption2)
+                        .foregroundColor(artist.isEmpty ? .primary : .secondary)
                         .lineLimit(1)
                 }
             }

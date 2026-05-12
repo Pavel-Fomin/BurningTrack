@@ -22,7 +22,7 @@ struct LibraryTrack: Identifiable, TrackDisplayable {
     // MARK: - TrackDisplayable
     /// Имя файла
     var fileName: String {
-        fileURL.deletingPathExtension().lastPathComponent
+        fileURL.lastPathComponent
     }
     /// UI флаг — доступность файла
     var isAvailable: Bool { true }

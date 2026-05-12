@@ -39,7 +39,7 @@ struct MiniPlayerView: View {
         
 
         let title = staticState?.title ?? track.fileName
-        let artist = staticState?.artist ?? "Неизвестный артист"
+        let artist = staticState?.artist ?? ""
         let artwork = staticState?.artwork
 
         return AnyView(

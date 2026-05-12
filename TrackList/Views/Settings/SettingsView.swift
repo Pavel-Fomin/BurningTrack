@@ -11,12 +11,25 @@ import Foundation
 import SwiftUI
 
 struct SettingsView: View {
+
+    @ObservedObject private var settingsManager = AppSettingsManager.shared
+
     var body: some View {
-        Text("Настройки в разработке")
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .foregroundColor(.secondary)
-        
+        List {
+            Section {
+                Toggle(
+                    "Отображать метаданные",
+                    isOn: Binding(
+                        get: {
+                            settingsManager.settings.visible.metadata.isTagReadingEnabled
+                        },
+                        set: { value in
+                            settingsManager.setTagReadingEnabled(value)
+                        }
+                    )
+                )
+            }
+        }
+        .listStyle(.insetGrouped)
     }
-    
-    
 }

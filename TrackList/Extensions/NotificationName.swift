@@ -12,6 +12,10 @@ import Foundation
 
 extension Notification.Name {
     
+    // MARK: - Settings
+    
+    static let appSettingsDidChange = Notification.Name("appSettingsDidChange")     /// Изменились настройки приложения
+    
     // MARK: - TrackList
     
     static let trackListsDidChange = Notification.Name("trackListsDidChange")       /// Любое изменение списка треклистов (создание/удаление/переименование)

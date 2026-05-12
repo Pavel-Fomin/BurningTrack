@@ -65,11 +65,12 @@ final class PlayerViewModel: ObservableObject {
     private func makeNowPlayingSnapshot(for track: any TrackDisplayable) -> NowPlayingSnapshot {
         
         let snapshot = snapshotsByTrackId[track.trackId]
+        let shouldShowTags = AppSettingsManager.shared.settings.visible.metadata.isTagReadingEnabled
         
         return NowPlayingSnapshot(
-            title: snapshot?.title ?? track.fileName,
-            artist: snapshot?.artist ?? "",
-            artwork: nowPlayingArtworkByTrackId[track.trackId],
+            title: shouldShowTags ? (snapshot?.title ?? track.fileName) : track.fileName,
+            artist: shouldShowTags ? (snapshot?.artist ?? "") : "",
+            artwork: shouldShowTags ? nowPlayingArtworkByTrackId[track.trackId] : nil,
             currentTime: currentTime,
             duration: snapshot?.duration ?? trackDuration,
             isPlaying: isPlaying
@@ -121,6 +122,17 @@ final class PlayerViewModel: ObservableObject {
             
             Task { @MainActor in
                 self.applyTrackUpdateEvent(updateEvent)
+            }
+        }
+
+        // Обновление runtime snapshot после изменения настроек приложения
+        NotificationCenter.default.addObserver(
+            forName: .appSettingsDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.reloadSnapshotsAfterSettingsChange()
             }
         }
         
@@ -202,6 +214,40 @@ final class PlayerViewModel: ObservableObject {
                     )
                 }
             }
+        }
+    }
+
+    /// Пересобирает runtime snapshot известных плееру треков после изменения настроек приложения.
+    private func reloadSnapshotsAfterSettingsChange() {
+        snapshotsByTrackId.removeAll()
+        nowPlayingArtworkByTrackId.removeAll()
+        var trackIds = Set<UUID>()
+
+        if let currentTrackDisplayable {
+            trackIds.insert(currentTrackDisplayable.trackId)
+        }
+
+        for track in playerTracksContext {
+            trackIds.insert(track.trackId)
+        }
+
+        for track in trackListContext {
+            trackIds.insert(track.trackId)
+        }
+
+        for track in libraryTracksContext {
+            trackIds.insert(track.trackId)
+        }
+
+        for trackId in trackIds {
+            requestSnapshotIfNeeded(for: trackId)
+        }
+
+        if let current = currentTrackDisplayable {
+            updateMiniPlayerStaticState(for: current)
+            playerManager.applyNowPlaying(
+                snapshot: makeNowPlayingSnapshot(for: current)
+            )
         }
     }
     

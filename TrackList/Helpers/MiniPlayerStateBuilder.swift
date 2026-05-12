@@ -21,25 +21,41 @@ import UIKit
 
 final class MiniPlayerStateBuilder {
 
+    @MainActor
     static func buildStaticState(
         track: any TrackDisplayable,
         snapshot: TrackRuntimeSnapshot?
     ) -> MiniPlayerStaticState {
 
+        let shouldShowTags = AppSettingsManager.shared.settings.visible.metadata.isTagReadingEnabled
+
         // Название берём из snapshot, если оно есть.
         // Если в тегах пусто — показываем имя файла.
-        let title = (snapshot?.title?.isEmpty == false)
-        ? (snapshot?.title ?? "")
-        : track.fileName
+        let title: String = {
+            if !shouldShowTags { return track.fileName }
+
+            if snapshot?.title?.isEmpty == false {
+                return snapshot?.title ?? ""
+            }
+
+            return track.fileName
+        }()
 
         // Исполнителя берём из snapshot, если он есть.
         // Если в тегах пусто — показываем fallback.
-        let artist = (snapshot?.artist?.isEmpty == false)
-        ? (snapshot?.artist ?? "")
-        : "Неизвестный артист"
+        let artist: String = {
+            if !shouldShowTags { return "" }
+
+            if snapshot?.artist?.isEmpty == false {
+                return snapshot?.artist ?? ""
+            }
+
+            return "Неизвестный артист"
+        }()
 
         // Обложку строим из artworkData внутри snapshot.
         let artwork: UIImage? = {
+            guard shouldShowTags else { return nil }
             guard let data = snapshot?.artworkData else { return nil }
 
             return ArtworkProvider.shared.image(

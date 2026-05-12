@@ -23,6 +23,7 @@ struct TrackListRowWrapper: View {
     let onTap: (Track) -> Void                        /// Обработчик тапа по строке
     let onDelete: (IndexSet) -> Void                  /// Обработчик удаления строки
     
+    @ObservedObject private var settingsManager = AppSettingsManager.shared /// Менеджер настроек отображения
     @EnvironmentObject var sheetManager: SheetManager /// Менеджер шитов
 
     // MARK: - Snapshot
@@ -34,11 +35,13 @@ struct TrackListRowWrapper: View {
 
     /// Трек для отображения с данными из snapshot
     private var displayTrack: Track {
-        Track(
+        let shouldShowTags = settingsManager.settings.visible.metadata.isTagReadingEnabled
+
+        return Track(
             listItemId: track.listItemId,
             trackId: track.trackId,
-            title: snapshot?.title ?? track.title,
-            artist: snapshot?.artist ?? track.artist,
+            title: shouldShowTags ? (snapshot?.title ?? track.fileName) : track.fileName,
+            artist: shouldShowTags ? snapshot?.artist : nil,
             duration: snapshot?.duration ?? track.duration,
             fileName: snapshot?.fileName ?? track.fileName,
             isAvailable: snapshot?.isAvailable ?? track.isAvailable

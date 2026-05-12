@@ -33,6 +33,7 @@ struct LibraryTrackRowWrapper: View {
     let onToggleSelection: () -> Void             /// Обработчик выбора
     
     @ObservedObject var playerViewModel: PlayerViewModel   /// ViewModel плеера
+    @ObservedObject private var settingsManager = AppSettingsManager.shared /// Менеджер настроек отображения
     @EnvironmentObject var sheetManager: SheetManager      /// Менеджер шитов
     
     // MARK: - Player state
@@ -67,6 +68,7 @@ struct LibraryTrackRowWrapper: View {
     
     /// Обложка трека (строится из snapshot.artworkData)
     private var artwork: UIImage? {
+        guard AppSettingsManager.shared.settings.visible.metadata.isTagReadingEnabled else { return nil }
         guard let data = snapshot?.artworkData else { return nil }
         
         return ArtworkProvider.shared.image(
@@ -79,6 +81,8 @@ struct LibraryTrackRowWrapper: View {
     // MARK: - UI
     
     var body: some View {
+        let shouldShowTags = settingsManager.settings.visible.metadata.isTagReadingEnabled
+
         TrackRowView(
             track: track,
             isCurrent: isCurrent,
@@ -88,8 +92,8 @@ struct LibraryTrackRowWrapper: View {
             
             // Данные отображения берём из snapshot (если он есть),
             // иначе используем fallback из модели трека
-            title: snapshot?.title ?? track.title,
-            artist: snapshot?.artist ?? track.artist ?? "",
+            title: shouldShowTags ? (snapshot?.title ?? track.title) : track.fileName,
+            artist: shouldShowTags ? (snapshot?.artist ?? track.artist ?? "") : "",
             duration: snapshot?.duration ?? track.duration,
             
             onRowTap: {

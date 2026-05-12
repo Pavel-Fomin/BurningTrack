@@ -18,6 +18,7 @@ struct PlayerTrackRowWrapper: View {
     let onTap: () -> Void                                /// Обработчик тапа по строке
     
     @ObservedObject var playerViewModel: PlayerViewModel /// ViewModel плеера
+    @ObservedObject private var settingsManager = AppSettingsManager.shared /// Менеджер настроек отображения
     @EnvironmentObject var sheetManager: SheetManager    /// Менеджер шитов
     
     // MARK: - Snapshot
@@ -29,6 +30,7 @@ struct PlayerTrackRowWrapper: View {
     
     /// Обложка трека
     private var artwork: UIImage? {
+        guard AppSettingsManager.shared.settings.visible.metadata.isTagReadingEnabled else { return nil }
         guard let data = snapshot?.artworkData else { return nil }
 
         return ArtworkProvider.shared.image(
@@ -41,14 +43,16 @@ struct PlayerTrackRowWrapper: View {
     // MARK: - UI
     
     var body: some View {
+        let shouldShowTags = settingsManager.settings.visible.metadata.isTagReadingEnabled
+
         TrackRowView(
             track: track,
             isCurrent: isCurrent,
             isPlaying: isPlaying,
             isHighlighted: sheetManager.highlightedRowID == track.id,
             artwork: artwork,
-            title: snapshot?.title ?? track.title ?? track.fileName,
-            artist: snapshot?.artist ?? track.artist ?? "",
+            title: shouldShowTags ? (snapshot?.title ?? track.fileName) : track.fileName,
+            artist: shouldShowTags ? (snapshot?.artist ?? "") : "",
             duration: snapshot?.duration ?? track.duration,
             onRowTap: onTap,
             onArtworkTap: {

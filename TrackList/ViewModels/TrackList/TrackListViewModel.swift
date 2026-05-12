@@ -48,6 +48,15 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
             }
         }
 
+        NotificationCenter.default.publisher(for: .appSettingsDidChange)
+            .sink { [weak self] _ in
+                Task { @MainActor in
+                    guard let self else { return }
+                    self.reloadSnapshotsAfterSettingsChange()
+                }
+            }
+            .store(in: &cancellables)
+
         NotificationCenter.default.publisher(for: .trackListTracksDidChange)
             .sink { [weak self] notification in
                 guard let changedId = notification.object as? UUID else { return }
@@ -137,6 +146,14 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
             await MainActor.run {
                 snapshotsByTrackId[trackId] = snapshot
             }
+        }
+    }
+
+    /// Пересобирает runtime snapshot загруженных треков после изменения настроек приложения.
+    private func reloadSnapshotsAfterSettingsChange() {
+        snapshotsByTrackId.removeAll()
+        for track in tracks {
+            requestSnapshotIfNeeded(for: track.trackId)
         }
     }
 

@@ -28,6 +28,7 @@ struct TrackListRowView: View {
     let onArtworkTap: () -> Void                 /// Тап по обложке
     let metadataProvider: TrackMetadataProviding /// Провайдер runtime snapshot
     
+    @ObservedObject private var settingsManager = AppSettingsManager.shared
     
     // MARK: - Snapshot
     
@@ -38,6 +39,7 @@ struct TrackListRowView: View {
     
     // Обложка
     private var artwork: UIImage? {
+        guard settingsManager.settings.visible.metadata.isTagReadingEnabled else { return nil }
         guard let data = snapshot?.artworkData else { return nil }
 
         return ArtworkProvider.shared.image(
@@ -51,14 +53,16 @@ struct TrackListRowView: View {
     // MARK: - UI
     
     var body: some View {
+        let shouldShowTags = settingsManager.settings.visible.metadata.isTagReadingEnabled
+
         TrackRowView(
             track: track,
             isCurrent: isCurrent,
             isPlaying: isPlaying,
             isHighlighted: isHighlighted,                            /// Подсветка управляется wrapper'ом
             artwork: artwork,
-            title: snapshot?.title ?? track.title ?? track.fileName,
-            artist: snapshot?.artist ?? track.artist ?? "",
+            title: shouldShowTags ? (snapshot?.title ?? track.fileName) : track.fileName,
+            artist: shouldShowTags ? (snapshot?.artist ?? "") : "",
             duration: snapshot?.duration ?? track.duration,
             onRowTap: onTap,                                       /// Правая зона — воспроизведение / пауза
             onArtworkTap: onArtworkTap                             /// Левая зона — делегируется выше (wrapper решает, что делать)

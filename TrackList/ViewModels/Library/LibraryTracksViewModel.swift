@@ -10,6 +10,7 @@
 
 import Foundation
 import SwiftUI
+import Combine
 
 @MainActor
 final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
@@ -31,6 +32,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
 
     private let tracksProvider: LibraryTracksProvider
     private let badgeProvider: TrackListBadgeProvider
+    private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Init
 
@@ -57,6 +59,15 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
                 self.applyTrackUpdateEvent(updateEvent)
             }
         }
+
+        NotificationCenter.default.publisher(for: .appSettingsDidChange)
+            .sink { [weak self] _ in
+                Task { @MainActor in
+                    guard let self else { return }
+                    self.reloadSnapshotsAfterSettingsChange()
+                }
+            }
+            .store(in: &cancellables)
     }
     
     // MARK: - Load
@@ -129,6 +140,17 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
             await MainActor.run {
                 snapshotsByTrackId[trackId] = snapshot
             }
+        }
+    }
+
+    /// Пересобирает runtime snapshot загруженных треков после изменения настроек приложения.
+    private func reloadSnapshotsAfterSettingsChange() {
+        snapshotsByTrackId.removeAll()
+        let trackIds = trackSections
+            .flatMap { $0.tracks }
+            .map { $0.id }
+        for trackId in trackIds {
+            requestSnapshotIfNeeded(for: trackId)
         }
     }
 
