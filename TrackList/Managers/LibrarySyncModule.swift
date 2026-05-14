@@ -91,6 +91,16 @@ actor LibrarySyncModule {
             let fileURL = file.url.resolvingSymlinksInPath()
             let fileName = file.fileName
             let folderId = file.folderURL.resolvingSymlinksInPath().libraryFolderId
+            let fileValues = try? fileURL.resourceValues(
+                forKeys: [
+                    .contentModificationDateKey,
+                    .creationDateKey
+                ]
+            )
+            let fileDate =
+                fileValues?.contentModificationDate ??
+                fileValues?.creationDate ??
+                Date()
             
             if aliveIds.count == 1 {
                 print("🧷 sync folderURL:", file.folderURL.path)
@@ -128,7 +138,8 @@ actor LibrarySyncModule {
                 fileName: fileName,
                 relativePath: relativePath,
                 folderId: folderId,
-                rootFolderId: rootFolderId
+                rootFolderId: rootFolderId,
+                fileDate: fileDate
             )
 
             // Bookmark файла (может обновляться, это не идентичность)

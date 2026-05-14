@@ -27,10 +27,14 @@ actor TrackRegistry {
         var relativePath: String
         var folderId: UUID
         var rootFolderId: UUID
+        /// Дата первого появления трека в фонотеке.
+        var importedAt: Date
+        /// Дата файла для сортировки и группировки фонотеки.
+        var fileDate: Date
         var updatedAt: Date
 
         enum CodingKeys: String, CodingKey {
-            case id, fileName, relativePath, folderId, rootFolderId, updatedAt
+            case id, fileName, relativePath, folderId, rootFolderId, importedAt, fileDate, updatedAt
         }
 
         init(
@@ -39,6 +43,8 @@ actor TrackRegistry {
             relativePath: String,
             folderId: UUID,
             rootFolderId: UUID,
+            importedAt: Date,
+            fileDate: Date,
             updatedAt: Date
         ) {
             self.id = id
@@ -46,6 +52,8 @@ actor TrackRegistry {
             self.relativePath = relativePath
             self.folderId = folderId
             self.rootFolderId = rootFolderId
+            self.importedAt = importedAt
+            self.fileDate = fileDate
             self.updatedAt = updatedAt
         }
 
@@ -57,6 +65,8 @@ actor TrackRegistry {
             folderId = try c.decode(UUID.self, forKey: .folderId)
             rootFolderId = try c.decode(UUID.self, forKey: .rootFolderId)
             updatedAt = try c.decode(Date.self, forKey: .updatedAt)
+            importedAt = (try? c.decode(Date.self, forKey: .importedAt)) ?? updatedAt
+            fileDate = (try? c.decode(Date.self, forKey: .fileDate)) ?? importedAt
         }
     }
 
@@ -159,15 +169,21 @@ actor TrackRegistry {
         fileName: String,
         relativePath: String,
         folderId: UUID,
-        rootFolderId: UUID
+        rootFolderId: UUID,
+        fileDate: Date = Date()
     ) {
+        let now = Date()
+        let existing = tracks[id]
+
         let entry = TrackEntry(
             id: id,
             fileName: fileName,
             relativePath: relativePath,
             folderId: folderId,
             rootFolderId: rootFolderId,
-            updatedAt: Date()
+            importedAt: existing?.importedAt ?? now,
+            fileDate: fileDate,
+            updatedAt: now
         )
         tracks[id] = entry
     }

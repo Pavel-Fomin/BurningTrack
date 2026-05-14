@@ -24,7 +24,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
 
     @Published var trackSections: [TrackSection] = []
     @Published var trackListNamesById: [UUID: [String]] = [:]
-    @Published private(set) var snapshotsByTrackId: [UUID: TrackRuntimeSnapshot] = [:] /// Runtime snapshot треков по id
+    @Published private(set) var snapshotsByTrackId: [UUID: TrackRuntimeSnapshot] = [:] /// Runtime-снимки треков по id
     @Published var isLoading = false
     @Published private(set) var didLoad = false
     
@@ -38,7 +38,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
 
     init(
         folderURL: URL,
-        tracksProvider: LibraryTracksProvider = DefaultLibraryTracksProvider(),
+        tracksProvider: LibraryTracksProvider = FastLibraryTracksProvider(),
         badgeProvider: TrackListBadgeProvider = DefaultTrackListBadgeProvider()
     ) {
         self.folderURL = folderURL
@@ -90,23 +90,63 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         isLoading = true
         defer { isLoading = false }
 
-        await MusicLibraryManager.shared.syncFolderIfNeeded(folderId: folderId)
+        await loadInitialTracks()
 
-        let all = await TrackRegistry.shared.allTracks()
-        print("📦 TrackRegistry total:", all.count)
-        print("📂 UI folderId:", folderId)
-
+        Task { [weak self] in
+            guard let self else { return }
+            await self.loadDetailsInBackground()
+        }
+    }
+    
+    /// Быстро загружает первичный список треков без синхронизации и дополнительных деталей.
+    private func loadInitialTracks() async {
         let tracks = await tracksProvider.tracks(inFolder: folderId)
-
-        print("🎵 tracks in folder:", tracks.count)
 
         trackSections = TrackSectionBuilder.build(
             from: tracks,
             mode: .date
         )
+    }
+
+    /// Догружает тяжёлые детали после появления первичного списка.
+    private func loadDetailsInBackground() async {
+        await MusicLibraryManager.shared.syncFolderIfNeeded(folderId: folderId)
 
         let ids = trackSections.flatMap { $0.tracks }.map { $0.id }
         trackListNamesById = badgeProvider.badges(for: ids)
+
+        await updateAvailabilityInBackground()
+    }
+
+    /// Проверяет доступность треков после первичного отображения списка.
+    private func updateAvailabilityInBackground() async {
+        let tracks = trackSections.flatMap { $0.tracks }
+        var availabilityById: [UUID: Bool] = [:]
+
+        for track in tracks {
+            availabilityById[track.id] = await BookmarkResolver.url(forTrack: track.id) != nil
+        }
+
+        trackSections = trackSections.map { section in
+            let updatedTracks = section.tracks.map { track in
+                let isAvailable = availabilityById[track.id] ?? track.isAvailable
+                return LibraryTrack(
+                    id: track.id,
+                    fileURL: track.fileURL,
+                    title: track.title,
+                    artist: track.artist,
+                    duration: track.duration,
+                    addedDate: track.addedDate,
+                    isAvailable: isAvailable
+                )
+            }
+
+            return TrackSection(
+                id: section.id,
+                title: section.title,
+                tracks: updatedTracks
+            )
+        }
     }
     
 
