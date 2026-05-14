@@ -10,6 +10,21 @@
 
 import SwiftUI
 
+// Типизирует причину программной прокрутки фонотеки.
+private enum LibraryScrollRequest: Equatable {
+    case reveal(UUID)
+    case activeTrack(UUID)
+
+    var targetId: UUID {
+        switch self {
+        case .reveal(let id):
+            return id
+        case .activeTrack(let id):
+            return id
+        }
+    }
+}
+
 struct LibraryTracksView: View {
 
     let folder: LibraryFolder
@@ -17,14 +32,15 @@ struct LibraryTracksView: View {
     let onRevealHandled: (UUID) -> Void
     let trackListViewModel: TrackListViewModel
 
-    let playerViewModel: PlayerViewModel
+    @ObservedObject var playerViewModel: PlayerViewModel
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject var sheetManager: SheetManager
     @StateObject private var tracksViewModel: LibraryTracksViewModel
     @StateObject private var scrollSpeed = ScrollSpeedModel(thresholdPtPerSec: 1500,debounceMs: 180)
 
     // MARK: -  Локальное состояние для скролла/подсветки
     
-    @State private var scrollTargetID: UUID?
+    @State private var scrollRequest: LibraryScrollRequest?
     @State private var revealedTrackID: UUID?
     @State private var revealedRequestId: UUID?
     @State private var pendingRevealRequest: LibraryRevealRequest?
@@ -77,16 +93,30 @@ struct LibraryTracksView: View {
                     Color.clear.frame(height: 88)
                 }
 
+                .onAppear {
+                    requestActiveTrackScrollIfNeeded()
+                }
                 // Как только появилась цель — скроллим
-                .onChange(of: scrollTargetID) { _, id in
-                    guard let id else { return }
+                .onChange(of: scrollRequest) { _, request in
+                    guard let request else { return }
+
+                    let targetId = request.targetId
+
                     withAnimation(.easeInOut(duration: 0.35)) {
-                        proxy.scrollTo(id, anchor: .center)
+                        proxy.scrollTo(targetId, anchor: .center)
                     }
-                    scrollTargetID = nil
+
+                    scrollRequest = nil
                 }
                 .onChange(of: tracksViewModel.trackSections) { _, _ in
                     revealTrackIfNeeded()
+                }
+                .onChange(of: playerViewModel.currentTrackDisplayable?.id) { _, _ in
+                    requestActiveTrackScrollIfNeeded()
+                }
+                .onChange(of: scenePhase) { _, newPhase in
+                    guard newPhase == .active else { return }
+                    requestActiveTrackScrollIfNeeded()
                 }
             }
 
@@ -145,6 +175,17 @@ struct LibraryTracksView: View {
         }
     }
 
+    /// Запрашивает прокрутку к активному треку, если она не конфликтует с reveal.
+    private func requestActiveTrackScrollIfNeeded() {
+        guard pendingRevealRequest == nil else { return }
+        guard scrollRequest == nil else { return }
+        guard playerViewModel.currentContext == .library else { return }
+        guard let currentTrackId = playerViewModel.currentTrackDisplayable?.id else { return }
+        guard containsTrack(id: currentTrackId) else { return }
+
+        scrollRequest = .activeTrack(currentTrackId)
+    }
+
     /// Показываем целевой трек только после появления строки в списке.
     private func revealTrackIfNeeded() {
         guard let request = pendingRevealRequest else { return }
@@ -165,7 +206,7 @@ struct LibraryTracksView: View {
         Task { @MainActor in
             // Даём List один проход на создание строки перед scrollTo.
             await Task.yield()
-            scrollTargetID = targetTrackId
+            scrollRequest = .reveal(targetTrackId)
             onRevealHandled(revealRequestId)
 
             try? await Task.sleep(nanoseconds: 1_200_000_000)
