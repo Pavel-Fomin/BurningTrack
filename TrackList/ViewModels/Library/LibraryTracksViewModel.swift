@@ -68,6 +68,22 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
                 }
             }
             .store(in: &cancellables)
+
+        NotificationCenter.default.publisher(for: .trackListsDidChange)
+            .sink { [weak self] _ in
+                Task { @MainActor in
+                    self?.reloadTrackListBadges()
+                }
+            }
+            .store(in: &cancellables)
+
+        NotificationCenter.default.publisher(for: .trackListTracksDidChange)
+            .sink { [weak self] _ in
+                Task { @MainActor in
+                    self?.reloadTrackListBadges()
+                }
+            }
+            .store(in: &cancellables)
     }
     
     // MARK: - Load
@@ -110,14 +126,22 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
 
     /// Догружает тяжёлые детали после появления первичного списка.
     private func loadDetailsInBackground() async {
-        await MusicLibraryManager.shared.syncFolderIfNeeded(folderId: folderId)
+        reloadTrackListBadges()
 
-        let ids = trackSections.flatMap { $0.tracks }.map { $0.id }
-        trackListNamesById = badgeProvider.badges(for: ids)
+        await MusicLibraryManager.shared.syncFolderIfNeeded(folderId: folderId)
 
         await updateAvailabilityInBackground()
     }
 
+    // MARK: - Badges
+
+    /// Обновляет бейджи треклистов для уже загруженных треков.
+    /// Не перезагружает сами треки и не меняет секции.
+    private func reloadTrackListBadges() {
+        let ids = trackSections.flatMap { $0.tracks }.map { $0.trackId }
+        trackListNamesById = badgeProvider.badges(for: ids)
+    }
+    
     /// Проверяет доступность треков после первичного отображения списка.
     private func updateAvailabilityInBackground() async {
         let tracks = trackSections.flatMap { $0.tracks }

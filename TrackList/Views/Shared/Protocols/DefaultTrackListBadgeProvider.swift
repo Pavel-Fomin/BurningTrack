@@ -2,36 +2,23 @@
 //  DefaultTrackListBadgeProvider.swift
 //  TrackList
 //
+//  Провайдер бейджей треклистов.
+//
+//  Роль:
+//  - предоставляет названия треклистов по trackId;
+//  - использует централизованный индекс TrackListBadgeIndex;
+//  - не читает JSON напрямую.
+//
 //  Created by Pavel Fomin on 13.12.2025.
 //
 
 import Foundation
 
-
 final class DefaultTrackListBadgeProvider: TrackListBadgeProvider {
 
+    // MARK: - Public
+
     func badges(for trackIds: [UUID]) -> [UUID: [String]] {
-
-        var namesById: [UUID: Set<String>] = [:]
-
-        let metas = (try? TrackListsManager.shared.loadTrackListMetas()) ?? []
-
-        for meta in metas {
-            guard let list = try? TrackListManager.shared.getTrackListById(meta.id) else {
-                continue
-            }
-            for track in list.tracks {
-                if trackIds.contains(track.trackId) {
-                    namesById[track.trackId, default: []].insert(meta.name)
-                }
-            }
-        }
-
-        var result: [UUID: [String]] = [:]
-        for id in trackIds {
-            result[id] = Array(namesById[id] ?? []).sorted()
-        }
-
-        return result
+        TrackListBadgeIndex.shared.badges(for: trackIds)
     }
 }

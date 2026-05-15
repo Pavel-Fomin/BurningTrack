@@ -1,6 +1,7 @@
 build/
 DerivedData/
 .codex-derived/
+.codex/
 *.xcuserstate
 *.xcworkspace/xcuserdata/
 *.xcodeproj/xcuserdata/
