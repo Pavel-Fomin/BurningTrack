@@ -27,6 +27,7 @@ final class MusicLibraryManager: ObservableObject {
 
     @Published private(set) var isAccessRestored = false       /// Флаг, что восстановление доступа к папкам завершено
     @Published var attachedFolders: [LibraryFolder] = []       /// Прикреплённые корневые папки (дерево подпапок и файлов для UI)
+    @Published private(set) var attachingFolderIds: Set<UUID> = [] /// Папки, которые сейчас прикрепляются и сканируются
    
     enum LibraryAccessState {
         case booting
@@ -64,6 +65,11 @@ final class MusicLibraryManager: ObservableObject {
         )
     }
 
+    /// Проверяет, находится ли папка в процессе прикрепления.
+    func isAttachingFolder(_ folderId: UUID) -> Bool {
+        attachingFolderIds.contains(folderId)
+    }
+
     // MARK: - Добавление папки: сохраняем bookmark, регистрируем, синхронизируем
 
     func saveBookmark(for url: URL) async throws {
@@ -76,39 +82,60 @@ final class MusicLibraryManager: ObservableObject {
         let rootFolderId = url.libraryFolderId
         activeRootFolderAccess[rootFolderId] = url
 
-        // 1. Создание bookmark для корневой папки
-        guard let bookmarkBase64 = BookmarkResolver.makeBookmarkBase64(for: url) else {
+        // Сразу показываем папку в UI, чтобы пользователь видел начало прикрепления
+        let liteRootFolder = liteFolder(from: url)
+        if attachedFolders.contains(where: { $0.id == rootFolderId }) == false {
+            attachedFolders.insert(liteRootFolder, at: 0)
+        }
+        attachingFolderIds.insert(rootFolderId)
+
+        do {
+            // 1. Создание bookmark для корневой папки
+            guard let bookmarkBase64 = BookmarkResolver.makeBookmarkBase64(for: url) else {
+                attachingFolderIds.remove(rootFolderId)
+                attachedFolders.removeAll { $0.id == rootFolderId }
+                activeRootFolderAccess.removeValue(forKey: rootFolderId)
+                url.stopAccessingSecurityScopedResource()
+                throw AppError.bookmarkCreateFailed
+            }
+
+            let rootFolderName = url.lastPathComponent
+
+            await BookmarksRegistry.shared.upsertFolderBookmark(
+                id: rootFolderId,
+                base64: bookmarkBase64
+            )
+
+            // 2. Строим дерево папки для UI (сканер используется только для UI-модели)
+            let rootTree = await buildFolderTree(from: url)
+
+            // 3. Регистрируем саму папку (только метаданные)
+            await TrackRegistry.shared.upsertFolder(
+                id: rootFolderId,
+                name: rootFolderName
+            )
+
+            // 4. Синхронизируем реестры по фактическому состоянию ФС (ТОЛЬКО через sync-модуль)
+            try await LibrarySyncModule.shared.syncRootFolder(
+                rootFolderId: rootFolderId,
+                rootURL: url,
+                mode: .full
+            )
+
+            // 5. Заменяем lite-папку на полноценное дерево
+            if let index = attachedFolders.firstIndex(where: { $0.id == rootFolderId }) {
+                attachedFolders[index] = rootTree
+            } else {
+                attachedFolders.insert(rootTree, at: 0)
+            }
+
+            attachingFolderIds.remove(rootFolderId)
+        } catch {
+            attachingFolderIds.remove(rootFolderId)
+            attachedFolders.removeAll { $0.id == rootFolderId }
             activeRootFolderAccess.removeValue(forKey: rootFolderId)
             url.stopAccessingSecurityScopedResource()
-            throw AppError.bookmarkCreateFailed
-        }
-
-        let rootFolderName = url.lastPathComponent
-
-        await BookmarksRegistry.shared.upsertFolderBookmark(
-            id: rootFolderId,
-            base64: bookmarkBase64
-        )
-
-        // 2. Строим дерево папки для UI (сканер используется только для UI-модели)
-        let rootTree = await buildFolderTree(from: url)
-
-        // 3. Регистрируем саму папку (только метаданные)
-        await TrackRegistry.shared.upsertFolder(
-            id: rootFolderId,
-            name: rootFolderName
-        )
-
-        // 4. Синхронизируем реестры по фактическому состоянию ФС (ТОЛЬКО через sync-модуль)
-        try await LibrarySyncModule.shared.syncRootFolder(
-            rootFolderId: rootFolderId,
-            rootURL: url,
-            mode: .full
-        )
-
-        // 5. Обновляем UI
-        if attachedFolders.contains(where: { $0.url == url }) == false {
-            attachedFolders.insert(rootTree, at: 0)
+            throw error
         }
     }
 

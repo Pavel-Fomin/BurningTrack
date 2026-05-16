@@ -57,7 +57,10 @@ struct MusicLibraryView: View {
             List {
 
                 ForEach(manager.attachedFolders) { folder in
+                    let isAttaching = manager.isAttachingFolder(folder.id)
+
                     Button {
+                        if isAttaching { return }
                         nav.openFolder(folder.id) 
                     } label: {
                         HStack(spacing: 12) {
@@ -67,40 +70,50 @@ struct MusicLibraryView: View {
 
                             Text(folder.name)
                                 .lineLimit(1)
+
+                            Spacer()
+
+                            if isAttaching {
+                                ProgressView()
+                                    .controlSize(.small)
+                            }
                         }
                         .padding(.vertical, 4)
                     }
                     .buttonStyle(.plain)
+                    .disabled(isAttaching)
                     .swipeActions(edge: .trailing) {
-                        Button(role: .destructive) {
-                            Task {
-                                let canDetach = await manager.canDetachFolder(
-                                    url: folder.url,
-                                    currentTrackId: playerViewModel.currentTrackDisplayable?.trackId,
-                                    isPlaying: playerViewModel.isPlaying
-                                )
+                        if isAttaching == false {
+                            Button(role: .destructive) {
+                                Task {
+                                    let canDetach = await manager.canDetachFolder(
+                                        url: folder.url,
+                                        currentTrackId: playerViewModel.currentTrackDisplayable?.trackId,
+                                        isPlaying: playerViewModel.isPlaying
+                                    )
 
-                                if canDetach {
-                                    do {
-                                        try await manager.removeBookmark(for: folder.url)
-                                        ToastManager.shared.handle(.folderRemoved(name: folder.name))
-                                    } catch let appError as AppError {
-                                        ToastManager.shared.handle(appError)
-                                    } catch {
-                                        ToastManager.shared.handle(
-                                            .operationFailed(message: "Не удалось открепить папку")
-                                        )
-                                    }
-                                } else {
-                                    await MainActor.run {
-                                        pendingDetachURL = folder.url
-                                        pendingDetachFolderName = folder.name
-                                        showDetachAlert = true
+                                    if canDetach {
+                                        do {
+                                            try await manager.removeBookmark(for: folder.url)
+                                            ToastManager.shared.handle(.folderRemoved(name: folder.name))
+                                        } catch let appError as AppError {
+                                            ToastManager.shared.handle(appError)
+                                        } catch {
+                                            ToastManager.shared.handle(
+                                                .operationFailed(message: "Не удалось открепить папку")
+                                            )
+                                        }
+                                    } else {
+                                        await MainActor.run {
+                                            pendingDetachURL = folder.url
+                                            pendingDetachFolderName = folder.name
+                                            showDetachAlert = true
+                                        }
                                     }
                                 }
+                            } label: {
+                                Image(systemName: "pin.slash.fill")
                             }
-                        } label: {
-                            Image(systemName: "pin.slash.fill")
                         }
                     }
                 }
