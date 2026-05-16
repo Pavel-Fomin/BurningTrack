@@ -34,7 +34,10 @@ struct MainTabView: View {
 
 // MARK: - Плеер
             
-            PlayerScreen(playerViewModel: playerViewModel)
+            PlayerScreen(
+                playerViewModel: playerViewModel,
+                trackListViewModel: trackListViewModel
+            )
                 .tabItem { Label("Плеер", systemImage: "waveform") }
                 .tag(ScenePhaseHandler.Tab.player)
 
@@ -51,14 +54,18 @@ struct MainTabView: View {
             
             TrackListsScreen(
                 trackListsViewModel: trackListsVM,
-                playerViewModel: playerViewModel
+                playerViewModel: playerViewModel,
+                trackListViewModel: trackListViewModel
             )
                 .tabItem { Label("Треклисты", systemImage: "list.star") }
                 .tag(ScenePhaseHandler.Tab.tracklists)
 
 // MARK: - Настройки
             
-            SettingsScreen()
+            SettingsScreen(
+                trackListViewModel: trackListViewModel,
+                playerViewModel: playerViewModel
+            )
                 .tabItem { Label("Настройки", systemImage: "gear") }
                 .tag(ScenePhaseHandler.Tab.settings)
         }

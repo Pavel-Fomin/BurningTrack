@@ -11,10 +11,17 @@ import Foundation
 import SwiftUI
 
 struct SettingsScreen: View {
+    let trackListViewModel: TrackListViewModel
+    let playerViewModel: PlayerViewModel
+
     var body: some View {
         NavigationStack {
             SettingsView()
                 .settingsToolbar()
         }
+        .miniPlayerHost(
+            trackListViewModel: trackListViewModel,
+            playerViewModel: playerViewModel
+        )
     }
 }

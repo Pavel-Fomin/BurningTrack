@@ -89,9 +89,6 @@ struct LibraryTracksView: View {
                 }
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
-                .safeAreaInset(edge: .bottom) {
-                    Color.clear.frame(height: 88)
-                }
 
                 .onAppear {
                     requestActiveTrackScrollIfNeeded()

@@ -22,7 +22,6 @@ struct PlayerView: View {
                     playerViewModel: playerViewModel
                 )
             }
-            .safeAreaInset(edge: .bottom) {Color.clear.frame(height: 88)}
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
             .background(Color(.systemBackground))

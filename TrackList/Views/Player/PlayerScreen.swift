@@ -12,6 +12,7 @@ import SwiftUI
 struct PlayerScreen: View {
 
     @ObservedObject var playerViewModel: PlayerViewModel
+    let trackListViewModel: TrackListViewModel
 
     @State private var showImporter = false
     @State private var isShowingExportPicker = false
@@ -42,6 +43,10 @@ struct PlayerScreen: View {
                 }
             )
         }
+        .miniPlayerHost(
+            trackListViewModel: trackListViewModel,
+            playerViewModel: playerViewModel
+        )
     }
 
     private func handleExport() {

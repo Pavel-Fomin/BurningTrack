@@ -13,7 +13,6 @@
 //
 
 import SwiftUI
-import AVKit
 
 struct MiniPlayerHeaderView: View {
 
@@ -63,9 +62,6 @@ struct MiniPlayerHeaderView: View {
             .offset(x: dragOffsetX)
             .animation(.spring(), value: dragOffsetX)
             .contentShape(Rectangle())
-            .onTapGesture {
-                onTap()
-            }
 
             Spacer()
 
@@ -74,6 +70,9 @@ struct MiniPlayerHeaderView: View {
         }
         .frame(height: 40)
         .contentShape(Rectangle())
+        .onTapGesture {
+            onTap()
+        }
         .gesture(
             DragGesture()
                 .onChanged { value in

@@ -41,6 +41,10 @@ struct LibraryScreen: View {
                     destination(for: route)
                 }
         }
+        .miniPlayerHost(
+            trackListViewModel: trackListViewModel,
+            playerViewModel: playerViewModel
+        )
         .onAppear {
             handlePendingShowTrack()
         }

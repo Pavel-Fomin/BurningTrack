@@ -4,7 +4,6 @@
 //
 //  Корневой контейнер приложения.
 //  - содержит TabView (через MainTabView),
-//  - поверх показывает мини-плеер,
 //  - поверх показывает тосты и шиты,
 //  - НЕ содержит никакой навигационной логики.
 //
@@ -44,40 +43,11 @@ struct ContentView: View {
     // MARK: - UI
     
     var body: some View {
-        ZStack(alignment: .bottom) {
-
-            // MARK: - Основные вкладки
-            
-            MainTabView(
-                trackListViewModel: trackListViewModel,
-                playerViewModel: playerViewModel
-            )
-
-            // MARK: - Мини-плеер
-            
-            if playerViewModel.currentTrackDisplayable != nil {
-                MiniPlayerView(
-                    trackListViewModel: trackListViewModel,
-                    playerViewModel: playerViewModel
-                )
-                .padding(.horizontal, 8)
-                .padding(.bottom, safeTabBarInset)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-        }
-
-        // MARK: - Подключение SheetHost
-        
+        MainTabView(
+            trackListViewModel: trackListViewModel,
+            playerViewModel: playerViewModel
+        )
         .sheetHost(playerManager: playerViewModel.playerManager)
         .toastHost()
     }
 }
-
-    // MARK: - Safe area для мини-плеера (Dynamic Island / Face ID / SE)
-    private var safeTabBarInset: CGFloat {
-        UIApplication.shared.connectedScenes
-            .compactMap { ($0 as? UIWindowScene)?.keyWindow }
-            .first?
-            .safeAreaInsets.bottom ?? 49
-    }
-

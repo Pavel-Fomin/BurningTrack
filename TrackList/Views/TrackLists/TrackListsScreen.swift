@@ -15,6 +15,7 @@ struct TrackListsScreen: View {
 
     @ObservedObject var trackListsViewModel: TrackListsViewModel
     @ObservedObject var playerViewModel: PlayerViewModel
+    let trackListViewModel: TrackListViewModel
 
     var body: some View {
         NavigationStack {
@@ -25,5 +26,9 @@ struct TrackListsScreen: View {
             .background(Color(.systemGroupedBackground))
             .trackListsToolbar()
         }
+        .miniPlayerHost(
+            trackListViewModel: trackListViewModel,
+            playerViewModel: playerViewModel
+        )
     }
 }
