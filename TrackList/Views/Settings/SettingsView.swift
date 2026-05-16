@@ -40,6 +40,18 @@ struct SettingsView: View {
                         }
                     )
                 )
+
+                Toggle(
+                    "Показывать формат",
+                    isOn: Binding(
+                        get: {
+                            settingsManager.settings.visible.library.isFileFormatVisible
+                        },
+                        set: { value in
+                            settingsManager.setFileFormatVisible(value)
+                        }
+                    )
+                )
             }
         }
         .listStyle(.insetGrouped)

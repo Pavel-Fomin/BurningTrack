@@ -78,4 +78,13 @@ final class AppSettingsManager: ObservableObject {
 
         NotificationCenter.default.post(name: .appSettingsDidChange, object: nil)
     }
+
+    func setFileFormatVisible(_ value: Bool) {
+        guard settings.visible.library.isFileFormatVisible != value else { return }
+
+        settings.visible.library.isFileFormatVisible = value
+        save()
+
+        NotificationCenter.default.post(name: .appSettingsDidChange, object: nil)
+    }
 }

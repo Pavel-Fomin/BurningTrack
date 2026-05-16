@@ -33,6 +33,7 @@ struct TrackRowView: View {
     let isSelected: Bool              /// Radio (пустой / выбранный)
     let onToggleSelection: (() -> Void)?
     let selectionPlacement: TrackRowSelectionPlacement
+    let showsFileFormat: Bool         /// Показывать формат файла в правой колонке
     
     var trackListNames: [String]? = nil
     var useNativeSwipeActions: Bool = false
@@ -53,6 +54,7 @@ struct TrackRowView: View {
         isSelected: Bool = false,
         onToggleSelection: (() -> Void)? = nil,
         selectionPlacement: TrackRowSelectionPlacement = .leading,
+        showsFileFormat: Bool = true,
         trackListNames: [String]? = nil,
         useNativeSwipeActions: Bool = false
     ) {
@@ -70,6 +72,7 @@ struct TrackRowView: View {
         self.isSelected = isSelected
         self.onToggleSelection = onToggleSelection
         self.selectionPlacement = selectionPlacement
+        self.showsFileFormat = showsFileFormat
         self.trackListNames = trackListNames
         self.useNativeSwipeActions = useNativeSwipeActions
     }
@@ -232,7 +235,7 @@ struct TrackRowView: View {
     /// Правая колонка с техническими метаданными трека
     private var metadataColumn: some View {
         VStack(alignment: .trailing, spacing: 2) {
-            if let fileFormatLabel {
+            if showsFileFormat, let fileFormatLabel {
                 Text(fileFormatLabel)
                     .font(.caption)
                     .foregroundColor(.secondary.opacity(0.65))

@@ -83,6 +83,7 @@ struct LibraryTrackRowWrapper: View {
     var body: some View {
         let shouldShowTags = settingsManager.settings.visible.metadata.isTagReadingEnabled
         let shouldShowTrackListMembership = settingsManager.settings.visible.library.isTrackListMembershipVisible
+        let shouldShowFileFormat = settingsManager.settings.visible.library.isFileFormatVisible
 
         TrackRowView(
             track: track,
@@ -113,6 +114,7 @@ struct LibraryTrackRowWrapper: View {
             showsSelection: showsSelection,
             isSelected: isSelected,
             onToggleSelection: onToggleSelection,
+            showsFileFormat: shouldShowFileFormat,
             trackListNames: shouldShowTrackListMembership ? trackListNames : nil
         )
         

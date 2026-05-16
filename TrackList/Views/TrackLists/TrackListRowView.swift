@@ -54,6 +54,7 @@ struct TrackListRowView: View {
     
     var body: some View {
         let shouldShowTags = settingsManager.settings.visible.metadata.isTagReadingEnabled
+        let shouldShowFileFormat = settingsManager.settings.visible.library.isFileFormatVisible
 
         TrackRowView(
             track: track,
@@ -65,7 +66,8 @@ struct TrackListRowView: View {
             artist: shouldShowTags ? (snapshot?.artist ?? "") : "",
             duration: snapshot?.duration ?? track.duration,
             onRowTap: onTap,                                       /// Правая зона — воспроизведение / пауза
-            onArtworkTap: onArtworkTap                             /// Левая зона — делегируется выше (wrapper решает, что делать)
+            onArtworkTap: onArtworkTap,                            /// Левая зона — делегируется выше (wrapper решает, что делать)
+            showsFileFormat: shouldShowFileFormat
         )
         
         .padding(.vertical, 4)

@@ -44,6 +44,7 @@ struct PlayerTrackRowWrapper: View {
     
     var body: some View {
         let shouldShowTags = settingsManager.settings.visible.metadata.isTagReadingEnabled
+        let shouldShowFileFormat = settingsManager.settings.visible.library.isFileFormatVisible
 
         TrackRowView(
             track: track,
@@ -57,7 +58,8 @@ struct PlayerTrackRowWrapper: View {
             onRowTap: onTap,
             onArtworkTap: {
                 sheetManager.present(.trackDetail(track))
-            }
+            },
+            showsFileFormat: shouldShowFileFormat
         )
         .task(id: track.trackId) {
             playerViewModel.requestSnapshotIfNeeded(for: track.trackId)

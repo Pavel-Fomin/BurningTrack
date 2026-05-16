@@ -19,6 +19,8 @@ struct TrackSelectableRowWrapper: View {
     let isSelected: Bool
     let metadataProvider: TrackMetadataProviding
     let onToggleSelection: () -> Void
+
+    @ObservedObject private var settingsManager = AppSettingsManager.shared
     
     // MARK: - Snapshot
     
@@ -41,6 +43,8 @@ struct TrackSelectableRowWrapper: View {
     // MARK: - UI
     
     var body: some View {
+        let shouldShowFileFormat = settingsManager.settings.visible.library.isFileFormatVisible
+
         TrackRowView(
             track: track,
             isCurrent: false,
@@ -57,7 +61,8 @@ struct TrackSelectableRowWrapper: View {
             showsSelection: true,
             isSelected: isSelected,
             onToggleSelection: onToggleSelection,
-            selectionPlacement: .trailing
+            selectionPlacement: .trailing,
+            showsFileFormat: shouldShowFileFormat
         )
         .listRowInsets(EdgeInsets(top: 12, leading: 0, bottom: 12, trailing: 0))
         .task(id: track.trackId) {

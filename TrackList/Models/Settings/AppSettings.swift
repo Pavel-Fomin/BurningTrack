@@ -90,11 +90,38 @@ extension AppSettings {
     // Настройки отображения фонотеки.
     struct LibrarySettings: Codable, Equatable {
         var isTrackListMembershipVisible: Bool
+        var isFileFormatVisible: Bool
 
-        // По умолчанию показываем связь трека с треклистами.
+        enum CodingKeys: String, CodingKey {
+            case isTrackListMembershipVisible
+            case isFileFormatVisible
+        }
+
+        init(isTrackListMembershipVisible: Bool, isFileFormatVisible: Bool) {
+            self.isTrackListMembershipVisible = isTrackListMembershipVisible
+            self.isFileFormatVisible = isFileFormatVisible
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            // Старые settings.json не содержат новых ключей, поэтому недостающие значения берём из defaultValue.
+            isTrackListMembershipVisible = try container.decodeIfPresent(
+                Bool.self,
+                forKey: .isTrackListMembershipVisible
+            ) ?? Self.defaultValue.isTrackListMembershipVisible
+
+            isFileFormatVisible = try container.decodeIfPresent(
+                Bool.self,
+                forKey: .isFileFormatVisible
+            ) ?? Self.defaultValue.isFileFormatVisible
+        }
+
+        // По умолчанию показываем связь трека с треклистами и формат файла.
         static var defaultValue: LibrarySettings {
             LibrarySettings(
-                isTrackListMembershipVisible: true
+                isTrackListMembershipVisible: true,
+                isFileFormatVisible: true
             )
         }
     }
