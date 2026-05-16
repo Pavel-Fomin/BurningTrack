@@ -11,6 +11,9 @@ import SwiftUI
 
 struct SelectionActionBar: View {
 
+    /// Форма glass-панели, общая для эффекта, обрезки и hit-test зоны.
+    private let actionBarShape = RoundedRectangle(cornerRadius: 28, style: .continuous)
+
     // MARK: - Input
 
     let selectedCount: Int
@@ -53,11 +56,11 @@ struct SelectionActionBar: View {
             .font(.headline)
             .disabled(!isPrimaryEnabled)
         }
-        .padding(.horizontal, 16)
+        .padding(.leading, 10)
+        .padding(.trailing, 16)
         .padding(.vertical, 10)
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-        .shadow(radius: 18, y: 8)
+        .glassEffect(.regular, in: actionBarShape)
+        .clipShape(actionBarShape)
         .padding(.horizontal, 16)
         .padding(.bottom, 12)
     }
