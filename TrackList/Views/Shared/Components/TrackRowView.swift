@@ -75,45 +75,67 @@ struct TrackRowView: View {
     }
     // MARK: - UI
 
+    /// Есть ли отображаемый исполнитель
+    private var hasArtist: Bool {
+        guard let artist = artist?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() else { return false }
+        return !artist.isEmpty && artist != "неизвестен"
+    }
+
+    /// Формат файла для правой колонки метаданных
+    private var fileFormatLabel: String? {
+        let extensionValue = (track.fileName as NSString).pathExtension
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !extensionValue.isEmpty else { return nil }
+        return extensionValue
+    }
+
+    /// Есть ли расширенный контент, который делает строку выше обложки
+    private var hasExtendedContent: Bool {
+        guard let trackListNames else { return false }
+        return !trackListNames.isEmpty
+    }
+
+    /// Вертикальное выравнивание строки: короткие строки центрируются, расширенные прижимаются к верху
+    private var rowContentAlignment: VerticalAlignment {
+        hasExtendedContent ? .top : .center
+    }
+
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(alignment: rowContentAlignment, spacing: 12) {
 
-            HStack(spacing: 12) {
+            // Radio (только в режиме выбора)
+            if showsSelection && selectionPlacement == .leading {
+                selectionButton
+            }
 
-                // Radio (только в режиме выбора)
-                if showsSelection && selectionPlacement == .leading {
-                    selectionButton
+            // Левая зона — обложка
+            artworkView
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    guard track.isAvailable else {
+                        ToastManager.shared.handle(
+                            .trackUnavailable(title: track.title ?? track.fileName)
+                        )
+                        return
+                    }
+                    onArtworkTap?()
                 }
 
-                // Левая зона — обложка
-                artworkView
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        guard track.isAvailable else {
-                            ToastManager.shared.handle(
-                                .trackUnavailable(title: track.title ?? track.fileName)
-                            )
-                            return
-                        }
-                        onArtworkTap?()
+            // Правая зона — информация о треке
+            trackInfoView
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    guard track.isAvailable else {
+                        ToastManager.shared.handle(
+                            .trackUnavailable(title: track.title ?? track.fileName)
+                        )
+                        return
                     }
-
-                // Правая зона — информация о треке
-                trackInfoView
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        guard track.isAvailable else {
-                            ToastManager.shared.handle(
-                                .trackUnavailable(title: track.title ?? track.fileName)
-                            )
-                            return
-                        }
-                        onRowTap()
-                    }
-
-                if showsSelection && selectionPlacement == .trailing {
-                    selectionButton
+                    onRowTap()
                 }
+
+            if showsSelection && selectionPlacement == .trailing {
+                selectionButton
             }
         }
         .padding(.vertical, 0)
@@ -173,12 +195,18 @@ struct TrackRowView: View {
     // MARK: - Информация о треке
 
     private var trackInfoView: some View {
-        let hasArtist: Bool = {
-            guard let artist = artist?.trimmingCharacters(in: .whitespaces).lowercased() else { return false }
-            return !artist.isEmpty && artist != "неизвестен"
-        }()
+        HStack(alignment: rowContentAlignment, spacing: 8) {
+            leftTextColumn
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-        return VStack(alignment: .leading, spacing: hasArtist ? 2 : 0) {
+            metadataColumn
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Левая колонка с основным текстом трека
+    private var leftTextColumn: some View {
+        VStack(alignment: .leading, spacing: hasArtist ? 2 : 0) {
             if hasArtist, let artistText = artist {
                 Text(artistText)
                     .font(.subheadline)
@@ -186,18 +214,10 @@ struct TrackRowView: View {
                     .lineLimit(1)
             }
 
-            HStack {
-                Text(title ?? track.fileName)
-                    .font(hasArtist ? .footnote : .subheadline)
-                    .foregroundColor(hasArtist ? .secondary : .primary)
-                    .lineLimit(1)
-
-                Spacer()
-
-                Text(formatTimeSmart(duration ?? track.duration))
-                    .font(.footnote)
-                    .foregroundColor(.secondary)
-            }
+            Text(title ?? track.fileName)
+                .font(hasArtist ? .footnote : .subheadline)
+                .foregroundColor(hasArtist ? .secondary : .primary)
+                .lineLimit(1)
 
             if let trackListNames, !trackListNames.isEmpty {
                 Text("уже в: \(trackListNames.joined(separator: ", "))")
@@ -207,6 +227,25 @@ struct TrackRowView: View {
                     .padding(.top, 4)
             }
         }
+    }
+
+    /// Правая колонка с техническими метаданными трека
+    private var metadataColumn: some View {
+        VStack(alignment: .trailing, spacing: 2) {
+            if let fileFormatLabel {
+                Text(fileFormatLabel)
+                    .font(.caption)
+                    .foregroundColor(.secondary.opacity(0.65))
+                    .lineLimit(1)
+            }
+
+            Text(formatTimeSmart(duration ?? track.duration))
+                .font(.footnote)
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+        }
+        .multilineTextAlignment(.trailing)
+        .layoutPriority(1)
     }
 
     // MARK: - Подсветка строки
