@@ -40,12 +40,38 @@ extension AppSettings {
     // Настройки, которые могут быть доступны пользователю через интерфейс приложения.
     struct VisibleSettings: Codable, Equatable {
         var metadata: MetadataSettings
+        var library: LibrarySettings
+
+        enum CodingKeys: String, CodingKey {
+            case metadata
+            case library
+        }
 
         // Значения пользовательских настроек по умолчанию.
         static var defaultValue: VisibleSettings {
             VisibleSettings(
-                metadata: MetadataSettings.defaultValue
+                metadata: MetadataSettings.defaultValue,
+                library: LibrarySettings.defaultValue
             )
+        }
+
+        init(metadata: MetadataSettings, library: LibrarySettings) {
+            self.metadata = metadata
+            self.library = library
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            metadata = try container.decodeIfPresent(
+                MetadataSettings.self,
+                forKey: .metadata
+            ) ?? MetadataSettings.defaultValue
+
+            library = try container.decodeIfPresent(
+                LibrarySettings.self,
+                forKey: .library
+            ) ?? LibrarySettings.defaultValue
         }
     }
 
@@ -57,6 +83,18 @@ extension AppSettings {
         static var defaultValue: MetadataSettings {
             MetadataSettings(
                 isTagReadingEnabled: true
+            )
+        }
+    }
+
+    // Настройки отображения фонотеки.
+    struct LibrarySettings: Codable, Equatable {
+        var isTrackListMembershipVisible: Bool
+
+        // По умолчанию показываем связь трека с треклистами.
+        static var defaultValue: LibrarySettings {
+            LibrarySettings(
+                isTrackListMembershipVisible: true
             )
         }
     }

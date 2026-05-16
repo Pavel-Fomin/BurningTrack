@@ -82,6 +82,7 @@ struct LibraryTrackRowWrapper: View {
     
     var body: some View {
         let shouldShowTags = settingsManager.settings.visible.metadata.isTagReadingEnabled
+        let shouldShowTrackListMembership = settingsManager.settings.visible.library.isTrackListMembershipVisible
 
         TrackRowView(
             track: track,
@@ -112,7 +113,7 @@ struct LibraryTrackRowWrapper: View {
             showsSelection: showsSelection,
             isSelected: isSelected,
             onToggleSelection: onToggleSelection,
-            trackListNames: trackListNames
+            trackListNames: shouldShowTrackListMembership ? trackListNames : nil
         )
         
         // Загружаем snapshot при появлении строки

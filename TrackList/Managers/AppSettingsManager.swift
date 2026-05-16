@@ -69,4 +69,13 @@ final class AppSettingsManager: ObservableObject {
         TrackRuntimeStore.shared.removeAllSnapshots()
         NotificationCenter.default.post(name: .appSettingsDidChange, object: nil)
     }
+
+    func setTrackListMembershipVisible(_ value: Bool) {
+        guard settings.visible.library.isTrackListMembershipVisible != value else { return }
+
+        settings.visible.library.isTrackListMembershipVisible = value
+        save()
+
+        NotificationCenter.default.post(name: .appSettingsDidChange, object: nil)
+    }
 }

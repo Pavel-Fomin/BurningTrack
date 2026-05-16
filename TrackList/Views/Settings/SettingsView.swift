@@ -16,7 +16,7 @@ struct SettingsView: View {
 
     var body: some View {
         List {
-            Section {
+            Section("Список треков") {
                 Toggle(
                     "Отображать метаданные",
                     isOn: Binding(
@@ -25,6 +25,18 @@ struct SettingsView: View {
                         },
                         set: { value in
                             settingsManager.setTagReadingEnabled(value)
+                        }
+                    )
+                )
+
+                Toggle(
+                    "Показывать «уже в…»",
+                    isOn: Binding(
+                        get: {
+                            settingsManager.settings.visible.library.isTrackListMembershipVisible
+                        },
+                        set: { value in
+                            settingsManager.setTrackListMembershipVisible(value)
                         }
                     )
                 )
