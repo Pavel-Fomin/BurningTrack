@@ -39,6 +39,11 @@ struct PlayerTrackRowWrapper: View {
             purpose: .trackList
         )
     }
+
+    /// Актуальное имя файла из runtime snapshot с fallback на модель строки.
+    private var displayFileName: String {
+        snapshot?.fileName ?? track.fileName
+    }
     
     // MARK: - UI
     
@@ -52,7 +57,7 @@ struct PlayerTrackRowWrapper: View {
             isPlaying: isPlaying,
             isHighlighted: sheetManager.highlightedRowID == track.id,
             artwork: artwork,
-            title: shouldShowTags ? (snapshot?.title ?? track.fileName) : track.fileName,
+            title: shouldShowTags ? (snapshot?.title ?? displayFileName) : displayFileName,
             artist: shouldShowTags ? (snapshot?.artist ?? "") : "",
             duration: snapshot?.duration ?? track.duration,
             onRowTap: onTap,
@@ -60,6 +65,14 @@ struct PlayerTrackRowWrapper: View {
                 sheetManager.present(.trackDetail(track))
             },
             showsFileFormat: shouldShowFileFormat
+        )
+        .trackFileRenameMenu(
+            trackId: track.trackId,
+            rowId: track.id,
+            currentFileName: displayFileName,
+            artist: snapshot?.artist,
+            title: snapshot?.title,
+            playerManager: playerViewModel.playerManager
         )
         .task(id: track.trackId) {
             playerViewModel.requestSnapshotIfNeeded(for: track.trackId)

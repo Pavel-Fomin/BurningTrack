@@ -77,6 +77,11 @@ struct LibraryTrackRowWrapper: View {
             purpose: .trackList
         )
     }
+
+    /// Актуальное имя файла из runtime snapshot с fallback на модель строки.
+    private var displayFileName: String {
+        snapshot?.fileName ?? track.fileName
+    }
     
     // MARK: - UI
     
@@ -94,7 +99,7 @@ struct LibraryTrackRowWrapper: View {
             
             // Данные отображения берём из snapshot (если он есть),
             // иначе используем fallback из модели трека
-            title: shouldShowTags ? (snapshot?.title ?? track.title) : track.fileName,
+            title: shouldShowTags ? (snapshot?.title ?? track.title ?? displayFileName) : displayFileName,
             artist: shouldShowTags ? (snapshot?.artist ?? track.artist ?? "") : "",
             duration: snapshot?.duration ?? track.duration,
             
@@ -116,6 +121,15 @@ struct LibraryTrackRowWrapper: View {
             onToggleSelection: onToggleSelection,
             showsFileFormat: shouldShowFileFormat,
             trackListNames: shouldShowTrackListMembership ? trackListNames : nil
+        )
+        .trackFileRenameMenu(
+            trackId: track.trackId,
+            rowId: track.id,
+            currentFileName: displayFileName,
+            artist: snapshot?.artist,
+            title: snapshot?.title,
+            playerManager: playerViewModel.playerManager,
+            isEnabled: !showsSelection
         )
         
         // Загружаем snapshot при появлении строки
@@ -178,6 +192,7 @@ struct LibraryTrackRowWrapper: View {
             }
         }
     }
+
 }
 
 // MARK: - Helpers

@@ -1,0 +1,44 @@
+//
+//  RenameTrackFileSheet.swift
+//  TrackList
+//
+//  UI-форма для ручного ввода нового имени файла трека.
+//  Отвечает только за поле ввода и не содержит логики сохранения или навигации.
+//
+//  Created by Pavel Fomin on 17.05.2026.
+//
+
+import SwiftUI
+
+struct RenameTrackFileSheet: View {
+
+    // MARK: - Input
+
+    /// Связанное состояние имени файла.
+    /// Источник истины находится в контейнере.
+    @Binding var fileName: String
+
+    /// Состояние фокуса поля ввода.
+    /// Используется для автоматического показа клавиатуры.
+    @FocusState private var isFileNameFocused: Bool
+
+    // MARK: - UI
+
+    var body: some View {
+        Form {
+            Section {
+                TextField("Название файла", text: $fileName)
+                    .clearable($fileName)
+                    .focused($isFileNameFocused)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled(true)
+            }
+        }
+        .formStyle(.grouped)
+
+        /// Автоматически устанавливаем фокус при появлении шита.
+        .task {
+            isFileNameFocused = true
+        }
+    }
+}

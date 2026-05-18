@@ -30,6 +30,9 @@ struct EditableFieldRow: View {
     
     @Binding var value: String /// Значение поля
 
+    /// Опциональный фокус для внешнего управления конкретным полем.
+    var focusBinding: FocusState<Bool>.Binding?
+
     // MARK: - UI
 
     var body: some View {
@@ -54,9 +57,16 @@ struct EditableFieldRow: View {
     // MARK: - Single line
 
     private var singleLineInput: some View {
-        TextField("", text: $value)
-            .font(.body)
-            .foregroundColor(.primary)
+        Group {
+            if let focusBinding {
+                TextField("", text: $value)
+                    .focused(focusBinding)
+            } else {
+                TextField("", text: $value)
+            }
+        }
+        .font(.body)
+        .foregroundColor(.primary)
         
     }
 

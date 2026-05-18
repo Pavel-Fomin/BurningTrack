@@ -30,6 +30,22 @@ struct RenameTrackListSheetData: Identifiable, Equatable {
     }
 }
 
+// MARK: - Данные для RenameTrackFileSheet
+
+struct RenameTrackFileSheetData: Identifiable, Equatable {
+    let id = UUID()
+    let trackId: UUID
+    let rowId: UUID
+    let currentFileName: String
+
+    static func == (
+        lhs: RenameTrackFileSheetData,
+        rhs: RenameTrackFileSheetData
+    ) -> Bool {
+        lhs.id == rhs.id
+    }
+}
+
 
 // MARK: - Данные для SaveTrackListSheet
 
@@ -79,6 +95,7 @@ enum AppSheet: Identifiable, Equatable {
     case trackDetail(any TrackDisplayable)
     case addToTrackList(AddToTrackListSheetData)
     case renameTrackList(RenameTrackListSheetData)
+    case renameTrackFile(RenameTrackFileSheetData)
     case saveTrackList(SaveTrackListSheetData)
     case newTrackListSelection(NewTrackListSelectionSheetData)
     case createTrackList
@@ -90,6 +107,7 @@ enum AppSheet: Identifiable, Equatable {
         case .trackDetail(let track): return "trackDetail_\(track.id)"
         case .addToTrackList(let data): return "addToTrackList_\(data.id)"
         case .renameTrackList(let data): return "renameTrackList_\(data.id)"
+        case .renameTrackFile(let data): return "renameTrackFile_\(data.id)"
         case .saveTrackList(let data): return "saveTrackList_\(data.id)"
         case .newTrackListSelection(let data): return "newTrackListSelection_\(data.id)"
         case .createTrackList: return "createTrackList"
@@ -191,6 +209,19 @@ final class SheetManager: ObservableObject {
         )
         present(.renameTrackList(data))
     }
+
+    func presentRenameTrackFile(
+        trackId: UUID,
+        rowId: UUID,
+        currentFileName: String
+    ) {
+        let data = RenameTrackFileSheetData(
+            trackId: trackId,
+            rowId: rowId,
+            currentFileName: currentFileName
+        )
+        present(.renameTrackFile(data))
+    }
     
     func presentSaveTrackList() {
         let data = SaveTrackListSheetData()
@@ -226,6 +257,7 @@ private extension AppSheet {
         case .trackDetail(let t): return t.id
         case .addToTrackList(let data): return data.track.id
         case .renameTrackList: return nil
+        case .renameTrackFile(let data): return data.rowId
         case .saveTrackList: return nil
         case .newTrackListSelection: return nil
         case .createTrackList: return nil

@@ -33,6 +33,11 @@ struct TrackListRowWrapper: View {
         metadataProvider.snapshot(for: track.trackId)
     }
 
+    /// Актуальное имя файла из runtime snapshot с fallback на модель строки.
+    private var displayFileName: String {
+        snapshot?.fileName ?? track.fileName
+    }
+
     /// Трек для отображения с данными из snapshot
     private var displayTrack: Track {
         let shouldShowTags = settingsManager.settings.visible.metadata.isTagReadingEnabled
@@ -40,10 +45,10 @@ struct TrackListRowWrapper: View {
         return Track(
             listItemId: track.listItemId,
             trackId: track.trackId,
-            title: shouldShowTags ? (snapshot?.title ?? track.fileName) : track.fileName,
+            title: shouldShowTags ? (snapshot?.title ?? displayFileName) : displayFileName,
             artist: shouldShowTags ? snapshot?.artist : nil,
             duration: snapshot?.duration ?? track.duration,
-            fileName: snapshot?.fileName ?? track.fileName,
+            fileName: displayFileName,
             isAvailable: snapshot?.isAvailable ?? track.isAvailable
         )
     }
@@ -63,6 +68,14 @@ struct TrackListRowWrapper: View {
             onDelete: { onDelete(IndexSet(integer: index)) },
             onArtworkTap: { sheetManager.present(.trackDetail(track)) },
             metadataProvider: metadataProvider
+        )
+        .trackFileRenameMenu(
+            trackId: track.trackId,
+            rowId: track.id,
+            currentFileName: displayFileName,
+            artist: snapshot?.artist,
+            title: snapshot?.title,
+            playerManager: playerViewModel.playerManager
         )
         .task(id: track.trackId) {
             metadataProvider.requestSnapshotIfNeeded(for: track.trackId)

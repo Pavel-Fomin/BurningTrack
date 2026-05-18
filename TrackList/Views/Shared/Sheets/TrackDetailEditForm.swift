@@ -36,6 +36,9 @@ struct TrackDetailEditForm: View {
 
     @State private var selectedPhotoItem: PhotosPickerItem?
 
+    /// Фокус поля имени файла для показа toolbar над клавиатурой.
+    @FocusState private var isFileNameFocused: Bool
+
     // MARK: - Field configuration
 
     private struct FieldConfig: Identifiable {
@@ -72,6 +75,28 @@ struct TrackDetailEditForm: View {
         return artworkUIImage
     }
 
+    // MARK: - Derived file name
+
+    private var normalizedArtist: String {
+        (values[.artist] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var normalizedTitle: String {
+        (values[.title] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var canBuildFileNameFromTags: Bool {
+        !normalizedArtist.isEmpty && !normalizedTitle.isEmpty
+    }
+
+    private var artistTitleFileName: String {
+        "\(normalizedArtist) - \(normalizedTitle)"
+    }
+
+    private var titleArtistFileName: String {
+        "\(normalizedTitle) - \(normalizedArtist)"
+    }
+
     // MARK: - UI
 
     var body: some View {
@@ -84,7 +109,8 @@ struct TrackDetailEditForm: View {
                     title: "Название файла",
                     isMultiline: false,
                     keyboardType: .default,
-                    value: $fileName
+                    value: $fileName,
+                    focusBinding: $isFileNameFocused
                 )
 
                 ForEach(fields) { field in
@@ -101,6 +127,23 @@ struct TrackDetailEditForm: View {
         }
         .task(id: selectedPhotoItem) {
             await loadSelectedArtwork()
+        }
+        .toolbar {
+            if isFileNameFocused && canBuildFileNameFromTags {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Button("Артист - Название") {
+                        fileName = artistTitleFileName
+                    }
+
+                    Rectangle()
+                        .fill(Color.secondary.opacity(0.35))
+                        .frame(width: 1, height: 18)
+
+                    Button("Название - Артист") {
+                        fileName = titleArtistFileName
+                    }
+                }
+            }
         }
     }
 

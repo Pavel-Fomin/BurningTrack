@@ -43,6 +43,15 @@ struct SheetHostModifier: ViewModifier {
             case .renameTrackList(let data):
                 RenameTrackListContainer(data: data)
                     .appSheet(detents: [.height(160)])
+
+                /// Ручное переименование файла трека
+            case .renameTrackFile(let data):
+                RenameTrackFileContainer(
+                    data: data,
+                    playerManager: playerManager
+                )
+                .appSheet(detents: [.height(180)])
+                .toastHost()
                 
                 /// Перемещение трека
             case .moveToFolder(let data):
