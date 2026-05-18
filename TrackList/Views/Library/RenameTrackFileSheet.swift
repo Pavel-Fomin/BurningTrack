@@ -19,8 +19,8 @@ struct RenameTrackFileSheet: View {
     @Binding var fileName: String
 
     /// Состояние фокуса поля ввода.
-    /// Используется для автоматического показа клавиатуры.
-    @FocusState private var isFileNameFocused: Bool
+    /// Управляется контейнером, чтобы снимать focus до закрытия sheet.
+    let isFileNameFocused: FocusState<Bool>.Binding
 
     // MARK: - UI
 
@@ -29,7 +29,7 @@ struct RenameTrackFileSheet: View {
             Section {
                 TextField("Название файла", text: $fileName)
                     .clearable($fileName)
-                    .focused($isFileNameFocused)
+                    .focused(isFileNameFocused)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled(true)
             }
@@ -38,7 +38,7 @@ struct RenameTrackFileSheet: View {
 
         /// Автоматически устанавливаем фокус при появлении шита.
         .task {
-            isFileNameFocused = true
+            isFileNameFocused.wrappedValue = true
         }
     }
 }

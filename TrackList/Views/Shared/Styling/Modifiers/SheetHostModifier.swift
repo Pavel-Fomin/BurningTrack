@@ -37,12 +37,12 @@ struct SheetHostModifier: ViewModifier {
                 /// Сохранение треклиста
             case .saveTrackList:
                 SaveTrackListContainer()
-                    .appSheet(detents: [.height(160)])
+                    .appSheet(detents: [.fraction(0.45), .medium])
                 
                 /// Переименование треклиста
             case .renameTrackList(let data):
                 RenameTrackListContainer(data: data)
-                    .appSheet(detents: [.height(160)])
+                    .appSheet(detents: [.fraction(0.45), .medium])
 
                 /// Ручное переименование файла трека
             case .renameTrackFile(let data):
@@ -50,7 +50,7 @@ struct SheetHostModifier: ViewModifier {
                     data: data,
                     playerManager: playerManager
                 )
-                .appSheet(detents: [.height(180)])
+                .appSheet(detents: [.fraction(0.45), .medium])
                 .toastHost()
                 
                 /// Перемещение трека
@@ -84,7 +84,7 @@ struct SheetHostModifier: ViewModifier {
                 /// Создание нового треклиста
             case .createTrackList:
                 CreateTrackListContainer()
-                    .appSheet(detents: [.height(284)])
+                    .appSheet(detents: [.fraction(0.55), .medium])
             }
         }
     }

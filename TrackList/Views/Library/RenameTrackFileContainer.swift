@@ -22,6 +22,7 @@ struct RenameTrackFileContainer: View {
     @State private var fileName: String
     @State private var showStopPlayerAlert = false
     @State private var showFileNameConflictAlert = false
+    @FocusState private var isFileNameFocused: Bool
 
     /// Проверяет, заполнено ли имя файла после удаления пробелов по краям.
     private var isFileNameValid: Bool {
@@ -47,13 +48,16 @@ struct RenameTrackFileContainer: View {
             rightButtonImage: "checkmark",
             isRightEnabled: .constant(isFileNameValid),
             onClose: {
-                SheetManager.shared.closeActive()
+                closeSheet()
             },
             onRightTap: {
                 Task { await rename() }
             }
         ) {
-            RenameTrackFileSheet(fileName: $fileName)
+            RenameTrackFileSheet(
+                fileName: $fileName,
+                isFileNameFocused: $isFileNameFocused
+            )
         }
         .alert(
             "Трек сейчас воспроизводится",
@@ -80,6 +84,12 @@ struct RenameTrackFileContainer: View {
     }
 
     // MARK: - Actions
+
+    /// Закрывает sheet после предварительного снятия фокуса с поля ввода.
+    private func closeSheet() {
+        isFileNameFocused = false
+        SheetManager.shared.closeActive()
+    }
 
     /// Выполняет ручное переименование через общий генератор предложения и командный слой.
     private func rename() async {
@@ -116,7 +126,7 @@ struct RenameTrackFileContainer: View {
             )
 
             await MainActor.run {
-                SheetManager.shared.closeActive()
+                closeSheet()
             }
         } catch let appError as AppError {
             await MainActor.run {
