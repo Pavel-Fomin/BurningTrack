@@ -17,6 +17,9 @@ struct CreateTrackListContainer: View {
     /// Название нового треклиста.
     @State private var name = generateDefaultTrackListName()
 
+    /// Фокус поля имени для управления клавиатурой из контейнера.
+    @FocusState private var isNameFocused: Bool
+
     // MARK: - UI
 
     var body: some View {
@@ -25,7 +28,7 @@ struct CreateTrackListContainer: View {
             rightButtonImage: nil,
             isRightEnabled: .constant(false),
             onClose: {
-                SheetManager.shared.closeActive()
+                closeSheet()
             }
         ) {
             CreateTrackListSheet(
@@ -36,7 +39,8 @@ struct CreateTrackListContainer: View {
                 },
                 onAddLater: {
                     createEmptyTrackList()
-                }
+                },
+                isNameFocused: $isNameFocused
             )
         }
     }
@@ -65,7 +69,7 @@ struct CreateTrackListContainer: View {
             return
         }
 
-        SheetManager.shared.closeActive()
+        closeSheet()
     }
 
     /// Открывает выбор треков для создания треклиста после подтверждения.
@@ -77,8 +81,20 @@ struct CreateTrackListContainer: View {
             return
         }
 
+        presentTrackSelectionSheet(name: trimmedName)
+    }
+
+    /// Закрывает sheet после предварительного снятия фокуса с поля ввода.
+    private func closeSheet() {
+        isNameFocused = false
+        SheetManager.shared.closeActive()
+    }
+
+    /// Переключает текущий sheet на выбор треков после предварительного снятия фокуса.
+    private func presentTrackSelectionSheet(name: String) {
+        isNameFocused = false
         SheetManager.shared.presentNewTrackListSelectionForCreate(
-            name: trimmedName
+            name: name
         )
     }
 }

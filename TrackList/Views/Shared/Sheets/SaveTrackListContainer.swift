@@ -29,6 +29,9 @@ struct SaveTrackListContainer: View {
     /// Название нового треклиста. Источник истины для формы.
     @State private var name = generateDefaultTrackListName()
 
+    /// Фокус поля имени для управления клавиатурой из контейнера.
+    @FocusState private var isNameFocused: Bool
+
     // MARK: - UI
 
     var body: some View {
@@ -45,7 +48,7 @@ struct SaveTrackListContainer: View {
 
             /// Закрытие sheet’а без действий
             onClose: {
-                SheetManager.shared.closeActive()
+                closeSheet()
             },
 
             /// Подтверждение создания треклиста
@@ -54,17 +57,26 @@ struct SaveTrackListContainer: View {
             }
         ) {
             /// Чистый UI-слой формы
-            SaveTrackListSheet(name: $name)
+            SaveTrackListSheet(
+                name: $name,
+                isNameFocused: $isNameFocused
+            )
         }
     }
 
     // MARK: - Actions
 
+    /// Закрывает sheet после предварительного снятия фокуса с поля ввода.
+    private func closeSheet() {
+        isNameFocused = false
+        SheetManager.shared.closeActive()
+    }
+
     /// Асинхронное создание треклиста
     private func create() async {
         do {
             try await AppCommandExecutor.shared.createTrackList(name: name)
-            SheetManager.shared.closeActive()
+            closeSheet()
         } catch let appError as AppError {
             print("❌ Ошибка сохранения треклиста: \(appError)")
             ToastManager.shared.handle(appError)

@@ -30,6 +30,9 @@ struct RenameTrackListContainer: View {
     /// Локальное состояние формы — источник истины
     @State private var name: String
 
+    /// Фокус поля имени для управления клавиатурой из контейнера.
+    @FocusState private var isNameFocused: Bool
+
     init(data: RenameTrackListSheetData) {
         self.data = data
         self._name = State(initialValue: data.currentName)
@@ -52,7 +55,7 @@ struct RenameTrackListContainer: View {
 
             /// Закрытие sheet’а без действий
             onClose: {
-                SheetManager.shared.closeActive()
+                closeSheet()
             },
 
             /// Подтверждение переименования
@@ -61,11 +64,20 @@ struct RenameTrackListContainer: View {
             }
         ) {
             /// Чистый UI-слой формы
-            RenameTrackListSheet(name: $name)
+            RenameTrackListSheet(
+                name: $name,
+                isNameFocused: $isNameFocused
+            )
         }
     }
 
     // MARK: - Actions
+
+    /// Закрывает sheet после предварительного снятия фокуса с поля ввода.
+    private func closeSheet() {
+        isNameFocused = false
+        SheetManager.shared.closeActive()
+    }
 
     /// Асинхронная операция переименования треклиста
     private func rename() async {
@@ -74,7 +86,7 @@ struct RenameTrackListContainer: View {
                 trackListId: data.trackListId,
                 newName: name
             )
-            SheetManager.shared.closeActive()
+            closeSheet()
         } catch let appError as AppError {
             print("❌ Ошибка переименования треклиста: \(appError)")
             ToastManager.shared.handle(appError)

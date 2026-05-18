@@ -29,8 +29,8 @@ struct RenameTrackListSheet: View {
     @Binding var name: String
 
     /// Состояние фокуса поля ввода.
-    /// Используется для автоматического показа клавиатуры.
-    @FocusState private var isNameFocused: Bool
+    /// Управляется контейнером, чтобы снимать focus до закрытия sheet.
+    let isNameFocused: FocusState<Bool>.Binding
 
     // MARK: - UI
 
@@ -39,9 +39,15 @@ struct RenameTrackListSheet: View {
             Section {
                 TextField("Новое название", text: $name)
                     .clearable($name)
-                    .focused($isNameFocused)
+                    .focused(isNameFocused)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled(true)
+                    .textContentType(.none)
+                    .keyboardType(.default)
+                    .submitLabel(.done)
+                    .onSubmit {
+                        isNameFocused.wrappedValue = false
+                    }
             }
         }
         .formStyle(.grouped)
@@ -49,7 +55,7 @@ struct RenameTrackListSheet: View {
         /// Автоматически устанавливаем фокус при появлении шита,
         /// чтобы сразу открыть клавиатуру без дополнительного тапа.
         .task {
-            isNameFocused = true
+            isNameFocused.wrappedValue = true
         }
     }
 }

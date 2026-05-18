@@ -22,7 +22,9 @@ struct CreateTrackListSheet: View {
     
     // MARK: - Focus
     
-    @FocusState private var isNameFocused: Bool /// Фокус поля имени для автоматического открытия клавиатуры.
+    /// Состояние фокуса поля ввода.
+    /// Управляется контейнером, чтобы снимать focus до закрытия или перехода к другому sheet.
+    let isNameFocused: FocusState<Bool>.Binding
     
     // MARK: - UI
     
@@ -34,9 +36,15 @@ struct CreateTrackListSheet: View {
                 Section {
                     TextField("Название треклиста", text: $name)
                         .clearable($name)
-                        .focused($isNameFocused)
+                        .focused(isNameFocused)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled(true)
+                        .textContentType(.none)
+                        .keyboardType(.default)
+                        .submitLabel(.done)
+                        .onSubmit {
+                            isNameFocused.wrappedValue = false
+                        }
                 }
             }
             
@@ -70,7 +78,7 @@ struct CreateTrackListSheet: View {
         
         /// автофокус как в остальных шитах
         .task {
-            isNameFocused = true
+            isNameFocused.wrappedValue = true
         }
     }
 }

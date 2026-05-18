@@ -21,7 +21,10 @@ struct SaveTrackListSheet: View {
     // MARK: - Input
 
     @Binding var name: String                   /// Название треклиста. Источник  в SaveTrackListContainer. Получает значение через Binding и не владеет состоянием.
-    @FocusState private var isNameFocused: Bool /// Управление фокусом. Используется для автоматического показа клавиатуры при открытии
+
+    /// Состояние фокуса поля ввода.
+    /// Управляется контейнером, чтобы снимать focus до закрытия sheet.
+    let isNameFocused: FocusState<Bool>.Binding
 
     // MARK: - UI
 
@@ -30,9 +33,15 @@ struct SaveTrackListSheet: View {
             Section {
                 TextField("Название", text: $name)
                     .clearable($name)
-                    .focused($isNameFocused)
+                    .focused(isNameFocused)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled(true)
+                    .textContentType(.none)
+                    .keyboardType(.default)
+                    .submitLabel(.done)
+                    .onSubmit {
+                        isNameFocused.wrappedValue = false
+                    }
             }
         }
         .formStyle(.grouped)
@@ -40,7 +49,7 @@ struct SaveTrackListSheet: View {
         /// Автоматически устанавливаем фокус при появлении шита,
         /// чтобы сразу открыть клавиатуру без дополнительного тапа.
         .task {
-            isNameFocused = true
+            isNameFocused.wrappedValue = true
         }
     }
 }

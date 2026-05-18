@@ -32,6 +32,12 @@ struct RenameTrackFileSheet: View {
                     .focused(isFileNameFocused)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled(true)
+                    .textContentType(.none)
+                    .keyboardType(.default)
+                    .submitLabel(.done)
+                    .onSubmit {
+                        isFileNameFocused.wrappedValue = false
+                    }
             }
         }
         .formStyle(.grouped)
