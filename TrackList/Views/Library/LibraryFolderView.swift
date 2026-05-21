@@ -24,22 +24,17 @@ struct LibraryFolderView: View {
     let onRevealHandled: (UUID) -> Void
     let trackListViewModel: TrackListViewModel
     let playerViewModel: PlayerViewModel
+    @Binding var selectionActionBarConfig: SelectionActionBarConfig?
 
     // MARK: - Навигация и ViewModel
 
     @ObservedObject private var nav = NavigationCoordinator.shared
     @EnvironmentObject var viewModel: LibraryFolderViewModel
-    
-    @State private var selection = Set<UUID>()
 
     // MARK: - UI
 
     var body: some View {
         Group {
-            
-            let _ = print("📌 LibraryFolderView displayMode:", viewModel.displayMode)
-            let _ = print("📌 folder:", viewModel.folder.name, "subfolders:", viewModel.subfolders.count)
-            
             switch viewModel.displayMode {
 
             case .tracks:
@@ -48,7 +43,8 @@ struct LibraryFolderView: View {
                     revealRequest: revealRequest,
                     onRevealHandled: onRevealHandled,
                     trackListViewModel: trackListViewModel,
-                    playerViewModel: playerViewModel
+                    playerViewModel: playerViewModel,
+                    selectionActionBarConfig: $selectionActionBarConfig
                 
                 )
 
@@ -56,10 +52,16 @@ struct LibraryFolderView: View {
                 List { folderSectionView() }
                     .listStyle(.insetGrouped)
                     .libraryToolbar(title: viewModel.folder.name)
+                    .onAppear {
+                        selectionActionBarConfig = nil
+                    }
 
             case .empty:
                 Color.clear
                     .libraryToolbar(title: viewModel.folder.name)
+                    .onAppear {
+                        selectionActionBarConfig = nil
+                    }
             }
         }
     }

@@ -28,7 +28,7 @@ struct LibraryTrackSectionsListView: View {
     
     let isSelecting: Bool
     
-    @Binding var selection: Set<UUID>
+    @Binding var selection: OrderedSelection<UUID>
 
     var body: some View {
         ForEach(sections, id: \.id) { section in

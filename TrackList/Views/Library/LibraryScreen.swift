@@ -16,6 +16,26 @@
 
 import SwiftUI
 
+struct SelectionActionBarConfig {
+    /// Заголовок нижней панели.
+    let title: String
+
+    /// Подзаголовок нижней панели, например количество выбранных элементов.
+    let subtitle: String?
+
+    /// Текст основной кнопки подтверждения.
+    let primaryTitle: String
+
+    /// Опциональная системная иконка.
+    let iconName: String?
+
+    /// Доступность основной кнопки.
+    let isPrimaryEnabled: Bool
+
+    /// Callback подтверждения, переданный владельцем состояния выбора.
+    let onPrimaryTap: () -> Void
+}
+
 struct LibraryScreen: View {
 
     // MARK: - Зависимости
@@ -28,6 +48,8 @@ struct LibraryScreen: View {
     @ObservedObject private var nav = NavigationCoordinator.shared
 
     @State private var isShowingFolderPicker = false
+    /// Конфигурация верхней нижней панели для текущего экрана фонотеки.
+    @State private var selectionActionBarConfig: SelectionActionBarConfig?
 
     // MARK: - UI
 
@@ -41,10 +63,23 @@ struct LibraryScreen: View {
                     destination(for: route)
                 }
         }
-        .miniPlayerHost(
+        .bottomPanelsHost(
             trackListViewModel: trackListViewModel,
-            playerViewModel: playerViewModel
-        )
+            playerViewModel: playerViewModel,
+            showsTopPanel: selectionActionBarConfig != nil
+        ) {
+            if let config = selectionActionBarConfig {
+                SelectionActionBar(
+                    title: config.title,
+                    subtitle: config.subtitle,
+                    primaryTitle: config.primaryTitle,
+                    iconName: config.iconName,
+                    isPrimaryEnabled: config.isPrimaryEnabled,
+                    onPrimaryTap: config.onPrimaryTap
+                )
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
         .onAppear {
             handlePendingShowTrack()
         }
@@ -89,6 +124,9 @@ struct LibraryScreen: View {
             playerViewModel: playerViewModel,
             onAddFolder: { isShowingFolderPicker = true }
         )
+        .onAppear {
+            selectionActionBarConfig = nil
+        }
     }
 
     // MARK: - Navigation destinations
@@ -110,7 +148,8 @@ struct LibraryScreen: View {
                         nav.clearRevealRequest(requestId: requestId)
                     },
                     trackListViewModel: trackListViewModel,
-                    playerViewModel: playerViewModel
+                    playerViewModel: playerViewModel,
+                    selectionActionBarConfig: $selectionActionBarConfig
                 )
             } else {
                 Text("Папка не найдена")

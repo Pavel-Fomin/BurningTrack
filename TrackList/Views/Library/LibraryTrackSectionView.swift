@@ -29,7 +29,7 @@ struct LibraryTrackSectionView: View {
     let revealedTrackID: UUID?
     
     let isSelecting: Bool
-    @Binding var selection: Set<UUID>
+    @Binding var selection: OrderedSelection<UUID>
 
     var body: some View {
         Section(header: Text(title).font(.headline).id(title)) {
@@ -46,11 +46,7 @@ struct LibraryTrackSectionView: View {
                     showsSelection: isSelecting,
                     isSelected: selection.contains(track.id),
                     onToggleSelection: {
-                        if selection.contains(track.id) {
-                            selection.remove(track.id)
-                        } else {
-                            selection.insert(track.id)
-                        }
+                        selection.toggle(track.id)
                     },
                     playerViewModel: playerViewModel
                 )

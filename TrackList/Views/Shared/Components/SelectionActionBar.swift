@@ -16,10 +16,10 @@ struct SelectionActionBar: View {
 
     // MARK: - Input
 
-    let selectedCount: Int
     let title: String
     let subtitle: String?
     let primaryTitle: String
+    let iconName: String?
     let isPrimaryEnabled: Bool
     let onPrimaryTap: () -> Void
 
@@ -28,13 +28,16 @@ struct SelectionActionBar: View {
     var body: some View {
         HStack(spacing: 12) {
 
-            Circle()
-                .fill(Color.gray.opacity(0.18))
-                .frame(width: 48, height: 48)
-                .overlay {
-                    Image(systemName: "music.note")
-                        .foregroundColor(.secondary)
-                }
+            // Иконка опциональна, чтобы компонент не был привязан к трекам или фонотеке.
+            if let iconName {
+                Circle()
+                    .fill(Color.gray.opacity(0.18))
+                    .frame(width: 48, height: 48)
+                    .overlay {
+                        Image(systemName: iconName)
+                            .foregroundColor(.secondary)
+                    }
+            }
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)

@@ -13,15 +13,12 @@ import SwiftUI
 struct LibraryTracksToolbar: ViewModifier {
 
     let title: String
+    let isSelecting: Bool
     let selectedCount: Int
 
     let onTapSelect: () -> Void
+    let onSelectBatchAction: (LibraryBatchAction) -> Void
     let onTapCancel: () -> Void
-
-    @Binding var isSelecting: Bool
-    
-    @State private var isAllSelected = false
-
     
     // MARK: - UI
     
@@ -33,87 +30,33 @@ struct LibraryTracksToolbar: ViewModifier {
                 isTitleSecondary: isSelecting,
                 leading: { leadingContent }
             )
-            .navigationBarBackButtonHidden(isSelecting)
             .toolbar {
                 trailingToolbarContent
             }
     }
 
-    // Leading toolbar content
+    // Контент слева не подменяет системную кнопку назад.
     @ViewBuilder
     private var leadingContent: some View {
-        if isSelecting {
-            Button {
-                isAllSelected.toggle()
-                /// позже сюда подключится логика select/deselect
-            } label: {
-                Image(systemName: isAllSelected
-                      ? "checkmark.circle.fill"
-                      : "circle")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(isAllSelected ? .green : .primary)
-            }
-            .accessibilityLabel(
-                isAllSelected ? "Снять выделение" : "Выбрать все"
-            )
-        } else {
-            EmptyView()
-        }
+        EmptyView()
     }
 
-    // Trailing toolbar content
+    // Контент справа отдаёт наружу только пользовательские намерения.
     @ToolbarContentBuilder
     private var trailingToolbarContent: some ToolbarContent {
 
         if isSelecting {
 
-            // 1. Меню
+            // Меню batch-действий в режиме выбора.
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
-
-                    /// Добавить
-                    Text("Добавить")
-
-                    Divider()
-
-                    Button {
-                    /// В плеер
-                    } label: {
-                        Label("В плеер", systemImage: "waveform")
-                    }
-
-                    Button {
-                    /// В треклист
-                    } label: {
-                        Label("В треклист", systemImage: "list.star")
-                    }
-
-                    Divider()
-
-                    /// Изменить
-                    Text("Изменить")
-                        .foregroundStyle(.secondary)
-
-                    Divider()
-
-                    Button {
-                    /// Переименовать
-                    } label: {
-                        Label("Переименовать", systemImage: "pencil")
-                    }
-
-                    Button {
-                    /// Редактировать теги
-                    } label: {
-                        Label("Редактировать теги", systemImage: "tag")
-                    }
-
+                    batchActionMenuItems
                 } label: {
                     Image(systemName: "ellipsis")
                 }
             }
 
-            /// 2. Закрыть
+            /// Закрывает режим выбора и очищает текущий selection.
             ToolbarItem(placement: .topBarTrailing) {
                 Button(action: onTapCancel) {
                     Image(systemName: "xmark")
@@ -121,12 +64,53 @@ struct LibraryTracksToolbar: ViewModifier {
             }
 
         } else {
-            
-            /// Редактировать
+
+            /// Меню обычного режима.
             ToolbarItem(placement: .topBarTrailing) {
-                Button(action: onTapSelect) {
-                    Image(systemName: "pencil")
+                Menu {
+                    Button(action: onTapSelect) {
+                        Label("Выбрать", systemImage: "checkmark.circle")
+                    }
+
+                    Divider()
+
+                    batchActionMenuItems
+                } label: {
+                    Image(systemName: "ellipsis")
                 }
+            }
+        }
+    }
+
+    /// Общие пункты batch-действий без выполнения самих действий.
+    @ViewBuilder
+    private var batchActionMenuItems: some View {
+        // Системные секции меню выравнивают заголовки отдельно от пунктов с иконками.
+        Section("Добавить") {
+            Button {
+                onSelectBatchAction(.addToPlayer)
+            } label: {
+                Label("В плеер", systemImage: "waveform")
+            }
+
+            Button {
+                onSelectBatchAction(.addToTrackList)
+            } label: {
+                Label("В треклист", systemImage: "list.star")
+            }
+        }
+
+        Section("Изменить") {
+            Button {
+                onSelectBatchAction(.renameFiles)
+            } label: {
+                Label("Переименовать", systemImage: "pencil")
+            }
+
+            Button {
+                onSelectBatchAction(.editTags)
+            } label: {
+                Label("Редактировать теги", systemImage: "tag")
             }
         }
     }
@@ -138,18 +122,20 @@ extension View {
 
     func libraryTracksToolbar(
         title: String,
-        isSelecting: Binding<Bool>,
+        isSelecting: Bool,
         selectedCount: Int,
         onTapSelect: @escaping () -> Void,
+        onSelectBatchAction: @escaping (LibraryBatchAction) -> Void,
         onTapCancel: @escaping () -> Void
     ) -> some View {
         self.modifier(
             LibraryTracksToolbar(
                 title: title,
+                isSelecting: isSelecting,
                 selectedCount: selectedCount,
                 onTapSelect: onTapSelect,
+                onSelectBatchAction: onSelectBatchAction,
                 onTapCancel: onTapCancel,
-                isSelecting: isSelecting
             )
         )
     }

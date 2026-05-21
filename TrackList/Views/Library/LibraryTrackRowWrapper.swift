@@ -119,6 +119,7 @@ struct LibraryTrackRowWrapper: View {
             showsSelection: showsSelection,
             isSelected: isSelected,
             onToggleSelection: onToggleSelection,
+            selectionPlacement: .trailing,
             showsFileFormat: shouldShowFileFormat,
             trackListNames: shouldShowTrackListMembership ? trackListNames : nil
         )

@@ -54,10 +54,10 @@ struct NewTrackListSelectionContainer: View {
 
             if viewModel.selectedCount > 0 {
                 SelectionActionBar(
-                    selectedCount: viewModel.selectedCount,
                     title: "Выбрано",
                     subtitle: "\(viewModel.selectedCount) треков",
                     primaryTitle: "Добавить",
+                    iconName: "music.note",
                     isPrimaryEnabled: viewModel.selectedCount > 0,
                     onPrimaryTap: {
                         Task { await addSelectedTracks() }

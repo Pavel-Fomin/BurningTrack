@@ -1,0 +1,78 @@
+//
+//  BottomPanelsHostModifier.swift
+//  TrackList
+//
+//  Модификатор единого нижнего контейнера панелей.
+//
+//  Роль:
+//  - резервирует место под реальные нижние панели через safeAreaInset;
+//  - размещает верхнюю панель над мини-плеером;
+//  - не выполняет действий плеера или мультиселекта;
+//  - не хранит состояние панелей.
+//
+//  Created by Pavel Fomin on 20.05.2026.
+//
+
+import SwiftUI
+
+struct BottomPanelsHostModifier<TopPanel: View>: ViewModifier {
+
+    // MARK: - Input
+
+    let trackListViewModel: TrackListViewModel
+    @ObservedObject var playerViewModel: PlayerViewModel
+    let showsTopPanel: Bool
+    let topPanel: () -> TopPanel
+
+    // MARK: - Body
+
+    func body(content: Content) -> some View {
+        content
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                BottomPanelsHost(
+                    showsTopPanel: showsTopPanel
+                ) {
+                    topPanel()
+                        .padding(.horizontal, 8)
+                } bottomPanel: {
+                    if playerViewModel.currentTrackDisplayable != nil {
+                        MiniPlayerView(
+                            trackListViewModel: trackListViewModel,
+                            playerViewModel: playerViewModel
+                        )
+                        // Возвращаем прежний внешний визуальный отступ мини-плеера.
+                        .padding(.horizontal, 8)
+                        .padding(.bottom, 8)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
+                }
+                .animation(.easeOut(duration: 0.25), value: showsTopPanel)
+                .animation(
+                    .easeOut(duration: 0.25),
+                    value: playerViewModel.currentTrackDisplayable?.id
+                )
+            }
+    }
+}
+
+// MARK: - View extension
+
+extension View {
+
+    /// Подключает единый нижний контейнер панелей к экрану.
+    func bottomPanelsHost<TopPanel: View>(
+        trackListViewModel: TrackListViewModel,
+        playerViewModel: PlayerViewModel,
+        showsTopPanel: Bool = true,
+        @ViewBuilder topPanel: @escaping () -> TopPanel
+    ) -> some View {
+        modifier(
+            BottomPanelsHostModifier(
+                trackListViewModel: trackListViewModel,
+                playerViewModel: playerViewModel,
+                showsTopPanel: showsTopPanel,
+                topPanel: topPanel
+            )
+        )
+    }
+}

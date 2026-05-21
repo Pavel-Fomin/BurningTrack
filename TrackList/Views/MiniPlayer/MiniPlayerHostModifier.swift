@@ -5,8 +5,8 @@
 //  Хост мини-плеера для экранов вкладок.
 //
 //  Роль:
-//  - подключает MiniPlayerView внутри layout конкретного экрана;
-//  - использует safeAreaInset, чтобы мини-плеер не перекрывал системный TabBar;
+//  - сохраняет внешний API .miniPlayerHost(...);
+//  - подключает мини-плеер через единый нижний контейнер;
 //  - не содержит логики воспроизведения;
 //  - не управляет жестами мини-плеера.
 //
@@ -22,32 +22,16 @@ struct MiniPlayerHostModifier: ViewModifier {
     let trackListViewModel: TrackListViewModel
     @ObservedObject var playerViewModel: PlayerViewModel
 
-    // MARK: - Layout
-
-    private let miniPlayerReservedHeight: CGFloat = 104
-    private let miniPlayerHorizontalPadding: CGFloat = 8
-    private let miniPlayerBottomPadding: CGFloat = 8
-
     // MARK: - Body
 
     func body(content: Content) -> some View {
         content
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                if playerViewModel.currentTrackDisplayable != nil {
-                    Color.clear
-                        .frame(height: miniPlayerReservedHeight)
-                }
-            }
-            .overlay(alignment: .bottom) {
-                if playerViewModel.currentTrackDisplayable != nil {
-                    MiniPlayerView(
-                        trackListViewModel: trackListViewModel,
-                        playerViewModel: playerViewModel
-                    )
-                    .padding(.horizontal, miniPlayerHorizontalPadding)
-                    .padding(.bottom, miniPlayerBottomPadding)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
+            .bottomPanelsHost(
+                trackListViewModel: trackListViewModel,
+                playerViewModel: playerViewModel,
+                showsTopPanel: false
+            ) {
+                EmptyView()
             }
     }
 }

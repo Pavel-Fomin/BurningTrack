@@ -149,7 +149,6 @@ struct TrackRowView: View {
 
     private var selectionButton: some View {
         Button {
-            guard !isCurrent else { return }   // на всякий случай
             onToggleSelection?()
         } label: {
             Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
@@ -163,7 +162,6 @@ struct TrackRowView: View {
         .buttonStyle(.plain)
         .frame(width: 44, height: 44)         // ← фикс: одинаково для всех строк
         .contentShape(Rectangle())
-        .disabled(isCurrent)                  // ← текущий трек не выбирается
     }
 
     // MARK: - Обложка
