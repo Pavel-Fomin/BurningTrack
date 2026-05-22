@@ -43,6 +43,11 @@ struct OrderedSelection<ID: Hashable> {
         ids.removeAll()
     }
 
+    /// Полностью заменяет выбор переданным списком ID, сохраняя порядок.
+    mutating func replace(with ids: [ID]) {
+        self.ids = ids
+    }
+
     /// Проверяет, выбран ли элемент.
     func contains(_ id: ID) -> Bool {
         ids.contains(id)

@@ -45,6 +45,18 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         }
     }
 
+    /// Общее количество треков в текущих секциях.
+    var totalVisibleTrackCount: Int {
+        trackSections.reduce(0) { result, section in
+            result + section.tracks.count
+        }
+    }
+
+    /// Показывает, выбраны ли все видимые треки.
+    var areAllVisibleTracksSelected: Bool {
+        totalVisibleTrackCount > 0 && bulkSelection.selectedCount == totalVisibleTrackCount
+    }
+
     // MARK: - Init
 
     init(
@@ -163,6 +175,22 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
     /// Сбрасывает режим массового выбора и текущий selection.
     func resetBulkSelection() {
         bulkSelection.reset()
+    }
+
+    /// Выбирает все видимые треки или снимает выбор со всех, если уже выбраны все.
+    func toggleSelectAllVisibleTracks() {
+        guard bulkSelection.isActive else { return }
+
+        if areAllVisibleTracksSelected {
+            bulkSelection.selection.clear()
+            return
+        }
+
+        let ids = trackSections.flatMap { section in
+            section.tracks.map { $0.id }
+        }
+
+        bulkSelection.replaceSelection(with: ids)
     }
 
     /// Обрабатывает выбор массового действия из toolbar.

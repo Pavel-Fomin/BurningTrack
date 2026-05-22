@@ -14,9 +14,10 @@ struct LibraryTracksToolbar: ViewModifier {
 
     let title: String
     let isSelecting: Bool
-    let selectedCount: Int
+    let isAllSelected: Bool
 
     let onTapSelect: () -> Void
+    let onToggleSelectAll: () -> Void
     let onSelectBatchAction: (BulkTrackAction) -> Void
     let onTapCancel: () -> Void
     
@@ -25,9 +26,9 @@ struct LibraryTracksToolbar: ViewModifier {
     func body(content: Content) -> some View {
         content
             .screenToolbar(
-                title: isSelecting ? "Выбрано" : title,
-                subtitle: isSelecting ? "\(selectedCount)" : nil,
-                isTitleSecondary: isSelecting,
+                title: title,
+                subtitle: nil,
+                isTitleSecondary: false,
                 leading: { leadingContent }
             )
             .toolbar {
@@ -50,6 +51,15 @@ struct LibraryTracksToolbar: ViewModifier {
             // Меню batch-действий в режиме выбора.
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
+                    Button(action: onToggleSelectAll) {
+                        Label(
+                            isAllSelected ? "Снять все" : "Выбрать все",
+                            systemImage: isAllSelected ? "circle" : "checkmark.circle"
+                        )
+                    }
+
+                    Divider()
+
                     batchActionMenuItems
                 } label: {
                     Image(systemName: "ellipsis")
@@ -123,8 +133,9 @@ extension View {
     func libraryTracksToolbar(
         title: String,
         isSelecting: Bool,
-        selectedCount: Int,
+        isAllSelected: Bool,
         onTapSelect: @escaping () -> Void,
+        onToggleSelectAll: @escaping () -> Void,
         onSelectBatchAction: @escaping (BulkTrackAction) -> Void,
         onTapCancel: @escaping () -> Void
     ) -> some View {
@@ -132,8 +143,9 @@ extension View {
             LibraryTracksToolbar(
                 title: title,
                 isSelecting: isSelecting,
-                selectedCount: selectedCount,
+                isAllSelected: isAllSelected,
                 onTapSelect: onTapSelect,
+                onToggleSelectAll: onToggleSelectAll,
                 onSelectBatchAction: onSelectBatchAction,
                 onTapCancel: onTapCancel,
             )

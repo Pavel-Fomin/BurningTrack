@@ -151,10 +151,15 @@ struct LibraryTracksView: View {
         .libraryTracksToolbar(
             title: folder.name,
             isSelecting: isSelecting,
-            selectedCount: tracksViewModel.bulkSelection.selectedCount,
+            isAllSelected: tracksViewModel.areAllVisibleTracksSelected,
             onTapSelect: {
                 // Вход в выбор без заранее выбранного batch-действия.
                 tracksViewModel.activateBulkSelection()
+                updateSelectionActionBarConfig()
+            },
+            onToggleSelectAll: {
+                // Массовое переключение выбора остаётся во ViewModel.
+                tracksViewModel.toggleSelectAllVisibleTracks()
                 updateSelectionActionBarConfig()
             },
             onSelectBatchAction: { action in

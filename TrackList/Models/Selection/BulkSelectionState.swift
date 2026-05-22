@@ -53,6 +53,11 @@ struct BulkSelectionState<ID: Hashable, Action> {
         pendingAction = action
     }
 
+    /// Заменяет текущий выбор переданным списком ID.
+    mutating func replaceSelection(with ids: [ID]) {
+        selection.replace(with: ids)
+    }
+
     /// Полностью очищает выбор и выходит из режима массового выбора.
     mutating func reset() {
         isActive = false
