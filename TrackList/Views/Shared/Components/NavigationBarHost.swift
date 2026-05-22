@@ -27,6 +27,10 @@ struct NavigationBarHost<Content: View>: UIViewControllerRepresentable {
 
     let title: String?
 
+    /// Вторичная строка заголовка.
+    /// Если nil — используется стандартный системный title без кастомного titleView.
+    let subtitle: String?
+
     /// System image name для правой кнопки (pencil / checkmark и т.д.)
     /// Если nil — кнопка не отображается
     let rightButtonImage: String?
@@ -50,6 +54,7 @@ struct NavigationBarHost<Content: View>: UIViewControllerRepresentable {
 
     init(
         title: String? = nil,
+        subtitle: String? = nil,
         rightButtonImage: String?,
         isRightEnabled: Binding<Bool>,
         onClose: (() -> Void)? = nil,
@@ -58,6 +63,7 @@ struct NavigationBarHost<Content: View>: UIViewControllerRepresentable {
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
+        self.subtitle = subtitle
         self.rightButtonImage = rightButtonImage
         self.isRightEnabled = isRightEnabled
         self.onClose = onClose
@@ -76,7 +82,7 @@ struct NavigationBarHost<Content: View>: UIViewControllerRepresentable {
             )
         )
         context.coordinator.hostingController = hosting
-        hosting.navigationItem.title = title
+        configureTitle(for: hosting)
 
         // Кнопка закрытия (×)
         if onClose != nil {
@@ -122,6 +128,7 @@ struct NavigationBarHost<Content: View>: UIViewControllerRepresentable {
     ) {
         guard let root = context.coordinator.hostingController else { return }
         guard let top = uiViewController.topViewController else { return }
+        configureTitle(for: root)
 
         // Обновляем rootView только на корневом экране.
         // При активном NavigationLink перезапись rootView сбрасывает стек навигации.
@@ -188,6 +195,54 @@ struct NavigationBarHost<Content: View>: UIViewControllerRepresentable {
     }
 
     func makeCoordinator() -> Coordinator {Coordinator()}
+
+    // MARK: - Title
+
+    /// Настраивает заголовок navigation bar.
+    private func configureTitle(for viewController: UIViewController) {
+        guard let subtitle else {
+            viewController.navigationItem.titleView = nil
+            viewController.navigationItem.title = title
+            return
+        }
+
+        viewController.navigationItem.title = nil
+        viewController.navigationItem.titleView = makeTitleView(
+            title: title,
+            subtitle: subtitle
+        )
+    }
+
+    /// Создаёт двухстрочный заголовок для sheet’ов, которым нужен subtitle.
+    private func makeTitleView(
+        title: String?,
+        subtitle: String
+    ) -> UIView {
+        let stack = UIStackView()
+        stack.axis = .vertical
+        stack.alignment = .center
+        stack.spacing = 2
+
+        if let title, !title.isEmpty {
+            let titleLabel = UILabel()
+            titleLabel.text = title
+            titleLabel.font = .preferredFont(forTextStyle: .headline)
+            titleLabel.textColor = .label
+            titleLabel.numberOfLines = 1
+            titleLabel.lineBreakMode = .byTruncatingTail
+            stack.addArrangedSubview(titleLabel)
+        }
+
+        let subtitleLabel = UILabel()
+        subtitleLabel.text = subtitle
+        subtitleLabel.font = .preferredFont(forTextStyle: .caption1)
+        subtitleLabel.textColor = .secondaryLabel
+        subtitleLabel.numberOfLines = 1
+        subtitleLabel.lineBreakMode = .byTruncatingTail
+        stack.addArrangedSubview(subtitleLabel)
+
+        return stack
+    }
 
     // MARK: - Coordinator
 

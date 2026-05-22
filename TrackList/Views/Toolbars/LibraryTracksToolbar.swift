@@ -17,7 +17,7 @@ struct LibraryTracksToolbar: ViewModifier {
     let selectedCount: Int
 
     let onTapSelect: () -> Void
-    let onSelectBatchAction: (LibraryBatchAction) -> Void
+    let onSelectBatchAction: (BulkTrackAction) -> Void
     let onTapCancel: () -> Void
     
     // MARK: - UI
@@ -104,7 +104,7 @@ struct LibraryTracksToolbar: ViewModifier {
             Button {
                 onSelectBatchAction(.renameFiles)
             } label: {
-                Label("Переименовать", systemImage: "pencil")
+                Label("Переименовать файлы", systemImage: "pencil")
             }
 
             Button {
@@ -125,7 +125,7 @@ extension View {
         isSelecting: Bool,
         selectedCount: Int,
         onTapSelect: @escaping () -> Void,
-        onSelectBatchAction: @escaping (LibraryBatchAction) -> Void,
+        onSelectBatchAction: @escaping (BulkTrackAction) -> Void,
         onTapCancel: @escaping () -> Void
     ) -> some View {
         self.modifier(

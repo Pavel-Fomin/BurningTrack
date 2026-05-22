@@ -25,6 +25,8 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
     @Published var trackSections: [TrackSection] = []
     @Published var trackListNamesById: [UUID: [String]] = [:]
     @Published private(set) var snapshotsByTrackId: [UUID: TrackRuntimeSnapshot] = [:] /// Runtime-снимки треков по id
+    @Published var bulkSelection = BulkSelectionState<UUID, BulkTrackAction>()
+    @Published private(set) var batchFilenameRenameFlow = BatchFilenameRenameFlow()
     @Published var isLoading = false
     @Published private(set) var didLoad = false
     
@@ -33,6 +35,15 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
     private let tracksProvider: LibraryTracksProvider
     private let badgeProvider: TrackListBadgeProvider
     private var cancellables = Set<AnyCancellable>()
+
+    /// Можно ли применить текущий план массового переименования.
+    var canApplyBatchFilenameRename: Bool {
+        guard batchFilenameRenameFlow.strategy != nil else { return false }
+
+        return batchFilenameRenameFlow.items.contains { item in
+            item.status == .ready
+        }
+    }
 
     // MARK: - Init
 
@@ -140,6 +151,140 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
     private func reloadTrackListBadges() {
         let ids = trackSections.flatMap { $0.tracks }.map { $0.trackId }
         trackListNamesById = badgeProvider.badges(for: ids)
+    }
+
+    // MARK: - Bulk Selection
+
+    /// Включает режим массового выбора без заранее выбранного действия.
+    func activateBulkSelection() {
+        bulkSelection.activate()
+    }
+
+    /// Сбрасывает режим массового выбора и текущий selection.
+    func resetBulkSelection() {
+        bulkSelection.reset()
+    }
+
+    /// Обрабатывает выбор массового действия из toolbar.
+    func selectBulkAction(_ action: BulkTrackAction) {
+        if bulkSelection.isActive {
+            guard bulkSelection.hasSelection else {
+                bulkSelection.setPendingAction(action)
+                return
+            }
+
+            applyBulkAction(action)
+            return
+        }
+
+        bulkSelection.activate(action: action)
+    }
+
+    /// Применяет действие, которое ожидает подтверждения через action bar.
+    func applyPendingBulkAction() {
+        guard let action = bulkSelection.pendingAction else { return }
+        applyBulkAction(action)
+    }
+
+    /// Передаёт зафиксированный выбор в flow выбранного массового действия.
+    private func applyBulkAction(_ action: BulkTrackAction) {
+        guard bulkSelection.hasSelection else { return }
+
+        let pendingAction = PendingBulkTrackAction(
+            action: action,
+            trackIDs: bulkSelection.selection.ids
+        )
+
+        guard !pendingAction.isEmpty else { return }
+
+        switch action {
+        case .renameFiles:
+            batchFilenameRenameFlow.prepare(
+                with: pendingAction,
+                tracks: filenameRenameTracks(for: pendingAction.trackIDs)
+            )
+            batchFilenameRenameFlow.validateRequiredMetadata()
+        case .addToPlayer, .addToTrackList, .editTags:
+            break
+        }
+
+        bulkSelection.reset()
+    }
+
+    /// Выбирает стратегию и применяет её к текущему rename flow.
+    func selectFilenameRenameStrategy(_ strategy: FilenameRenameStrategy) {
+        batchFilenameRenameFlow.buildPlan(
+            strategy: strategy,
+            tracks: batchFilenameRenameFlow.tracks
+        )
+    }
+
+    /// Исключает трек только из операции переименования и пересобирает план.
+    func removeTrackFromRenameFlow(_ trackId: UUID) {
+        batchFilenameRenameFlow.removeTrack(id: trackId)
+    }
+
+    /// Пересобирает план для оставшихся треков и заново рассчитывает целевые имена.
+    func rebuildRenamePlan() {
+        guard let strategy = batchFilenameRenameFlow.strategy else { return }
+
+        batchFilenameRenameFlow.buildPlan(
+            strategy: strategy,
+            tracks: batchFilenameRenameFlow.tracks
+        )
+    }
+
+    /// Закрывает flow массового переименования без изменений файлов.
+    func resetBatchFilenameRenameFlow() {
+        batchFilenameRenameFlow.reset()
+    }
+
+    /// Применяет массовое переименование файлов для готовых строк плана.
+    func applyBatchFilenameRename(using playerManager: PlayerManager) async {
+        // До выбора стратегии targetFileName равен текущему имени, поэтому применять такой план нельзя.
+        guard batchFilenameRenameFlow.strategy != nil else { return }
+
+        let commands = batchFilenameRenameFlow.items
+            .filter { $0.status == .ready }
+            .map { item in
+                BatchFilenameRenameCommand(
+                    trackId: item.trackId,
+                    currentFileName: item.currentFileName,
+                    targetFileName: item.targetFileName
+                )
+            }
+
+        guard !commands.isEmpty else { return }
+
+        let result = await AppCommandExecutor.shared.renameTrackFilesBatch(
+            commands,
+            using: playerManager
+        )
+
+        batchFilenameRenameFlow.applyResult(result)
+    }
+
+    /// Собирает входные данные для плана переименования в порядке выбранных trackIDs.
+    private func filenameRenameTracks(for trackIDs: [UUID]) -> [BatchFilenameRenameTrack] {
+        let tracksById = Dictionary(
+            uniqueKeysWithValues: trackSections
+                .flatMap(\.tracks)
+                .map { ($0.id, $0) }
+        )
+
+        return trackIDs.compactMap { trackId in
+            guard let track = tracksById[trackId] else { return nil }
+
+            let snapshot = snapshotsByTrackId[trackId]
+
+            return BatchFilenameRenameTrack(
+                trackId: trackId,
+                folderPath: track.fileURL.deletingLastPathComponent().standardizedFileURL.path,
+                currentFileName: track.fileURL.lastPathComponent,
+                artist: snapshot?.artist ?? track.artist,
+                title: snapshot?.title ?? track.title
+            )
+        }
     }
     
     /// Проверяет доступность треков после первичного отображения списка.

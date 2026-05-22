@@ -84,6 +84,29 @@ final class TrackUpdateCoordinator {
         return updateEvent
     }
 
+    /// Обновляет runtime-состояние для нескольких треков после файловых изменений.
+    ///
+    /// Метод не показывает toast. Он только:
+    /// - сбрасывает cache;
+    /// - пересобирает runtime snapshot;
+    /// - публикует track update event.
+    func handleTrackUpdates(_ updates: [TrackUpdateRequest]) async -> [TrackUpdateEvent] {
+        var events: [TrackUpdateEvent] = []
+
+        for update in updates {
+            if let event = await handleTrackUpdate(
+                forTrackId: update.trackId,
+                reason: .fileRenamed,
+                changedFields: [.fileName],
+                previousURL: update.previousURL
+            ) {
+                events.append(event)
+            }
+        }
+
+        return events
+    }
+
     // MARK: - Invalidate
 
     /// Инвалидирует runtime-кэши, связанные с треком.

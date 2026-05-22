@@ -45,12 +45,19 @@ struct LibraryTracksView: View {
     @State private var revealedTrackID: UUID?
     @State private var revealedRequestId: UUID?
     @State private var pendingRevealRequest: LibraryRevealRequest?
-    @State private var multiselectMode: MultiselectMode<LibraryBatchAction> = .inactive
-    @State private var selection = OrderedSelection<UUID>()
+    @State private var isShowingBatchFilenameRenameSheet = false
 
     /// Показывает, активен ли локальный режим выбора фонотеки.
     private var isSelecting: Bool {
-        multiselectMode.isSelecting
+        tracksViewModel.bulkSelection.isActive
+    }
+
+    /// Пробрасывает selection в список без переноса логики выбора в строки.
+    private var selectionBinding: Binding<OrderedSelection<UUID>> {
+        Binding(
+            get: { tracksViewModel.bulkSelection.selection },
+            set: { tracksViewModel.bulkSelection.selection = $0 }
+        )
     }
     
     // MARK: - Init
@@ -92,7 +99,7 @@ struct LibraryTracksView: View {
                         isScrollingFast: scrollSpeed.isFast,
                         revealedTrackID: revealedTrackID,
                         isSelecting: isSelecting,
-                        selection: $selection
+                        selection: selectionBinding
                     )
                 }
                 .listStyle(.plain)
@@ -144,10 +151,10 @@ struct LibraryTracksView: View {
         .libraryTracksToolbar(
             title: folder.name,
             isSelecting: isSelecting,
-            selectedCount: selection.count,
+            selectedCount: tracksViewModel.bulkSelection.selectedCount,
             onTapSelect: {
                 // Вход в выбор без заранее выбранного batch-действия.
-                multiselectMode = .selecting(action: nil)
+                tracksViewModel.activateBulkSelection()
                 updateSelectionActionBarConfig()
             },
             onSelectBatchAction: { action in
@@ -176,8 +183,25 @@ struct LibraryTracksView: View {
                 await tracksViewModel.refresh()
             }
         }
-        .onChange(of: selection.count) { _, _ in
+        .onChange(of: tracksViewModel.bulkSelection.selectedCount) { _, _ in
             updateSelectionActionBarConfig()
+        }
+        .onChange(of: tracksViewModel.batchFilenameRenameFlow.isActive) { _, isActive in
+            isShowingBatchFilenameRenameSheet = isActive
+        }
+        .onChange(of: isShowingBatchFilenameRenameSheet) { _, isShowing in
+            guard !isShowing else { return }
+            tracksViewModel.resetBatchFilenameRenameFlow()
+        }
+        .sheet(isPresented: $isShowingBatchFilenameRenameSheet) {
+            BatchFilenameRenameContainer(
+                viewModel: tracksViewModel,
+                playerManager: playerViewModel.playerManager,
+                onClose: {
+                    isShowingBatchFilenameRenameSheet = false
+                }
+            )
+                .appSheet(detents: [.large])
         }
         .onDisappear {
             selectionActionBarConfig = nil
@@ -195,59 +219,37 @@ struct LibraryTracksView: View {
 
     /// Обновляет конфигурацию нижней панели подтверждения для родительского host.
     private func updateSelectionActionBarConfig() {
-        guard let action = multiselectMode.action else {
+        guard let action = tracksViewModel.bulkSelection.pendingAction else {
             selectionActionBarConfig = nil
             return
         }
 
         selectionActionBarConfig = SelectionActionBarConfig(
             title: action.title,
-            subtitle: "Выбрано: \(selection.count)",
+            subtitle: "Выбрано: \(tracksViewModel.bulkSelection.selectedCount)",
             primaryTitle: "Применить",
             iconName: action.iconName,
-            isPrimaryEnabled: !selection.isEmpty,
+            isPrimaryEnabled: tracksViewModel.bulkSelection.hasSelection,
             onPrimaryTap: applySelectedBatchAction
         )
     }
 
     /// Сбрасывает режим мультиселекта и очищает нижнюю панель.
     private func resetMultiselect() {
-        multiselectMode = .inactive
-        selection.clear()
+        tracksViewModel.resetBulkSelection()
         selectionActionBarConfig = nil
     }
 
     /// Обрабатывает выбор batch-действия с учётом текущего режима и выбора.
-    private func handleBatchActionSelection(_ action: LibraryBatchAction) {
-        if multiselectMode.isSelecting {
-            guard !selection.isEmpty else {
-                multiselectMode = .selecting(action: action)
-                updateSelectionActionBarConfig()
-                return
-            }
-
-            applyBatchAction(action)
-            return
-        }
-
-        multiselectMode = .selecting(action: action)
+    private func handleBatchActionSelection(_ action: BulkTrackAction) {
+        tracksViewModel.selectBulkAction(action)
         updateSelectionActionBarConfig()
-    }
-
-    /// Применяет batch-действие к текущему выбору через техническую заглушку.
-    private func applyBatchAction(_ action: LibraryBatchAction) {
-        guard !selection.isEmpty else { return }
-
-        print("Batch action:", action)
-        print("Selected IDs:", selection.ids)
-
-        resetMultiselect()
     }
 
     /// Применяет заранее выбранное batch-действие из нижней панели.
     private func applySelectedBatchAction() {
-        guard let action = multiselectMode.action else { return }
-        applyBatchAction(action)
+        tracksViewModel.applyPendingBulkAction()
+        updateSelectionActionBarConfig()
     }
 
     /// Запрашивает прокрутку к активному треку, если она не конфликтует с reveal.

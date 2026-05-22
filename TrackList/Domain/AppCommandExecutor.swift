@@ -134,6 +134,62 @@ actor AppCommandExecutor {
             ToastManager.shared.handle(event)
         }
     }
+
+    /// Массово переименовывает файлы треков.
+    ///
+    /// Метод использует `LibraryFileManager.renameTrack` как атомарную операцию одного файла.
+    /// В отличие от одиночного rename-flow, здесь не показывается toast на каждый файл.
+    func renameTrackFilesBatch(
+        _ commands: [BatchFilenameRenameCommand],
+        using playerManager: PlayerManager
+    ) async -> BatchFilenameRenameResult {
+        var succeeded: [BatchFilenameRenameSuccess] = []
+        var failed: [BatchFilenameRenameFailure] = []
+        var successfulUpdates: [TrackUpdateRequest] = []
+
+        for command in commands {
+            do {
+                // Запоминаем старый URL до переименования, чтобы post-update pipeline сбросил cache по старому пути.
+                let previousURL = await BookmarkResolver.url(forTrack: command.trackId)
+
+                try await LibraryFileManager.shared.renameTrack(
+                    id: command.trackId,
+                    to: command.targetFileName,
+                    using: playerManager
+                )
+
+                succeeded.append(
+                    BatchFilenameRenameSuccess(
+                        trackId: command.trackId,
+                        oldFileName: command.currentFileName,
+                        newFileName: command.targetFileName
+                    )
+                )
+
+                successfulUpdates.append(
+                    TrackUpdateRequest(
+                        trackId: command.trackId,
+                        previousURL: previousURL
+                    )
+                )
+            } catch {
+                failed.append(
+                    BatchFilenameRenameFailure(
+                        trackId: command.trackId,
+                        targetFileName: command.targetFileName,
+                        error: error
+                    )
+                )
+            }
+        }
+
+        _ = await TrackUpdateCoordinator.shared.handleTrackUpdates(successfulUpdates)
+
+        return BatchFilenameRenameResult(
+            succeeded: succeeded,
+            failed: failed
+        )
+    }
     
     
     // MARK: - Добавить в треклист
