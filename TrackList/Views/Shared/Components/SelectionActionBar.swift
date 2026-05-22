@@ -31,22 +31,23 @@ struct SelectionActionBar: View {
             // Иконка опциональна, чтобы компонент не был привязан к трекам или фонотеке.
             if let iconName {
                 Circle()
-                    .fill(Color.gray.opacity(0.18))
+                    .fill(Color.white.opacity(0.14))
                     .frame(width: 48, height: 48)
                     .overlay {
                         Image(systemName: iconName)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.white.opacity(0.86))
                     }
             }
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.white.opacity(0.68))
 
                 if let subtitle {
                     Text(subtitle)
-                        .font(.headline)
+                        .font(.subheadline)
+                        .foregroundColor(.white)
                         .lineLimit(1)
                 }
             }
@@ -57,11 +58,16 @@ struct SelectionActionBar: View {
                 onPrimaryTap()
             }
             .font(.headline)
+            .foregroundColor(isPrimaryEnabled ? .white : .white.opacity(0.38))
             .disabled(!isPrimaryEnabled)
         }
         .padding(.leading, 10)
         .padding(.trailing, 16)
         .padding(.vertical, 10)
+        .background {
+            actionBarShape
+                .fill(Color.black.opacity(0.72))
+        }
         .glassEffect(.regular, in: actionBarShape)
         .clipShape(actionBarShape)
         .padding(.horizontal, 16)
