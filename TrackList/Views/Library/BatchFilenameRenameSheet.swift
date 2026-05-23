@@ -28,9 +28,35 @@ struct BatchFilenameRenameSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             strategyPickerRow
+                .disabled(isLoadingMetadata)
+                .opacity(isLoadingMetadata ? 0.5 : 1)
+
+            if isLoadingMetadata {
+                metadataLoadingRow
+            }
+
             listContent
+                .disabled(isLoadingMetadata)
+                .opacity(isLoadingMetadata ? 0.55 : 1)
+
             renameFooter
         }
+    }
+
+    private var isLoadingMetadata: Bool {
+        flow.phase == .loadingMetadata
+    }
+
+    private var metadataLoadingRow: some View {
+        VStack(spacing: 10) {
+            ProgressView()
+
+            Text("Читаю теги…")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 20)
     }
 
     @ViewBuilder

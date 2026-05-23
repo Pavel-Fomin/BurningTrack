@@ -53,6 +53,10 @@ enum BatchFilenameRenameStatus: Equatable {
 
 /// Фаза массового переименования файлов.
 enum BatchFilenameRenamePhase: Equatable {
+    /// Metadata выбранных файлов загружается.
+    /// Sheet уже может быть открыт, но стратегия и применение должны быть недоступны.
+    case loadingMetadata
+
     /// Пользователь подготавливает список.
     case preparing
 
@@ -226,6 +230,21 @@ struct BatchFilenameRenameFlow {
     /// Показывает, начат ли flow массового переименования.
     var isActive: Bool {
         pendingAction != nil
+    }
+
+    /// Активирует flow до завершения чтения metadata.
+    ///
+    /// Используется, чтобы sheet открылся сразу и показал список выбранных файлов
+    /// по текущим именам, пока artist/title ещё загружаются.
+    mutating func startLoadingMetadata(
+        with pendingAction: PendingBulkTrackAction,
+        tracks: [BatchFilenameRenameTrack]
+    ) {
+        self.pendingAction = pendingAction
+        self.tracks = tracks
+        strategy = nil
+        phase = .loadingMetadata
+        items = []
     }
 
     /// Запоминает выбор для будущего построения плана переименования.

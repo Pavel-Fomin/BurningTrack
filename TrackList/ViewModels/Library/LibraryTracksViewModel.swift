@@ -12,6 +12,29 @@ import Foundation
 import SwiftUI
 import Combine
 
+/// Ограничивает количество одновременно выполняемых задач.
+/// Нужен для безопасной загрузки metadata большого количества файлов.
+private actor AsyncLimiter {
+    private let limit: Int
+    private var running = 0
+
+    init(limit: Int) {
+        self.limit = limit
+    }
+
+    func acquire() async {
+        while running >= limit {
+            await Task.yield()
+        }
+
+        running += 1
+    }
+
+    func release() {
+        running -= 1
+    }
+}
+
 @MainActor
 final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
 
@@ -38,6 +61,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
 
     /// Можно ли применить текущий план массового переименования.
     var canApplyBatchFilenameRename: Bool {
+        guard batchFilenameRenameFlow.phase != .loadingMetadata else { return false }
         guard batchFilenameRenameFlow.strategy != nil else { return false }
 
         return batchFilenameRenameFlow.items.contains { item in
@@ -227,11 +251,10 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
 
         switch action {
         case .renameFiles:
-            batchFilenameRenameFlow.prepare(
-                with: pendingAction,
-                tracks: filenameRenameTracks(for: pendingAction.trackIDs)
-            )
-            batchFilenameRenameFlow.validateRequiredMetadata()
+            startBatchFilenameRenameLoading(with: pendingAction)
+            Task { @MainActor in
+                await prepareBatchFilenameRename(with: pendingAction)
+            }
         case .addToPlayer, .addToTrackList, .editTags:
             break
         }
@@ -241,6 +264,8 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
 
     /// Выбирает стратегию и применяет её к текущему rename flow.
     func selectFilenameRenameStrategy(_ strategy: FilenameRenameStrategy) {
+        guard batchFilenameRenameFlow.phase != .loadingMetadata else { return }
+
         batchFilenameRenameFlow.buildPlan(
             strategy: strategy,
             tracks: batchFilenameRenameFlow.tracks
@@ -290,6 +315,76 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         )
 
         batchFilenameRenameFlow.applyResult(result)
+    }
+
+    /// Сразу открывает sheet массового переименования,
+    /// пока metadata выбранных файлов ещё загружается.
+    private func startBatchFilenameRenameLoading(with pendingAction: PendingBulkTrackAction) {
+        batchFilenameRenameFlow.startLoadingMetadata(
+            with: pendingAction,
+            tracks: filenameRenameTracks(for: pendingAction.trackIDs)
+        )
+    }
+
+    /// Подготавливает flow массового переименования после загрузки runtime metadata.
+    private func prepareBatchFilenameRename(with pendingAction: PendingBulkTrackAction) async {
+        await ensureSnapshotsForBatchRename(trackIDs: pendingAction.trackIDs)
+
+        guard batchFilenameRenameFlow.pendingAction?.action == .renameFiles else { return }
+
+        let currentTrackIDs = batchFilenameRenameFlow.pendingAction?.trackIDs ?? []
+        guard !currentTrackIDs.isEmpty else { return }
+
+        batchFilenameRenameFlow.prepare(
+            with: PendingBulkTrackAction(
+                action: .renameFiles,
+                trackIDs: currentTrackIDs
+            ),
+            tracks: filenameRenameTracks(for: currentTrackIDs)
+        )
+        batchFilenameRenameFlow.validateRequiredMetadata()
+    }
+
+    /// Загружает runtime snapshots для batch rename.
+    /// Использует существующий runtime pipeline:
+    /// TrackRuntimeStore -> TrackRuntimeSnapshotBuilder.
+    private func ensureSnapshotsForBatchRename(trackIDs: [UUID]) async {
+        let limiter = AsyncLimiter(limit: 6)
+
+        await withTaskGroup(of: Void.self) { group in
+            for trackID in trackIDs {
+                if snapshotsByTrackId[trackID] != nil {
+                    continue
+                }
+
+                group.addTask { [weak self] in
+                    guard let self else { return }
+
+                    await limiter.acquire()
+
+                    if let storedSnapshot = TrackRuntimeStore.shared.snapshot(forTrackId: trackID) {
+                        await MainActor.run {
+                            self.snapshotsByTrackId[trackID] = storedSnapshot
+                        }
+                        await limiter.release()
+                        return
+                    }
+
+                    guard let snapshot = await TrackRuntimeSnapshotBuilder.shared.buildSnapshot(forTrackId: trackID) else {
+                        await limiter.release()
+                        return
+                    }
+
+                    TrackRuntimeStore.shared.storeSnapshot(snapshot)
+
+                    await MainActor.run {
+                        self.snapshotsByTrackId[trackID] = snapshot
+                    }
+
+                    await limiter.release()
+                }
+            }
+        }
     }
 
     /// Собирает входные данные для плана переименования в порядке выбранных trackIDs.
