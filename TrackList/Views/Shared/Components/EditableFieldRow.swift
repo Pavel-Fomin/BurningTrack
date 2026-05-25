@@ -67,6 +67,7 @@ struct EditableFieldRow: View {
         }
         .font(.body)
         .foregroundColor(.primary)
+        .keyboardType(keyboardType)
         
     }
 

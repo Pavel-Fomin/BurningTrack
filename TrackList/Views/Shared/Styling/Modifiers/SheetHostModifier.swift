@@ -81,6 +81,16 @@ struct SheetHostModifier: ViewModifier {
                 NewTrackListSelectionContainer(data: data)
                     .appSheet(detents: [.large])
 
+                /// Массовое редактирование тегов
+            case .batchTagEdit:
+                BatchTagEditContainer(
+                    flow: $sheetManager.batchTagEditFlow,
+                    onClose: {
+                        sheetManager.closeActive()
+                    }
+                )
+                .appSheet(detents: [.large])
+
                 /// Создание нового треклиста
             case .createTrackList:
                 CreateTrackListContainer()

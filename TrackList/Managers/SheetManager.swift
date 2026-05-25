@@ -87,6 +87,14 @@ struct AddToTrackListSheetData: Identifiable, Equatable {
     }
 }
 
+// MARK: - Данные для BatchTagEditSheet
+
+/// Данные для показа sheet массового редактирования тегов.
+struct BatchTagEditSheetData: Identifiable, Equatable {
+    /// Идентификатор sheet.
+    let id: UUID
+}
+
 
 // MARK: - Перечень шитов
 
@@ -98,6 +106,7 @@ enum AppSheet: Identifiable, Equatable {
     case renameTrackFile(RenameTrackFileSheetData)
     case saveTrackList(SaveTrackListSheetData)
     case newTrackListSelection(NewTrackListSelectionSheetData)
+    case batchTagEdit(BatchTagEditSheetData)
     case createTrackList
     
 
@@ -110,6 +119,7 @@ enum AppSheet: Identifiable, Equatable {
         case .renameTrackFile(let data): return "renameTrackFile_\(data.id)"
         case .saveTrackList(let data): return "saveTrackList_\(data.id)"
         case .newTrackListSelection(let data): return "newTrackListSelection_\(data.id)"
+        case .batchTagEdit(let data): return "batchTagEdit_\(data.id)"
         case .createTrackList: return "createTrackList"
         }
     }
@@ -132,12 +142,35 @@ final class SheetManager: ObservableObject {
     /// Следующий шит, который должен открыться после dismiss текущего
     private var pendingSheet: AppSheet?
 
+    /// Последний показанный sheet для корректной очистки состояния после dismiss.
+    private var lastActiveSheet: AppSheet?
+
     /// ID строки для выделения в списках
     @Published var highlightedRowID: UUID?
     
     /// Счётчик закрытий sheet’ов.
     /// Используется как единая точка UX-commit после dismiss.
     @Published private(set) var dismissCounter: Int = 0
+
+    /// Flow массового редактирования тегов.
+    @Published var batchTagEditFlow = BatchTagEditFlow(
+        pendingAction: nil,
+        phase: .editing,
+        tracks: [],
+        fields: [],
+        artwork: BatchTagArtworkEditState(
+            action: .keep,
+            newArtworkData: nil,
+            summary: .none,
+            previewSummary: BatchTagArtworkPreviewSummary(
+                selectedCount: 0,
+                artworkCount: 0,
+                missingArtworkCount: 0
+            ),
+            previewItems: [],
+            selectedTarget: nil
+        )
+    )
 
     private init() {}
 
@@ -150,6 +183,7 @@ final class SheetManager: ObservableObject {
         if activeSheet == nil {
             // Можно открыть сразу
             activeSheet = sheet
+            lastActiveSheet = sheet
         } else {
             // Шит уже на экране → откроем после dismiss
             pendingSheet = sheet
@@ -161,13 +195,19 @@ final class SheetManager: ObservableObject {
     // MARK: - ВЫЗЫВАЕТСЯ ИЗ ContentView.onDismiss
   
     func handleDismiss() {
+        let dismissedSheet = activeSheet ?? lastActiveSheet
+
         // Фиксируем факт закрытия sheet — UX-commit
         dismissCounter += 1
+
+        resetTransientStateIfNeeded(for: dismissedSheet)
 
         if let next = pendingSheet {
             pendingSheet = nil
             activeSheet = next
+            lastActiveSheet = next
         } else {
+            lastActiveSheet = nil
             highlightedRowID = nil
         }
     }
@@ -244,6 +284,42 @@ final class SheetManager: ObservableObject {
 
     func presentCreateTrackList() {
         activeSheet = .createTrackList
+        lastActiveSheet = .createTrackList
+    }
+
+    /// Показывает sheet массового редактирования тегов.
+    func presentBatchTagEdit(flow: BatchTagEditFlow) {
+        batchTagEditFlow = flow
+        present(.batchTagEdit(BatchTagEditSheetData(id: UUID())))
+    }
+
+    /// Сбрасывает временные состояния sheet после закрытия.
+    private func resetTransientStateIfNeeded(for sheet: AppSheet?) {
+        guard case .batchTagEdit = sheet else { return }
+
+        resetBatchTagEditFlow()
+    }
+
+    /// Сбрасывает flow массового редактирования тегов.
+    private func resetBatchTagEditFlow() {
+        batchTagEditFlow = BatchTagEditFlow(
+            pendingAction: nil,
+            phase: .editing,
+            tracks: [],
+            fields: [],
+            artwork: BatchTagArtworkEditState(
+                action: .keep,
+                newArtworkData: nil,
+                summary: .none,
+                previewSummary: BatchTagArtworkPreviewSummary(
+                    selectedCount: 0,
+                    artworkCount: 0,
+                    missingArtworkCount: 0
+                ),
+                previewItems: [],
+                selectedTarget: nil
+            )
+        )
     }
 }
 
@@ -260,6 +336,7 @@ private extension AppSheet {
         case .renameTrackFile(let data): return data.rowId
         case .saveTrackList: return nil
         case .newTrackListSelection: return nil
+        case .batchTagEdit: return nil
         case .createTrackList: return nil
         }
     }

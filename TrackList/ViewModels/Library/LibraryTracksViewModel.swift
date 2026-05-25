@@ -255,7 +255,9 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
             Task { @MainActor in
                 await prepareBatchFilenameRename(with: pendingAction)
             }
-        case .addToPlayer, .addToTrackList, .editTags:
+        case .editTags:
+            startBatchTagEditFlow(pendingAction: pendingAction)
+        case .addToPlayer, .addToTrackList:
             break
         }
 
@@ -290,6 +292,55 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
     /// Закрывает flow массового переименования без изменений файлов.
     func resetBatchFilenameRenameFlow() {
         batchFilenameRenameFlow.reset()
+    }
+
+    /// Запускает flow массового редактирования тегов.
+    private func startBatchTagEditFlow(pendingAction: PendingBulkTrackAction) {
+        let tracks = trackSections.flatMap { $0.tracks }
+        let selectedTracks: [BatchTagEditTrack] = pendingAction.trackIDs.compactMap { trackID in
+            guard let track = tracks.first(where: { $0.id == trackID }) else { return nil }
+            return BatchTagEditTrack(
+                trackId: track.id,
+                fileName: track.fileName,
+                values: [:],
+                hasArtwork: false
+            )
+        }
+        let fields = EditableTrackField.allCases.map {
+            BatchTagFieldEditState(
+                field: $0,
+                action: .keep,
+                value: "",
+                summary: .empty
+            )
+        }
+        let flow = BatchTagEditFlow(
+            pendingAction: pendingAction,
+            phase: .editing,
+            tracks: selectedTracks,
+            fields: fields,
+            artwork: BatchTagArtworkEditState(
+                action: .keep,
+                newArtworkData: nil,
+                summary: .none,
+                previewSummary: BatchTagArtworkPreviewSummary(
+                    selectedCount: selectedTracks.count,
+                    artworkCount: 0,
+                    missingArtworkCount: selectedTracks.count
+                ),
+                previewItems: selectedTracks.prefix(8).map {
+                    BatchTagArtworkPreviewItem(
+                        id: UUID(),
+                        trackId: $0.trackId,
+                        title: $0.fileName,
+                        artworkData: nil
+                    )
+                },
+                selectedTarget: nil
+            )
+        )
+
+        SheetManager.shared.presentBatchTagEdit(flow: flow)
     }
 
     /// Применяет массовое переименование файлов для готовых строк плана.
