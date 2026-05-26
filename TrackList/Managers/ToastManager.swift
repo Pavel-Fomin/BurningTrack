@@ -206,7 +206,7 @@ final class ToastManager: ObservableObject {
                 artworkImage: nil,
                 message: "Файл переименован"
             )
-            
+
         case let .fileAndTagsUpdated(title, artist, artwork):
             return ToastData(
                 style: .track(title: title, artist: artist),

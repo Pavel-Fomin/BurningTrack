@@ -59,16 +59,6 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
     private let badgeProvider: TrackListBadgeProvider
     private var cancellables = Set<AnyCancellable>()
 
-    /// Можно ли применить текущий план массового переименования.
-    var canApplyBatchFilenameRename: Bool {
-        guard batchFilenameRenameFlow.phase != .loadingMetadata else { return false }
-        guard batchFilenameRenameFlow.strategy != nil else { return false }
-
-        return batchFilenameRenameFlow.items.contains { item in
-            item.status == .ready
-        }
-    }
-
     /// Общее количество треков в текущих секциях.
     var totalVisibleTrackCount: Int {
         trackSections.reduce(0) { result, section in
@@ -94,6 +84,8 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         self.tracksProvider = tracksProvider
         self.badgeProvider = badgeProvider
 
+        bindBatchFilenameRenameFlow()
+
         NotificationCenter.default.addObserver(
             forName: .trackDidUpdate,
             object: nil,
@@ -104,6 +96,19 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
 
             Task { @MainActor in
                 self.applyTrackUpdateEvent(updateEvent)
+            }
+        }
+
+        NotificationCenter.default.addObserver(
+            forName: .trackBatchDidUpdate,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let self else { return }
+            guard let events = notification.userInfo?["events"] as? [TrackUpdateEvent] else { return }
+
+            Task { @MainActor in
+                self.applyTrackUpdateEvents(events)
             }
         }
 
@@ -134,6 +139,15 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
     }
     
     // MARK: - Load
+
+    /// Пробрасывает изменения flow наружу для подписчиков ViewModel.
+    private func bindBatchFilenameRenameFlow() {
+        batchFilenameRenameFlow.objectWillChange
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
+    }
 
     func loadTracksIfNeeded() async {
         // Если уже загружали — ничего не делаем
@@ -264,36 +278,6 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         bulkSelection.reset()
     }
 
-    /// Выбирает стратегию и применяет её к текущему rename flow.
-    func selectFilenameRenameStrategy(_ strategy: FilenameRenameStrategy) {
-        guard batchFilenameRenameFlow.phase != .loadingMetadata else { return }
-
-        batchFilenameRenameFlow.buildPlan(
-            strategy: strategy,
-            tracks: batchFilenameRenameFlow.tracks
-        )
-    }
-
-    /// Исключает трек только из операции переименования и пересобирает план.
-    func removeTrackFromRenameFlow(_ trackId: UUID) {
-        batchFilenameRenameFlow.removeTrack(id: trackId)
-    }
-
-    /// Пересобирает план для оставшихся треков и заново рассчитывает целевые имена.
-    func rebuildRenamePlan() {
-        guard let strategy = batchFilenameRenameFlow.strategy else { return }
-
-        batchFilenameRenameFlow.buildPlan(
-            strategy: strategy,
-            tracks: batchFilenameRenameFlow.tracks
-        )
-    }
-
-    /// Закрывает flow массового переименования без изменений файлов.
-    func resetBatchFilenameRenameFlow() {
-        batchFilenameRenameFlow.reset()
-    }
-
     /// Запускает flow массового редактирования тегов.
     private func startBatchTagEditFlow(pendingAction: PendingBulkTrackAction) {
         let tracks = trackSections.flatMap { $0.tracks }
@@ -345,6 +329,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
 
     /// Применяет массовое переименование файлов для готовых строк плана.
     func applyBatchFilenameRename(using playerManager: PlayerManager) async {
+        guard !batchFilenameRenameFlow.isBusy else { return }
         // До выбора стратегии targetFileName равен текущему имени, поэтому применять такой план нельзя.
         guard batchFilenameRenameFlow.strategy != nil else { return }
 
@@ -360,9 +345,19 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
 
         guard !commands.isEmpty else { return }
 
+        batchFilenameRenameFlow.startApplyingRename(totalCount: commands.count)
+        defer {
+            batchFilenameRenameFlow.finishApplyingRename()
+        }
+
         let result = await AppCommandExecutor.shared.renameTrackFilesBatch(
             commands,
-            using: playerManager
+            using: playerManager,
+            progress: { [weak self] processed, _ in
+                self?.batchFilenameRenameFlow.updateApplyingRenameProgress(
+                    processedCount: processed
+                )
+            }
         )
 
         batchFilenameRenameFlow.applyResult(result)
@@ -375,10 +370,17 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
             with: pendingAction,
             tracks: filenameRenameTracks(for: pendingAction.trackIDs)
         )
+        batchFilenameRenameFlow.startPreparingRename(
+            totalCount: pendingAction.trackIDs.count
+        )
     }
 
     /// Подготавливает flow массового переименования после загрузки runtime metadata.
     private func prepareBatchFilenameRename(with pendingAction: PendingBulkTrackAction) async {
+        defer {
+            batchFilenameRenameFlow.finishPreparingRename()
+        }
+
         await ensureSnapshotsForBatchRename(trackIDs: pendingAction.trackIDs)
 
         guard batchFilenameRenameFlow.pendingAction?.action == .renameFiles else { return }
@@ -401,10 +403,20 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
     /// TrackRuntimeStore -> TrackRuntimeSnapshotBuilder.
     private func ensureSnapshotsForBatchRename(trackIDs: [UUID]) async {
         let limiter = AsyncLimiter(limit: 6)
+        var preparedCount = 0
+
+        /// Фиксирует завершение подготовки одного трека.
+        func updatePreparedCount() {
+            preparedCount += 1
+            batchFilenameRenameFlow.updatePreparingRenameProgress(
+                preparedCount: preparedCount
+            )
+        }
 
         await withTaskGroup(of: Void.self) { group in
             for trackID in trackIDs {
                 if snapshotsByTrackId[trackID] != nil {
+                    updatePreparedCount()
                     continue
                 }
 
@@ -413,7 +425,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
 
                     await limiter.acquire()
 
-                    if let storedSnapshot = TrackRuntimeStore.shared.snapshot(forTrackId: trackID) {
+                    if let storedSnapshot = await TrackRuntimeStore.shared.snapshot(forTrackId: trackID) {
                         await MainActor.run {
                             self.snapshotsByTrackId[trackID] = storedSnapshot
                         }
@@ -426,7 +438,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
                         return
                     }
 
-                    TrackRuntimeStore.shared.storeSnapshot(snapshot)
+                    await TrackRuntimeStore.shared.storeSnapshot(snapshot)
 
                     await MainActor.run {
                         self.snapshotsByTrackId[trackID] = snapshot
@@ -434,6 +446,10 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
 
                     await limiter.release()
                 }
+            }
+
+            for await _ in group {
+                updatePreparedCount()
             }
         }
     }
@@ -541,6 +557,94 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
     ///
     /// - Parameter updateEvent: Событие обновления трека
     private func applyTrackUpdateEvent(_ updateEvent: TrackUpdateEvent) {
-        snapshotsByTrackId[updateEvent.trackId] = updateEvent.snapshot
+        applyTrackUpdateEvents([updateEvent])
+    }
+
+    /// Пакетно применяет события обновления треков к секциям без полного refresh списка.
+    private func applyTrackUpdateEvents(_ events: [TrackUpdateEvent]) {
+        guard !events.isEmpty else { return }
+
+        let eventsByTrackId = events.reduce(into: [UUID: TrackUpdateEvent]()) { result, event in
+            result[event.trackId] = event
+        }
+
+        var updatedSnapshots = snapshotsByTrackId
+        for event in events {
+            updatedSnapshots[event.trackId] = event.snapshot
+        }
+        snapshotsByTrackId = updatedSnapshots
+
+        trackSections = trackSections.map { section in
+            let updatedTracks = section.tracks.map { track in
+                guard let updateEvent = eventsByTrackId[track.id] else { return track }
+                return updatedLibraryTrack(from: track, using: updateEvent)
+            }
+
+            return TrackSection(
+                id: section.id,
+                title: section.title,
+                tracks: updatedTracks
+            )
+        }
+    }
+
+    /// Собирает обновлённую модель строки фонотеки из runtime snapshot.
+    private func updatedLibraryTrack(
+        from track: LibraryTrack,
+        using updateEvent: TrackUpdateEvent
+    ) -> LibraryTrack {
+        let snapshot = updateEvent.snapshot
+        let fileURL = updatedFileURL(
+            currentURL: track.fileURL,
+            snapshot: snapshot,
+            changedFields: updateEvent.changedFields
+        )
+
+        return LibraryTrack(
+            id: track.id,
+            fileURL: fileURL,
+            title: updatedOptionalString(
+                currentValue: track.title,
+                snapshotValue: snapshot.title,
+                field: .title,
+                changedFields: updateEvent.changedFields
+            ),
+            artist: updatedOptionalString(
+                currentValue: track.artist,
+                snapshotValue: snapshot.artist,
+                field: .artist,
+                changedFields: updateEvent.changedFields
+            ),
+            duration: updateEvent.changedFields.contains(.duration)
+                ? snapshot.duration ?? track.duration
+                : track.duration,
+            addedDate: track.addedDate,
+            isAvailable: updateEvent.changedFields.contains(.isAvailable)
+                ? snapshot.isAvailable
+                : track.isAvailable
+        )
+    }
+
+    /// Обновляет optional-строку только если соответствующее поле действительно менялось.
+    private func updatedOptionalString(
+        currentValue: String?,
+        snapshotValue: String?,
+        field: TrackChangedField,
+        changedFields: Set<TrackChangedField>
+    ) -> String? {
+        changedFields.contains(field) ? snapshotValue : currentValue
+    }
+
+    /// Обновляет URL строки после rename, не перечитывая весь список фонотеки.
+    private func updatedFileURL(
+        currentURL: URL,
+        snapshot: TrackRuntimeSnapshot,
+        changedFields: Set<TrackChangedField>
+    ) -> URL {
+        guard changedFields.contains(.fileName) else { return currentURL }
+
+        return currentURL
+            .deletingLastPathComponent()
+            .appendingPathComponent(snapshot.fileName)
     }
 }

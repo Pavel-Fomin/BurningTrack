@@ -95,8 +95,45 @@ struct BatchTagEditSheetData: Identifiable, Equatable {
     let id: UUID
 }
 
+// MARK: - Данные для BatchFilenameRenameSheet
+
+/// Данные для показа sheet массового переименования файлов.
+struct BatchFilenameRenameSheetData: Identifiable, Equatable {
+    /// Идентификатор sheet.
+    let id = UUID()
+
+    /// Flow массового переименования файлов.
+    let flow: BatchFilenameRenameFlow
+
+    /// Менеджер плеера для проверки занятых файлов при применении команды.
+    let playerManager: PlayerManager
+
+    /// Применение подготовленного плана переименования.
+    let onApply: () async -> Void
+
+    static func == (
+        lhs: BatchFilenameRenameSheetData,
+        rhs: BatchFilenameRenameSheetData
+    ) -> Bool {
+        lhs.id == rhs.id
+    }
+}
+
 
 // MARK: - Перечень шитов
+
+enum AppSheetKind: Equatable {
+    case moveToFolder
+    case trackDetail
+    case addToTrackList
+    case renameTrackList
+    case renameTrackFile
+    case saveTrackList
+    case newTrackListSelection
+    case batchTagEdit
+    case batchFilenameRename
+    case createTrackList
+}
 
 enum AppSheet: Identifiable, Equatable {
     case moveToFolder(MoveToFolderSheetData)
@@ -107,6 +144,7 @@ enum AppSheet: Identifiable, Equatable {
     case saveTrackList(SaveTrackListSheetData)
     case newTrackListSelection(NewTrackListSelectionSheetData)
     case batchTagEdit(BatchTagEditSheetData)
+    case batchFilenameRename(BatchFilenameRenameSheetData)
     case createTrackList
     
 
@@ -120,12 +158,29 @@ enum AppSheet: Identifiable, Equatable {
         case .saveTrackList(let data): return "saveTrackList_\(data.id)"
         case .newTrackListSelection(let data): return "newTrackListSelection_\(data.id)"
         case .batchTagEdit(let data): return "batchTagEdit_\(data.id)"
+        case .batchFilenameRename(let data): return "batchFilenameRename_\(data.id)"
         case .createTrackList: return "createTrackList"
         }
     }
 
     static func == (lhs: AppSheet, rhs: AppSheet) -> Bool {
         lhs.id == rhs.id
+    }
+
+    /// Тип sheet без payload для принятия решений после dismiss.
+    var kind: AppSheetKind {
+        switch self {
+        case .moveToFolder: return .moveToFolder
+        case .trackDetail: return .trackDetail
+        case .addToTrackList: return .addToTrackList
+        case .renameTrackList: return .renameTrackList
+        case .renameTrackFile: return .renameTrackFile
+        case .saveTrackList: return .saveTrackList
+        case .newTrackListSelection: return .newTrackListSelection
+        case .batchTagEdit: return .batchTagEdit
+        case .batchFilenameRename: return .batchFilenameRename
+        case .createTrackList: return .createTrackList
+        }
     }
 }
 
@@ -152,6 +207,9 @@ final class SheetManager: ObservableObject {
     /// Используется как единая точка UX-commit после dismiss.
     @Published private(set) var dismissCounter: Int = 0
 
+    /// Тип последнего закрытого sheet для точечной реакции экранов на dismiss.
+    @Published private(set) var lastDismissedSheetKind: AppSheetKind?
+
     /// Flow массового редактирования тегов.
     @Published var batchTagEditFlow = BatchTagEditFlow(
         pendingAction: nil,
@@ -171,6 +229,19 @@ final class SheetManager: ObservableObject {
             selectedTarget: nil
         )
     )
+
+    /// Проверяет, не открыт ли уже sheet массового переименования.
+    private var isBatchFilenameRenamePresentedOrPending: Bool {
+        if case .batchFilenameRename = activeSheet {
+            return true
+        }
+
+        if case .batchFilenameRename = pendingSheet {
+            return true
+        }
+
+        return false
+    }
 
     private init() {}
 
@@ -196,6 +267,7 @@ final class SheetManager: ObservableObject {
   
     func handleDismiss() {
         let dismissedSheet = activeSheet ?? lastActiveSheet
+        lastDismissedSheetKind = dismissedSheet?.kind
 
         // Фиксируем факт закрытия sheet — UX-commit
         dismissCounter += 1
@@ -293,11 +365,43 @@ final class SheetManager: ObservableObject {
         present(.batchTagEdit(BatchTagEditSheetData(id: UUID())))
     }
 
+    /// Показывает sheet массового переименования файлов.
+    func presentBatchFilenameRename(
+        flow: BatchFilenameRenameFlow,
+        playerManager: PlayerManager,
+        onApply: @escaping () async -> Void
+    ) {
+        guard !isBatchFilenameRenamePresentedOrPending else { return }
+
+        let data = BatchFilenameRenameSheetData(
+            flow: flow,
+            playerManager: playerManager,
+            onApply: onApply
+        )
+
+        present(.batchFilenameRename(data))
+    }
+
     /// Сбрасывает временные состояния sheet после закрытия.
     private func resetTransientStateIfNeeded(for sheet: AppSheet?) {
-        guard case .batchTagEdit = sheet else { return }
+        switch sheet {
+        case .batchTagEdit:
+            resetBatchTagEditFlow()
 
-        resetBatchTagEditFlow()
+        case .batchFilenameRename(let data):
+            data.flow.reset()
+
+        case .moveToFolder,
+             .trackDetail,
+             .addToTrackList,
+             .renameTrackList,
+             .renameTrackFile,
+             .saveTrackList,
+             .newTrackListSelection,
+             .createTrackList,
+             nil:
+            return
+        }
     }
 
     /// Сбрасывает flow массового редактирования тегов.
@@ -337,6 +441,7 @@ private extension AppSheet {
         case .saveTrackList: return nil
         case .newTrackListSelection: return nil
         case .batchTagEdit: return nil
+        case .batchFilenameRename: return nil
         case .createTrackList: return nil
         }
     }

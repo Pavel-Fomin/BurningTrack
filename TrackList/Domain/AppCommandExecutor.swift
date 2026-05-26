@@ -141,11 +141,14 @@ actor AppCommandExecutor {
     /// В отличие от одиночного rename-flow, здесь не показывается toast на каждый файл.
     func renameTrackFilesBatch(
         _ commands: [BatchFilenameRenameCommand],
-        using playerManager: PlayerManager
+        using playerManager: PlayerManager,
+        progress: (@MainActor (_ processed: Int, _ total: Int) -> Void)? = nil
     ) async -> BatchFilenameRenameResult {
         var succeeded: [BatchFilenameRenameSuccess] = []
         var failed: [BatchFilenameRenameFailure] = []
         var successfulUpdates: [TrackUpdateRequest] = []
+        var processedCount = 0
+        let totalCount = commands.count
 
         for command in commands {
             do {
@@ -180,6 +183,11 @@ actor AppCommandExecutor {
                         error: error
                     )
                 )
+            }
+
+            processedCount += 1
+            if let progress {
+                await progress(processedCount, totalCount)
             }
         }
 
@@ -770,7 +778,7 @@ private func changedFieldsForTagUpdate(
 private func resolveSnapshot(for trackId: UUID) async -> TrackRuntimeSnapshot? {
     
     // 1. Пытаемся взять из store (быстро)
-    if let snapshot = TrackRuntimeStore.shared.snapshot(forTrackId: trackId) {
+    if let snapshot = await TrackRuntimeStore.shared.snapshot(forTrackId: trackId) {
         return snapshot
     }
     

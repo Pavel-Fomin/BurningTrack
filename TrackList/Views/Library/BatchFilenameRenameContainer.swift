@@ -14,17 +14,20 @@ import SwiftUI
 /// Контейнер отвечает за:
 /// - единый заголовок sheet;
 /// - закрытие sheet;
-/// - передачу действий во ViewModel;
+/// - передачу действий во flow;
 /// - соблюдение общего контракта sheet’ов проекта.
 struct BatchFilenameRenameContainer: View {
 
     // MARK: - State
 
-    /// ViewModel текущего списка треков фонотеки.
-    @ObservedObject var viewModel: LibraryTracksViewModel
+    /// Flow массового переименования файлов.
+    @ObservedObject var flow: BatchFilenameRenameFlow
 
     /// Менеджер плеера нужен командному слою для проверки занятого файла.
     let playerManager: PlayerManager
+
+    /// Применение подготовленного плана переименования.
+    let onApply: () async -> Void
 
     /// Закрытие sheet’а из родительского экрана.
     let onClose: () -> Void
@@ -36,29 +39,38 @@ struct BatchFilenameRenameContainer: View {
             title: "Изменение имени файла",
             subtitle: "Из тегов",
             rightButtonImage: "checkmark",
-            isRightEnabled: .constant(true),
+            isRightEnabled: .constant(!flow.isBusy),
             onClose: {
+                guard !flow.isBusy else { return }
                 onClose()
             },
             onRightTap: {
+                guard !flow.isBusy else { return }
                 onClose()
             }
         ) {
             BatchFilenameRenameSheet(
-                flow: viewModel.batchFilenameRenameFlow,
-                canApplyRename: viewModel.canApplyBatchFilenameRename,
+                flow: flow,
+                canApplyRename: flow.canApplyRename,
                 onSelectStrategy: { strategy in
-                    viewModel.selectFilenameRenameStrategy(strategy)
+                    guard !flow.isBusy else { return }
+                    guard flow.phase != .loadingMetadata else { return }
+                    flow.buildPlan(
+                        strategy: strategy,
+                        tracks: flow.tracks
+                    )
                 },
                 onRemoveTrack: { trackId in
-                    viewModel.removeTrackFromRenameFlow(trackId)
+                    guard !flow.isBusy else { return }
+                    flow.removeTrack(id: trackId)
                 },
                 onRename: {
                     Task {
-                        await viewModel.applyBatchFilenameRename(using: playerManager)
+                        await onApply()
                     }
                 }
             )
         }
+        .interactiveDismissDisabled(flow.isBusy)
     }
 }

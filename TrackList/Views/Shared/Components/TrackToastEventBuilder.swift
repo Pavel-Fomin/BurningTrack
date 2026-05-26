@@ -25,7 +25,7 @@ enum TrackToastEventBuilder {
     ) async -> ToastEvent {
         let snapshot: TrackRuntimeSnapshot?
 
-        if let storedSnapshot = TrackRuntimeStore.shared.snapshot(forTrackId: track.trackId) {
+        if let storedSnapshot = await TrackRuntimeStore.shared.snapshot(forTrackId: track.trackId) {
             snapshot = storedSnapshot
         } else {
             snapshot = await TrackRuntimeSnapshotBuilder.shared.buildSnapshot(forTrackId: track.trackId)

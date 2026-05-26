@@ -21,6 +21,7 @@ extension Notification.Name {
     static let trackListsDidChange = Notification.Name("trackListsDidChange")       /// Любое изменение списка треклистов (создание/удаление/переименование)
     static let trackListTracksDidChange = Notification.Name("trackListTracksDidChange") /// Изменились треки внутри одного треклиста
     static let trackDidUpdate = Notification.Name("trackDidUpdate")                 /// Единое событие обновления трека с payload TrackUpdateEvent
+    static let trackBatchDidUpdate = Notification.Name("trackBatchDidUpdate")       /// Пакетное событие обновления треков с payload [TrackUpdateEvent]
     
     // MARK: - Library
     

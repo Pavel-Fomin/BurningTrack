@@ -91,6 +91,18 @@ struct SheetHostModifier: ViewModifier {
                 )
                 .appSheet(detents: [.large])
 
+                /// Массовое переименование файлов
+            case .batchFilenameRename(let data):
+                BatchFilenameRenameContainer(
+                    flow: data.flow,
+                    playerManager: data.playerManager,
+                    onApply: data.onApply,
+                    onClose: {
+                        sheetManager.closeActive()
+                    }
+                )
+                .appSheet(detents: [.large])
+
                 /// Создание нового треклиста
             case .createTrackList:
                 CreateTrackListContainer()

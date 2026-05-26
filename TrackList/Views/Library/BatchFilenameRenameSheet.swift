@@ -28,15 +28,17 @@ struct BatchFilenameRenameSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             strategyPickerRow
-                .disabled(isLoadingMetadata)
-                .opacity(isLoadingMetadata ? 0.5 : 1)
+                .disabled(isLoadingMetadata || flow.isBusy)
+                .opacity(isLoadingMetadata || flow.isBusy ? 0.5 : 1)
 
-            if isLoadingMetadata {
-                metadataLoadingRow
+            if flow.isApplyingRename {
+                applyingProgressView
+            } else if flow.isPreparingRename {
+                preparingProgressView
             }
 
             listContent
-                .disabled(isLoadingMetadata)
+                .disabled(isLoadingMetadata || flow.isBusy)
                 .opacity(isLoadingMetadata ? 0.55 : 1)
 
             renameFooter
@@ -47,16 +49,20 @@ struct BatchFilenameRenameSheet: View {
         flow.phase == .loadingMetadata
     }
 
-    private var metadataLoadingRow: some View {
-        VStack(spacing: 10) {
-            ProgressView()
+    private var preparingProgressView: some View {
+        BatchOperationProgressView(
+            title: "Читаю теги…",
+            processedCount: flow.preparedRenameCount,
+            totalCount: flow.totalPrepareCount
+        )
+    }
 
-            Text("Читаю теги…")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 20)
+    private var applyingProgressView: some View {
+        BatchOperationProgressView(
+            title: "Переименовываю файлы…",
+            processedCount: flow.processedRenameCount,
+            totalCount: flow.totalRenameCount
+        )
     }
 
     @ViewBuilder
@@ -94,7 +100,7 @@ struct BatchFilenameRenameSheet: View {
                     .frame(maxWidth: .infinity)
             }
             .primaryButtonStyle()
-            .disabled(!canApplyRename)
+            .disabled(!canApplyRename || flow.isBusy)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 16)

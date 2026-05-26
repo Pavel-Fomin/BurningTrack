@@ -14,6 +14,7 @@
 
 import Foundation
 
+@MainActor
 final class TrackRuntimeStore {
 
     // MARK: - Singleton
@@ -22,7 +23,9 @@ final class TrackRuntimeStore {
 
     // MARK: - Storage
 
-    private var snapshotsByTrackId: [UUID: TrackRuntimeSnapshot] = [:]  /// Словарь актуальных snapshot по идентификатору трека
+    /// Словарь актуальных snapshot по идентификатору трека.
+    /// Доступ изолирован MainActor, чтобы фоновые TaskGroup-задачи не писали в Dictionary параллельно.
+    private var snapshotsByTrackId: [UUID: TrackRuntimeSnapshot] = [:]
 
     // MARK: - Init
 

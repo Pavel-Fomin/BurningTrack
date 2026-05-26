@@ -51,32 +51,12 @@ final class TrackUpdateCoordinator {
         changedFields: Set<TrackChangedField>,
         previousURL: URL? = nil
     ) async -> TrackUpdateEvent? {
-
-        // Получаем актуальный URL трека через существующий bookmark pipeline.
-        guard let url = await BookmarkResolver.url(forTrack: trackId) else { return nil }
-
-        // Сбрасываем runtime-кэши перед повторной сборкой snapshot.
-        invalidateRuntimeCaches(
+        guard let updateEvent = await makeTrackUpdateEvent(
             forTrackId: trackId,
-            url: url,
-            previousURL: previousURL
-        )
-
-        // Пересобираем каноничный snapshot трека.
-        guard let snapshot = await TrackRuntimeSnapshotBuilder.shared.buildSnapshot(forTrackId: trackId) else {
-            return nil
-        }
-
-        // Сохраняем новый snapshot в централизованное runtime-хранилище.
-        TrackRuntimeStore.shared.storeSnapshot(snapshot)
-
-        // Собираем единое событие обновления.
-        let updateEvent = TrackUpdateEvent(
-            trackId: trackId,
             reason: reason,
             changedFields: changedFields,
-            snapshot: snapshot
-        )
+            previousURL: previousURL
+        ) else { return nil }
 
         // Публикуем событие для подписчиков.
         publishTrackUpdateEvent(updateEvent)
@@ -94,7 +74,7 @@ final class TrackUpdateCoordinator {
         var events: [TrackUpdateEvent] = []
 
         for update in updates {
-            if let event = await handleTrackUpdate(
+            if let event = await makeTrackUpdateEvent(
                 forTrackId: update.trackId,
                 reason: .fileRenamed,
                 changedFields: [.fileName],
@@ -104,7 +84,43 @@ final class TrackUpdateCoordinator {
             }
         }
 
+        publishTrackBatchUpdateEvent(events)
+
         return events
+    }
+
+    /// Собирает событие обновления трека без публикации NotificationCenter.
+    private func makeTrackUpdateEvent(
+        forTrackId trackId: UUID,
+        reason: TrackUpdateReason,
+        changedFields: Set<TrackChangedField>,
+        previousURL: URL? = nil
+    ) async -> TrackUpdateEvent? {
+
+        // Получаем актуальный URL трека через существующий bookmark pipeline.
+        guard let url = await BookmarkResolver.url(forTrack: trackId) else { return nil }
+
+        // Сбрасываем runtime-кэши перед повторной сборкой snapshot.
+        await invalidateRuntimeCaches(
+            forTrackId: trackId,
+            url: url,
+            previousURL: previousURL
+        )
+
+        // Пересобираем каноничный snapshot трека.
+        guard let snapshot = await TrackRuntimeSnapshotBuilder.shared.buildSnapshot(forTrackId: trackId) else {
+            return nil
+        }
+
+        // Сохраняем новый snapshot в централизованное runtime-хранилище.
+        await TrackRuntimeStore.shared.storeSnapshot(snapshot)
+
+        return TrackUpdateEvent(
+            trackId: trackId,
+            reason: reason,
+            changedFields: changedFields,
+            snapshot: snapshot
+        )
     }
 
     // MARK: - Invalidate
@@ -119,7 +135,7 @@ final class TrackUpdateCoordinator {
         forTrackId trackId: UUID,
         url: URL,
         previousURL: URL?
-    ) {
+    ) async {
 
         // Сбрасываем raw metadata cache по актуальному URL.
         TrackMetadataCacheManager.shared.invalidate(url: url)
@@ -133,7 +149,7 @@ final class TrackUpdateCoordinator {
         ArtworkProvider.shared.invalidate(trackId: trackId)
 
         // Удаляем старый snapshot из централизованного runtime store.
-        TrackRuntimeStore.shared.removeSnapshot(forTrackId: trackId)
+        await TrackRuntimeStore.shared.removeSnapshot(forTrackId: trackId)
     }
 
     // MARK: - Publish
@@ -143,5 +159,18 @@ final class TrackUpdateCoordinator {
     /// - Parameter updateEvent: Готовое событие обновления
     private func publishTrackUpdateEvent(_ updateEvent: TrackUpdateEvent) {
         NotificationCenter.default.post(name: .trackDidUpdate, object: updateEvent)
+    }
+
+    /// Публикует пакетное событие обновления треков.
+    ///
+    /// - Parameter updateEvents: Готовые события обновления треков
+    private func publishTrackBatchUpdateEvent(_ updateEvents: [TrackUpdateEvent]) {
+        guard !updateEvents.isEmpty else { return }
+
+        NotificationCenter.default.post(
+            name: .trackBatchDidUpdate,
+            object: nil,
+            userInfo: ["events": updateEvents]
+        )
     }
 }

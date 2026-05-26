@@ -13,6 +13,7 @@
 //
 
 import Foundation
+import Combine
 
 enum FilenameRenameStrategy: Equatable {
     /// Имя файла строится в формате "исполнитель - название".
@@ -197,7 +198,7 @@ extension BatchFilenameRenameItem {
     }
 }
 
-struct BatchFilenameRenameFlow {
+final class BatchFilenameRenameFlow: ObservableObject {
     /// Состояние строки после попытки применения.
     private struct PreservedAppliedState {
         /// Статус, полученный после применения операции.
@@ -208,19 +209,37 @@ struct BatchFilenameRenameFlow {
     }
 
     /// Pending-действие, с которым будет строиться следующий шаг переименования.
-    private(set) var pendingAction: PendingBulkTrackAction?
+    @Published private(set) var pendingAction: PendingBulkTrackAction?
 
     /// Исходные треки, оставленные пользователем в операции.
-    private(set) var tracks: [BatchFilenameRenameTrack] = []
+    @Published private(set) var tracks: [BatchFilenameRenameTrack] = []
 
     /// Стратегия, по которой построен текущий план.
-    private(set) var strategy: FilenameRenameStrategy?
+    @Published private(set) var strategy: FilenameRenameStrategy?
 
     /// Текущая фаза массового переименования.
-    private(set) var phase: BatchFilenameRenamePhase = .preparing
+    @Published private(set) var phase: BatchFilenameRenamePhase = .preparing
 
     /// Данные будущего preview массового переименования.
-    private(set) var items: [BatchFilenameRenameItem] = []
+    @Published private(set) var items: [BatchFilenameRenameItem] = []
+
+    /// Выполняется ли сейчас чтение тегов для подготовки переименования.
+    @Published private(set) var isPreparingRename = false
+
+    /// Количество треков, для которых уже прочитаны данные.
+    @Published private(set) var preparedRenameCount = 0
+
+    /// Общее количество треков, отправленных на чтение тегов.
+    @Published private(set) var totalPrepareCount = 0
+
+    /// Выполняется ли сейчас применение массового переименования.
+    @Published private(set) var isApplyingRename = false
+
+    /// Количество файлов, уже обработанных во время применения.
+    @Published private(set) var processedRenameCount = 0
+
+    /// Общее количество файлов, отправленных на применение.
+    @Published private(set) var totalRenameCount = 0
 
     /// Совместимое имя для уже построенного плана переименования.
     var plan: [BatchFilenameRenameItem] {
@@ -232,11 +251,27 @@ struct BatchFilenameRenameFlow {
         pendingAction != nil
     }
 
+    /// Показывает, занята ли операция подготовкой или применением.
+    var isBusy: Bool {
+        isPreparingRename || isApplyingRename
+    }
+
+    /// Можно ли применить текущий план массового переименования.
+    var canApplyRename: Bool {
+        guard !isBusy else { return false }
+        guard phase != .loadingMetadata else { return false }
+        guard strategy != nil else { return false }
+
+        return items.contains { item in
+            item.status == .ready
+        }
+    }
+
     /// Активирует flow до завершения чтения metadata.
     ///
     /// Используется, чтобы sheet открылся сразу и показал список выбранных файлов
     /// по текущим именам, пока artist/title ещё загружаются.
-    mutating func startLoadingMetadata(
+    func startLoadingMetadata(
         with pendingAction: PendingBulkTrackAction,
         tracks: [BatchFilenameRenameTrack]
     ) {
@@ -245,10 +280,11 @@ struct BatchFilenameRenameFlow {
         strategy = nil
         phase = .loadingMetadata
         items = []
+        resetApplyingRenameProgress()
     }
 
     /// Запоминает выбор для будущего построения плана переименования.
-    mutating func prepare(
+    func prepare(
         with pendingAction: PendingBulkTrackAction,
         tracks: [BatchFilenameRenameTrack]
     ) {
@@ -257,10 +293,11 @@ struct BatchFilenameRenameFlow {
         strategy = nil
         phase = .preparing
         items = []
+        resetApplyingRenameProgress()
     }
 
     /// Строит план переименования без записи на диск.
-    mutating func buildPlan(
+    func buildPlan(
         strategy: FilenameRenameStrategy,
         tracks: [BatchFilenameRenameTrack]
     ) {
@@ -287,7 +324,7 @@ struct BatchFilenameRenameFlow {
     }
 
     /// Выполняет первичную проверку обязательных метаданных до выбора стратегии.
-    mutating func validateRequiredMetadata() {
+    func validateRequiredMetadata() {
         items = tracks.map { track in
             let artist = normalized(track.artist)
             let title = normalized(track.title)
@@ -307,7 +344,7 @@ struct BatchFilenameRenameFlow {
     }
 
     /// Убирает трек только из текущей операции массового переименования.
-    mutating func removeTrack(id: UUID) {
+    func removeTrack(id: UUID) {
         tracks.removeAll { $0.trackId == id }
         items.removeAll { $0.trackId == id }
 
@@ -328,7 +365,7 @@ struct BatchFilenameRenameFlow {
     }
 
     /// Применяет результат массового переименования к текущему плану.
-    mutating func applyResult(_ result: BatchFilenameRenameResult) {
+    func applyResult(_ result: BatchFilenameRenameResult) {
         let succeededIds = Set(result.succeeded.map(\.trackId))
         let failedById = Dictionary(
             uniqueKeysWithValues: result.failed.map { ($0.trackId, $0) }
@@ -349,13 +386,63 @@ struct BatchFilenameRenameFlow {
         phase = .applied
     }
 
-    /// Сбрасывает подготовку массового переименования.
-    mutating func reset() {
+    /// Запускает отображение прогресса массового переименования.
+    func startApplyingRename(totalCount: Int) {
+        isApplyingRename = true
+        processedRenameCount = 0
+        totalRenameCount = totalCount
+    }
+
+    /// Обновляет количество уже обработанных файлов.
+    func updateApplyingRenameProgress(processedCount: Int) {
+        processedRenameCount = processedCount
+    }
+
+    /// Завершает отображение прогресса массового переименования.
+    func finishApplyingRename() {
+        isApplyingRename = false
+    }
+
+    /// Запускает отображение прогресса чтения тегов.
+    func startPreparingRename(totalCount: Int) {
+        isPreparingRename = true
+        preparedRenameCount = 0
+        totalPrepareCount = totalCount
+    }
+
+    /// Обновляет количество треков, для которых уже прочитаны данные.
+    func updatePreparingRenameProgress(preparedCount: Int) {
+        preparedRenameCount = preparedCount
+    }
+
+    /// Завершает отображение прогресса чтения тегов.
+    func finishPreparingRename() {
+        isPreparingRename = false
+    }
+
+    /// Сбрасывает состояние массового переименования файлов.
+    func reset() {
         pendingAction = nil
         tracks = []
         strategy = nil
         phase = .preparing
         items = []
+        resetPreparingRenameProgress()
+        resetApplyingRenameProgress()
+    }
+
+    /// Сбрасывает значения прогресса чтения тегов.
+    private func resetPreparingRenameProgress() {
+        isPreparingRename = false
+        preparedRenameCount = 0
+        totalPrepareCount = 0
+    }
+
+    /// Сбрасывает значения прогресса применения.
+    private func resetApplyingRenameProgress() {
+        isApplyingRename = false
+        processedRenameCount = 0
+        totalRenameCount = 0
     }
 
     /// Собирает один элемент плана и сохраняет исходное расширение файла.
