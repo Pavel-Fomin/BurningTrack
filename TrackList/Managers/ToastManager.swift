@@ -200,6 +200,27 @@ final class ToastManager: ObservableObject {
                 message: "Теги обновлены"
             )
 
+        case let .batchTagsUpdated(count):
+            return ToastData(
+                style: .trackList(name: "\(count) треков"),
+                artworkImage: nil,
+                message: "Теги обновлены"
+            )
+
+        case let .batchTagsPartiallyUpdated(succeeded, failed):
+            return ToastData(
+                style: .trackList(name: "Успешно: \(succeeded), ошибок: \(failed)"),
+                artworkImage: nil,
+                message: "Теги обновлены частично"
+            )
+
+        case let .batchTagsUpdateFailed(failed):
+            return ToastData(
+                style: .trackList(name: "Ошибок: \(failed)"),
+                artworkImage: nil,
+                message: "Не удалось обновить теги"
+            )
+
         case let .fileRenamed(newName):
             return ToastData(
                 style: .trackList(name: newName),

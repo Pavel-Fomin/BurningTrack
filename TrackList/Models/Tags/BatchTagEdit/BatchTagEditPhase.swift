@@ -10,6 +10,10 @@
 import Foundation
 
 enum BatchTagEditPhase: Equatable {
-    case loadingMetadata  /// Метаданные выбранных треков ещё загружаются.
-    case editing          /// Форма готова к редактированию.
+    /// Метаданные выбранных треков ещё загружаются.
+    case loadingMetadata
+    /// Форма готова к редактированию.
+    case editing
+    /// Теги выбранных треков сохраняются.
+    case saving
 }

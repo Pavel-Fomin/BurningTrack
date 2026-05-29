@@ -280,51 +280,95 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
 
     /// Запускает flow массового редактирования тегов.
     private func startBatchTagEditFlow(pendingAction: PendingBulkTrackAction) {
-        let tracks = trackSections.flatMap { $0.tracks }
-        let selectedTracks: [BatchTagEditTrack] = pendingAction.trackIDs.compactMap { trackID in
-            guard let track = tracks.first(where: { $0.id == trackID }) else { return nil }
-            return BatchTagEditTrack(
-                trackId: track.id,
-                fileName: track.fileName,
-                values: [:],
-                hasArtwork: false
-            )
-        }
-        let fields = EditableTrackField.allCases.map {
-            BatchTagFieldEditState(
-                field: $0,
-                action: .keep,
-                value: "",
-                summary: .empty
-            )
-        }
-        let flow = BatchTagEditFlow(
+        let loadingFlow = BatchTagEditFlow(
             pendingAction: pendingAction,
-            phase: .editing,
-            tracks: selectedTracks,
-            fields: fields,
+            phase: .loadingMetadata,
+            tracks: [],
+            fields: [],
+            trackFieldOverrides: [:],
             artwork: BatchTagArtworkEditState(
                 action: .keep,
                 newArtworkData: nil,
                 summary: .none,
                 previewSummary: BatchTagArtworkPreviewSummary(
-                    selectedCount: selectedTracks.count,
+                    selectedCount: pendingAction.trackIDs.count,
                     artworkCount: 0,
-                    missingArtworkCount: selectedTracks.count
+                    missingArtworkCount: pendingAction.trackIDs.count
                 ),
-                previewItems: selectedTracks.prefix(8).map {
-                    BatchTagArtworkPreviewItem(
-                        id: UUID(),
-                        trackId: $0.trackId,
-                        title: $0.fileName,
-                        artworkData: nil
-                    )
-                },
+                previewItems: [],
                 selectedTarget: nil
             )
         )
 
-        SheetManager.shared.presentBatchTagEdit(flow: flow)
+        SheetManager.shared.presentBatchTagEdit(
+            flow: loadingFlow,
+            onSave: { [weak self] in
+                await self?.applyBatchTagEdit()
+            }
+        )
+
+        Task { [pendingAction] in
+            let loadedFlow = await BatchTagMetadataLoader().loadFlow(
+                pendingAction: pendingAction
+            )
+            guard SheetManager.shared.batchTagEditFlow.pendingAction?.trackIDs == pendingAction.trackIDs else { return }
+            SheetManager.shared.batchTagEditFlow = loadedFlow
+        }
+    }
+
+    /// Сохраняет массовые изменения тегов.
+    private func applyBatchTagEdit() async {
+        let flow = SheetManager.shared.batchTagEditFlow
+        let pendingAction = flow.pendingAction
+        let selectedTarget = flow.artwork.selectedTarget
+
+        guard let pendingAction else {
+            ToastManager.shared.handle(.batchTagsUpdateFailed(failed: flow.tracks.count))
+            return
+        }
+
+        do {
+            let plan = try BatchTagEditSavePlanner.makePlan(from: flow)
+            let result = await BatchTagEditSaveExecutor().execute(plan: plan)
+
+            if result.failedCount == 0 {
+                ToastManager.shared.handle(.batchTagsUpdated(count: result.succeededCount))
+            } else if result.succeededCount > 0 {
+                ToastManager.shared.handle(
+                    .batchTagsPartiallyUpdated(
+                        succeeded: result.succeededCount,
+                        failed: result.failedCount
+                    )
+                )
+            } else {
+                ToastManager.shared.handle(.batchTagsUpdateFailed(failed: result.failedCount))
+            }
+
+            if result.succeededCount > 0 {
+                await reloadBatchTagEditFlowAfterSave(
+                    pendingAction: pendingAction,
+                    selectedTarget: selectedTarget
+                )
+            }
+        } catch {
+            ToastManager.shared.handle(.batchTagsUpdateFailed(failed: flow.tracks.count))
+        }
+    }
+
+    /// Обновляет данные открытого sheet массового редактирования тегов после сохранения.
+    private func reloadBatchTagEditFlowAfterSave(
+        pendingAction: PendingBulkTrackAction,
+        selectedTarget: BatchTagArtworkActionTarget?
+    ) async {
+        let reloadedFlow = await BatchTagMetadataLoader().loadFlow(
+            pendingAction: pendingAction
+        )
+
+        guard SheetManager.shared.batchTagEditFlow.pendingAction?.trackIDs == pendingAction.trackIDs else { return }
+        var updatedFlow = reloadedFlow
+        updatedFlow.artwork.selectedTarget = selectedTarget ?? .summary
+        updatedFlow.phase = .editing
+        SheetManager.shared.batchTagEditFlow = updatedFlow
     }
 
     /// Применяет массовое переименование файлов для готовых строк плана.

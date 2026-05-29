@@ -618,7 +618,8 @@ actor AppCommandExecutor {
     func updateTrackTags(
         trackId: UUID,
         patch: TagWritePatch,
-        artworkAction: ArtworkWriteAction
+        artworkAction: ArtworkWriteAction,
+        showsSuccessToast: Bool = true
     ) async throws {
 
         // 1. Резолв URL трека через bookmark
@@ -683,8 +684,10 @@ actor AppCommandExecutor {
         )
 
         // 6. Показ тоста
-        await MainActor.run {
-            ToastManager.shared.handle(event)
+        if showsSuccessToast {
+            await MainActor.run {
+                ToastManager.shared.handle(event)
+            }
         }
     }
 }

@@ -95,6 +95,15 @@ enum ToastEvent: Equatable {
         artist: String,
         artwork: Image?
     )
+
+    /// Массовое обновление тегов завершено успешно.
+    case batchTagsUpdated(count: Int)
+
+    /// Массовое обновление тегов завершено частично.
+    case batchTagsPartiallyUpdated(succeeded: Int, failed: Int)
+
+    /// Массовое обновление тегов не выполнено.
+    case batchTagsUpdateFailed(failed: Int)
     
     /// Файл переименован
     case fileRenamed(newName: String)

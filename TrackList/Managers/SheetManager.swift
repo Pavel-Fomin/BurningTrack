@@ -93,6 +93,16 @@ struct AddToTrackListSheetData: Identifiable, Equatable {
 struct BatchTagEditSheetData: Identifiable, Equatable {
     /// Идентификатор sheet.
     let id: UUID
+
+    /// Сохранение массовых изменений тегов.
+    let onSave: () async -> Void
+
+    static func == (
+        lhs: BatchTagEditSheetData,
+        rhs: BatchTagEditSheetData
+    ) -> Bool {
+        lhs.id == rhs.id
+    }
 }
 
 // MARK: - Данные для BatchFilenameRenameSheet
@@ -216,6 +226,7 @@ final class SheetManager: ObservableObject {
         phase: .editing,
         tracks: [],
         fields: [],
+        trackFieldOverrides: [:],
         artwork: BatchTagArtworkEditState(
             action: .keep,
             newArtworkData: nil,
@@ -360,9 +371,19 @@ final class SheetManager: ObservableObject {
     }
 
     /// Показывает sheet массового редактирования тегов.
-    func presentBatchTagEdit(flow: BatchTagEditFlow) {
+    func presentBatchTagEdit(
+        flow: BatchTagEditFlow,
+        onSave: @escaping () async -> Void
+    ) {
         batchTagEditFlow = flow
-        present(.batchTagEdit(BatchTagEditSheetData(id: UUID())))
+        present(
+            .batchTagEdit(
+                BatchTagEditSheetData(
+                    id: UUID(),
+                    onSave: onSave
+                )
+            )
+        )
     }
 
     /// Показывает sheet массового переименования файлов.
@@ -411,6 +432,7 @@ final class SheetManager: ObservableObject {
             phase: .editing,
             tracks: [],
             fields: [],
+            trackFieldOverrides: [:],
             artwork: BatchTagArtworkEditState(
                 action: .keep,
                 newArtworkData: nil,

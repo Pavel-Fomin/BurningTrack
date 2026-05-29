@@ -82,12 +82,13 @@ struct SheetHostModifier: ViewModifier {
                     .appSheet(detents: [.large])
 
                 /// Массовое редактирование тегов
-            case .batchTagEdit:
+            case .batchTagEdit(let data):
                 BatchTagEditContainer(
                     flow: $sheetManager.batchTagEditFlow,
                     onClose: {
                         sheetManager.closeActive()
-                    }
+                    },
+                    onSave: data.onSave
                 )
                 .appSheet(detents: [.large])
 
