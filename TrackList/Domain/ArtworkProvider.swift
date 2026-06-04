@@ -47,6 +47,7 @@ final class ArtworkProvider {
         .trackList,
         .miniPlayer,
         .trackInfoSheet,
+        .batchTagPreview,
         .toast,
         .nowPlaying
     ]
@@ -56,6 +57,11 @@ final class ArtworkProvider {
             let key = ArtworkCacheKey(trackId: trackId, purpose: purpose)
             cache.removeObject(forKey: WrappedKey(key))
         }
+    }
+
+    /// Полностью очищает кэш подготовленных обложек.
+    func removeAll() {
+        cache.removeAllObjects()
     }
     
     

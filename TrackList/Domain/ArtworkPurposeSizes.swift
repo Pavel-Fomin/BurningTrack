@@ -30,11 +30,14 @@ enum ArtworkPurposeSizes {
         /// Миниплеер
         case .miniPlayer: return 96
 
-        /// Sheet «о треке»
-        case .trackInfoSheet: return 320
+	        /// Sheet «о треке»
+	        case .trackInfoSheet: return 320
 
-        /// Lock Screen / Control Center
-        case .nowPlaying: return 512
+	        /// Preview обложки в форме массового редактирования тегов
+	        case .batchTagPreview: return 300
+
+	        /// Lock Screen / Control Center
+	        case .nowPlaying: return 512
         }
     }
 }

@@ -28,6 +28,9 @@ enum ArtworkPurpose {
     // Обложка для sheet «о треке»
     case trackInfoSheet
 
+    /// Preview обложки в форме массового редактирования тегов.
+    case batchTagPreview
+
     // Обложка для toast
     case toast
 

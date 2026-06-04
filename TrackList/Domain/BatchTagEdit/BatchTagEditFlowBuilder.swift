@@ -150,7 +150,7 @@ enum BatchTagEditFlowBuilder {
                 id: snapshot.trackId,
                 trackId: snapshot.trackId,
                 title: snapshot.fileName,
-                artworkData: snapshot.artworkData
+                hasArtwork: snapshot.artworkData != nil
             )
         }
     }

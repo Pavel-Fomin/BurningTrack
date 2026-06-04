@@ -21,7 +21,7 @@ struct BatchTagArtworkEditSection: View {
     /// Горизонтальный список preview-карточек.
     private var previewScroll: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(alignment: .top, spacing: 12) {
+            LazyHStack(alignment: .top, spacing: 12) {
                 BatchTagArtworkSummaryCard(
                     summary: artwork.previewSummary,
                     isSelected: artwork.selectedTarget == .summary,

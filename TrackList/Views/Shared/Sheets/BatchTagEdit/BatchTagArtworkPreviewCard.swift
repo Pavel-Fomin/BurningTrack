@@ -8,9 +8,12 @@
 //
 
 import SwiftUI
+import UIKit
 
 /// Карточка preview одной обложки в форме массового редактирования тегов.
 struct BatchTagArtworkPreviewCard: View {
+    /// Загруженное preview-изображение обложки.
+    @State private var image: UIImage?
     /// Preview-элемент обложки.
     let item: BatchTagArtworkPreviewItem
     /// Выбрана ли карточка.
@@ -25,6 +28,12 @@ struct BatchTagArtworkPreviewCard: View {
                 onSelect()
             }
             .batchTagArtworkSelection(isSelected)
+            .task(id: item.trackId) {
+                await loadArtworkIfNeeded()
+            }
+            .onDisappear {
+                image = nil
+            }
     }
     /// Обложка или placeholder.
     @ViewBuilder
@@ -38,8 +47,7 @@ struct BatchTagArtworkPreviewCard: View {
     /// Основное содержимое обложки.
     @ViewBuilder
     private var artworkContent: some View {
-        if let artworkData = item.artworkData,
-           let image = UIImage(data: artworkData) {
+        if let image {
             Image(uiImage: image)
                 .resizable()
                 .scaledToFill()
@@ -71,5 +79,17 @@ struct BatchTagArtworkPreviewCard: View {
     /// Фиксированный размер preview обложки.
     private var previewShape: some Shape {
         RoundedRectangle(cornerRadius: 24, style: .continuous)
+    }
+
+    /// Лениво загружает preview-изображение обложки.
+    private func loadArtworkIfNeeded() async {
+        image = nil
+        guard item.hasArtwork else { return }
+        let loadedImage = await BatchTagArtworkPreviewLoader.shared.image(
+            forTrackId: item.trackId,
+            hasArtwork: item.hasArtwork
+        )
+        guard !Task.isCancelled else { return }
+        image = loadedImage
     }
 }

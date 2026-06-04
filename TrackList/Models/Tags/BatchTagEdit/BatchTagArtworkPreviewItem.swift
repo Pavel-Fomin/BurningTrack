@@ -17,6 +17,6 @@ struct BatchTagArtworkPreviewItem: Identifiable, Equatable {
     let trackId: UUID
     /// Название, которое отображается под обложкой.
     let title: String
-    /// Данные обложки. Если nil, отображается placeholder.
-    let artworkData: Data?
+    /// Есть ли у трека обложка.
+    let hasArtwork: Bool
 }
