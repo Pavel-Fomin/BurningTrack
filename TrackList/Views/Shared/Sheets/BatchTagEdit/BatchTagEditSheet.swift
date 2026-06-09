@@ -14,6 +14,8 @@ import UIKit
 struct BatchTagEditSheet: View {
     /// Состояние flow массового редактирования тегов.
     @Binding var flow: BatchTagEditFlow
+    /// Цель, для которой выбирается новая обложка.
+    @State private var replacementTarget: BatchTagArtworkActionTarget?
 
     var body: some View {
         content
@@ -85,6 +87,9 @@ struct BatchTagEditSheet: View {
             .padding(.vertical, 16)
         }
         .background(Color(.systemGroupedBackground))
+        .batchTagArtworkReplacementPicker(target: $replacementTarget) { target, data in
+            flow.artwork.setAction(.replace(data: data), for: target)
+        }
     }
 
     /// Строка редактирования одного поля.
@@ -252,7 +257,7 @@ struct BatchTagEditSheet: View {
         case .remove:
             flow.artwork.setAction(.remove, for: target)
         case .replace:
-            flow.artwork.action = .replace
+            replacementTarget = target
         case .compress:
             flow.artwork.action = .keep
         }

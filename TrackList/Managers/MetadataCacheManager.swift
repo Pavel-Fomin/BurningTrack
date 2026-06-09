@@ -39,16 +39,14 @@ final class TrackMetadataCacheManager: ObservableObject, @unchecked Sendable {
 
     /// Удаляет метаданные трека из технического кэша.
     /// Используется после изменения тегов, обложки или переименования файла.
-    func invalidate(url: URL) {
+    func invalidate(url: URL) async {
         let nsurl = url as NSURL
+
+        await _MetadataCoordinator.shared.cancel(url: url)
         cache.removeObject(forKey: nsurl)
 
-        Task {
-            await _MetadataCoordinator.shared.cancel(url: url)
-
-            await MainActor.run {
-                self.revision += 1
-            }
+        await MainActor.run {
+            self.revision += 1
         }
     }
 
@@ -77,6 +75,7 @@ final class TrackMetadataCacheManager: ObservableObject, @unchecked Sendable {
         
         return await _MetadataCoordinator.shared.run(url: url) {
             guard let metadata = try? await RuntimeMetadataParser.parseMetadata(from: url) else { return nil }
+            guard !Task.isCancelled else { return nil }
             return self.convertAndCache(metadata, for: nsurl, includeArtwork: includeArtwork)
         }
     }
@@ -186,9 +185,10 @@ final class TrackMetadataCacheManager: ObservableObject, @unchecked Sendable {
             return await task.value
         }
         
-        func cancel(url: URL) {
-            inFlight[url]?.cancel()
-            inFlight[url] = nil
+        func cancel(url: URL) async {
+            guard let task = inFlight.removeValue(forKey: url) else { return }
+            task.cancel()
+            _ = await task.value
         }
     }
 }

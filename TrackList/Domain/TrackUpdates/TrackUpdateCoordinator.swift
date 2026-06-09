@@ -138,11 +138,11 @@ final class TrackUpdateCoordinator {
     ) async {
 
         // Сбрасываем raw metadata cache по актуальному URL.
-        TrackMetadataCacheManager.shared.invalidate(url: url)
+        await TrackMetadataCacheManager.shared.invalidate(url: url)
 
         // Если путь файла изменился, сбрасываем raw metadata cache и по старому URL.
         if let previousURL, previousURL != url {
-            TrackMetadataCacheManager.shared.invalidate(url: previousURL)
+            await TrackMetadataCacheManager.shared.invalidate(url: previousURL)
         }
 
         // Сбрасываем производный image-cache artwork.

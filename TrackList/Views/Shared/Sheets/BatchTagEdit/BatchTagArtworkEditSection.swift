@@ -32,8 +32,10 @@ struct BatchTagArtworkEditSection: View {
                 )
                 ForEach(artwork.previewItems) { item in
                     let hasArtworkForPreview = hasArtworkForPreview(for: item)
+                    let artworkAction = artwork.action(for: item.trackId)
                     BatchTagArtworkPreviewCard(
                         item: item,
+                        artworkAction: artworkAction,
                         hasArtworkForPreview: hasArtworkForPreview,
                         isSelected: artwork.selectedTarget == .track(item.trackId),
                         onSelect: {

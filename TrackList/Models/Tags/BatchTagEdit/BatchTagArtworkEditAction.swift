@@ -10,7 +10,7 @@
 import Foundation
 
 enum BatchTagArtworkEditAction: Equatable {
-    case keep    /// Не менять обложки.
-    case remove  /// Удалить обложки.
-    case replace /// Заменить обложки новой картинкой.
+    case keep                /// Не менять обложки.
+    case remove              /// Удалить обложки.
+    case replace(data: Data) /// Заменить обложки новой картинкой.
 }

@@ -31,8 +31,7 @@ enum BatchTagEditSavePlanner {
             )
             let artworkEditAction = flow.artwork.action(for: track.trackId)
             let artworkAction = try makeArtworkAction(
-                from: artworkEditAction,
-                newArtworkData: flow.artwork.newArtworkData
+                from: artworkEditAction
             )
             guard hasChanges(
                 patch: patch,
@@ -169,19 +168,15 @@ enum BatchTagEditSavePlanner {
 
     /// Собирает действие с обложкой.
     private static func makeArtworkAction(
-        from action: BatchTagArtworkEditAction,
-        newArtworkData: Data?
+        from action: BatchTagArtworkEditAction
     ) throws -> ArtworkWriteAction {
         switch action {
         case .keep:
             return .none
         case .remove:
             return .remove
-        case .replace:
-            guard let newArtworkData else {
-                throw BatchTagEditSaveValidationError.missingReplacementArtwork
-            }
-            return .replace(data: newArtworkData)
+        case .replace(let data):
+            return .replace(data: data)
         }
     }
 }

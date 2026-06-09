@@ -9,8 +9,16 @@
 
 import Foundation
 
+/// Устаревшее UI-состояние действия с обложкой.
+/// Сохраняется до перевода replace UI на действия с данными изображения.
+enum BatchTagArtworkLegacyEditAction: Equatable {
+    case keep
+    case remove
+    case replace
+}
+
 struct BatchTagArtworkEditState: Equatable {
-    var action: BatchTagArtworkEditAction  /// Действие, выбранное пользователем для обложек.
+    var action: BatchTagArtworkLegacyEditAction /// Устаревшее действие, используемое текущим UI.
     /// Общее действие с обложками для всей выбранной группы треков.
     var groupAction: BatchTagArtworkEditAction = .keep
     /// Индивидуальные действия с обложками по идентификаторам треков.

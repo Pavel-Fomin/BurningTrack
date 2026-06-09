@@ -16,6 +16,8 @@ struct BatchTagArtworkPreviewCard: View {
     @State private var image: UIImage?
     /// Preview-элемент обложки.
     let item: BatchTagArtworkPreviewItem
+    /// Несохранённое действие с обложкой для этой карточки.
+    let artworkAction: BatchTagArtworkEditAction
     /// Должна ли карточка показывать обложку с учётом несохранённых изменений.
     let hasArtworkForPreview: Bool
     /// Выбрана ли карточка.
@@ -30,7 +32,7 @@ struct BatchTagArtworkPreviewCard: View {
                 onSelect()
             }
             .batchTagArtworkSelection(isSelected)
-            .task(id: "\(item.trackId.uuidString)-\(hasArtworkForPreview)") {
+            .task(id: previewTaskId) {
                 await loadArtworkIfNeeded()
             }
             .onDisappear {
@@ -49,16 +51,42 @@ struct BatchTagArtworkPreviewCard: View {
     /// Основное содержимое обложки.
     @ViewBuilder
     private var artworkContent: some View {
-        if hasArtworkForPreview, let image {
-            Image(uiImage: image)
-                .resizable()
-                .scaledToFill()
-                .frame(width: 150, height: 150)
-                .clipShape(previewShape)
-        } else {
-            placeholder
+        switch artworkAction {
+        case .replace(let data):
+            if let replacementImage = UIImage(data: data) {
+                Image(uiImage: replacementImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 150, height: 150)
+                    .clipShape(previewShape)
+            } else {
+                placeholder
+            }
+        case .keep, .remove:
+            if hasArtworkForPreview, let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 150, height: 150)
+                    .clipShape(previewShape)
+            } else {
+                placeholder
+            }
         }
     }
+
+    /// Идентификатор перезагрузки preview при изменении локального состояния обложки.
+    private var previewTaskId: String {
+        switch artworkAction {
+        case .keep:
+            return "\(item.trackId.uuidString)-keep-\(hasArtworkForPreview)"
+        case .remove:
+            return "\(item.trackId.uuidString)-remove-\(hasArtworkForPreview)"
+        case .replace(let data):
+            return "\(item.trackId.uuidString)-replace-\(data.count)"
+        }
+    }
+
     /// Placeholder при отсутствии обложки.
     private var placeholder: some View {
         ZStack {
@@ -86,6 +114,9 @@ struct BatchTagArtworkPreviewCard: View {
     /// Лениво загружает preview-изображение обложки.
     private func loadArtworkIfNeeded() async {
         image = nil
+        if case .replace = artworkAction {
+            return
+        }
         guard hasArtworkForPreview else { return }
         let loadedImage = await BatchTagArtworkPreviewLoader.shared.image(
             forTrackId: item.trackId,
