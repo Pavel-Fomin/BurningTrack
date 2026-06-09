@@ -31,8 +31,10 @@ struct BatchTagArtworkEditSection: View {
                     onMenuAction: onMenuAction
                 )
                 ForEach(artwork.previewItems) { item in
+                    let hasArtworkForPreview = hasArtworkForPreview(for: item)
                     BatchTagArtworkPreviewCard(
                         item: item,
+                        hasArtworkForPreview: hasArtworkForPreview,
                         isSelected: artwork.selectedTarget == .track(item.trackId),
                         onSelect: {
                             artwork.selectedTarget = .track(item.trackId)
@@ -42,6 +44,18 @@ struct BatchTagArtworkEditSection: View {
                 }
             }
             .padding(.horizontal, 16)
+        }
+    }
+
+    /// Определяет, должна ли карточка визуально показывать обложку с учётом несохранённых изменений.
+    private func hasArtworkForPreview(for item: BatchTagArtworkPreviewItem) -> Bool {
+        switch artwork.action(for: item.trackId) {
+        case .keep:
+            return item.hasArtwork
+        case .remove:
+            return false
+        case .replace:
+            return item.hasArtwork
         }
     }
 }

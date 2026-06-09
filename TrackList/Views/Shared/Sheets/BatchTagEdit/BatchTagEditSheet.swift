@@ -250,7 +250,7 @@ struct BatchTagEditSheet: View {
         flow.artwork.selectedTarget = target
         switch action {
         case .remove:
-            flow.artwork.action = .remove
+            flow.artwork.setAction(.remove, for: target)
         case .replace:
             flow.artwork.action = .replace
         case .compress:

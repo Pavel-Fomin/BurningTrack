@@ -34,6 +34,7 @@ struct BatchTagEditFlow {
                 field.action != .keep
             }
         }
-        return hasFieldChanges || hasTrackFieldOverrides
+        let hasArtworkChanges = artwork.hasChanges
+        return hasFieldChanges || hasTrackFieldOverrides || hasArtworkChanges
     }
 }

@@ -59,7 +59,7 @@ final class TrackUpdateCoordinator {
         ) else { return nil }
 
         // Публикуем событие для подписчиков.
-        publishTrackUpdateEvent(updateEvent)
+        await publishTrackUpdateEvent(updateEvent)
 
         return updateEvent
     }
@@ -84,7 +84,7 @@ final class TrackUpdateCoordinator {
             }
         }
 
-        publishTrackBatchUpdateEvent(events)
+        await publishTrackBatchUpdateEvent(events)
 
         return events
     }
@@ -157,6 +157,7 @@ final class TrackUpdateCoordinator {
     /// Публикует единое событие обновления трека.
     ///
     /// - Parameter updateEvent: Готовое событие обновления
+    @MainActor
     private func publishTrackUpdateEvent(_ updateEvent: TrackUpdateEvent) {
         NotificationCenter.default.post(name: .trackDidUpdate, object: updateEvent)
     }
@@ -164,6 +165,7 @@ final class TrackUpdateCoordinator {
     /// Публикует пакетное событие обновления треков.
     ///
     /// - Parameter updateEvents: Готовые события обновления треков
+    @MainActor
     private func publishTrackBatchUpdateEvent(_ updateEvents: [TrackUpdateEvent]) {
         guard !updateEvents.isEmpty else { return }
 

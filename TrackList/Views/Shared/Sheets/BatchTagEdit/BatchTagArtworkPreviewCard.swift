@@ -16,6 +16,8 @@ struct BatchTagArtworkPreviewCard: View {
     @State private var image: UIImage?
     /// Preview-элемент обложки.
     let item: BatchTagArtworkPreviewItem
+    /// Должна ли карточка показывать обложку с учётом несохранённых изменений.
+    let hasArtworkForPreview: Bool
     /// Выбрана ли карточка.
     let isSelected: Bool
     /// Обработчик выбора карточки.
@@ -28,7 +30,7 @@ struct BatchTagArtworkPreviewCard: View {
                 onSelect()
             }
             .batchTagArtworkSelection(isSelected)
-            .task(id: item.trackId) {
+            .task(id: "\(item.trackId.uuidString)-\(hasArtworkForPreview)") {
                 await loadArtworkIfNeeded()
             }
             .onDisappear {
@@ -47,7 +49,7 @@ struct BatchTagArtworkPreviewCard: View {
     /// Основное содержимое обложки.
     @ViewBuilder
     private var artworkContent: some View {
-        if let image {
+        if hasArtworkForPreview, let image {
             Image(uiImage: image)
                 .resizable()
                 .scaledToFill()
@@ -84,10 +86,10 @@ struct BatchTagArtworkPreviewCard: View {
     /// Лениво загружает preview-изображение обложки.
     private func loadArtworkIfNeeded() async {
         image = nil
-        guard item.hasArtwork else { return }
+        guard hasArtworkForPreview else { return }
         let loadedImage = await BatchTagArtworkPreviewLoader.shared.image(
             forTrackId: item.trackId,
-            hasArtwork: item.hasArtwork
+            hasArtwork: hasArtworkForPreview
         )
         guard !Task.isCancelled else { return }
         image = loadedImage

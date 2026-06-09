@@ -22,13 +22,17 @@ enum BatchTagEditSavePlanner {
         from flow: BatchTagEditFlow
     ) throws -> BatchTagEditSavePlan {
         let groupPatch = try makePatch(from: flow.fields)
-        let artworkAction: ArtworkWriteAction = .none
         let commands: [BatchTagEditWriteCommand] = try flow.tracks.compactMap { track in
             let overrideFields = flow.trackFieldOverrides[track.trackId]?.fields.values.map { $0 } ?? []
             let overridePatch = try makePatch(from: overrideFields)
             let patch = mergedPatch(
                 groupPatch: groupPatch,
                 overridePatch: overridePatch
+            )
+            let artworkEditAction = flow.artwork.action(for: track.trackId)
+            let artworkAction = try makeArtworkAction(
+                from: artworkEditAction,
+                newArtworkData: flow.artwork.newArtworkData
             )
             guard hasChanges(
                 patch: patch,
@@ -165,15 +169,16 @@ enum BatchTagEditSavePlanner {
 
     /// Собирает действие с обложкой.
     private static func makeArtworkAction(
-        from artwork: BatchTagArtworkEditState
+        from action: BatchTagArtworkEditAction,
+        newArtworkData: Data?
     ) throws -> ArtworkWriteAction {
-        switch artwork.action {
+        switch action {
         case .keep:
             return .none
         case .remove:
             return .remove
         case .replace:
-            guard let newArtworkData = artwork.newArtworkData else {
+            guard let newArtworkData else {
                 throw BatchTagEditSaveValidationError.missingReplacementArtwork
             }
             return .replace(data: newArtworkData)
