@@ -112,8 +112,6 @@ enum BatchTagEditFlowBuilder {
     /// Собирает состояние секции обложек.
     private static func makeArtworkState(snapshots: [TrackRuntimeSnapshot]) -> BatchTagArtworkEditState {
         BatchTagArtworkEditState(
-            action: .keep,
-            newArtworkData: nil,
             summary: makeArtworkSummary(snapshots: snapshots),
             previewSummary: makeArtworkPreviewSummary(snapshots: snapshots),
             previewItems: makeArtworkPreviewItems(snapshots: snapshots),
@@ -137,10 +135,14 @@ enum BatchTagEditFlowBuilder {
     /// Считает summary для первой карточки preview.
     private static func makeArtworkPreviewSummary(snapshots: [TrackRuntimeSnapshot]) -> BatchTagArtworkPreviewSummary {
         let artworkCount = snapshots.filter { $0.artworkData != nil }.count
+        let totalArtworkSizeBytes = snapshots.reduce(0) { result, snapshot in
+            result + (snapshot.artworkData?.count ?? 0)
+        }
         return BatchTagArtworkPreviewSummary(
             selectedCount: snapshots.count,
             artworkCount: artworkCount,
-            missingArtworkCount: snapshots.count - artworkCount
+            missingArtworkCount: snapshots.count - artworkCount,
+            totalArtworkSizeBytes: totalArtworkSizeBytes
         )
     }
     /// Собирает preview items для всех выбранных треков.
@@ -150,7 +152,8 @@ enum BatchTagEditFlowBuilder {
                 id: snapshot.trackId,
                 trackId: snapshot.trackId,
                 title: snapshot.fileName,
-                hasArtwork: snapshot.artworkData != nil
+                hasArtwork: snapshot.artworkData != nil,
+                artworkSizeBytes: snapshot.artworkData?.count
             )
         }
     }

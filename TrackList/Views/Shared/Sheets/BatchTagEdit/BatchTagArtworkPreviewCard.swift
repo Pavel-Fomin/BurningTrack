@@ -20,6 +20,8 @@ struct BatchTagArtworkPreviewCard: View {
     let artworkAction: BatchTagArtworkEditAction
     /// Должна ли карточка показывать обложку с учётом несохранённых изменений.
     let hasArtworkForPreview: Bool
+    /// Размер preview-обложки в байтах с учётом несохранённых изменений.
+    let artworkSizeBytesForPreview: Int
     /// Выбрана ли карточка.
     let isSelected: Bool
     /// Обработчик выбора карточки.
@@ -44,6 +46,12 @@ struct BatchTagArtworkPreviewCard: View {
     private var artworkView: some View {
         ZStack(alignment: .topTrailing) {
             artworkContent
+            VStack {
+                Spacer()
+                sizeBadge
+                    .padding(.bottom, 8)
+            }
+            .frame(width: 150, height: 150)
             menuButton
                 .padding(8)
         }
@@ -85,6 +93,23 @@ struct BatchTagArtworkPreviewCard: View {
         case .replace(let data):
             return "\(item.trackId.uuidString)-replace-\(data.count)"
         }
+    }
+
+    /// Форматированный размер preview-обложки.
+    private var formattedArtworkSize: String {
+        BatchTagArtworkSizeFormatter.string(from: artworkSizeBytesForPreview)
+    }
+
+    /// Подпись с размером обложки внутри карточки.
+    private var sizeBadge: some View {
+        Text(formattedArtworkSize)
+            .font(.caption2)
+            .foregroundStyle(.white)
+            .lineLimit(1)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(.black.opacity(0.55))
+            .clipShape(Capsule())
     }
 
     /// Placeholder при отсутствии обложки.

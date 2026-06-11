@@ -13,6 +13,8 @@ import SwiftUI
 struct BatchTagArtworkSummaryCard: View {
     /// Сводная информация по обложкам.
     let summary: BatchTagArtworkPreviewSummary
+    /// Общий размер preview-обложек в байтах с учётом несохранённых изменений.
+    let totalArtworkSizeBytesForPreview: Int
     /// Выбрана ли карточка.
     let isSelected: Bool
     /// Обработчик выбора карточки.
@@ -26,6 +28,12 @@ struct BatchTagArtworkSummaryCard: View {
                 .font(.title2)
                 .foregroundStyle(.secondary)
                 .frame(width: 150, height: 150)
+            VStack {
+                Spacer()
+                sizeBadge
+                    .padding(.bottom, 8)
+            }
+            .frame(width: 150, height: 150)
             menuButton
                 .padding(8)
         }
@@ -35,6 +43,24 @@ struct BatchTagArtworkSummaryCard: View {
         }
         .batchTagArtworkSelection(isSelected)
     }
+
+    /// Форматированный общий размер preview-обложек.
+    private var formattedTotalArtworkSize: String {
+        BatchTagArtworkSizeFormatter.string(from: totalArtworkSizeBytesForPreview)
+    }
+
+    /// Badge с общим размером обложек.
+    private var sizeBadge: some View {
+        Text(formattedTotalArtworkSize)
+            .font(.caption2)
+            .foregroundStyle(.white)
+            .lineLimit(1)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(.black.opacity(0.55))
+            .clipShape(Capsule())
+    }
+
     /// Кнопка меню действий.
     private var menuButton: some View {
         BatchTagArtworkCardMenu {

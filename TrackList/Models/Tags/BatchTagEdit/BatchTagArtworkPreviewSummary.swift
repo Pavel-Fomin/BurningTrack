@@ -17,4 +17,18 @@ struct BatchTagArtworkPreviewSummary: Equatable {
     let artworkCount: Int
     /// Количество треков без обложек.
     let missingArtworkCount: Int
+    /// Общий размер исходных обложек в байтах.
+    let totalArtworkSizeBytes: Int
+
+    init(
+        selectedCount: Int,
+        artworkCount: Int,
+        missingArtworkCount: Int,
+        totalArtworkSizeBytes: Int = 0
+    ) {
+        self.selectedCount = selectedCount
+        self.artworkCount = artworkCount
+        self.missingArtworkCount = missingArtworkCount
+        self.totalArtworkSizeBytes = totalArtworkSizeBytes
+    }
 }

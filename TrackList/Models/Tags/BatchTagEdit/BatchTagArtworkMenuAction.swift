@@ -16,5 +16,5 @@ enum BatchTagArtworkMenuAction: Equatable {
     /// Заменить обложку.
     case replace
     /// Сжать обложку.
-    case compress
+    case compress(BatchArtworkCompressionOption)
 }

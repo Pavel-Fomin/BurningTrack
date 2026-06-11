@@ -9,21 +9,11 @@
 
 import Foundation
 
-/// Устаревшее UI-состояние действия с обложкой.
-/// Сохраняется до перевода replace UI на действия с данными изображения.
-enum BatchTagArtworkLegacyEditAction: Equatable {
-    case keep
-    case remove
-    case replace
-}
-
 struct BatchTagArtworkEditState: Equatable {
-    var action: BatchTagArtworkLegacyEditAction /// Устаревшее действие, используемое текущим UI.
     /// Общее действие с обложками для всей выбранной группы треков.
     var groupAction: BatchTagArtworkEditAction = .keep
     /// Индивидуальные действия с обложками по идентификаторам треков.
     var trackActions: [UUID: BatchTagArtworkEditAction] = [:]
-    var newArtworkData: Data?              /// Данные новой выбранной обложки.
     let summary: BatchTagArtworkSummary    /// Сводная информация о текущих обложках выбранных треков.
     /// Сводная информация для первой карточки preview.
     var previewSummary: BatchTagArtworkPreviewSummary
@@ -31,6 +21,15 @@ struct BatchTagArtworkEditState: Equatable {
     var previewItems: [BatchTagArtworkPreviewItem]
     /// Текущая выбранная цель действий с обложками.
     var selectedTarget: BatchTagArtworkActionTarget?
+    /// Количество обложек, которые не удалось сжать.
+    var compressionFailureCount: Int = 0
+    /// Идентификатор текущей операции сжатия.
+    var activeCompressionId: UUID?
+
+    /// Выполняется ли сжатие обложек.
+    var isCompressing: Bool {
+        activeCompressionId != nil
+    }
 
     /// Сохраняет действие с обложкой отдельно от текущего UI-выбора карточки.
     mutating func setAction(
@@ -40,6 +39,7 @@ struct BatchTagArtworkEditState: Equatable {
         switch target {
         case .summary:
             groupAction = action
+            trackActions.removeAll()
         case .track(let id):
             trackActions[id] = action
         }

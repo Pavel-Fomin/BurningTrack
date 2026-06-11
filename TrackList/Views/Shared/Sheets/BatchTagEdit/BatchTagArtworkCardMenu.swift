@@ -22,8 +22,12 @@ struct BatchTagArtworkCardMenu: View {
             Button("Заменить") {
                 onAction(.replace)
             }
-            Button("Сжать") {
-                onAction(.compress)
+            Menu("Сжать") {
+                ForEach(BatchArtworkCompressionOption.allCases, id: \.self) { option in
+                    Button(option.title) {
+                        onAction(.compress(option))
+                    }
+                }
             }
         } label: {
             Image(systemName: "ellipsis")

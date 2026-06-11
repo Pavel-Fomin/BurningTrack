@@ -228,8 +228,6 @@ final class SheetManager: ObservableObject {
         fields: [],
         trackFieldOverrides: [:],
         artwork: BatchTagArtworkEditState(
-            action: .keep,
-            newArtworkData: nil,
             summary: .none,
             previewSummary: BatchTagArtworkPreviewSummary(
                 selectedCount: 0,
@@ -434,8 +432,6 @@ final class SheetManager: ObservableObject {
             fields: [],
             trackFieldOverrides: [:],
             artwork: BatchTagArtworkEditState(
-                action: .keep,
-                newArtworkData: nil,
                 summary: .none,
                 previewSummary: BatchTagArtworkPreviewSummary(
                     selectedCount: 0,

@@ -287,8 +287,6 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
             fields: [],
             trackFieldOverrides: [:],
             artwork: BatchTagArtworkEditState(
-                action: .keep,
-                newArtworkData: nil,
                 summary: .none,
                 previewSummary: BatchTagArtworkPreviewSummary(
                     selectedCount: pendingAction.trackIDs.count,

@@ -16,14 +16,29 @@ struct BatchTagArtworkEditSection: View {
     /// Обработчик действия из меню карточки.
     let onMenuAction: (BatchTagArtworkMenuAction, BatchTagArtworkActionTarget) -> Void
     var body: some View {
-        previewScroll
+        VStack(alignment: .leading, spacing: 8) {
+            previewScroll
+            if artwork.compressionFailureCount > 0 {
+                Text(compressionFailureText)
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+                    .padding(.horizontal, 16)
+            }
+        }
     }
+
+    /// Текст ошибки сжатия обложек.
+    private var compressionFailureText: String {
+        "Не удалось сжать \(artwork.compressionFailureCount) обложек"
+    }
+
     /// Горизонтальный список preview-карточек.
     private var previewScroll: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             LazyHStack(alignment: .top, spacing: 12) {
                 BatchTagArtworkSummaryCard(
                     summary: artwork.previewSummary,
+                    totalArtworkSizeBytesForPreview: totalArtworkSizeBytesForPreview,
                     isSelected: artwork.selectedTarget == .summary,
                     onSelect: {
                         artwork.selectedTarget = .summary
@@ -33,10 +48,12 @@ struct BatchTagArtworkEditSection: View {
                 ForEach(artwork.previewItems) { item in
                     let hasArtworkForPreview = hasArtworkForPreview(for: item)
                     let artworkAction = artwork.action(for: item.trackId)
+                    let artworkSizeBytesForPreview = artworkSizeBytesForPreview(for: item)
                     BatchTagArtworkPreviewCard(
                         item: item,
                         artworkAction: artworkAction,
                         hasArtworkForPreview: hasArtworkForPreview,
+                        artworkSizeBytesForPreview: artworkSizeBytesForPreview,
                         isSelected: artwork.selectedTarget == .track(item.trackId),
                         onSelect: {
                             artwork.selectedTarget = .track(item.trackId)
@@ -58,6 +75,25 @@ struct BatchTagArtworkEditSection: View {
             return false
         case .replace:
             return item.hasArtwork
+        }
+    }
+
+    /// Возвращает размер обложки с учётом несохранённых изменений.
+    private func artworkSizeBytesForPreview(for item: BatchTagArtworkPreviewItem) -> Int {
+        switch artwork.action(for: item.trackId) {
+        case .keep:
+            return item.artworkSizeBytes ?? 0
+        case .remove:
+            return 0
+        case .replace(let data):
+            return data.count
+        }
+    }
+
+    /// Возвращает общий размер обложек с учётом несохранённых изменений.
+    private var totalArtworkSizeBytesForPreview: Int {
+        artwork.previewItems.reduce(0) { result, item in
+            result + artworkSizeBytesForPreview(for: item)
         }
     }
 }

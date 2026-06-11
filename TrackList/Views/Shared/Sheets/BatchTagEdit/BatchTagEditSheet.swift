@@ -255,11 +255,139 @@ struct BatchTagEditSheet: View {
         flow.artwork.selectedTarget = target
         switch action {
         case .remove:
+            flow.artwork.activeCompressionId = nil
+            flow.artwork.compressionFailureCount = 0
             flow.artwork.setAction(.remove, for: target)
         case .replace:
+            flow.artwork.activeCompressionId = nil
+            flow.artwork.compressionFailureCount = 0
             replacementTarget = target
-        case .compress:
-            flow.artwork.action = .keep
+        case .compress(let option):
+            compressArtwork(option: option, target: target)
         }
     }
+
+    /// Сжимает обложку для выбранной цели и сохраняет результат как несохранённую замену.
+    private func compressArtwork(
+        option: BatchArtworkCompressionOption,
+        target: BatchTagArtworkActionTarget
+    ) {
+        let operationId = UUID()
+        flow.artwork.activeCompressionId = operationId
+        flow.artwork.compressionFailureCount = 0
+        let preparation = artworkCompressionPreparation(for: target)
+        guard !preparation.sources.isEmpty else {
+            if flow.artwork.activeCompressionId == operationId {
+                flow.artwork.compressionFailureCount = preparation.failureCount
+                flow.artwork.activeCompressionId = nil
+            }
+            return
+        }
+
+        Task {
+            var results: [BatchTagArtworkCompressionResult] = []
+            var failureCount = preparation.failureCount
+            for source in preparation.sources {
+                guard !Task.isCancelled else { return }
+                do {
+                    let compressedData = try await BatchTagArtworkCompressor.compress(
+                        data: source.data,
+                        option: option
+                    )
+                    results.append(
+                        BatchTagArtworkCompressionResult(
+                            trackId: source.trackId,
+                            data: compressedData
+                        )
+                    )
+                } catch {
+                    // Ошибка одного трека не останавливает сжатие остальных.
+                    failureCount += 1
+                    continue
+                }
+            }
+
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                guard flow.artwork.activeCompressionId == operationId else { return }
+                for result in results {
+                    flow.artwork.setAction(
+                        .replace(data: result.data),
+                        for: .track(result.trackId)
+                    )
+                }
+                flow.artwork.compressionFailureCount = failureCount
+                flow.artwork.activeCompressionId = nil
+            }
+        }
+    }
+
+    /// Собирает исходные данные и количество отсутствующих обложек на главном потоке.
+    private func artworkCompressionPreparation(
+        for target: BatchTagArtworkActionTarget
+    ) -> BatchTagArtworkCompressionPreparation {
+        let trackIds: [UUID]
+        switch target {
+        case .summary:
+            trackIds = flow.artwork.previewItems.map(\.trackId)
+        case .track(let trackId):
+            trackIds = [trackId]
+        }
+
+        var sources: [BatchTagArtworkCompressionSource] = []
+        var failureCount = 0
+        for trackId in trackIds {
+            if let data = sourceArtworkDataForCompression(for: trackId) {
+                sources.append(
+                    BatchTagArtworkCompressionSource(
+                        trackId: trackId,
+                        data: data
+                    )
+                )
+            } else {
+                failureCount += 1
+            }
+        }
+        return BatchTagArtworkCompressionPreparation(
+            sources: sources,
+            failureCount: failureCount
+        )
+    }
+
+    /// Возвращает лучшие доступные данные обложки для сжатия.
+    private func sourceArtworkDataForCompression(for trackId: UUID) -> Data? {
+        let action = flow.artwork.action(for: trackId)
+        switch action {
+        case .remove:
+            return nil
+        case .keep:
+            return TrackRuntimeStore.shared.snapshot(forTrackId: trackId)?.artworkData
+        case .replace(let data):
+            return TrackRuntimeStore.shared.snapshot(forTrackId: trackId)?.artworkData ?? data
+        }
+    }
+}
+
+/// Подготовленные данные для фонового сжатия обложек.
+private struct BatchTagArtworkCompressionPreparation: Sendable {
+    /// Исходные данные обложек, доступные для сжатия.
+    let sources: [BatchTagArtworkCompressionSource]
+    /// Количество треков без доступных исходных данных.
+    let failureCount: Int
+}
+
+/// Исходные данные обложки для фонового сжатия.
+private struct BatchTagArtworkCompressionSource: Sendable {
+    /// Идентификатор трека.
+    let trackId: UUID
+    /// Данные обложки до сжатия.
+    let data: Data
+}
+
+/// Результат фонового сжатия обложки.
+private struct BatchTagArtworkCompressionResult: Sendable {
+    /// Идентификатор трека.
+    let trackId: UUID
+    /// Сжатые JPEG-данные обложки.
+    let data: Data
 }
