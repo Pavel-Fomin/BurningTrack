@@ -8,9 +8,6 @@
 //
 
 import Foundation
-import CoreGraphics
-import ImageIO
-import UniformTypeIdentifiers
 
 /// Сжимает данные обложки для массового редактирования тегов.
 enum BatchTagArtworkCompressor {
@@ -24,60 +21,23 @@ enum BatchTagArtworkCompressor {
         data: Data,
         option: BatchArtworkCompressionOption
     ) async throws -> Data {
-        let maxPixelSize = option.maxPixelSize
-        return try await Task.detached(priority: .userInitiated) {
-            try compressInBackground(
-                data: data,
-                maxPixelSize: maxPixelSize
-            )
-        }.value
-    }
-
-    /// Сжимает изображение через ImageIO вне главного потока.
-    private static func compressInBackground(
-        data: Data,
-        maxPixelSize: Int
-    ) throws -> Data {
-        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
-            throw BatchTagArtworkCompressionError.invalidImageData
-        }
-
-        let thumbnailOptions: [CFString: Any] = [
-            kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceCreateThumbnailWithTransform: true,
-            kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
-            kCGImageSourceShouldCacheImmediately: true
-        ]
-        guard let image = CGImageSourceCreateThumbnailAtIndex(
-            source,
-            0,
-            thumbnailOptions as CFDictionary
-        ) else {
-            throw BatchTagArtworkCompressionError.invalidImageData
-        }
-
-        let outputData = NSMutableData()
-        guard let destination = CGImageDestinationCreateWithData(
-            outputData,
-            UTType.jpeg.identifier as CFString,
-            1,
-            nil
-        ) else {
-            throw BatchTagArtworkCompressionError.failedToEncodeJPEG
-        }
-
-        let destinationOptions: [CFString: Any] = [
-            kCGImageDestinationLossyCompressionQuality: 0.85
-        ]
-        CGImageDestinationAddImage(
-            destination,
-            image,
-            destinationOptions as CFDictionary
+        let request = ArtworkPreparationRequest(
+            imageData: data,
+            maxPixelSize: option.maxPixelSize,
+            compressionQuality: 0.85
         )
-        guard CGImageDestinationFinalize(destination) else {
-            throw BatchTagArtworkCompressionError.failedToEncodeJPEG
+        do {
+            return try await ArtworkPreparationService.prepare(request)
+        } catch let error as ArtworkPreparationError {
+            switch error {
+            case .invalidImageData:
+                throw BatchTagArtworkCompressionError.invalidImageData
+            case .failedToEncodeJPEG:
+                throw BatchTagArtworkCompressionError.failedToEncodeJPEG
+            }
+        } catch {
+            throw error
         }
-        return outputData as Data
     }
 }
 

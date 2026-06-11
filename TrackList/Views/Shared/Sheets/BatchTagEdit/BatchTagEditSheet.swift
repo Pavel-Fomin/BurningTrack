@@ -88,7 +88,12 @@ struct BatchTagEditSheet: View {
         }
         .background(Color(.systemGroupedBackground))
         .batchTagArtworkReplacementPicker(target: $replacementTarget) { target, data in
-            flow.artwork.setAction(.replace(data: data), for: target)
+            Task {
+                await prepareReplacementArtwork(
+                    data: data,
+                    target: target
+                )
+            }
         }
     }
 
@@ -264,6 +269,40 @@ struct BatchTagEditSheet: View {
             replacementTarget = target
         case .compress(let option):
             compressArtwork(option: option, target: target)
+        }
+    }
+
+    /// Нормализует выбранную обложку перед сохранением в состоянии формы.
+    private func prepareReplacementArtwork(
+        data: Data,
+        target: BatchTagArtworkActionTarget
+    ) async {
+        flow.artwork.preparationProgress = BatchTagArtworkPreparationProgress(
+            current: 0,
+            total: 1
+        )
+        defer {
+            flow.artwork.preparationProgress = nil
+        }
+
+        let request = ArtworkPreparationRequest(
+            imageData: data,
+            maxPixelSize: 1024,
+            compressionQuality: 0.85
+        )
+        do {
+            let normalizedData = try await ArtworkPreparationService.prepare(request)
+            guard !Task.isCancelled else { return }
+            flow.artwork.preparationProgress = BatchTagArtworkPreparationProgress(
+                current: 1,
+                total: 1
+            )
+            flow.artwork.setAction(
+                .replace(data: normalizedData),
+                for: target
+            )
+        } catch {
+            return
         }
     }
 

@@ -21,10 +21,17 @@ struct BatchTagArtworkEditState: Equatable {
     var previewItems: [BatchTagArtworkPreviewItem]
     /// Текущая выбранная цель действий с обложками.
     var selectedTarget: BatchTagArtworkActionTarget?
+    /// Прогресс подготовки обложек перед сохранением.
+    var preparationProgress: BatchTagArtworkPreparationProgress?
     /// Количество обложек, которые не удалось сжать.
     var compressionFailureCount: Int = 0
     /// Идентификатор текущей операции сжатия.
     var activeCompressionId: UUID?
+
+    /// Выполняется ли подготовка обложек перед сохранением.
+    var isPreparing: Bool {
+        preparationProgress != nil
+    }
 
     /// Выполняется ли сжатие обложек.
     var isCompressing: Bool {

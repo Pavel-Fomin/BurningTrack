@@ -27,6 +27,7 @@ struct BatchTagEditFlow {
         guard phase == .editing else { return false }
         guard !tracks.isEmpty else { return false }
         guard !artwork.isCompressing else { return false }
+        guard !artwork.isPreparing else { return false }
         let hasFieldChanges = fields.contains { field in
             field.action != .keep
         }
