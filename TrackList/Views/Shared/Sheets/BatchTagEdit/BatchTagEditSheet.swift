@@ -402,7 +402,7 @@ struct BatchTagEditSheet: View {
         case .keep:
             return TrackRuntimeStore.shared.snapshot(forTrackId: trackId)?.artworkData
         case .replace(let data):
-            return TrackRuntimeStore.shared.snapshot(forTrackId: trackId)?.artworkData ?? data
+            return data
         }
     }
 }
