@@ -18,7 +18,18 @@ struct TrackListScreen: View {
     init(trackList: TrackList, playerViewModel: PlayerViewModel) {
         self.trackList = trackList
         self.playerViewModel = playerViewModel
-        _viewModel = StateObject(wrappedValue: TrackListViewModel(trackList: trackList))
+        _viewModel = StateObject(
+            wrappedValue: TrackListViewModel(
+                trackList: trackList,
+                renameActionHandler: TrackFileRenameActionHandler(
+                    playerManager: playerViewModel.playerManager,
+                    sheetManager: SheetManager.shared,
+                    commandExecutor: AppCommandExecutor.shared,
+                    toastManager: ToastManager.shared,
+                    proposalBuilder: FileRenameProposalBuilder()
+                )
+            )
+        )
     }
     
     var body: some View {

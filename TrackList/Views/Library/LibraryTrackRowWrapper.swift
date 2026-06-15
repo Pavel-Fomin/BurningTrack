@@ -31,6 +31,7 @@ struct LibraryTrackRowWrapper: View {
     let isSelected: Bool                          /// Выбран ли текущий трек
     
     let onToggleSelection: () -> Void             /// Обработчик выбора
+    let onRenameTrack: (UUID, FileRenameStrategy) -> Void /// Обработчик переименования трека
     
     @ObservedObject var playerViewModel: PlayerViewModel   /// ViewModel плеера
     @ObservedObject private var settingsManager = AppSettingsManager.shared /// Менеджер настроек отображения
@@ -124,13 +125,12 @@ struct LibraryTrackRowWrapper: View {
             trackListNames: shouldShowTrackListMembership ? trackListNames : nil
         )
         .trackFileRenameMenu(
-            trackId: track.trackId,
-            rowId: track.id,
-            currentFileName: displayFileName,
             artist: snapshot?.artist,
             title: snapshot?.title,
-            playerManager: playerViewModel.playerManager,
-            isEnabled: !showsSelection
+            isEnabled: !showsSelection,
+            onRename: { strategy in
+                onRenameTrack(track.trackId, strategy)
+            }
         )
         
         // Загружаем snapshot при появлении строки

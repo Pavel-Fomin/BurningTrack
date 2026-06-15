@@ -2,24 +2,77 @@
 //  PlayerPlaylistView.swift
 //  TrackList
 //
-//  Обёртка над PlayerView — подписка на PlaylistManager
+//  Обёртка над PlayerView — передача состояния Player Flow
 //  Передаёт данные в UI и управляет действиями
 //
 //  Created by Pavel Fomin on 15.07.2025.
 //
 
-import Foundation
 import SwiftUI
 
 struct PlayerPlaylistView: View {
-    @ObservedObject private var manager = PlaylistManager.shared
-    @ObservedObject var playerViewModel: PlayerViewModel
+    @ObservedObject var screenViewModel: PlayerScreenViewModel
     
     var body: some View {
         PlayerView(
-            tracks: manager.tracks,
-            playerViewModel: playerViewModel
+            rows: screenViewModel.state.rows,
+            scrollTargetId: screenViewModel.state.scrollTargetId,
+            onTrackTap: { queueItemId in
+                screenViewModel.handle(
+                    .playPause(queueItemId: queueItemId)
+                )
+            },
+            onMoveTracks: { from, to in
+                screenViewModel.handle(
+                    .moveTracks(
+                        from: from,
+                        to: to
+                    )
+                )
+            },
+            onDeleteTrack: { queueItemId in
+                screenViewModel.handle(
+                    .deleteTrack(
+                        queueItemId: queueItemId
+                    )
+                )
+            },
+            onShowInLibrary: { queueItemId in
+                screenViewModel.handle(
+                    .showInLibrary(
+                        queueItemId: queueItemId
+                    )
+                )
+            },
+            onMoveToFolder: { queueItemId in
+                screenViewModel.handle(
+                    .moveToFolder(
+                        queueItemId: queueItemId
+                    )
+                )
+            },
+            onArtworkTap: { queueItemId in
+                screenViewModel.handle(
+                    .artworkTap(
+                        queueItemId: queueItemId
+                    )
+                )
+            },
+            onRequestSnapshot: { trackId in
+                screenViewModel.handle(
+                    .requestSnapshot(
+                        trackId: trackId
+                    )
+                )
+            },
+            onRenameTrack: { queueItemId, strategy in
+                screenViewModel.handle(
+                    .renameTrack(
+                        queueItemId: queueItemId,
+                        strategy: strategy
+                    )
+                )
+            }
         )
     }
 }
-

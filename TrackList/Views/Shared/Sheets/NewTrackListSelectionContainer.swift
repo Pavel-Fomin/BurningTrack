@@ -13,6 +13,9 @@ struct NewTrackListSelectionContainer: View {
 
     let data: NewTrackListSelectionSheetData
 
+    /// Общий обработчик переименования файлов треков.
+    let renameActionHandler: TrackFileRenameActionHandler
+
     // MARK: - State
 
     /// Количество выбранных треков.
@@ -47,6 +50,7 @@ struct NewTrackListSelectionContainer: View {
             ) {
                 NewTrackListSelectionFolderListView(
                     folders: MusicLibraryManager.shared.attachedFolders,
+                    renameActionHandler: renameActionHandler,
                     selectionViewModel: viewModel
                 )
             }

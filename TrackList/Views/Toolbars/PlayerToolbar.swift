@@ -28,7 +28,7 @@ struct PlayerToolbar: ViewModifier {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         Button("Сохранить треклист") {
-                            SheetManager.shared.presentSaveTrackList()
+                            onSave()
                         }
 
                         Button(action: onExport) {
@@ -41,9 +41,7 @@ struct PlayerToolbar: ViewModifier {
                         }
 
                         Button("Очистить треклист", role: .destructive) {
-                            Task {
-                                await AppCommandExecutor.shared.clearPlayer()
-                            }
+                            onClear()
                         }
 
                     } label: {

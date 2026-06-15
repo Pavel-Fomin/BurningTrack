@@ -82,7 +82,16 @@ struct LibraryTracksView: View {
         self._selectionActionBarConfig = selectionActionBarConfig
         self._pendingRevealRequest = State(initialValue: revealRequest)
         self._tracksViewModel = StateObject(
-            wrappedValue: LibraryTracksViewModel(folderURL: folder.url)
+            wrappedValue: LibraryTracksViewModel(
+                folderURL: folder.url,
+                renameActionHandler: TrackFileRenameActionHandler(
+                    playerManager: playerViewModel.playerManager,
+                    sheetManager: SheetManager.shared,
+                    commandExecutor: AppCommandExecutor.shared,
+                    toastManager: ToastManager.shared,
+                    proposalBuilder: FileRenameProposalBuilder()
+                )
+            )
         )
     }
 
@@ -146,6 +155,12 @@ struct LibraryTracksView: View {
                     playerViewModel: playerViewModel,
                     isScrollingFast: scrollSpeed.isFast,
                     revealedTrackID: revealedTrackID,
+                    onRenameTrack: { trackId, strategy in
+                        tracksViewModel.renameTrack(
+                            trackId: trackId,
+                            strategy: strategy
+                        )
+                    },
                     isSelecting: isSelecting,
                     selection: selectionBinding
                 )

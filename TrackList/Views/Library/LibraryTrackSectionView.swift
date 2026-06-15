@@ -27,6 +27,7 @@ struct LibraryTrackSectionView: View {
 
     let isScrollingFast: Bool
     let revealedTrackID: UUID?
+    let onRenameTrack: (UUID, FileRenameStrategy) -> Void
     
     let isSelecting: Bool
     @Binding var selection: OrderedSelection<UUID>
@@ -67,6 +68,7 @@ struct LibraryTrackSectionView: View {
             showsSelection: isSelecting,
             isSelected: isSelected,
             onToggleSelection: onToggleSelection,
+            onRenameTrack: onRenameTrack,
             playerViewModel: playerViewModel
         )
         .id(rowId)

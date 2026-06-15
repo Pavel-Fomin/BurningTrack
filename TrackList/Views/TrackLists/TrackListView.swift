@@ -37,6 +37,12 @@ struct TrackListView: View {
                         onDelete: { indexSet in
                             trackListViewModel.removeTrack(at: indexSet)
                         },
+                        onRenameTrack: { rowId, strategy in
+                            trackListViewModel.renameTrack(
+                                rowId: rowId,
+                                strategy: strategy
+                            )
+                        },
                         onMove: { source, destination in
                             trackListViewModel.moveTrack(from: source, to: destination)
                         }
@@ -82,6 +88,7 @@ struct TrackListView: View {
                 let playerViewModel: PlayerViewModel
                 let onTap: (Track) -> Void
                 let onDelete: (IndexSet) -> Void
+                let onRenameTrack: (UUID, FileRenameStrategy) -> Void
                 let onMove: (IndexSet, Int) -> Void
 
                 var body: some View {
@@ -93,7 +100,8 @@ struct TrackListView: View {
                             metadataProvider: metadataProvider,
                             playerViewModel: playerViewModel,
                             onTap: onTap,
-                            onDelete: onDelete
+                            onDelete: onDelete,
+                            onRenameTrack: onRenameTrack
                         )
                         .id(track.id)
                     }

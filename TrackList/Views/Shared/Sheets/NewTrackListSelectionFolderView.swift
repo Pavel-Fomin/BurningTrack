@@ -15,6 +15,9 @@ struct NewTrackListSelectionFolderView: View {
 
     let folder: LibraryFolder
 
+    /// Общий обработчик переименования файлов треков.
+    let renameActionHandler: TrackFileRenameActionHandler
+
     // MARK: - State
 
     @ObservedObject var selectionViewModel: NewTrackListSelectionViewModel
@@ -26,13 +29,18 @@ struct NewTrackListSelectionFolderView: View {
 
     init(
         folder: LibraryFolder,
-        selectionViewModel: NewTrackListSelectionViewModel
+        selectionViewModel: NewTrackListSelectionViewModel,
+        renameActionHandler: TrackFileRenameActionHandler
     ) {
         self.folder = folder
         self.selectionViewModel = selectionViewModel
+        self.renameActionHandler = renameActionHandler
 
         _tracksViewModel = StateObject(
-            wrappedValue: LibraryTracksViewModel(folderURL: folder.url)
+            wrappedValue: LibraryTracksViewModel(
+                folderURL: folder.url,
+                renameActionHandler: renameActionHandler
+            )
         )
     }
 
@@ -58,7 +66,8 @@ struct NewTrackListSelectionFolderView: View {
                             NavigationLink {
                                 NewTrackListSelectionFolderView(
                                     folder: subfolder,
-                                    selectionViewModel: selectionViewModel
+                                    selectionViewModel: selectionViewModel,
+                                    renameActionHandler: renameActionHandler
                                 )
                             } label: {
                                 HStack(spacing: 12) {

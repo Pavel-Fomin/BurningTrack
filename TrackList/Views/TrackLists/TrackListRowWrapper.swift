@@ -22,6 +22,7 @@ struct TrackListRowWrapper: View {
     let playerViewModel: PlayerViewModel              /// ViewModel плеера
     let onTap: (Track) -> Void                        /// Обработчик тапа по строке
     let onDelete: (IndexSet) -> Void                  /// Обработчик удаления строки
+    let onRenameTrack: (UUID, FileRenameStrategy) -> Void /// Обработчик переименования строки
     
     @ObservedObject private var settingsManager = AppSettingsManager.shared /// Менеджер настроек отображения
     @EnvironmentObject var sheetManager: SheetManager /// Менеджер шитов
@@ -70,12 +71,12 @@ struct TrackListRowWrapper: View {
             metadataProvider: metadataProvider
         )
         .trackFileRenameMenu(
-            trackId: track.trackId,
-            rowId: track.id,
-            currentFileName: displayFileName,
             artist: snapshot?.artist,
             title: snapshot?.title,
-            playerManager: playerViewModel.playerManager
+            isEnabled: true,
+            onRename: { strategy in
+                onRenameTrack(track.id, strategy)
+            }
         )
         .task(id: track.trackId) {
             metadataProvider.requestSnapshotIfNeeded(for: track.trackId)

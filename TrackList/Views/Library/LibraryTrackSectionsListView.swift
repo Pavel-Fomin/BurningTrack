@@ -25,6 +25,7 @@ struct LibraryTrackSectionsListView: View {
     
     let isScrollingFast: Bool
     let revealedTrackID: UUID?
+    let onRenameTrack: (UUID, FileRenameStrategy) -> Void
     
     let isSelecting: Bool
     
@@ -42,6 +43,7 @@ struct LibraryTrackSectionsListView: View {
                 metadataProvider: metadataProvider,
                 isScrollingFast: isScrollingFast,
                 revealedTrackID: revealedTrackID,
+                onRenameTrack: onRenameTrack,
                 isSelecting: isSelecting,
                 selection: $selection
                

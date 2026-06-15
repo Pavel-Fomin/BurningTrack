@@ -26,11 +26,19 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
     @Published var tracks: [Track] = []
     @Published var currentListId: UUID?
     @Published private(set) var snapshotsByTrackId: [UUID: TrackRuntimeSnapshot] = [:] /// Runtime snapshot треков по id
+
+    /// Общий обработчик переименования файлов треков.
+    private let renameActionHandler: TrackFileRenameActionHandler
+
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Init
     
-    init(trackList: TrackList) {
+    init(
+        trackList: TrackList,
+        renameActionHandler: TrackFileRenameActionHandler
+    ) {
+        self.renameActionHandler = renameActionHandler
         self.currentListId = trackList.id
         self.name = trackList.name
         self.tracks = trackList.tracks
@@ -80,7 +88,32 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
     }
     
     // Заглушка. Мы ушли от активного треклиста.
-    init() { }
+    init(renameActionHandler: TrackFileRenameActionHandler) {
+        self.renameActionHandler = renameActionHandler
+    }
+
+    // MARK: - Rename
+
+    /// Запускает сценарий переименования файла трека из треклиста.
+    func renameTrack(
+        rowId: UUID,
+        strategy: FileRenameStrategy
+    ) {
+        guard let track = tracks.first(where: { $0.id == rowId }) else {
+            return
+        }
+
+        let snapshot = snapshotsByTrackId[track.trackId]
+        let request = TrackFileRenameRequest(
+            trackId: track.trackId,
+            rowId: track.id,
+            currentFileName: snapshot?.fileName ?? track.fileName,
+            artist: snapshot?.artist,
+            title: snapshot?.title,
+            strategy: strategy
+        )
+        renameActionHandler.handle(request)
+    }
 
     // MARK: - Loading
 

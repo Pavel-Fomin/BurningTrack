@@ -19,9 +19,18 @@ struct TrackListApp: App {
     let playerViewModel: PlayerViewModel
     
     init() {
-        let trackListVM = TrackListViewModel()
+        let playerVM = PlayerViewModel() // без аргументов
+        let trackListVM = TrackListViewModel(
+            renameActionHandler: TrackFileRenameActionHandler(
+                playerManager: playerVM.playerManager,
+                sheetManager: SheetManager.shared,
+                commandExecutor: AppCommandExecutor.shared,
+                toastManager: ToastManager.shared,
+                proposalBuilder: FileRenameProposalBuilder()
+            )
+        )
         self.trackListViewModel = trackListVM
-        self.playerViewModel = PlayerViewModel() // без аргументов
+        self.playerViewModel = playerVM
     }
 
     var body: some Scene {

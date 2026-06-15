@@ -6,8 +6,8 @@
 //
 //  Роль:
 //  - показывает одинаковое context menu для строк фонотеки, плеера и треклистов
-//  - строит предложения переименования через FileRenameProposalBuilder
-//  - открывает ручной rename sheet через SheetManager
+//  - показывает предпросмотр имени файла для автоматических стратегий
+//  - передаёт выбранную стратегию переименования через callback
 //  - не знает о конкретной модели строки
 //
 //  Created by Pavel Fomin on 18.05.2026.
@@ -19,15 +19,10 @@ struct TrackFileRenameMenuModifier: ViewModifier {
 
     // MARK: - Input
 
-    let trackId: UUID
-    let rowId: UUID
-    let currentFileName: String
     let artist: String?
     let title: String?
-    let playerManager: PlayerManager
     let isEnabled: Bool
-
-    @EnvironmentObject private var sheetManager: SheetManager
+    let onRename: (FileRenameStrategy) -> Void
 
     // MARK: - Derived rename data
 
@@ -67,7 +62,7 @@ struct TrackFileRenameMenuModifier: ViewModifier {
 
                     if hasUsableTagsForRename {
                         Button("Артист - Название") {
-                            renameUsingTags(strategy: .artistTitle)
+                            onRename(.artistTitle)
                         }
 
                         Text(artistTitlePreview)
@@ -76,7 +71,7 @@ struct TrackFileRenameMenuModifier: ViewModifier {
                         Divider()
 
                         Button("Название - Артист") {
-                            renameUsingTags(strategy: .titleArtist)
+                            onRename(.titleArtist)
                         }
 
                         Text(titleArtistPreview)
@@ -89,64 +84,11 @@ struct TrackFileRenameMenuModifier: ViewModifier {
                     Divider()
 
                     Button("Исправить вручную") {
-                        sheetManager.presentRenameTrackFile(
-                            trackId: trackId,
-                            rowId: rowId,
-                            currentFileName: currentFileName
-                        )
+                        onRename(.manual)
                     }
                 }
         } else {
             content
-        }
-    }
-
-    // MARK: - Actions
-
-    /// Переименовывает файл по тегам через общий генератор предложения.
-    private func renameUsingTags(strategy: FileRenameStrategy) {
-        let input = FileRenameInput(
-            trackId: trackId,
-            currentFileName: currentFileName,
-            artist: artist,
-            title: title
-        )
-
-        let proposal = FileRenameProposalBuilder().makeProposal(
-            from: input,
-            strategy: strategy
-        )
-
-        guard case .ready = proposal.status else {
-            if case .skipped(let reason) = proposal.status {
-                ToastManager.shared.handle(.operationFailed(message: reason))
-            } else {
-                ToastManager.shared.handle(
-                    .operationFailed(message: "Не удалось подготовить новое имя файла")
-                )
-            }
-            return
-        }
-
-        Task {
-            do {
-                try await AppCommandExecutor.shared.saveTrackEdits(
-                    trackId: trackId,
-                    newFileName: proposal.newFileName,
-                    fileChanged: true,
-                    patch: TagWritePatch(),
-                    tagsChanged: false,
-                    artworkAction: .none,
-                    artworkChanged: false,
-                    using: playerManager
-                )
-            } catch let appError as AppError {
-                ToastManager.shared.handle(appError)
-            } catch {
-                ToastManager.shared.handle(
-                    .operationFailed(message: "Не удалось переименовать файл")
-                )
-            }
         }
     }
 }
@@ -155,23 +97,17 @@ extension View {
 
     /// Подключает единое меню переименования файла к строке трека.
     func trackFileRenameMenu(
-        trackId: UUID,
-        rowId: UUID,
-        currentFileName: String,
         artist: String?,
         title: String?,
-        playerManager: PlayerManager,
-        isEnabled: Bool = true
+        isEnabled: Bool = true,
+        onRename: @escaping (FileRenameStrategy) -> Void
     ) -> some View {
         modifier(
             TrackFileRenameMenuModifier(
-                trackId: trackId,
-                rowId: rowId,
-                currentFileName: currentFileName,
                 artist: artist,
                 title: title,
-                playerManager: playerManager,
-                isEnabled: isEnabled
+                isEnabled: isEnabled,
+                onRename: onRename
             )
         )
     }

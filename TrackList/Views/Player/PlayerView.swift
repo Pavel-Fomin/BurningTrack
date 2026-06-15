@@ -11,15 +11,30 @@
 import Foundation
 import SwiftUI
 struct PlayerView: View {
-    let tracks: [PlayerTrack]
-    @ObservedObject var playerViewModel: PlayerViewModel
+    let rows: [PlayerTrackRowState]
+    let scrollTargetId: UUID?
+    let onTrackTap: (UUID) -> Void
+    let onMoveTracks: (IndexSet, Int) -> Void
+    let onDeleteTrack: (UUID) -> Void
+    let onShowInLibrary: (UUID) -> Void
+    let onMoveToFolder: (UUID) -> Void
+    let onArtworkTap: (UUID) -> Void
+    let onRequestSnapshot: (UUID) -> Void
+    let onRenameTrack: (UUID, FileRenameStrategy) -> Void
     @Environment(\.scenePhase) private var scenePhase
     var body: some View {
         ScrollViewReader { proxy in
             List {
                 PlayerRowsView(
-                    tracks: tracks,
-                    playerViewModel: playerViewModel
+                    rows: rows,
+                    onTrackTap: onTrackTap,
+                    onMoveTracks: onMoveTracks,
+                    onDeleteTrack: onDeleteTrack,
+                    onShowInLibrary: onShowInLibrary,
+                    onMoveToFolder: onMoveToFolder,
+                    onArtworkTap: onArtworkTap,
+                    onRequestSnapshot: onRequestSnapshot,
+                    onRenameTrack: onRenameTrack
                 )
             }
             .listStyle(.plain)
@@ -28,7 +43,7 @@ struct PlayerView: View {
             .onAppear {
                 scrollToCurrentTrackIfNeeded(using: proxy, animated: false)
             }
-            .onChange(of: playerViewModel.currentTrackDisplayable?.id) { _, _ in
+            .onChange(of: scrollTargetId) { _, _ in
                 scrollToCurrentTrackIfNeeded(using: proxy, animated: true)
             }
             .onChange(of: scenePhase) { _, newPhase in
@@ -38,49 +53,46 @@ struct PlayerView: View {
         }
     }
     private func scrollToCurrentTrackIfNeeded(using proxy: ScrollViewProxy, animated: Bool) {
-        guard playerViewModel.currentContext == .player else { return }
-        guard let currentTrackId = playerViewModel.currentTrackDisplayable?.id else { return }
-        guard tracks.contains(where: { $0.id == currentTrackId }) else { return }
+        guard let scrollTargetId else { return }
+        guard rows.contains(where: { $0.id == scrollTargetId }) else { return }
         if animated {
             withAnimation(.easeInOut(duration: 0.25)) {
-                proxy.scrollTo(currentTrackId, anchor: .center)
+                proxy.scrollTo(scrollTargetId, anchor: .center)
             }
         } else {
-            proxy.scrollTo(currentTrackId, anchor: .center)
+            proxy.scrollTo(scrollTargetId, anchor: .center)
         }
     }
     // MARK: - Компонент строк плеера
     
     private struct PlayerRowsView: View {
-        let tracks: [any TrackDisplayable]
-        let playerViewModel: PlayerViewModel
+        let rows: [PlayerTrackRowState]
+        let onTrackTap: (UUID) -> Void
+        let onMoveTracks: (IndexSet, Int) -> Void
+        let onDeleteTrack: (UUID) -> Void
+        let onShowInLibrary: (UUID) -> Void
+        let onMoveToFolder: (UUID) -> Void
+        let onArtworkTap: (UUID) -> Void
+        let onRequestSnapshot: (UUID) -> Void
+        let onRenameTrack: (UUID, FileRenameStrategy) -> Void
         var body: some View {
-            ForEach(Array(tracks.enumerated()), id: \.element.id) { _, track in
-                let isCurrent = playerViewModel.isCurrent(track, in: .player)
-                let isPlaying = isCurrent && playerViewModel.isPlaying
+            ForEach(rows) { row in
                 PlayerTrackRowWrapper(
-                    track: track,
-                    isCurrent: isCurrent,
-                    isPlaying: isPlaying,
+                    row: row,
                     onTap: {
-                        if isCurrent {
-                            playerViewModel.togglePlayPause()
-                        } else {
-                            playerViewModel.play(track: track, context: tracks)
-                        }
+                        onTrackTap(row.id)
                     },
-                    playerViewModel: playerViewModel
+                    onDeleteTrack: onDeleteTrack,
+                    onShowInLibrary: onShowInLibrary,
+                    onMoveToFolder: onMoveToFolder,
+                    onArtworkTap: onArtworkTap,
+                    onRequestSnapshot: onRequestSnapshot,
+                    onRenameTrack: onRenameTrack
                 )
-                .id(track.id)
+                .id(row.id)
             }
             .onMove { from, to in
-                let previousTracks = PlaylistManager.shared.tracks
-                PlaylistManager.shared.tracks.move(fromOffsets: from, toOffset: to)
-                guard PlaylistManager.shared.saveToDisk() else {
-                    PlaylistManager.shared.tracks = previousTracks
-                    ToastManager.shared.handle(.playlistSaveFailed)
-                    return
-                }
+                onMoveTracks(from, to)
             }
         }
     }

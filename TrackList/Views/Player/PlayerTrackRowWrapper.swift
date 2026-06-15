@@ -6,76 +6,48 @@
 //
 
 import SwiftUI
-import UIKit
 
 struct PlayerTrackRowWrapper: View {
     
     // MARK: - Input
     
-    let track: any TrackDisplayable                      /// Трек строки
-    let isCurrent: Bool                                  /// Является ли строка текущим треком
-    let isPlaying: Bool                                  /// Воспроизводится ли текущий трек
+    let row: PlayerTrackRowState                         /// Готовое состояние строки плеера
     let onTap: () -> Void                                /// Обработчик тапа по строке
-    
-    @ObservedObject var playerViewModel: PlayerViewModel /// ViewModel плеера
-    @ObservedObject private var settingsManager = AppSettingsManager.shared /// Менеджер настроек отображения
-    @EnvironmentObject var sheetManager: SheetManager    /// Менеджер шитов
-    
-    // MARK: - Snapshot
-    
-    /// Runtime snapshot трека
-    private var snapshot: TrackRuntimeSnapshot? {
-        playerViewModel.snapshot(for: track.trackId)
-    }
-    
-    /// Обложка трека
-    private var artwork: UIImage? {
-        guard AppSettingsManager.shared.settings.visible.metadata.isTagReadingEnabled else { return nil }
-        guard let data = snapshot?.artworkData else { return nil }
-
-        return ArtworkProvider.shared.image(
-            trackId: track.trackId,
-            artworkData: data,
-            purpose: .trackList
-        )
-    }
-
-    /// Актуальное имя файла из runtime snapshot с fallback на модель строки.
-    private var displayFileName: String {
-        snapshot?.fileName ?? track.fileName
-    }
+    let onDeleteTrack: (UUID) -> Void                    /// Обработчик удаления элемента очереди
+    let onShowInLibrary: (UUID) -> Void                  /// Обработчик показа элемента очереди в фонотеке
+    let onMoveToFolder: (UUID) -> Void                   /// Обработчик перемещения элемента очереди в папку
+    let onArtworkTap: (UUID) -> Void                     /// Обработчик тапа по обложке элемента очереди
+    let onRequestSnapshot: (UUID) -> Void                /// Обработчик запроса runtime snapshot трека
+    let onRenameTrack: (UUID, FileRenameStrategy) -> Void /// Обработчик переименования элемента очереди
     
     // MARK: - UI
     
     var body: some View {
-        let shouldShowTags = settingsManager.settings.visible.metadata.isTagReadingEnabled
-        let shouldShowFileFormat = settingsManager.settings.visible.library.isFileFormatVisible
-
         TrackRowView(
-            track: track,
-            isCurrent: isCurrent,
-            isPlaying: isPlaying,
-            isHighlighted: sheetManager.highlightedRowID == track.id,
-            artwork: artwork,
-            title: shouldShowTags ? (snapshot?.title ?? displayFileName) : displayFileName,
-            artist: shouldShowTags ? (snapshot?.artist ?? "") : "",
-            duration: snapshot?.duration ?? track.duration,
+            track: row.track,
+            isCurrent: row.isCurrent,
+            isPlaying: row.isPlaying,
+            isHighlighted: row.isHighlighted,
+            artwork: row.artwork,
+            title: row.title,
+            artist: row.artist,
+            duration: row.duration,
             onRowTap: onTap,
             onArtworkTap: {
-                sheetManager.present(.trackDetail(track))
+                onArtworkTap(row.id)
             },
-            showsFileFormat: shouldShowFileFormat
+            showsFileFormat: row.showsFileFormat
         )
         .trackFileRenameMenu(
-            trackId: track.trackId,
-            rowId: track.id,
-            currentFileName: displayFileName,
-            artist: snapshot?.artist,
-            title: snapshot?.title,
-            playerManager: playerViewModel.playerManager
+            artist: row.renameArtist,
+            title: row.renameTitle,
+            isEnabled: true,
+            onRename: { strategy in
+                onRenameTrack(row.id, strategy)
+            }
         )
-        .task(id: track.trackId) {
-            playerViewModel.requestSnapshotIfNeeded(for: track.trackId)
+        .task(id: row.trackId) {
+            onRequestSnapshot(row.trackId)
         }
 
         // MARK: - Свайпы плеера
@@ -84,32 +56,14 @@ struct PlayerTrackRowWrapper: View {
 
             /// Удалить
             Button(role: .destructive) {
-                Task {
-                    do {
-                        try await AppCommandExecutor.shared.removeTrackFromPlayer(
-                            queueItemId: track.id
-                        )
-                    } catch let appError as AppError {
-                        ToastManager.shared.handle(appError)
-                    } catch {
-                        ToastManager.shared.handle(
-                            .operationFailed(
-                                message: "Не удалось удалить трек из плеера"
-                            )
-                        )
-                    }
-                }
+                onDeleteTrack(row.id)
             } label: {
                 Label("Удалить", systemImage: "trash")
             }
 
             /// Показать в фонотеке
             Button {
-                SheetActionCoordinator.shared.handle(
-                    action: .showInLibrary,
-                    track: track,
-                    context: .player
-                )
+                onShowInLibrary(row.id)
             } label: {
                 Label("Показать", systemImage: "scope")
             }
@@ -117,11 +71,7 @@ struct PlayerTrackRowWrapper: View {
 
             /// Переместить
             Button {
-                SheetActionCoordinator.shared.handle(
-                    action: .moveToFolder,
-                    track: track,
-                    context: .player
-                )
+                onMoveToFolder(row.id)
             } label: {
                 Label("Переместить", systemImage: "arrow.right.doc.on.clipboard")
             }

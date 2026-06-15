@@ -57,6 +57,10 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
 
     private let tracksProvider: LibraryTracksProvider
     private let badgeProvider: TrackListBadgeProvider
+
+    /// Общий обработчик переименования файлов треков.
+    private let renameActionHandler: TrackFileRenameActionHandler
+
     private var cancellables = Set<AnyCancellable>()
 
     /// Общее количество треков в текущих секциях.
@@ -75,12 +79,14 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
 
     init(
         folderURL: URL,
+        renameActionHandler: TrackFileRenameActionHandler,
         tracksProvider: LibraryTracksProvider = FastLibraryTracksProvider(),
         badgeProvider: TrackListBadgeProvider = DefaultTrackListBadgeProvider()
     ) {
         self.folderURL = folderURL
         self.folderId = folderURL.libraryFolderId
 
+        self.renameActionHandler = renameActionHandler
         self.tracksProvider = tracksProvider
         self.badgeProvider = badgeProvider
 
@@ -136,6 +142,32 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
                 }
             }
             .store(in: &cancellables)
+    }
+
+    // MARK: - Rename
+
+    /// Запускает сценарий переименования файла трека из фонотеки.
+    func renameTrack(
+        trackId: UUID,
+        strategy: FileRenameStrategy
+    ) {
+        guard let track = trackSections
+            .flatMap(\.tracks)
+            .first(where: { $0.trackId == trackId })
+        else {
+            return
+        }
+
+        let snapshot = snapshotsByTrackId[track.trackId]
+        let request = TrackFileRenameRequest(
+            trackId: track.trackId,
+            rowId: track.id,
+            currentFileName: snapshot?.fileName ?? track.fileName,
+            artist: snapshot?.artist,
+            title: snapshot?.title,
+            strategy: strategy
+        )
+        renameActionHandler.handle(request)
     }
     
     // MARK: - Load

@@ -19,8 +19,8 @@ struct SheetHostModifier: ViewModifier {
 
     @ObservedObject private var sheetManager = SheetManager.shared
 
-    /// PlayerManager пока пробрасывается дальше без использования логики.
-    /// Будет убран на следующих этапах.
+    /// Единый PlayerManager передаётся в rename-flow, чтобы файловые операции
+    /// использовали тот же playback backend, что и активный плеер.
     let playerManager: PlayerManager
 
     func body(content: Content) -> some View {
@@ -78,7 +78,16 @@ struct SheetHostModifier: ViewModifier {
 
                 /// Выбор треков для нового треклиста
             case .newTrackListSelection(let data):
-                NewTrackListSelectionContainer(data: data)
+                NewTrackListSelectionContainer(
+                    data: data,
+                    renameActionHandler: TrackFileRenameActionHandler(
+                        playerManager: playerManager,
+                        sheetManager: SheetManager.shared,
+                        commandExecutor: AppCommandExecutor.shared,
+                        toastManager: ToastManager.shared,
+                        proposalBuilder: FileRenameProposalBuilder()
+                    )
+                )
                     .appSheet(detents: [.large])
 
                 /// Массовое редактирование тегов

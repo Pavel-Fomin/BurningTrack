@@ -14,32 +14,89 @@ struct PlayerScreen: View {
     @ObservedObject var playerViewModel: PlayerViewModel
     let trackListViewModel: TrackListViewModel
 
-    @State private var showImporter = false
-    @State private var isShowingExportPicker = false
-    @State private var isShowingSaveSheet = false
-    @State private var trackListName: String = defaultTrackListName()
+    @StateObject private var screenViewModel: PlayerScreenViewModel
+
+    init(
+        playerViewModel: PlayerViewModel,
+        trackListViewModel: TrackListViewModel
+    ) {
+        self.playerViewModel = playerViewModel
+        self.trackListViewModel = trackListViewModel
+        let trackFileRenameActionHandler = TrackFileRenameActionHandler(
+            playerManager: playerViewModel.playerManager,
+            sheetManager: SheetManager.shared,
+            commandExecutor: AppCommandExecutor.shared,
+            toastManager: ToastManager.shared,
+            proposalBuilder: FileRenameProposalBuilder()
+        )
+        let playbackActionHandler = PlayerPlaybackActionHandler(
+            playerViewModel: playerViewModel,
+            playlistManager: PlaylistManager.shared
+        )
+        let queueActionHandler = PlayerQueueActionHandler(
+            playlistManager: PlaylistManager.shared,
+            commandExecutor: AppCommandExecutor.shared,
+            toastManager: ToastManager.shared
+        )
+        let presentationActionHandler = PlayerPresentationActionHandler(
+            playlistManager: PlaylistManager.shared,
+            sheetManager: SheetManager.shared,
+            sheetActionCoordinator: SheetActionCoordinator.shared
+        )
+        let exportActionHandler = PlayerExportActionHandler(
+            playlistManager: PlaylistManager.shared,
+            exportManager: ExportManager.shared,
+            toastManager: ToastManager.shared,
+            presenterProvider: {
+                UIApplication.topViewController()
+            }
+        )
+        let playerRenameActionHandler = PlayerRenameActionHandler(
+            playlistManager: PlaylistManager.shared,
+            playerViewModel: playerViewModel,
+            trackFileRenameActionHandler: trackFileRenameActionHandler
+        )
+        let rowStateBuilder = PlayerTrackRowStateBuilder(
+            artworkProvider: ArtworkProvider.shared
+        )
+        let actionHandler = PlayerFlowActionHandler(
+            playbackActionHandler: playbackActionHandler,
+            queueActionHandler: queueActionHandler,
+            presentationActionHandler: presentationActionHandler,
+            exportActionHandler: exportActionHandler,
+            renameActionHandler: playerRenameActionHandler
+        )
+        _screenViewModel = StateObject(
+            wrappedValue: PlayerScreenViewModel(
+                playerViewModel: playerViewModel,
+                actionHandler: actionHandler,
+                sheetManager: SheetManager.shared,
+                playlistManager: PlaylistManager.shared,
+                appSettingsManager: AppSettingsManager.shared,
+                rowStateBuilder: rowStateBuilder
+            )
+        )
+    }
 
     var body: some View {
         NavigationStack {
             ZStack(alignment: .bottom) {
                 VStack(spacing: 0) {
-                    PlayerPlaylistView(playerViewModel: playerViewModel)
+                    PlayerPlaylistView(
+                        screenViewModel: screenViewModel
+                    )
                 }
             }
             .playerToolbar(
-                trackCount: PlaylistManager.shared.tracks.count,
+                trackCount: screenViewModel.state.trackCount,
                 onSave: {
-                    if PlaylistManager.shared.saveToDisk() {
-                        ToastManager.shared.handle(.playlistSaved)
-                    } else {
-                        ToastManager.shared.handle(.playlistSaveFailed)
-                    }
+                    screenViewModel.handle(.saveTrackList)
                 },
-                onExport: {handleExport()},
+                onExport: {
+                    screenViewModel.handle(.exportTrackList)
+                },
                 onClear: {
-                    Task {
-                        await AppCommandExecutor.shared.clearPlayer()
-                    }
+                    screenViewModel.handle(.clearTrackList)
                 }
             )
         }
@@ -48,38 +105,4 @@ struct PlayerScreen: View {
             playerViewModel: playerViewModel
         )
     }
-
-    private func handleExport() {
-        let tracks = PlaylistManager.shared.tracks.map {$0.asTrack()}
-
-        guard !tracks.isEmpty else {
-            ToastManager.shared.handle(.noTracksToExport)
-            return
-        }
-
-        if let topVC = UIApplication.topViewController() {
-            Task {
-                do {
-                    _ = try await ExportManager.shared.exportViaTempAndPicker(
-                        tracks,
-                        presenter: topVC
-                    )
-                } catch let appError as AppError {
-                    ToastManager.shared.handle(appError)
-                } catch {
-                    ToastManager.shared.handle(.exportFailed)
-                }
-            }
-        } else {
-            ToastManager.shared.handle(.presenterUnavailable)
-        }
-    }
-}
-
-// MARK: - Вспомогательная функция
-
-private func defaultTrackListName() -> String {
-    let formatter = DateFormatter()
-    formatter.dateFormat = "dd.MM.yy, HH:mm"
-    return formatter.string(from: Date())
 }
