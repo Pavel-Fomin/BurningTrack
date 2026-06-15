@@ -11,10 +11,15 @@ import Foundation
 
 // Управляет загрузкой и сохранением настроек приложения в Documents/settings.json.
 @MainActor
-final class AppSettingsManager: ObservableObject {
+final class AppSettingsManager: ObservableObject, SettingsManaging {
     static let shared = AppSettingsManager()
 
     @Published private(set) var settings: AppSettings
+
+    // Предоставляет Settings-flow поток изменений без раскрытия projected value свойства.
+    var settingsPublisher: Published<AppSettings>.Publisher {
+        $settings
+    }
 
     private let fileURL: URL
     private let encoder: JSONEncoder

@@ -14,9 +14,45 @@ struct SettingsScreen: View {
     let trackListViewModel: TrackListViewModel
     let playerViewModel: PlayerViewModel
 
+    @StateObject private var viewModel: SettingsScreenViewModel
+
+    init(
+        trackListViewModel: TrackListViewModel,
+        playerViewModel: PlayerViewModel
+    ) {
+        let settingsManager = AppSettingsManager.shared
+
+        self.init(
+            trackListViewModel: trackListViewModel,
+            playerViewModel: playerViewModel,
+            settingsManager: settingsManager
+        )
+    }
+
+    init(
+        trackListViewModel: TrackListViewModel,
+        playerViewModel: PlayerViewModel,
+        settingsManager: any SettingsManaging
+    ) {
+        self.trackListViewModel = trackListViewModel
+        self.playerViewModel = playerViewModel
+
+        // Собираем зависимости экрана настроек в composition root.
+        let actionHandler = SettingsActionHandler(settingsManager: settingsManager)
+        _viewModel = StateObject(
+            wrappedValue: SettingsScreenViewModel(
+                settingsManager: settingsManager,
+                actionHandler: actionHandler
+            )
+        )
+    }
+
     var body: some View {
         NavigationStack {
-            SettingsView()
+            SettingsView(
+                state: viewModel.state,
+                onAction: viewModel.handle
+            )
                 .settingsToolbar()
         }
         .miniPlayerHost(

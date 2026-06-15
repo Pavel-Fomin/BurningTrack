@@ -12,7 +12,8 @@ import SwiftUI
 
 struct SettingsView: View {
 
-    @ObservedObject private var settingsManager = AppSettingsManager.shared
+    let state: SettingsScreenState
+    let onAction: (SettingsAction) -> Void
 
     var body: some View {
         List {
@@ -21,10 +22,10 @@ struct SettingsView: View {
                     "Отображать метаданные",
                     isOn: Binding(
                         get: {
-                            settingsManager.settings.visible.metadata.isTagReadingEnabled
+                            state.isTagReadingEnabled
                         },
                         set: { value in
-                            settingsManager.setTagReadingEnabled(value)
+                            onAction(.setTagReadingEnabled(value))
                         }
                     )
                 )
@@ -33,10 +34,10 @@ struct SettingsView: View {
                     "Показывать «уже в…»",
                     isOn: Binding(
                         get: {
-                            settingsManager.settings.visible.library.isTrackListMembershipVisible
+                            state.isTrackListMembershipVisible
                         },
                         set: { value in
-                            settingsManager.setTrackListMembershipVisible(value)
+                            onAction(.setTrackListMembershipVisible(value))
                         }
                     )
                 )
@@ -45,10 +46,10 @@ struct SettingsView: View {
                     "Показывать формат",
                     isOn: Binding(
                         get: {
-                            settingsManager.settings.visible.library.isFileFormatVisible
+                            state.isFileFormatVisible
                         },
                         set: { value in
-                            settingsManager.setFileFormatVisible(value)
+                            onAction(.setFileFormatVisible(value))
                         }
                     )
                 )
