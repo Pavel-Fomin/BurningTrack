@@ -12,6 +12,9 @@
 
 import Foundation
 
+// Алиас фиксирует внешнюю модель метаинформации до объявления вложенного alias manager-а.
+typealias TrackListsManagerTrackListMeta = TrackListMeta
+
 final class TrackListsManager {
     
     static let shared = TrackListsManager()
@@ -20,11 +23,8 @@ final class TrackListsManager {
     
     // MARK: - Модель метаинформации
     
-    struct TrackListMeta: Identifiable, Codable, Equatable {
-        let id: UUID
-        var name: String
-        let createdAt: Date
-    }
+    /// Совместимость для старых обращений TrackListsManager.TrackListMeta.
+    typealias TrackListMeta = TrackListsManagerTrackListMeta
     
     
     // MARK: - Пути
@@ -287,3 +287,7 @@ final class TrackListsManager {
         }
     }
 }
+
+// MARK: - TrackListsManaging
+
+extension TrackListsManager: TrackListsManaging {}

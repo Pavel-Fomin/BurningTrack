@@ -381,3 +381,7 @@ final class ToastManager: ObservableObject {
         }
     }
 }
+
+// MARK: - ToastPresenting
+
+extension ToastManager: ToastPresenting {}

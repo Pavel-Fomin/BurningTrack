@@ -12,7 +12,6 @@
 //
 
 import Foundation
-import SwiftUI
 import Combine
 
 @MainActor
@@ -20,45 +19,84 @@ final class TrackListsViewModel: ObservableObject {
 
     // MARK: - Состояния
     @Published var trackLists: [TrackList] = []
-    @Published var isEditing: Bool = false
+    /// Готовое состояние экрана списка треклистов.
+    @Published private(set) var screenState = TrackListsScreenState(
+        rows: [],
+        isEmpty: true,
+        pendingDeleteTrackListId: nil,
+        isShowingDeleteConfirmation: false
+    )
+    /// Собирает состояние экрана из текущего списка треклистов.
+    private let stateBuilder = TrackListsScreenStateBuilder()
+    /// Управляет метаданными списка треклистов.
+    private let trackListsManager: any TrackListsManaging
+    /// Управляет содержимым одного треклиста.
+    private let trackListManager: any TrackListManaging
+    /// Показывает пользовательские сообщения об ошибках.
+    private let toastPresenter: any ToastPresenting
+    /// Поставляет события изменения списка треклистов.
+    private let eventProvider: any TrackListsEventProviding
+    /// Идентификатор треклиста, ожидающего подтверждения удаления.
+    private var pendingDeleteTrackListId: UUID?
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Init
 
-    init() {
-        NotificationCenter.default.publisher(for: .trackListsDidChange)
+    init(
+        trackListsManager: any TrackListsManaging,
+        trackListManager: any TrackListManaging,
+        toastPresenter: any ToastPresenting,
+        eventProvider: any TrackListsEventProviding
+    ) {
+        self.trackListsManager = trackListsManager
+        self.trackListManager = trackListManager
+        self.toastPresenter = toastPresenter
+        self.eventProvider = eventProvider
+
+        eventProvider.trackListsDidChange
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
+            .sink { [weak self] in
                 self?.refresh()
             }
             .store(in: &cancellables)
     }
 
+    /// Пересобирает состояние экрана с учётом подтверждения удаления.
+    private func updateScreenState() {
+        let baseState = stateBuilder.build(trackLists: trackLists)
+
+        screenState = TrackListsScreenState(
+            rows: baseState.rows,
+            isEmpty: baseState.isEmpty,
+            pendingDeleteTrackListId: pendingDeleteTrackListId,
+            isShowingDeleteConfirmation: pendingDeleteTrackListId != nil
+        )
+    }
+
     // MARK: - Загрузка всех треклистов
 
-    func refresh() {
-        let metas: [TrackListsManager.TrackListMeta]
+    /// Загружает треклисты и обрабатывает ошибки чтения данных.
+    private func loadTrackLists() -> [TrackList] {
+        let metas: [TrackListMeta]
         do {
-            metas = try TrackListsManager.shared.loadTrackListMetas()
+            metas = try trackListsManager.loadTrackListMetas()
         } catch let appError as AppError {
-            self.trackLists = []
-            ToastManager.shared.handle(appError)
-            return
+            toastPresenter.handle(appError)
+            return []
         } catch {
-            self.trackLists = []
-            ToastManager.shared.handle(AppError.trackListLoadFailed)
-            return
+            toastPresenter.handle(AppError.trackListLoadFailed)
+            return []
         }
 
         var trackLoadError: AppError?
         var didFailToLoadTracks = false
 
-        self.trackLists = metas
+        let loadedTrackLists = metas
             .sorted { $0.createdAt > $1.createdAt }
             .map { meta in
                 let tracks: [Track]
                 do {
-                    tracks = try TrackListManager.shared.loadTracks(for: meta.id)
+                    tracks = try trackListManager.loadTracks(for: meta.id)
                 } catch let appError as AppError {
                     trackLoadError = appError
                     didFailToLoadTracks = true
@@ -76,8 +114,15 @@ final class TrackListsViewModel: ObservableObject {
             }
 
         if didFailToLoadTracks {
-            ToastManager.shared.handle(trackLoadError ?? AppError.trackListLoadFailed)
+            toastPresenter.handle(trackLoadError ?? AppError.trackListLoadFailed)
         }
+
+        return loadedTrackLists
+    }
+
+    func refresh() {
+        self.trackLists = loadTrackLists()
+        updateScreenState()
 
         print("📥 Загружено \(trackLists.count) треклистов")
     }
@@ -85,15 +130,28 @@ final class TrackListsViewModel: ObservableObject {
 
     // MARK: - Удаление
 
+    /// Запрашивает подтверждение удаления треклиста.
+    func requestDeleteTrackList(id: UUID) {
+        pendingDeleteTrackListId = id
+        updateScreenState()
+    }
+
+    /// Отменяет подтверждение удаления треклиста.
+    func cancelDeleteTrackList() {
+        pendingDeleteTrackListId = nil
+        updateScreenState()
+    }
+
     func deleteTrackList(id: UUID) {
         do {
-            try TrackListsManager.shared.deleteTrackList(id: id)
+            try trackListsManager.deleteTrackList(id: id)
+            pendingDeleteTrackListId = nil
             refresh()
             print("🗑️ Треклист \(id) удалён")
         } catch let appError as AppError {
-            ToastManager.shared.handle(appError)
+            toastPresenter.handle(appError)
         } catch {
-            ToastManager.shared.handle(AppError.trackListSaveFailed)
+            toastPresenter.handle(AppError.trackListSaveFailed)
         }
     }
 
@@ -101,14 +159,7 @@ final class TrackListsViewModel: ObservableObject {
     // MARK: - Переименование
 
     func renameTrackList(id: UUID, to newName: String) throws {
-        try TrackListsManager.shared.renameTrackList(id: id, to: newName)
+        try trackListsManager.renameTrackList(id: id, to: newName)
         print("✏️ Треклист \(id) переименован в «\(newName)»")
-    }
-
-
-    // MARK: - Редактирование(не используется)
-
-    func toggleEditMode() {
-        isEditing.toggle()
     }
 }

@@ -1,0 +1,33 @@
+//
+//  TrackListsScreenStateBuilder.swift
+//  TrackList
+//
+//  Собирает состояние экрана списка треклистов.
+//
+//  Created by Pavel Fomin on 15.06.2026.
+//
+
+import Foundation
+
+struct TrackListsScreenStateBuilder {
+
+    func build(
+        trackLists: [TrackList]
+    ) -> TrackListsScreenState {
+
+        let rows = trackLists.map { trackList in
+            TrackListsRowState(
+                id: trackList.id,
+                title: trackList.name,
+                tracksCountText: "\(trackList.tracks.count) треков"
+            )
+        }
+
+        return TrackListsScreenState(
+            rows: rows,
+            isEmpty: rows.isEmpty,
+            pendingDeleteTrackListId: nil,
+            isShowingDeleteConfirmation: false
+        )
+    }
+}

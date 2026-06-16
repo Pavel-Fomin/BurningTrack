@@ -17,14 +17,40 @@ struct TrackListsScreen: View {
     @ObservedObject var playerViewModel: PlayerViewModel
     let trackListViewModel: TrackListViewModel
 
+    /// Обрабатывает действия экрана списка треклистов.
+    private var actionHandler: TrackListsActionHandler {
+        TrackListsActionHandler(
+            viewModel: trackListsViewModel,
+            presenter: SheetManager.shared
+        )
+    }
+
     var body: some View {
         NavigationStack {
             TrackListsListView(
-                viewModel: trackListsViewModel,
-                playerViewModel: playerViewModel
+                state: trackListsViewModel.screenState,
+                onAction: { action in
+                    actionHandler.handle(action)
+                },
+                destination: { id in
+                    guard let trackList = trackListsViewModel.trackLists.first(where: { $0.id == id }) else {
+                        return AnyView(EmptyView())
+                    }
+
+                    return AnyView(
+                        TrackListScreen(
+                            trackList: trackList,
+                            playerViewModel: playerViewModel
+                        )
+                    )
+                }
             )
             .background(Color(.systemGroupedBackground))
-            .trackListsToolbar()
+            .trackListsToolbar(
+                onCreateTrackList: {
+                    actionHandler.handle(.createTrackList)
+                }
+            )
         }
         .miniPlayerHost(
             trackListViewModel: trackListViewModel,

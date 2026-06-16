@@ -24,7 +24,13 @@ struct MainTabView: View {
     @ObservedObject var trackListViewModel: TrackListViewModel
     @ObservedObject var playerViewModel: PlayerViewModel
     
-    @StateObject private var trackListsVM = TrackListsViewModel()
+    /// Сборка production-зависимостей TrackLists-flow.
+    @StateObject private var trackListsVM = TrackListsViewModel(
+        trackListsManager: TrackListsManager.shared,
+        trackListManager: TrackListManager.shared,
+        toastPresenter: ToastManager.shared,
+        eventProvider: NotificationTrackListsEventProvider()
+    )
     
     
 // MARK: - UI

@@ -11,49 +11,61 @@ import Foundation
 import SwiftUI
 
 struct TrackListsListView: View {
-    @State private var trackListToDelete: TrackList? = nil
-    @State private var showDeleteAlert = false
-    @ObservedObject var viewModel: TrackListsViewModel
-    let playerViewModel: PlayerViewModel
+    /// Готовое состояние экрана списка треклистов.
+    let state: TrackListsScreenState
+    /// Передаёт пользовательские действия обработчику экрана.
+    let onAction: (TrackListsAction) -> Void
+    /// Собирает экран выбранного треклиста.
+    let destination: (UUID) -> AnyView
     
     
     var body: some View {
         ZStack {
             List {
-                ForEach(viewModel.trackLists) { list in
-                    trackListRow(for: list)
+                ForEach(state.rows) { row in
+                    trackListRow(for: row)
                 }
             }
-            .onAppear { viewModel.refresh() }
+            .onAppear {
+                onAction(.onAppear)
+            }
             .listStyle(.insetGrouped)
         }
         .alert(
-            "Удалить треклист\n«\(trackListToDelete?.name ?? "")»?",
-            isPresented: $showDeleteAlert,
-            presenting: trackListToDelete
-        ) { list in
+            "Удалить треклист?",
+            isPresented: Binding(
+                get: { state.isShowingDeleteConfirmation },
+                set: { isPresented in
+                    if !isPresented {
+                        onAction(.cancelDeleteTrackList)
+                    }
+                }
+            )
+        ) {
             Button("Удалить", role: .destructive) {
-                withAnimation(.easeInOut(duration: 0.25)) {
-                    viewModel.deleteTrackList(id: list.id)
+                if let id = state.pendingDeleteTrackListId {
+                    onAction(.confirmDeleteTrackList(id))
                 }
             }
-            Button("Отмена", role: .cancel) {}
-        } message: { _ in
+            Button("Отмена", role: .cancel) {
+                onAction(.cancelDeleteTrackList)
+            }
+        } message: {
             Text("Треклист удалится безвозвратно")
         }
     }
     
     @ViewBuilder
-    private func trackListRow(for list: TrackList) -> some View {
+    private func trackListRow(for row: TrackListsRowState) -> some View {
         NavigationLink(
-            destination: TrackListScreen(trackList: list, playerViewModel: playerViewModel)
+            destination: destination(row.id)
         ) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(list.name)
+                    Text(row.title)
                         .font(.body)
                         .fontWeight(.regular)
-                    Text("\(list.tracks.count) треков")
+                    Text(row.tracksCountText)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -64,8 +76,7 @@ struct TrackListsListView: View {
         }
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             Button(role: .destructive) {
-                trackListToDelete = list
-                showDeleteAlert = true
+                onAction(.requestDeleteTrackList(row.id))
             } label: {
                 Label("Удалить", systemImage: "trash")
             }

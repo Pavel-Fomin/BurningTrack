@@ -464,3 +464,7 @@ private extension AppSheet {
         }
     }
 }
+
+// MARK: - TrackListsPresenting
+
+extension SheetManager: TrackListsPresenting {}

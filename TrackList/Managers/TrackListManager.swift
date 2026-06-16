@@ -152,3 +152,17 @@ final class TrackListManager {
         !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 }
+
+// MARK: - TrackListManaging
+
+extension TrackListManager: TrackListManaging {
+
+    /// Сохраняет треки и уведомляет об изменении списка треклистов.
+    nonisolated func saveTracks(_ tracks: [Track], for id: UUID) -> Bool {
+        saveTracks(
+            tracks,
+            for: id,
+            postTrackListsDidChange: true
+        )
+    }
+}

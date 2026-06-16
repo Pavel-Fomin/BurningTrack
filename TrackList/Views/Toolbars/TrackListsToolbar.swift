@@ -10,6 +10,8 @@
 import SwiftUI
 
 struct TrackListsToolbar: ViewModifier {
+    /// Запрашивает создание нового треклиста.
+    let onCreateTrackList: () -> Void
 
     // MARK: - UI
 
@@ -21,7 +23,7 @@ struct TrackListsToolbar: ViewModifier {
                 trailing: {
                     Menu {
                         Button {
-                            SheetManager.shared.presentCreateTrackList()
+                            onCreateTrackList()
                         } label: {
                             Label("Новый треклист", systemImage: "plus")
                     
@@ -38,7 +40,13 @@ struct TrackListsToolbar: ViewModifier {
 // MARK: - Modifier
 extension View {
     
-    func trackListsToolbar() -> some View {
-        self.modifier(TrackListsToolbar())
+    func trackListsToolbar(
+        onCreateTrackList: @escaping () -> Void
+    ) -> some View {
+        self.modifier(
+            TrackListsToolbar(
+                onCreateTrackList: onCreateTrackList
+            )
+        )
     }
 }
