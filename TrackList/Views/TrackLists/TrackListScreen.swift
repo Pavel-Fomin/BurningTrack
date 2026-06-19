@@ -12,7 +12,7 @@ import SwiftUI
 
 struct TrackListScreen: View {
     let trackList: TrackList
-    @ObservedObject var playerViewModel: PlayerViewModel
+    let playerViewModel: PlayerViewModel
     @StateObject private var viewModel: TrackListViewModel
 
     /// Фабрика production ViewModel для detail-flow одного треклиста.
@@ -37,7 +37,8 @@ struct TrackListScreen: View {
         _viewModel = StateObject(
             wrappedValue: Self.viewModelFactory.make(
                 trackList: trackList,
-                playerManager: playerViewModel.playerManager
+                playerManager: playerViewModel.playerManager,
+                playbackStateProvider: playerViewModel
             )
         )
     }
@@ -64,26 +65,5 @@ struct TrackListScreen: View {
                 }
             )
         }
-        .onAppear {
-            updatePlaybackState()
-        }
-        .onChange(of: playerViewModel.currentTrackDisplayable?.id) { _, _ in
-            updatePlaybackState()
-        }
-        .onChange(of: playerViewModel.currentContext) { _, _ in
-            updatePlaybackState()
-        }
-        .onChange(of: playerViewModel.isPlaying) { _, _ in
-            updatePlaybackState()
-        }
-    }
-
-    /// Синхронизирует playback-состояние ViewModel с плеером.
-    private func updatePlaybackState() {
-        viewModel.updatePlaybackState(
-            currentTrackId: playerViewModel.currentTrackDisplayable?.id,
-            currentContext: playerViewModel.currentContext,
-            isPlaying: playerViewModel.isPlaying
-        )
     }
 }

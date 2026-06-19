@@ -16,11 +16,13 @@ struct TrackListsScreen: View {
     @ObservedObject var trackListsViewModel: TrackListsViewModel
     @ObservedObject var playerViewModel: PlayerViewModel
 
+    /// Фабрика production action handler для master-flow списка треклистов.
+    private let actionHandlerFactory = TrackListsActionHandlerFactory()
+
     /// Обрабатывает действия экрана списка треклистов.
     private var actionHandler: TrackListsActionHandler {
-        TrackListsActionHandler(
-            viewModel: trackListsViewModel,
-            presenter: SheetManager.shared
+        actionHandlerFactory.make(
+            viewModel: trackListsViewModel
         )
     }
 

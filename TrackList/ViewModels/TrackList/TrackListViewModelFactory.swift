@@ -14,7 +14,8 @@ struct TrackListViewModelFactory {
     /// Создаёт production ViewModel для detail-flow одного треклиста.
     func make(
         trackList: TrackList,
-        playerManager: PlayerManager
+        playerManager: PlayerManager,
+        playbackStateProvider: any PlaybackStateProviding
     ) -> TrackListViewModel {
         TrackListViewModel(
             trackList: trackList,
@@ -30,6 +31,7 @@ struct TrackListViewModelFactory {
             toastPresenter: ToastManager.shared,
             commandExecutor: AppCommandExecutor.shared,
             eventProvider: NotificationTrackListEventProvider(),
+            playbackStateProvider: playbackStateProvider,
             runtimeSnapshotProvider: TrackRuntimeStore.shared,
             runtimeSnapshotBuilder: TrackRuntimeSnapshotBuilder.shared
         )

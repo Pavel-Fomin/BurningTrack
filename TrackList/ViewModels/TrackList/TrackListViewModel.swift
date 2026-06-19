@@ -40,6 +40,8 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
     private let commandExecutor: any TrackListCommandExecuting
     /// Предоставляет события, влияющие на экран одного треклиста.
     private let eventProvider: any TrackListEventProviding
+    /// Предоставляет playback-состояние без прямой подписки View на PlayerViewModel.
+    private let playbackStateProvider: any PlaybackStateProviding
     /// Предоставляет сохранённые runtime snapshot треков.
     private let runtimeSnapshotProvider: any TrackRuntimeSnapshotProviding
     /// Создаёт runtime snapshot треков.
@@ -67,6 +69,7 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
         toastPresenter: any ToastPresenting,
         commandExecutor: any TrackListCommandExecuting,
         eventProvider: any TrackListEventProviding,
+        playbackStateProvider: any PlaybackStateProviding,
         runtimeSnapshotProvider: any TrackRuntimeSnapshotProviding,
         runtimeSnapshotBuilder: any TrackRuntimeSnapshotBuilding
     ) {
@@ -76,12 +79,23 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
         self.toastPresenter = toastPresenter
         self.commandExecutor = commandExecutor
         self.eventProvider = eventProvider
+        self.playbackStateProvider = playbackStateProvider
         self.runtimeSnapshotProvider = runtimeSnapshotProvider
         self.runtimeSnapshotBuilder = runtimeSnapshotBuilder
         self.currentListId = trackList.id
         self.name = trackList.name
         self.tracks = trackList.tracks
-        rebuildScreenState()
+        applyPlaybackState(playbackStateProvider.playbackState)
+
+        playbackStateProvider.playbackStatePublisher
+            .sink { [weak self] playbackState in
+                guard let self else { return }
+
+                Task { @MainActor in
+                    self.applyPlaybackState(playbackState)
+                }
+            }
+            .store(in: &cancellables)
         
         eventProvider.trackDidUpdate
             .sink { [weak self] updateEvent in
@@ -124,27 +138,6 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
                 }
             }
             .store(in: &cancellables)
-    }
-    
-    // Заглушка. Мы ушли от активного треклиста.
-    init(
-        fileRenamer: any TrackFileRenaming,
-        trackListManager: any TrackListManaging,
-        trackListsManager: any TrackListsManaging,
-        toastPresenter: any ToastPresenting,
-        commandExecutor: any TrackListCommandExecuting,
-        eventProvider: any TrackListEventProviding,
-        runtimeSnapshotProvider: any TrackRuntimeSnapshotProviding,
-        runtimeSnapshotBuilder: any TrackRuntimeSnapshotBuilding
-    ) {
-        self.fileRenamer = fileRenamer
-        self.trackListManager = trackListManager
-        self.trackListsManager = trackListsManager
-        self.toastPresenter = toastPresenter
-        self.commandExecutor = commandExecutor
-        self.eventProvider = eventProvider
-        self.runtimeSnapshotProvider = runtimeSnapshotProvider
-        self.runtimeSnapshotBuilder = runtimeSnapshotBuilder
     }
 
     // MARK: - Rename
@@ -209,17 +202,11 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
 
     // MARK: - Screen State
 
-    /// Обновляет playback-состояние для пересборки состояния экрана.
-    func updatePlaybackState(
-        currentTrackId: UUID?,
-        currentContext: PlaybackContext?,
-        isPlaying: Bool,
-        highlightedRowId: UUID? = nil
-    ) {
-        self.currentTrackId = currentTrackId
-        self.currentContext = currentContext
-        self.isPlaybackActive = isPlaying
-        self.highlightedRowId = highlightedRowId
+    /// Применяет playback-состояние к локальному состоянию экрана.
+    private func applyPlaybackState(_ playbackState: PlaybackState) {
+        currentTrackId = playbackState.currentDisplayableId
+        currentContext = playbackState.currentContext
+        isPlaybackActive = playbackState.isPlaying
 
         rebuildScreenState()
     }

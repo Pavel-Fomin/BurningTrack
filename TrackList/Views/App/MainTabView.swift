@@ -22,14 +22,12 @@ struct MainTabView: View {
     @ObservedObject private var nav = NavigationCoordinator.shared
 
     @ObservedObject var playerViewModel: PlayerViewModel
-    
-    /// Сборка production-зависимостей TrackLists-flow.
-    @StateObject private var trackListsVM = TrackListsViewModel(
-        trackListsManager: TrackListsManager.shared,
-        trackListManager: TrackListManager.shared,
-        toastPresenter: ToastManager.shared,
-        eventProvider: NotificationTrackListsEventProvider()
-    )
+
+    /// Фабрика production ViewModel для master-flow списка треклистов.
+    private static let trackListsViewModelFactory = TrackListsViewModelFactory()
+
+    /// ViewModel master-flow списка треклистов.
+    @StateObject private var trackListsVM = Self.trackListsViewModelFactory.make()
     
     
 // MARK: - UI
