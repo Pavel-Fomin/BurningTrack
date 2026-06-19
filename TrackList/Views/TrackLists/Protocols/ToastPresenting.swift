@@ -18,3 +18,11 @@ protocol ToastPresenting {
     /// Показывает ошибку пользовательского уровня.
     func handle(_ error: AppError)
 }
+
+extension ToastPresenting {
+
+    /// Показывает пользовательское событие со стандартной длительностью.
+    func handle(_ event: ToastEvent) {
+        handle(event, duration: 2.0)
+    }
+}

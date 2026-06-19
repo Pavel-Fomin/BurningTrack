@@ -37,7 +37,7 @@ struct TrackListScreen: View {
         _viewModel = StateObject(
             wrappedValue: Self.viewModelFactory.make(
                 trackList: trackList,
-                playerManager: playerViewModel.playerManager,
+                playerManager: playerViewModel.fileOperationPlayerManager,
                 playbackStateProvider: playerViewModel
             )
         )

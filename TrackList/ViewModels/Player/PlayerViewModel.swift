@@ -33,8 +33,6 @@ final class PlayerViewModel: ObservableObject {
     @Published var currentContext: PlaybackContext?                  /// Контекст воспроизведения (плеер / треклист / фонотека)
     @Published private(set) var snapshotsByTrackId: [UUID: TrackRuntimeSnapshot] = [:] /// Runtime snapshot треков по id
     
-    private var nowPlayingArtworkByTrackId: [UUID: CGImage] = [:]
-    
     // MARK: - MiniPlayer State
     
     /// Статическое состояние мини-плеера (обновляется редко).
@@ -52,88 +50,94 @@ final class PlayerViewModel: ObservableObject {
     
     // MARK: - Внутренние зависимости
     
-    let playerManager = PlayerManager()
-    private var playerTracksContext: [PlayerTrack] = []     /// Контекст плеера
-    private var trackListContext: [Track] = []              /// Контекст треклиста
-    private var libraryTracksContext: [LibraryTrack] = []   /// Контекст фонотеки
-    
+    private let playerManager: any PlayerManaging
+    private let playbackContextStore: PlayerPlaybackContextStore
+    private let nowPlayingSnapshotBuilder: any NowPlayingSnapshotBuilding
+    private let runtimeSnapshotController: PlayerRuntimeSnapshotController
+    private let eventObserver: any PlayerEventObserving
+    /// Показывает пользовательские ошибки без прямой зависимости от ToastManager.shared.
+    private let toastPresenter: any ToastPresenting
+
+    /// Конкретный PlayerManager нужен сценариям файловых операций,
+    /// где используется проверка занятости трека.
+    private let concretePlayerManager: PlayerManager?
+
+    /// Отдаёт тот же PlayerManager для файловых операций вне playback-слоя.
+    var fileOperationPlayerManager: PlayerManager {
+        guard let concretePlayerManager else {
+            preconditionFailure("Для файловых операций требуется PlayerManager")
+        }
+
+        return concretePlayerManager
+    }
+
     // MARK: - Now Playing Snapshot
     
     /// Собирает snapshot для Control Center из текущего состояния.
     /// Источник метаданных — TrackRuntimeSnapshot.
     /// Artwork используется отдельного размера (~512 px).
     private func makeNowPlayingSnapshot(for track: any TrackDisplayable) -> NowPlayingSnapshot {
-        
-        let snapshot = snapshotsByTrackId[track.trackId]
-        let shouldShowTags = AppSettingsManager.shared.settings.visible.metadata.isTagReadingEnabled
-        
-        return NowPlayingSnapshot(
-            title: shouldShowTags ? (snapshot?.title ?? track.fileName) : track.fileName,
-            artist: shouldShowTags ? (snapshot?.artist ?? "") : "",
-            artwork: shouldShowTags ? nowPlayingArtworkByTrackId[track.trackId] : nil,
+        nowPlayingSnapshotBuilder.makeSnapshot(
+            track: track,
+            runtimeSnapshot: runtimeSnapshotController.snapshot(for: track.trackId),
+            artwork: runtimeSnapshotController.nowPlayingArtwork(for: track.trackId),
             currentTime: currentTime,
-            duration: snapshot?.duration ?? trackDuration,
+            fallbackDuration: trackDuration,
             isPlaying: isPlaying
         )
+    }
+
+    /// Публикует наружу актуальное зеркало runtime snapshot-ов контроллера.
+    private func publishRuntimeSnapshots() {
+        snapshotsByTrackId = runtimeSnapshotController.snapshotsByTrackId
     }
     
     // MARK: - Инициализация
     
-    init() {
+    init(
+        playerManager: any PlayerManaging = PlayerManager(),
+        playbackContextStore: PlayerPlaybackContextStore = PlayerPlaybackContextStore(),
+        nowPlayingSnapshotBuilder: any NowPlayingSnapshotBuilding = NowPlayingSnapshotBuilder(),
+        runtimeSnapshotController: PlayerRuntimeSnapshotController = PlayerRuntimeSnapshotController(),
+        eventObserver: any PlayerEventObserving = NotificationPlayerEventObserver(),
+        toastPresenter: (any ToastPresenting)? = nil
+    ) {
+        self.playerManager = playerManager
+        self.playbackContextStore = playbackContextStore
+        self.nowPlayingSnapshotBuilder = nowPlayingSnapshotBuilder
+        self.runtimeSnapshotController = runtimeSnapshotController
+        self.eventObserver = eventObserver
+        self.toastPresenter = toastPresenter ?? ToastManager.shared
+        self.concretePlayerManager = playerManager as? PlayerManager
+
         // Обновление длительности трека
-        NotificationCenter.default.addObserver(
-            forName: .trackDurationUpdated,
-            object: nil,
-            queue: .main
-        ) { [weak self] notification in
-            if let duration = notification.userInfo?["duration"] as? TimeInterval {
-                Task { @MainActor in
-                    guard let self else { return }
-                    
-                    self.trackDuration = duration
-                    self.updateMiniPlayerProgressState()
-                    
-                    // Если есть текущий трек — пересобираем snapshot
-                    if let current = self.currentTrackDisplayable {
-                        self.playerManager.applyNowPlaying(
-                            snapshot: self.makeNowPlayingSnapshot(for: current)
-                        )
-                    }
-                }
+        eventObserver.onTrackDurationUpdated = { [weak self] duration in
+            guard let self else { return }
+
+            self.trackDuration = duration
+            self.updateMiniPlayerProgressState()
+
+            // Если есть текущий трек — пересобираем snapshot
+            if let current = self.currentTrackDisplayable {
+                self.playerManager.applyNowPlaying(
+                    snapshot: self.makeNowPlayingSnapshot(for: current)
+                )
             }
         }
         
         // Автопереход к следующему треку по завершении
-        NotificationCenter.default.addObserver(
-            forName: .trackDidFinish,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { await self?.playNextTrack() }
+        eventObserver.onTrackDidFinish = { [weak self] in
+            self?.playNextTrack()
         }
+
         // Обновление runtime snapshot трека
-        NotificationCenter.default.addObserver(
-            forName: .trackDidUpdate,
-            object: nil,
-            queue: .main
-        ) { [weak self] notification in
-            guard let self else { return }
-            guard let updateEvent = notification.object as? TrackUpdateEvent else { return }
-            
-            Task { @MainActor in
-                self.applyTrackUpdateEvent(updateEvent)
-            }
+        eventObserver.onTrackDidUpdate = { [weak self] event in
+            self?.applyTrackUpdateEvent(event)
         }
 
         // Обновление runtime snapshot после изменения настроек приложения
-        NotificationCenter.default.addObserver(
-            forName: .appSettingsDidChange,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in
-                self?.reloadSnapshotsAfterSettingsChange()
-            }
+        eventObserver.onSettingsChanged = { [weak self] in
+            self?.reloadSnapshotsAfterSettingsChange()
         }
         
         // Настройка Remote Command Center
@@ -169,75 +173,38 @@ final class PlayerViewModel: ObservableObject {
     /// - Parameter trackId: Идентификатор трека
     /// - Returns: TrackRuntimeSnapshot или nil
     func snapshot(for trackId: UUID) -> TrackRuntimeSnapshot? {
-        snapshotsByTrackId[trackId]
+        runtimeSnapshotController.snapshot(for: trackId)
     }
     
     /// Запрашивает runtime snapshot трека, если он ещё не загружен.
     ///
     /// - Parameter trackId: Идентификатор трека
     func requestSnapshotIfNeeded(for trackId: UUID) {
-        
-        if snapshotsByTrackId[trackId] != nil { return }
-        
         Task {
-            // 1. Получаем snapshot из store или собираем через builder.
-            let snapshot: TrackRuntimeSnapshot?
-            
-            if let storedSnapshot = TrackRuntimeStore.shared.snapshot(forTrackId: trackId) {
-                snapshot = storedSnapshot
-            } else {
-                snapshot = await TrackRuntimeSnapshotBuilder.shared.buildSnapshot(forTrackId: trackId)
-            }
-            
-            guard let snapshot else { return }
-            
-            // 2. Большой artwork для Lock Screen / Control Center (512px)
-            // Берём СЫРЫЕ данные из snapshot и строим CGImage через ImageDownsampler.
-            let nowPlayingCGImage: CGImage? = {
-                guard let data = snapshot.artworkData else { return nil }
-                return makeThumbnail(from: data, maxPixel: ArtworkPurposeSizes.maxPixel(for: .nowPlaying))
-            }()
-            
-            await MainActor.run {
-                // 3. Сохраняем snapshot локально для плеера.
-                snapshotsByTrackId[trackId] = snapshot
-                
-                if let nowPlayingCGImage {
-                    nowPlayingArtworkByTrackId[trackId] = nowPlayingCGImage
-                }
-                
-                if let current = currentTrackDisplayable,
-               current.trackId == trackId {
-                    self.updateMiniPlayerStaticState(for: current)
-                    playerManager.applyNowPlaying(
-                        snapshot: makeNowPlayingSnapshot(for: current)
-                    )
-                }
+            let changedTrackId = await runtimeSnapshotController.requestSnapshotIfNeeded(for: trackId)
+
+            guard let changedTrackId else { return }
+
+            publishRuntimeSnapshots()
+
+            if let current = currentTrackDisplayable,
+               current.trackId == changedTrackId {
+                updateMiniPlayerStaticState(for: current)
+                playerManager.applyNowPlaying(
+                    snapshot: makeNowPlayingSnapshot(for: current)
+                )
             }
         }
     }
 
     /// Пересобирает runtime snapshot известных плееру треков после изменения настроек приложения.
     private func reloadSnapshotsAfterSettingsChange() {
-        snapshotsByTrackId.removeAll()
-        nowPlayingArtworkByTrackId.removeAll()
-        var trackIds = Set<UUID>()
+        runtimeSnapshotController.clear()
+        publishRuntimeSnapshots()
 
-        if let currentTrackDisplayable {
-            trackIds.insert(currentTrackDisplayable.trackId)
-        }
-
-        for track in playerTracksContext {
-            trackIds.insert(track.trackId)
-        }
-
-        for track in trackListContext {
-            trackIds.insert(track.trackId)
-        }
-
-        for track in libraryTracksContext {
-            trackIds.insert(track.trackId)
-        }
+        let trackIds = playbackContextStore.allTrackIds(
+            currentTrack: currentTrackDisplayable
+        )
 
         for trackId in trackIds {
             requestSnapshotIfNeeded(for: trackId)
@@ -255,24 +222,12 @@ final class PlayerViewModel: ObservableObject {
     ///
     /// - Parameter updateEvent: Событие обновления трека
     private func applyTrackUpdateEvent(_ updateEvent: TrackUpdateEvent) {
-        
-        let trackId = updateEvent.trackId
-        
-        // 1. Обновляем локальный snapshot.
-        snapshotsByTrackId[trackId] = updateEvent.snapshot
-        
-        // 2. Сбрасываем старую now playing обложку.
-        nowPlayingArtworkByTrackId[trackId] = nil
-        
-        // 3. Пересобираем now playing artwork из нового snapshot.
-        if let data = updateEvent.snapshot.artworkData,
-           let cgImage = makeThumbnail(from: data, maxPixel: ArtworkPurposeSizes.maxPixel(for: .nowPlaying)) {
-            nowPlayingArtworkByTrackId[trackId] = cgImage
-        }
-        
-        // 4. Если обновился текущий трек — обновляем mini player и Now Playing.
+        let changedTrackId = runtimeSnapshotController.applyTrackUpdateEvent(updateEvent)
+
+        publishRuntimeSnapshots()
+
         if let current = currentTrackDisplayable,
-           current.trackId == trackId {
+           current.trackId == changedTrackId {
             updateMiniPlayerStaticState(for: current)
             playerManager.applyNowPlaying(
                 snapshot: makeNowPlayingSnapshot(for: current)
@@ -285,7 +240,7 @@ final class PlayerViewModel: ObservableObject {
     /// Пересобирает статическое состояние мини-плеера из текущего трека и runtime snapshot.
     private func updateMiniPlayerStaticState(for track: any TrackDisplayable) {
         
-        let snapshot = snapshotsByTrackId[track.trackId]
+        let snapshot = runtimeSnapshotController.snapshot(for: track.trackId)
 
         miniPlayerStaticState = MiniPlayerStateBuilder.buildStaticState(
             track: track,
@@ -330,24 +285,10 @@ final class PlayerViewModel: ObservableObject {
         updateMiniPlayerProgressState()
         
         // Обновляем контексты
-        if track is PlayerTrack {
-            playerTracksContext = context.compactMap { $0 as? PlayerTrack }
-            trackListContext = []
-            libraryTracksContext = []
-        } else if track is Track {
-            trackListContext = context.compactMap { $0 as? Track }
-            playerTracksContext = []
-            libraryTracksContext = []
-        } else if track is LibraryTrack {
-            libraryTracksContext = context.compactMap { $0 as? LibraryTrack }
-            trackListContext = []
-            playerTracksContext = []
-        } else {
-            // Неизвестный тип — на всякий случай чистим всё
-            playerTracksContext = []
-            trackListContext = []
-            libraryTracksContext = []
-        }
+        playbackContextStore.updateContext(
+            currentTrack: track,
+            context: context
+        )
         
         // Стартуем воспроизведение через PlayerManager
         Task { @MainActor in
@@ -376,11 +317,11 @@ final class PlayerViewModel: ObservableObject {
             } catch let appError as AppError {
                 isPlaying = false
                 updateMiniPlayerProgressState()
-                ToastManager.shared.handle(appError)
+                toastPresenter.handle(appError)
             } catch {
                 isPlaying = false
                 updateMiniPlayerProgressState()
-                ToastManager.shared.handle(.playbackFailed(title: track.title ?? track.fileName))
+                toastPresenter.handle(.playbackFailed(title: track.title ?? track.fileName))
             }
         }
         
@@ -426,25 +367,9 @@ final class PlayerViewModel: ObservableObject {
     /// Следующий трек в текущем контексте
     func playNextTrack() {
         guard let current = currentTrackDisplayable else { return }
-        
-        if let libTrack = current as? LibraryTrack {
-            guard let index = libraryTracksContext.firstIndex(where: { $0.id == libTrack.id }),
-                  index + 1 < libraryTracksContext.count else { return }
-            
-            play(track: libraryTracksContext[index + 1], context: libraryTracksContext)
-            
-        } else if let track = current as? Track {
-            guard let index = trackListContext.firstIndex(where: { $0.id == track.id }),
-                  index + 1 < trackListContext.count else { return }
-            
-            play(track: trackListContext[index + 1], context: trackListContext)
-            
-        } else if let playerTrack = current as? PlayerTrack {
-            guard let index = playerTracksContext.firstIndex(where: { $0.id == playerTrack.id }),
-                  index + 1 < playerTracksContext.count else { return }
-            
-            play(track: playerTracksContext[index + 1], context: playerTracksContext)
-        }
+        guard let next = playbackContextStore.nextTrack(after: current) else { return }
+
+        play(track: next.track, context: next.context)
     }
     
     /// Предыдущий трек в текущем контексте
@@ -452,28 +377,13 @@ final class PlayerViewModel: ObservableObject {
         guard let current = currentTrackDisplayable else { return }
         
         if currentTime > 3 {
-               seek(to: 0)
-               return
-           }
-        
-        if let libTrack = current as? LibraryTrack {
-            guard let index = libraryTracksContext.firstIndex(where: { $0.id == libTrack.id }),
-                  index - 1 >= 0 else { return }
-            
-            play(track: libraryTracksContext[index - 1], context: libraryTracksContext)
-            
-        } else if let track = current as? Track {
-            guard let index = trackListContext.firstIndex(where: { $0.id == track.id }),
-                  index - 1 >= 0 else { return }
-            
-            play(track: trackListContext[index - 1], context: trackListContext)
-            
-        } else if let playerTrack = current as? PlayerTrack {
-            guard let index = playerTracksContext.firstIndex(where: { $0.id == playerTrack.id }),
-                  index - 1 >= 0 else { return }
-            
-            play(track: playerTracksContext[index - 1], context: playerTracksContext)
+            seek(to: 0)
+            return
         }
+
+        guard let previous = playbackContextStore.previousTrack(before: current) else { return }
+
+        play(track: previous.track, context: previous.context)
     }
     
     
@@ -492,6 +402,5 @@ final class PlayerViewModel: ObservableObject {
     
     deinit {
         playerManager.removeTimeObserver()
-        NotificationCenter.default.removeObserver(self)
     }
 }

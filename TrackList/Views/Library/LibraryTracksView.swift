@@ -82,7 +82,7 @@ struct LibraryTracksView: View {
             wrappedValue: LibraryTracksViewModel(
                 folderURL: folder.url,
                 renameActionHandler: TrackFileRenameActionHandler(
-                    playerManager: playerViewModel.playerManager,
+                    playerManager: playerViewModel.fileOperationPlayerManager,
                     sheetManager: SheetManager.shared,
                     commandExecutor: AppCommandExecutor.shared,
                     toastManager: ToastManager.shared,
@@ -272,10 +272,10 @@ struct LibraryTracksView: View {
 
         sheetManager.presentBatchFilenameRename(
             flow: tracksViewModel.batchFilenameRenameFlow,
-            playerManager: playerViewModel.playerManager,
+            playerManager: playerViewModel.fileOperationPlayerManager,
             onApply: {
                 await tracksViewModel.applyBatchFilenameRename(
-                    using: playerViewModel.playerManager
+                    using: playerViewModel.fileOperationPlayerManager
                 )
             }
         )

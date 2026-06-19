@@ -16,7 +16,7 @@ struct PlayerFlowActionHandlerFactory {
         playerViewModel: PlayerViewModel
     ) -> PlayerFlowActionHandler {
         let trackFileRenameActionHandler = TrackFileRenameActionHandler(
-            playerManager: playerViewModel.playerManager,
+            playerManager: playerViewModel.fileOperationPlayerManager,
             sheetManager: SheetManager.shared,
             commandExecutor: AppCommandExecutor.shared,
             toastManager: ToastManager.shared,

@@ -45,7 +45,7 @@ struct ContentView: View {
         MainTabView(
             playerViewModel: playerViewModel
         )
-        .sheetHost(playerManager: playerViewModel.playerManager)
+        .sheetHost(playerManager: playerViewModel.fileOperationPlayerManager)
         .toastHost()
     }
 }
