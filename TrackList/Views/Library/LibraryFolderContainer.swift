@@ -18,7 +18,6 @@ struct LibraryFolderContainer: View {
     let folder: LibraryFolder
     let revealRequest: LibraryRevealRequest?
     let onRevealHandled: (UUID) -> Void
-    let trackListViewModel: TrackListViewModel
     let playerViewModel: PlayerViewModel
     @Binding var selectionActionBarConfig: SelectionActionBarConfig?
 
@@ -28,14 +27,12 @@ struct LibraryFolderContainer: View {
         folder: LibraryFolder,
         revealRequest: LibraryRevealRequest? = nil,
         onRevealHandled: @escaping (UUID) -> Void = { _ in },
-        trackListViewModel: TrackListViewModel,
         playerViewModel: PlayerViewModel,
         selectionActionBarConfig: Binding<SelectionActionBarConfig?>
     ) {
         self.folder = folder
         self.revealRequest = revealRequest
         self.onRevealHandled = onRevealHandled
-        self.trackListViewModel = trackListViewModel
         self.playerViewModel = playerViewModel
         self._selectionActionBarConfig = selectionActionBarConfig
     }
@@ -47,7 +44,6 @@ struct LibraryFolderContainer: View {
             folder: folder,
             revealRequest: revealRequest,
             onRevealHandled: onRevealHandled,
-            trackListViewModel: trackListViewModel,
             playerViewModel: playerViewModel,
             selectionActionBarConfig: $selectionActionBarConfig
         )
@@ -62,7 +58,6 @@ private struct LibraryFolderContent: View {
     let folder: LibraryFolder
     let revealRequest: LibraryRevealRequest?
     let onRevealHandled: (UUID) -> Void
-    let trackListViewModel: TrackListViewModel
     let playerViewModel: PlayerViewModel
     @Binding var selectionActionBarConfig: SelectionActionBarConfig?
 
@@ -76,14 +71,12 @@ private struct LibraryFolderContent: View {
         folder: LibraryFolder,
         revealRequest: LibraryRevealRequest?,
         onRevealHandled: @escaping (UUID) -> Void,
-        trackListViewModel: TrackListViewModel,
         playerViewModel: PlayerViewModel,
         selectionActionBarConfig: Binding<SelectionActionBarConfig?>
     ) {
         self.folder = folder
         self.revealRequest = revealRequest
         self.onRevealHandled = onRevealHandled
-        self.trackListViewModel = trackListViewModel
         self.playerViewModel = playerViewModel
         self._selectionActionBarConfig = selectionActionBarConfig
         self._viewModel = StateObject(wrappedValue: LibraryFolderViewModel(folder: folder))
@@ -95,7 +88,6 @@ private struct LibraryFolderContent: View {
         LibraryFolderView(
             revealRequest: revealRequest,
             onRevealHandled: onRevealHandled,
-            trackListViewModel: trackListViewModel,
             playerViewModel: playerViewModel,
             selectionActionBarConfig: $selectionActionBarConfig
         )

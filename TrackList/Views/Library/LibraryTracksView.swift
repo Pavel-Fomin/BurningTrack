@@ -30,7 +30,6 @@ struct LibraryTracksView: View {
     let folder: LibraryFolder
     let revealRequest: LibraryRevealRequest?
     let onRevealHandled: (UUID) -> Void
-    let trackListViewModel: TrackListViewModel
     @Binding var selectionActionBarConfig: SelectionActionBarConfig?
 
     @ObservedObject var playerViewModel: PlayerViewModel
@@ -70,14 +69,12 @@ struct LibraryTracksView: View {
         folder: LibraryFolder,
         revealRequest: LibraryRevealRequest? = nil,
         onRevealHandled: @escaping (UUID) -> Void = { _ in },
-        trackListViewModel: TrackListViewModel,
         playerViewModel: PlayerViewModel,
         selectionActionBarConfig: Binding<SelectionActionBarConfig?> = .constant(nil)
     ) {
         self.folder = folder
         self.revealRequest = revealRequest
         self.onRevealHandled = onRevealHandled
-        self.trackListViewModel = trackListViewModel
         self.playerViewModel = playerViewModel
         self._selectionActionBarConfig = selectionActionBarConfig
         self._pendingRevealRequest = State(initialValue: revealRequest)
@@ -149,7 +146,6 @@ struct LibraryTracksView: View {
                 LibraryTrackSectionsListView(
                     sections: tracksViewModel.trackSections,
                     allTracks: allVisibleTracks,
-                    trackListViewModel: trackListViewModel,
                     trackListNamesById: tracksViewModel.trackListNamesById,
                     metadataProvider: tracksViewModel,
                     playerViewModel: playerViewModel,

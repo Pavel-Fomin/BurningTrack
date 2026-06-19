@@ -21,7 +21,6 @@ struct MainTabView: View {
     @ObservedObject private var scene = ScenePhaseHandler.shared
     @ObservedObject private var nav = NavigationCoordinator.shared
 
-    @ObservedObject var trackListViewModel: TrackListViewModel
     @ObservedObject var playerViewModel: PlayerViewModel
     
     /// Сборка production-зависимостей TrackLists-flow.
@@ -41,8 +40,7 @@ struct MainTabView: View {
 // MARK: - Плеер
             
             PlayerScreen(
-                playerViewModel: playerViewModel,
-                trackListViewModel: trackListViewModel
+                playerViewModel: playerViewModel
             )
                 .tabItem { Label("Плеер", systemImage: "waveform") }
                 .tag(ScenePhaseHandler.Tab.player)
@@ -50,8 +48,7 @@ struct MainTabView: View {
 // MARK: - Фонотека
             
             LibraryScreen(
-                playerViewModel: playerViewModel,
-                trackListViewModel: trackListViewModel
+                playerViewModel: playerViewModel
             )
                 .tabItem { Label("Фонотека", systemImage: "play.square.stack") }
                 .tag(ScenePhaseHandler.Tab.library)
@@ -60,8 +57,7 @@ struct MainTabView: View {
             
             TrackListsScreen(
                 trackListsViewModel: trackListsVM,
-                playerViewModel: playerViewModel,
-                trackListViewModel: trackListViewModel
+                playerViewModel: playerViewModel
             )
                 .tabItem { Label("Треклисты", systemImage: "list.star") }
                 .tag(ScenePhaseHandler.Tab.tracklists)
@@ -69,7 +65,6 @@ struct MainTabView: View {
 // MARK: - Настройки
             
             SettingsScreen(
-                trackListViewModel: trackListViewModel,
                 playerViewModel: playerViewModel
             )
                 .tabItem { Label("Настройки", systemImage: "gear") }

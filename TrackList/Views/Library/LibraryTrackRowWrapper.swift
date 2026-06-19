@@ -19,7 +19,6 @@ struct LibraryTrackRowWrapper: View {
     let track: LibraryTrack                       /// Текущий трек строки
     let allTracks: [LibraryTrack]                 /// Контекст всех треков (для переключения)
     
-    let trackListViewModel: TrackListViewModel    /// ViewModel треклистов (используется для действий)
     let trackListNamesById: [UUID: [String]]      /// Названия треклистов, в которые входит трек
     
     let metadataProvider: TrackMetadataProviding  /// Провайдер runtime snapshot

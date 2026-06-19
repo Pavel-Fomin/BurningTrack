@@ -19,7 +19,6 @@ struct MiniPlayerHostModifier: ViewModifier {
 
     // MARK: - Input
 
-    let trackListViewModel: TrackListViewModel
     @ObservedObject var playerViewModel: PlayerViewModel
 
     // MARK: - Body
@@ -27,7 +26,6 @@ struct MiniPlayerHostModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .bottomPanelsHost(
-                trackListViewModel: trackListViewModel,
                 playerViewModel: playerViewModel,
                 showsTopPanel: false
             ) {
@@ -44,12 +42,10 @@ extension View {
     ///
     /// Используется на уровне screen, а не в ContentView поверх TabView.
     func miniPlayerHost(
-        trackListViewModel: TrackListViewModel,
         playerViewModel: PlayerViewModel
     ) -> some View {
         modifier(
             MiniPlayerHostModifier(
-                trackListViewModel: trackListViewModel,
                 playerViewModel: playerViewModel
             )
         )

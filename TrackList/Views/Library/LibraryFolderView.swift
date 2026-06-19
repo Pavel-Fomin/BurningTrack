@@ -22,7 +22,6 @@ struct LibraryFolderView: View {
 
     let revealRequest: LibraryRevealRequest?
     let onRevealHandled: (UUID) -> Void
-    let trackListViewModel: TrackListViewModel
     let playerViewModel: PlayerViewModel
     @Binding var selectionActionBarConfig: SelectionActionBarConfig?
 
@@ -42,7 +41,6 @@ struct LibraryFolderView: View {
                     folder: viewModel.folder,
                     revealRequest: revealRequest,
                     onRevealHandled: onRevealHandled,
-                    trackListViewModel: trackListViewModel,
                     playerViewModel: playerViewModel,
                     selectionActionBarConfig: $selectionActionBarConfig
                 

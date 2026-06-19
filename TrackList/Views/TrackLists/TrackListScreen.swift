@@ -14,20 +14,30 @@ struct TrackListScreen: View {
     let trackList: TrackList
     @ObservedObject var playerViewModel: PlayerViewModel
     @StateObject private var viewModel: TrackListViewModel
-    
+
+    /// Фабрика production ViewModel для detail-flow одного треклиста.
+    private static let viewModelFactory = TrackListViewModelFactory()
+
+    /// Factory production-обработчика действий detail-flow.
+    private let actionHandlerFactory = TrackListFlowActionHandlerFactory()
+
+    /// Обработчик действий detail-flow одного треклиста.
+    private var actionHandler: TrackListFlowActionHandler {
+        actionHandlerFactory.make(
+            reader: viewModel,
+            playbackManager: playerViewModel,
+            mutator: viewModel,
+            renamer: viewModel
+        )
+    }
+
     init(trackList: TrackList, playerViewModel: PlayerViewModel) {
         self.trackList = trackList
         self.playerViewModel = playerViewModel
         _viewModel = StateObject(
-            wrappedValue: TrackListViewModel(
+            wrappedValue: Self.viewModelFactory.make(
                 trackList: trackList,
-                renameActionHandler: TrackFileRenameActionHandler(
-                    playerManager: playerViewModel.playerManager,
-                    sheetManager: SheetManager.shared,
-                    commandExecutor: AppCommandExecutor.shared,
-                    toastManager: ToastManager.shared,
-                    proposalBuilder: FileRenameProposalBuilder()
-                )
+                playerManager: playerViewModel.playerManager
             )
         )
     }
@@ -35,55 +45,45 @@ struct TrackListScreen: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                
-                TrackListView(
-                    trackListViewModel: viewModel,
-                    playerViewModel: playerViewModel
-                )
+                if let screenState = viewModel.screenState {
+                    TrackListView(
+                        state: screenState,
+                        onAction: { action in
+                            actionHandler.handle(action)
+                        },
+                        onRequestSnapshot: { trackId in
+                            viewModel.requestSnapshotIfNeeded(for: trackId)
+                        }
+                    )
+                }
             }
             .trackListToolbar(
-                viewModel: viewModel,
-                onAddTrack: {
-                    guard let trackListId = viewModel.currentListId else { return }
-
-                    SheetManager.shared.presentNewTrackListSelectionForAppend(
-                        trackListId: trackListId
-                    )
-                },
-                onExport: handleExport,
-                onRename: {
-                    SheetManager.shared.presentRenameTrackList(
-                        trackListId: viewModel.currentListId!,
-                        currentName: viewModel.name
-                    )
+                title: viewModel.screenState?.title ?? viewModel.name,
+                onAction: { action in
+                    actionHandler.handle(action)
                 }
             )
         }
+        .onAppear {
+            updatePlaybackState()
+        }
+        .onChange(of: playerViewModel.currentTrackDisplayable?.id) { _, _ in
+            updatePlaybackState()
+        }
+        .onChange(of: playerViewModel.currentContext) { _, _ in
+            updatePlaybackState()
+        }
+        .onChange(of: playerViewModel.isPlaying) { _, _ in
+            updatePlaybackState()
+        }
     }
-    
-    private func handleExport() {
-        let tracks = viewModel.tracks
-        
-        guard !tracks.isEmpty else {
-            ToastManager.shared.handle(.noTracksToExport)
-            return
-        }
-        
-        if let topVC = UIApplication.topViewController() {
-            Task {
-                do {
-                    _ = try await ExportManager.shared.exportViaTempAndPicker(
-                        tracks,
-                        presenter: topVC
-                    )
-                } catch let appError as AppError {
-                    ToastManager.shared.handle(appError)
-                } catch {
-                    ToastManager.shared.handle(.exportFailed)
-                }
-            }
-        } else {
-            ToastManager.shared.handle(.presenterUnavailable)
-        }
+
+    /// Синхронизирует playback-состояние ViewModel с плеером.
+    private func updatePlaybackState() {
+        viewModel.updatePlaybackState(
+            currentTrackId: playerViewModel.currentTrackDisplayable?.id,
+            currentContext: playerViewModel.currentContext,
+            isPlaying: playerViewModel.isPlaying
+        )
     }
 }

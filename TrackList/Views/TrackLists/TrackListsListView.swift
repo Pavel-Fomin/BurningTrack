@@ -10,13 +10,13 @@
 import Foundation
 import SwiftUI
 
-struct TrackListsListView: View {
+struct TrackListsListView<Destination: View>: View {
     /// Готовое состояние экрана списка треклистов.
     let state: TrackListsScreenState
     /// Передаёт пользовательские действия обработчику экрана.
     let onAction: (TrackListsAction) -> Void
     /// Собирает экран выбранного треклиста.
-    let destination: (UUID) -> AnyView
+    let destination: (TrackListsRowState) -> Destination
     
     
     var body: some View {
@@ -57,9 +57,9 @@ struct TrackListsListView: View {
     
     @ViewBuilder
     private func trackListRow(for row: TrackListsRowState) -> some View {
-        NavigationLink(
-            destination: destination(row.id)
-        ) {
+        NavigationLink {
+            destination(row)
+        } label: {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(row.title)

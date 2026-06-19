@@ -24,6 +24,8 @@ struct TrackListsScreenState {
 struct TrackListsRowState: Identifiable {
     /// Идентификатор треклиста.
     let id: UUID
+    /// Модель треклиста для типизированной навигации.
+    let trackList: TrackList
     /// Название треклиста.
     let title: String
     /// Количество треков в треклисте.

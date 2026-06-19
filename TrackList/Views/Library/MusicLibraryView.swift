@@ -18,7 +18,6 @@ struct MusicLibraryView: View {
 
     // MARK: - Входные данные
 
-    let trackListViewModel: TrackListViewModel
     let playerViewModel: PlayerViewModel
     let onAddFolder: () -> Void
 

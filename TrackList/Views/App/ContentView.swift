@@ -27,7 +27,6 @@ struct ContentView: View {
     @ObservedObject private var scene = ScenePhaseHandler.shared
 
     @ObservedObject var playerViewModel: PlayerViewModel
-    let trackListViewModel: TrackListViewModel
 
     // MARK: - Обёртка для sheet(item:)
     
@@ -44,7 +43,6 @@ struct ContentView: View {
     
     var body: some View {
         MainTabView(
-            trackListViewModel: trackListViewModel,
             playerViewModel: playerViewModel
         )
         .sheetHost(playerManager: playerViewModel.playerManager)

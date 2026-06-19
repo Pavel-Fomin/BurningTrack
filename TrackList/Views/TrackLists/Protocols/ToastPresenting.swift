@@ -12,6 +12,9 @@ import Foundation
 @MainActor
 protocol ToastPresenting {
 
+    /// Показывает пользовательское событие с заданной длительностью.
+    func handle(_ event: ToastEvent, duration: TimeInterval)
+
     /// Показывает ошибку пользовательского уровня.
     func handle(_ error: AppError)
 }

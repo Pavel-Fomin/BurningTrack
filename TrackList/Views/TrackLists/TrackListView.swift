@@ -11,40 +11,60 @@ import SwiftUI
 import AVFoundation
 
 struct TrackListView: View {
-    @ObservedObject var trackListViewModel: TrackListViewModel
-    @ObservedObject var playerViewModel: PlayerViewModel
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.scenePhase) private var scenePhase
-    
-    
+    private let state: TrackListScreenState
+    private let onAction: (TrackListAction) -> Void
+    /// Запрашивает runtime snapshot трека для строки.
+    private let onRequestSnapshot: (UUID) -> Void
+
+    init(
+        state: TrackListScreenState,
+        onAction: @escaping (TrackListAction) -> Void,
+        onRequestSnapshot: @escaping (UUID) -> Void
+    ) {
+        self.state = state
+        self.onAction = onAction
+        self.onRequestSnapshot = onRequestSnapshot
+    }
+
     var body: some View {
         ZStack {
             ScrollViewReader { proxy in
                 List {
                     TrackListRowsView(
-                        tracks: trackListViewModel.tracks,
-                        metadataProvider: trackListViewModel,
-                        playerViewModel: playerViewModel,
-                        onTap: { track in
-                            if track.isAvailable {
-                                if (playerViewModel.currentTrackDisplayable as? Track)?.id == track.id {
-                                    playerViewModel.togglePlayPause()
-                                } else {
-                                    playerViewModel.play(track: track, context: trackListViewModel.tracks)
-                                }
-                            } else {print("❌ Трек недоступен: \(track.title ?? track.fileName)")}
+                        rows: state.rows,
+                        onRequestSnapshot: onRequestSnapshot,
+                        onTap: { rowId in
+                            onAction(.rowTapped(rowId: rowId))
                         },
-                        onDelete: { indexSet in
-                            trackListViewModel.removeTrack(at: indexSet)
+                        onDelete: { rowId in
+                            onAction(.deleteTrack(rowId: rowId))
                         },
                         onRenameTrack: { rowId, strategy in
-                            trackListViewModel.renameTrack(
-                                rowId: rowId,
-                                strategy: strategy
+                            onAction(
+                                .renameFile(
+                                    rowId: rowId,
+                                    strategy: strategy
+                                )
                             )
                         },
+                        onArtworkTap: { rowId in
+                            onAction(.artworkTapped(rowId: rowId))
+                        },
+                        onShowInLibrary: { rowId in
+                            onAction(.showInLibrary(rowId: rowId))
+                        },
+                        onMoveToFolder: { rowId in
+                            onAction(.moveToFolder(rowId: rowId))
+                        },
                         onMove: { source, destination in
-                            trackListViewModel.moveTrack(from: source, to: destination)
+                            onAction(
+                                .moveTrack(
+                                    from: source,
+                                    to: destination
+                                )
+                            )
                         }
                     )
                 }
@@ -54,7 +74,7 @@ struct TrackListView: View {
                 .onAppear {
                     scrollToCurrentTrackIfNeeded(using: proxy, animated: false)
                 }
-                .onChange(of: playerViewModel.currentTrackDisplayable?.id) { _, _ in
+                .onChange(of: state.scrollTargetRowId) { _, _ in
                     scrollToCurrentTrackIfNeeded(using: proxy, animated: true)
                 }
                 .onChange(of: scenePhase) { _, newPhase in
@@ -66,16 +86,14 @@ struct TrackListView: View {
     }
     
     private func scrollToCurrentTrackIfNeeded(using proxy: ScrollViewProxy, animated: Bool) {
-        guard playerViewModel.currentContext == .trackList else { return }
-        guard let currentTrackId = playerViewModel.currentTrackDisplayable?.id else { return }
-        guard trackListViewModel.tracks.contains(where: { $0.id == currentTrackId }) else { return }
+        guard let targetId = state.scrollTargetRowId else { return }
 
         if animated {
             withAnimation(.easeInOut(duration: 0.25)) {
-                proxy.scrollTo(currentTrackId, anchor: .center)
+                proxy.scrollTo(targetId, anchor: .center)
             }
         } else {
-            proxy.scrollTo(currentTrackId, anchor: .center)
+            proxy.scrollTo(targetId, anchor: .center)
         }
     }
 }
@@ -83,27 +101,69 @@ struct TrackListView: View {
             // MARK: - Компонент строк треков
 
             private struct TrackListRowsView: View {
-                let tracks: [Track]
-                let metadataProvider: TrackMetadataProviding
-                let playerViewModel: PlayerViewModel
-                let onTap: (Track) -> Void
-                let onDelete: (IndexSet) -> Void
+                let rows: [TrackListRowState]
+                let onRequestSnapshot: (UUID) -> Void
+                let onTap: (UUID) -> Void
+                let onDelete: (UUID) -> Void
                 let onRenameTrack: (UUID, FileRenameStrategy) -> Void
+                let onArtworkTap: (UUID) -> Void
+                let onShowInLibrary: (UUID) -> Void
+                let onMoveToFolder: (UUID) -> Void
                 let onMove: (IndexSet, Int) -> Void
 
                 var body: some View {
-                    ForEach(Array(tracks.enumerated()), id: \.element.id) { index, track in
-                        TrackListRowWrapper(
-                            track: track,
-                            index: index,
-                            tracksContext: tracks,
-                            metadataProvider: metadataProvider,
-                            playerViewModel: playerViewModel,
-                            onTap: onTap,
-                            onDelete: onDelete,
-                            onRenameTrack: onRenameTrack
+                    ForEach(rows) { row in
+                        TrackListRowView(
+                            state: row,
+                            onTap: {
+                                onTap(row.id)
+                            },
+                            onDelete: {
+                                onDelete(row.id)
+                            },
+                            onArtworkTap: {
+                                onArtworkTap(row.id)
+                            }
                         )
-                        .id(track.id)
+                        .trackFileRenameMenu(
+                            artist: row.renameArtist,
+                            title: row.renameTitle,
+                            isEnabled: true,
+                            onRename: { strategy in
+                                onRenameTrack(row.id, strategy)
+                            }
+                        )
+                        .task(id: row.trackId) {
+                            onRequestSnapshot(row.trackId)
+                        }
+
+                        // Свайпы треклиста
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+
+                            /// Локальное действие — удалить из треклиста
+                            Button(role: .destructive) {
+                                onDelete(row.id)
+                            } label: {
+                                Label("Удалить", systemImage: "trash")
+                            }
+
+                            /// Глобальное действие — показать в фонотеке
+                            Button {
+                                onShowInLibrary(row.id)
+                            } label: {
+                                Label("Показать", systemImage: "scope")
+                            }
+                            .tint(.gray)
+
+                            // Глобальное действие — переместить
+                            Button {
+                                onMoveToFolder(row.id)
+                            } label: {
+                                Label("Переместить", systemImage: "arrow.right.doc.on.clipboard")
+                            }
+                            .tint(.blue)
+                        }
+                        .id(row.id)
                     }
                     .onMove(perform: onMove)
                 }

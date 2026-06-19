@@ -11,25 +11,29 @@ import SwiftUI
 
 struct TrackListToolbar: ViewModifier {
 
-    @ObservedObject var viewModel: TrackListViewModel
-    let onAddTrack: () -> Void
-    let onExport: () -> Void
-    let onRename: () -> Void
+    let title: String
+    let onAction: (TrackListAction) -> Void
 
     // MARK: - UI
     
     func body(content: Content) -> some View {
         content
             .screenToolbar(
-                title: viewModel.name,
+                title: title,
                 leading: { EmptyView() }
             )
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
-                        Button("Добавить трек", action: onAddTrack)
-                        Button("Экспорт", action: onExport)
-                        Button("Переименовать", action: onRename)
+                        Button("Добавить трек") {
+                            onAction(.addTrack)
+                        }
+                        Button("Экспорт") {
+                            onAction(.export)
+                        }
+                        Button("Переименовать") {
+                            onAction(.renameTrackList)
+                        }
                     } label: {
                         Image(systemName: "ellipsis")
                             .font(.system(size: 18, weight: .semibold))
@@ -44,17 +48,13 @@ struct TrackListToolbar: ViewModifier {
 extension View {
 
     func trackListToolbar(
-        viewModel: TrackListViewModel,
-        onAddTrack: @escaping () -> Void,
-        onExport: @escaping () -> Void,
-        onRename: @escaping () -> Void
+        title: String,
+        onAction: @escaping (TrackListAction) -> Void
     ) -> some View {
         self.modifier(
             TrackListToolbar(
-                viewModel: viewModel,
-                onAddTrack: onAddTrack,
-                onExport: onExport,
-                onRename: onRename
+                title: title,
+                onAction: onAction
             )
         )
     }

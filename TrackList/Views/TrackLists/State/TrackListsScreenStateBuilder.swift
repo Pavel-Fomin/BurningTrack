@@ -18,6 +18,7 @@ struct TrackListsScreenStateBuilder {
         let rows = trackLists.map { trackList in
             TrackListsRowState(
                 id: trackList.id,
+                trackList: trackList,
                 title: trackList.name,
                 tracksCountText: "\(trackList.tracks.count) треков"
             )

@@ -16,7 +16,6 @@ struct LibraryTrackSectionsListView: View {
     let sections: [TrackSection]
     let allTracks: [LibraryTrack]
 
-    let trackListViewModel: TrackListViewModel
     let trackListNamesById: [UUID: [String]]
     
     let metadataProvider: TrackMetadataProviding
@@ -37,7 +36,6 @@ struct LibraryTrackSectionsListView: View {
                 title: section.title,
                 tracks: section.tracks,
                 allTracks: allTracks,
-                trackListViewModel: trackListViewModel,
                 trackListNamesById: trackListNamesById,
                 playerViewModel: playerViewModel,
                 metadataProvider: metadataProvider,

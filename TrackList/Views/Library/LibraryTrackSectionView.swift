@@ -18,7 +18,6 @@ struct LibraryTrackSectionView: View {
     let tracks: [LibraryTrack]
     let allTracks: [LibraryTrack]
 
-    let trackListViewModel: TrackListViewModel
     let trackListNamesById: [UUID: [String]]
 
     let playerViewModel: PlayerViewModel
@@ -60,7 +59,6 @@ struct LibraryTrackSectionView: View {
         return LibraryTrackRowWrapper(
             track: track,
             allTracks: allTracks,
-            trackListViewModel: trackListViewModel,
             trackListNamesById: trackListNamesById,
             metadataProvider: metadataProvider,
             isScrollingFast: isScrollingFast,

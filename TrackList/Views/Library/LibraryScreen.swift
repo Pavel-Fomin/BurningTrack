@@ -43,7 +43,6 @@ struct LibraryScreen: View {
     private let musicLibraryManager = MusicLibraryManager.shared
 
     let playerViewModel: PlayerViewModel
-    let trackListViewModel: TrackListViewModel
     
     @ObservedObject private var nav = NavigationCoordinator.shared
 
@@ -64,7 +63,6 @@ struct LibraryScreen: View {
                 }
         }
         .bottomPanelsHost(
-            trackListViewModel: trackListViewModel,
             playerViewModel: playerViewModel,
             showsTopPanel: selectionActionBarConfig != nil
         ) {
@@ -120,7 +118,6 @@ struct LibraryScreen: View {
     @ViewBuilder
     private var rootContent: some View {
         MusicLibraryView(
-            trackListViewModel: trackListViewModel,
             playerViewModel: playerViewModel,
             onAddFolder: { isShowingFolderPicker = true }
         )
@@ -147,7 +144,6 @@ struct LibraryScreen: View {
                     onRevealHandled: { requestId in
                         nav.clearRevealRequest(requestId: requestId)
                     },
-                    trackListViewModel: trackListViewModel,
                     playerViewModel: playerViewModel,
                     selectionActionBarConfig: $selectionActionBarConfig
                 )

@@ -24,7 +24,6 @@ struct AVRoutePickerViewWrapper: UIViewRepresentable {
 
 struct MiniPlayerView: View {
     let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
-    var trackListViewModel: TrackListViewModel?
 
     @ObservedObject var playerViewModel: PlayerViewModel
 

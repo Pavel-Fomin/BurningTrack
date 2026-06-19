@@ -13,61 +13,39 @@
 //
 
 import SwiftUI
-import UIKit
 
 struct TrackListRowView: View {
     
     // MARK: - Input
     
-    let track: Track                             /// Трек строки
-    let isCurrent: Bool                          /// Является ли строка текущим треком
-    let isPlaying: Bool                          /// Воспроизводится ли текущий трек
-    let isHighlighted: Bool                      /// Подсвечена ли строка
-    let onTap: () -> Void                        /// Тап по строке (воспроизведение / пауза)
-    let onDelete: () -> Void                     /// Удаление строки (локальное действие)
-    let onArtworkTap: () -> Void                 /// Тап по обложке
-    let metadataProvider: TrackMetadataProviding /// Провайдер runtime snapshot
-    
-    @ObservedObject private var settingsManager = AppSettingsManager.shared
-    
-    // MARK: - Snapshot
-    
-    // Runtime snapshot трека
-    private var snapshot: TrackRuntimeSnapshot? {
-        metadataProvider.snapshot(for: track.trackId)
-    }
-    
-    // Обложка
-    private var artwork: UIImage? {
-        guard settingsManager.settings.visible.metadata.isTagReadingEnabled else { return nil }
-        guard let data = snapshot?.artworkData else { return nil }
-
-        return ArtworkProvider.shared.image(
-            trackId: track.trackId,
-            artworkData: data,
-            purpose: .trackList
-        )
-    }
-    
+    let state: TrackListRowState /// Готовое состояние строки треклиста
+    let onTap: () -> Void        /// Тап по строке (воспроизведение / пауза)
+    let onDelete: () -> Void     /// Удаление строки (локальное действие)
+    let onArtworkTap: () -> Void /// Тап по обложке
     
     // MARK: - UI
     
     var body: some View {
-        let shouldShowTags = settingsManager.settings.visible.metadata.isTagReadingEnabled
-        let shouldShowFileFormat = settingsManager.settings.visible.library.isFileFormatVisible
-
         TrackRowView(
-            track: track,
-            isCurrent: isCurrent,
-            isPlaying: isPlaying,
-            isHighlighted: isHighlighted,                            /// Подсветка управляется wrapper'ом
-            artwork: artwork,
-            title: shouldShowTags ? (snapshot?.title ?? track.fileName) : track.fileName,
-            artist: shouldShowTags ? (snapshot?.artist ?? "") : "",
-            duration: snapshot?.duration ?? track.duration,
-            onRowTap: onTap,                                       /// Правая зона — воспроизведение / пауза
-            onArtworkTap: onArtworkTap,                            /// Левая зона — делегируется выше (wrapper решает, что делать)
-            showsFileFormat: shouldShowFileFormat
+            track: Track(
+                listItemId: state.id,
+                trackId: state.trackId,
+                title: state.title,
+                artist: state.artist,
+                duration: state.duration,
+                fileName: state.fileName,
+                isAvailable: state.isAvailable
+            ),
+            isCurrent: state.isCurrent,
+            isPlaying: state.isPlaying,
+            isHighlighted: state.isHighlighted, /// Подсветка управляется wrapper'ом
+            artwork: state.artwork,
+            title: state.title,
+            artist: state.artist,
+            duration: state.duration,
+            onRowTap: onTap,                    /// Правая зона — воспроизведение / пауза
+            onArtworkTap: onArtworkTap,         /// Левая зона — делегируется выше (wrapper решает, что делать)
+            showsFileFormat: state.showsFileFormat
         )
         
         .padding(.vertical, 4)

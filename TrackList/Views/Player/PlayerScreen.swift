@@ -12,16 +12,13 @@ import SwiftUI
 struct PlayerScreen: View {
 
     @ObservedObject var playerViewModel: PlayerViewModel
-    let trackListViewModel: TrackListViewModel
 
     @StateObject private var screenViewModel: PlayerScreenViewModel
 
     init(
-        playerViewModel: PlayerViewModel,
-        trackListViewModel: TrackListViewModel
+        playerViewModel: PlayerViewModel
     ) {
         self.playerViewModel = playerViewModel
-        self.trackListViewModel = trackListViewModel
         let trackFileRenameActionHandler = TrackFileRenameActionHandler(
             playerManager: playerViewModel.playerManager,
             sheetManager: SheetManager.shared,
@@ -101,7 +98,6 @@ struct PlayerScreen: View {
             )
         }
         .miniPlayerHost(
-            trackListViewModel: trackListViewModel,
             playerViewModel: playerViewModel
         )
     }

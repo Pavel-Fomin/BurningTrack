@@ -15,7 +15,6 @@ struct TrackListsScreen: View {
 
     @ObservedObject var trackListsViewModel: TrackListsViewModel
     @ObservedObject var playerViewModel: PlayerViewModel
-    let trackListViewModel: TrackListViewModel
 
     /// Обрабатывает действия экрана списка треклистов.
     private var actionHandler: TrackListsActionHandler {
@@ -32,16 +31,10 @@ struct TrackListsScreen: View {
                 onAction: { action in
                     actionHandler.handle(action)
                 },
-                destination: { id in
-                    guard let trackList = trackListsViewModel.trackLists.first(where: { $0.id == id }) else {
-                        return AnyView(EmptyView())
-                    }
-
-                    return AnyView(
-                        TrackListScreen(
-                            trackList: trackList,
-                            playerViewModel: playerViewModel
-                        )
+                destination: { row in
+                    TrackListScreen(
+                        trackList: row.trackList,
+                        playerViewModel: playerViewModel
                     )
                 }
             )
@@ -53,7 +46,6 @@ struct TrackListsScreen: View {
             )
         }
         .miniPlayerHost(
-            trackListViewModel: trackListViewModel,
             playerViewModel: playerViewModel
         )
     }

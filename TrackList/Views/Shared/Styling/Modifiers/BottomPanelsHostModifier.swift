@@ -19,7 +19,6 @@ struct BottomPanelsHostModifier<TopPanel: View>: ViewModifier {
 
     // MARK: - Input
 
-    let trackListViewModel: TrackListViewModel
     @ObservedObject var playerViewModel: PlayerViewModel
     let showsTopPanel: Bool
     let topPanel: () -> TopPanel
@@ -37,7 +36,6 @@ struct BottomPanelsHostModifier<TopPanel: View>: ViewModifier {
                 } bottomPanel: {
                     if playerViewModel.currentTrackDisplayable != nil {
                         MiniPlayerView(
-                            trackListViewModel: trackListViewModel,
                             playerViewModel: playerViewModel
                         )
                         // Возвращаем прежний внешний визуальный отступ мини-плеера.
@@ -61,14 +59,12 @@ extension View {
 
     /// Подключает единый нижний контейнер панелей к экрану.
     func bottomPanelsHost<TopPanel: View>(
-        trackListViewModel: TrackListViewModel,
         playerViewModel: PlayerViewModel,
         showsTopPanel: Bool = true,
         @ViewBuilder topPanel: @escaping () -> TopPanel
     ) -> some View {
         modifier(
             BottomPanelsHostModifier(
-                trackListViewModel: trackListViewModel,
                 playerViewModel: playerViewModel,
                 showsTopPanel: showsTopPanel,
                 topPanel: topPanel
