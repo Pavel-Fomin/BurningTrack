@@ -13,9 +13,6 @@ import Foundation
 /// View отправляет эти действия наверх, но не выполняет бизнес-логику сама.
 enum TrackListAction {
 
-    /// Экран появился.
-    case onAppear
-
     /// Пользователь нажал на строку трека.
     case rowTapped(rowId: UUID)
 

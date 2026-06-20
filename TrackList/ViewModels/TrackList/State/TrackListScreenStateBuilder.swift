@@ -40,7 +40,6 @@ struct TrackListScreenStateBuilder {
     ///   - currentContext: Контекст текущего воспроизведения.
     ///   - isPlaying: Идёт ли воспроизведение.
     ///   - highlightedRowId: Идентификатор подсвеченной строки.
-    ///   - totalDurationText: Общая длительность треклиста.
     /// - Returns: Готовое состояние экрана.
     func build(
         id: UUID,
@@ -50,8 +49,7 @@ struct TrackListScreenStateBuilder {
         currentTrackId: UUID?,
         currentContext: PlaybackContext?,
         isPlaying: Bool,
-        highlightedRowId: UUID?,
-        totalDurationText: String
+        highlightedRowId: UUID?
     ) -> TrackListScreenState {
         let rows = tracks.map { track in
             let isCurrent = currentContext == .trackList && currentTrackId == track.id
@@ -71,8 +69,6 @@ struct TrackListScreenStateBuilder {
             id: id,
             title: title,
             rows: rows,
-            canExport: !tracks.isEmpty,
-            totalDurationText: totalDurationText,
             scrollTargetRowId: scrollTargetRowId
         )
     }

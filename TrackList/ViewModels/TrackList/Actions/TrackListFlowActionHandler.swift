@@ -60,9 +60,6 @@ final class TrackListFlowActionHandler {
     func handle(_ action: TrackListAction) {
         switch action {
 
-        case .onAppear:
-            break
-
         case .addTrack:
             presentationHandler.presentAddTrack()
 

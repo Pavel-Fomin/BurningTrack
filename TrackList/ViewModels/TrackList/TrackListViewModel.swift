@@ -7,8 +7,7 @@
 //  - сохранение треков
 //  - перемещение
 //  - удаление
-//  - экспорт
-//  - переименование
+//  - переименование файлов треков
 //
 //  Created by Pavel Fomin on 28.04.2025.
 //
@@ -19,7 +18,7 @@ import SwiftUI
 import Combine
 
 @MainActor
-final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
+final class TrackListViewModel: ObservableObject {
 
     @Published var name: String = ""
     @Published var tracks: [Track] = []
@@ -226,20 +225,12 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
             currentTrackId: currentTrackId,
             currentContext: currentContext,
             isPlaying: isPlaybackActive,
-            highlightedRowId: highlightedRowId,
-            totalDurationText: formattedTotalDuration
+            highlightedRowId: highlightedRowId
         )
     }
     
     
     // MARK: - Snapshot
-
-    /// Возвращает runtime snapshot трека по его идентификатору.
-    /// - Parameter trackId: Идентификатор трека
-    /// - Returns: TrackRuntimeSnapshot или nil
-    func snapshot(for trackId: UUID) -> TrackRuntimeSnapshot? {
-        snapshotsByTrackId[trackId]
-    }
 
     /// Запрашивает runtime snapshot трека, если он ещё не загружен.
     /// - Parameter trackId: Идентификатор трека
@@ -328,48 +319,6 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
         }
     }
 
-    // MARK: - Clear
-
-    func clearTrackList() {
-        guard let id = currentListId else { return }
-        guard trackListManager.saveTracks([], for: id) else {
-            PersistentLogger.log("TrackListViewModel: clearTrackList saveTracks failed id=\(id)")
-            toastPresenter.handle(AppError.trackListSaveFailed)
-            return
-        }
-        toastPresenter.handle(
-            .trackListCleared(name: name),
-            duration: 2.0
-        )
-        print("🧹 Треклист очищен")
-    }
-
-
-    // MARK: - Refresh availability
-
-    func refreshTrackAvailability() {
-        Task { @MainActor in
-            var updated: [Track] = []
-            for track in tracks {
-                let isAvailable = await BookmarkResolver.url(forTrack: track.trackId) != nil
-                updated.append(
-                    Track(
-                        listItemId: track.listItemId,
-                        trackId: track.trackId,
-                        title: track.title,
-                        artist: track.artist,
-                        duration: track.duration,
-                        fileName: track.fileName,
-                        isAvailable: isAvailable
-                    )
-                )
-            }
-            self.tracks = updated
-            rebuildScreenState()
-            print("♻️ Актуализирована доступность треков через BookmarkResolver")
-        }
-    }
-
  
     // MARK: - Refresh meta
 
@@ -393,32 +342,5 @@ final class TrackListViewModel: ObservableObject, TrackMetadataProviding {
             name = meta.name
             rebuildScreenState()
         }
-    }
-}
-
-
-// MARK: - Duration utils
-
-extension TrackListViewModel {
-    var totalDuration: TimeInterval {
-        tracks.reduce(0) { $0 + $1.duration }
-    }
-
-    var formattedTotalDuration: String {
-        let formatter = DateComponentsFormatter()
-        formatter.zeroFormattingBehavior = .pad
-
-        if totalDuration >= 86400 {
-            formatter.allowedUnits = [.day, .hour, .minute]
-            formatter.unitsStyle = .short
-        } else if totalDuration >= 3600 {
-            formatter.allowedUnits = [.hour, .minute]
-            formatter.unitsStyle = .short
-        } else {
-            formatter.allowedUnits = [.minute, .second]
-            formatter.unitsStyle = .positional
-        }
-
-        return formatter.string(from: totalDuration) ?? "0:00"
     }
 }

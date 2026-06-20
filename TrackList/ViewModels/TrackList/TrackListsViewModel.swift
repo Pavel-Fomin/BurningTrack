@@ -4,8 +4,7 @@
 //
 //  ViewModel для списка всех треклистов
 //  - загрузка треклистов (tracklists.json)
-//  - удаление,
-//  - переименование
+//  - удаление
 //  - обновление UI списка
 //
 //  Created by Pavel Fomin on 07.11.2025.
@@ -22,7 +21,6 @@ final class TrackListsViewModel: ObservableObject {
     /// Готовое состояние экрана списка треклистов.
     @Published private(set) var screenState = TrackListsScreenState(
         rows: [],
-        isEmpty: true,
         pendingDeleteTrackListId: nil,
         isShowingDeleteConfirmation: false
     )
@@ -67,7 +65,6 @@ final class TrackListsViewModel: ObservableObject {
 
         screenState = TrackListsScreenState(
             rows: baseState.rows,
-            isEmpty: baseState.isEmpty,
             pendingDeleteTrackListId: pendingDeleteTrackListId,
             isShowingDeleteConfirmation: pendingDeleteTrackListId != nil
         )
@@ -153,13 +150,5 @@ final class TrackListsViewModel: ObservableObject {
         } catch {
             toastPresenter.handle(AppError.trackListSaveFailed)
         }
-    }
-
-
-    // MARK: - Переименование
-
-    func renameTrackList(id: UUID, to newName: String) throws {
-        try trackListsManager.renameTrackList(id: id, to: newName)
-        print("✏️ Треклист \(id) переименован в «\(newName)»")
     }
 }

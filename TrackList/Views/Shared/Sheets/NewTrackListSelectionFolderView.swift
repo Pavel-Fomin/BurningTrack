@@ -49,12 +49,6 @@ struct NewTrackListSelectionFolderView: View {
         tracksViewModel.trackSections.flatMap(\.tracks)
     }
 
-    /// Проверяет, выбраны ли все треки текущей папки
-    private var areAllCurrentTracksSelected: Bool {
-        guard !currentTracks.isEmpty else { return false }
-        return currentTracks.allSatisfy { selectionViewModel.isSelected($0) }
-    }
-
     // MARK: - UI
 
     var body: some View {
@@ -141,11 +135,15 @@ struct NewTrackListSelectionFolderView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 if !currentTracks.isEmpty {
                     Button(
-                        areAllCurrentTracksSelected
+                        selectionViewModel.areAllSelected(currentTracks)
                             ? "Снять выбор"
                             : "Выбрать все"
                     ) {
-                        toggleAllCurrentTracks()
+                        if selectionViewModel.areAllSelected(currentTracks) {
+                            selectionViewModel.deselectAll(currentTracks)
+                        } else {
+                            selectionViewModel.selectAll(currentTracks)
+                        }
                     }
                 }
             }
@@ -153,25 +151,6 @@ struct NewTrackListSelectionFolderView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task {
             await tracksViewModel.refresh()
-        }
-    }
-
-    // MARK: - Actions
-
-    /// Переключает выбор всех треков текущей папки.
-    private func toggleAllCurrentTracks() {
-        if areAllCurrentTracksSelected {
-            for track in currentTracks {
-                if selectionViewModel.isSelected(track) {
-                    selectionViewModel.toggle(track)
-                }
-            }
-        } else {
-            for track in currentTracks {
-                if !selectionViewModel.isSelected(track) {
-                    selectionViewModel.toggle(track)
-                }
-            }
         }
     }
 }

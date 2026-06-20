@@ -21,9 +21,21 @@ struct NewTrackListSelectionContainer: View {
     /// Количество выбранных треков.
     /// Состояние выбора треков внутри sheet.
     @StateObject private var viewModel = NewTrackListSelectionViewModel()
+
     // MARK: - UI
 
     var body: some View {
+        let state = NewTrackListSelectionStateBuilder().build(
+            selectedCount: viewModel.selectedCount,
+            mode: data.mode
+        )
+        let actionHandler = NewTrackListSelectionActionHandler(
+            mode: data.mode,
+            selectedTracksProvider: {
+                viewModel.selectedTracks
+            }
+        )
+
         ZStack(alignment: .bottom) {
             NavigationBarHost(
                 title: "Выберите треки",
@@ -33,18 +45,18 @@ struct NewTrackListSelectionContainer: View {
 
                 /// Пока кнопка активна только если выбран хотя бы один трек.
                 isRightEnabled: Binding(
-                    get: { viewModel.selectedCount > 0 },
+                    get: { state.canSubmit },
                     set: { _ in }
                 ),
 
                 /// Закрытие sheet’а без применения выбора.
                 onClose: {
-                    SheetManager.shared.closeActive()
+                    actionHandler.handle(.cancel)
                 },
 
                 /// Применение выбранных треков после подтверждения.
                 onRightTap: {
-                    Task { await addSelectedTracks() }
+                    actionHandler.handle(.submit)
                 },
                 showsRightButtonOnlyOnRoot: true
             ) {
@@ -56,109 +68,18 @@ struct NewTrackListSelectionContainer: View {
             }
             
 
-            if viewModel.selectedCount > 0 {
+            if state.canSubmit {
                 SelectionActionBar(
                     title: "Выбрано",
                     subtitle: "\(viewModel.selectedCount) треков",
-                    primaryTitle: "Добавить",
+                    primaryTitle: state.buttonTitle,
                     iconName: "music.note",
-                    isPrimaryEnabled: viewModel.selectedCount > 0,
+                    isPrimaryEnabled: state.canSubmit,
                     onPrimaryTap: {
-                        Task { await addSelectedTracks() }
+                        actionHandler.handle(.submit)
                     }
                 )
             }
         }
-    }
-
-    // MARK: - Actions
-
-    /// Создаёт треклист с выбранными треками или добавляет их в существующий.
-    private func addSelectedTracks() async {
-        let selectedTracks = viewModel.selectedTracks
-
-        guard !selectedTracks.isEmpty else {
-            ToastManager.shared.handle(.operationFailed(message: "Нет выбранных треков"))
-            return
-        }
-
-        switch data.mode {
-
-        case .create(let name):
-            do {
-                let created = try TrackListsManager.shared.createTrackList(
-                    from: selectedTracks,
-                    withName: name
-                )
-                ToastManager.shared.handle(.trackListCreated(name: created.name))
-            } catch let appError as AppError {
-                PersistentLogger.log("NewTrackListSelectionContainer: create tracklist failed error=\(appError)")
-                ToastManager.shared.handle(appError)
-                return
-            } catch {
-                PersistentLogger.log("NewTrackListSelectionContainer: create tracklist failed error=\(error)")
-                ToastManager.shared.handle(AppError.trackListSaveFailed)
-                return
-            }
-
-        case .append(let trackListId):
-            let trackListName: String
-            do {
-                trackListName = try TrackListsManager.shared
-                    .loadTrackListMetas()
-                    .first { $0.id == trackListId }?
-                    .name ?? "Треклист"
-            } catch let appError as AppError {
-                ToastManager.shared.handle(appError)
-                return
-            } catch {
-                ToastManager.shared.handle(AppError.trackListLoadFailed)
-                return
-            }
-
-            do {
-                let addedTracks = selectedTracks
-                try TrackListsManager.shared.addTracks(
-                    selectedTracks,
-                    to: trackListId
-                )
-                await showAddedTracksToast(
-                    addedTracks,
-                    trackListName: trackListName
-                )
-            } catch let appError as AppError {
-                PersistentLogger.log("NewTrackListSelectionContainer: add tracks failed error=\(appError)")
-                ToastManager.shared.handle(appError)
-                return
-            } catch {
-                PersistentLogger.log("NewTrackListSelectionContainer: add tracks failed error=\(error)")
-                ToastManager.shared.handle(AppError.trackListSaveFailed)
-                return
-            }
-        }
-
-        SheetManager.shared.closeActive()
-    }
-
-    /// Показывает один Toast по результату добавления треков.
-    private func showAddedTracksToast(
-        _ addedTracks: [LibraryTrack],
-        trackListName: String
-    ) async {
-        if addedTracks.count == 1, let track = addedTracks.first {
-            let event = await TrackToastEventBuilder.trackAddedToTrackList(
-                track: track,
-                trackListName: trackListName
-            )
-            ToastManager.shared.handle(event)
-            return
-        }
-
-        ToastManager.shared.handle(
-            .tracksAddedToTrackList(
-                count: addedTracks.count,
-                name: trackListName
-            )
-        )
     }
 }

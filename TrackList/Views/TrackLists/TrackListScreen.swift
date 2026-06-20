@@ -2,7 +2,7 @@
 //  TrackListScreen.swift
 //  TrackList
 //
-//  Список треков(Отображает треклист по ID)
+//  Detail-экран одного треклиста.
 //
 //  Created by Pavel Fomin on 19.07.2025.
 //
@@ -18,7 +18,7 @@ struct TrackListScreen: View {
     /// Фабрика production ViewModel для detail-flow одного треклиста.
     private static let viewModelFactory = TrackListViewModelFactory()
 
-    /// Factory production-обработчика действий detail-flow.
+    /// Фабрика production-обработчика действий detail-flow.
     private let actionHandlerFactory = TrackListFlowActionHandlerFactory()
 
     /// Обработчик действий detail-flow одного треклиста.
@@ -44,26 +44,24 @@ struct TrackListScreen: View {
     }
     
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                if let screenState = viewModel.screenState {
-                    TrackListView(
-                        state: screenState,
-                        onAction: { action in
-                            actionHandler.handle(action)
-                        },
-                        onRequestSnapshot: { trackId in
-                            viewModel.requestSnapshotIfNeeded(for: trackId)
-                        }
-                    )
-                }
+        VStack(spacing: 0) {
+            if let screenState = viewModel.screenState {
+                TrackListView(
+                    state: screenState,
+                    onAction: { action in
+                        actionHandler.handle(action)
+                    },
+                    onRequestSnapshot: { trackId in
+                        viewModel.requestSnapshotIfNeeded(for: trackId)
+                    }
+                )
             }
-            .trackListToolbar(
-                title: viewModel.screenState?.title ?? viewModel.name,
-                onAction: { action in
-                    actionHandler.handle(action)
-                }
-            )
         }
+        .trackListToolbar(
+            title: viewModel.screenState?.title ?? viewModel.name,
+            onAction: { action in
+                actionHandler.handle(action)
+            }
+        )
     }
 }

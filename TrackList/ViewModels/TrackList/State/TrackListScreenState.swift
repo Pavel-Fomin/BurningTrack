@@ -23,12 +23,6 @@ struct TrackListScreenState {
     /// Строки треков.
     let rows: [TrackListRowState]
 
-    /// Можно ли экспортировать треки.
-    let canExport: Bool
-
-    /// Общая длительность треклиста.
-    let totalDurationText: String
-
     /// Идентификатор строки, к которой нужно проскроллить список.
     let scrollTargetRowId: UUID?
 }

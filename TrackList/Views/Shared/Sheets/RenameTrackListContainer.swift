@@ -6,9 +6,8 @@
 //
 //  Роль контейнера:
 //  - владеет состоянием формы (name)
-//  - выполняет команду переименования треклиста
-//  - управляет закрытием sheet’а
-//  - конфигурирует единый навигационный тулбар через NavigationBarHost
+//  - собирает состояние rename sheet-flow
+//  - передаёт действия в RenameTrackListActionHandler
 //
 //  Архитектурные принципы:
 //  - контейнер не содержит визуальной разметки формы
@@ -30,9 +29,6 @@ struct RenameTrackListContainer: View {
     /// Локальное состояние формы — источник истины
     @State private var name: String
 
-    /// Фокус поля имени для управления клавиатурой из контейнера.
-    @FocusState private var isNameFocused: Bool
-
     init(data: RenameTrackListSheetData) {
         self.data = data
         self._name = State(initialValue: data.currentName)
@@ -41,58 +37,29 @@ struct RenameTrackListContainer: View {
     // MARK: - UI
 
     var body: some View {
-        NavigationBarHost(
-            /// Заголовок шита
-            title: "Переименовать треклист",
-
-            /// Кнопка подтверждения (✓)
-            rightButtonImage: "checkmark",
-
-            /// Активна только при валидном имени
-            isRightEnabled: .constant(
-                TrackListManager.shared.validateName(name)
-            ),
-
-            /// Закрытие sheet’а без действий
-            onClose: {
-                closeSheet()
-            },
-
-            /// Подтверждение переименования
-            onRightTap: {
-                Task { await rename() }
+        let state = RenameTrackListStateBuilder().build(name: name)
+        let actionHandler = RenameTrackListActionHandler(
+            trackListId: data.trackListId,
+            name: state.name,
+            onNameChanged: { newName in
+                name = newName
             }
-        ) {
-            /// Чистый UI-слой формы
-            RenameTrackListSheet(
-                name: $name,
-                isNameFocused: $isNameFocused
-            )
-        }
-    }
+        )
 
-    // MARK: - Actions
-
-    /// Закрывает sheet после предварительного снятия фокуса с поля ввода.
-    private func closeSheet() {
-        isNameFocused = false
-        SheetManager.shared.closeActive()
-    }
-
-    /// Асинхронная операция переименования треклиста
-    private func rename() async {
-        do {
-            try await AppCommandExecutor.shared.renameTrackList(
-                trackListId: data.trackListId,
-                newName: name
-            )
-            closeSheet()
-        } catch let appError as AppError {
-            print("❌ Ошибка переименования треклиста: \(appError)")
-            ToastManager.shared.handle(appError)
-        } catch {
-            print("❌ Ошибка переименования треклиста: \(error)")
-            ToastManager.shared.handle(AppError.trackListSaveFailed)
-        }
+        RenameTrackListSheet(
+            name: Binding(
+                get: { name },
+                set: { newName in
+                    actionHandler.handle(.nameChanged(newName))
+                }
+            ),
+            canSubmit: state.canSubmit,
+            onSubmit: {
+                actionHandler.handle(.submit)
+            },
+            onCancel: {
+                actionHandler.handle(.cancel)
+            }
+        )
     }
 }

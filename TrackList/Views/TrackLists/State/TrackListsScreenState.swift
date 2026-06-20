@@ -13,8 +13,6 @@ import Foundation
 struct TrackListsScreenState {
     /// Строки списка треклистов.
     let rows: [TrackListsRowState]
-    /// Есть ли треклисты для отображения.
-    let isEmpty: Bool
     /// Идентификатор треклиста, ожидающего подтверждения удаления.
     let pendingDeleteTrackListId: UUID?
     /// Нужно ли показывать диалог удаления.

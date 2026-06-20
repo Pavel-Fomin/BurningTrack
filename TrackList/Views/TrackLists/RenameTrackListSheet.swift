@@ -7,7 +7,8 @@
 //  Роль компонента:
 //  - отображает поле ввода имени
 //  - управляет фокусом TextField
-//  - не содержит бизнес-логики и навигации
+//  - конфигурирует единый навигационный тулбар через NavigationBarHost
+//  - не содержит бизнес-логики
 //
 //  Архитектурные принципы:
 //  - не знает о SheetManager
@@ -28,25 +29,60 @@ struct RenameTrackListSheet: View {
     /// Источник истины находится в контейнере.
     @Binding var name: String
 
+    /// Можно ли подтвердить переименование с текущим названием.
+    let canSubmit: Bool
+    /// Действие подтверждения переименования.
+    let onSubmit: () -> Void
+    /// Действие закрытия sheet без переименования.
+    let onCancel: () -> Void
+
     /// Состояние фокуса поля ввода.
-    /// Управляется контейнером, чтобы снимать focus до закрытия sheet.
-    let isNameFocused: FocusState<Bool>.Binding
+    /// Управляется sheet-компонентом, чтобы снимать focus до закрытия sheet.
+    @FocusState private var isNameFocused: Bool
 
     // MARK: - UI
 
     var body: some View {
+        NavigationBarHost(
+            /// Заголовок шита
+            title: "Переименовать треклист",
+
+            /// Кнопка подтверждения (✓)
+            rightButtonImage: "checkmark",
+
+            /// Активна только при валидном имени
+            isRightEnabled: .constant(canSubmit),
+
+            /// Закрытие sheet’а без действий
+            onClose: {
+                finishEditing()
+                onCancel()
+            },
+
+            /// Подтверждение переименования
+            onRightTap: {
+                finishEditing()
+                onSubmit()
+            }
+        ) {
+            form
+        }
+    }
+
+    /// Содержимое формы переименования треклиста.
+    private var form: some View {
         Form {
             Section {
                 TextField("Новое название", text: $name)
                     .clearable($name)
-                    .focused(isNameFocused)
+                    .focused($isNameFocused)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled(true)
                     .textContentType(.none)
                     .keyboardType(.default)
                     .submitLabel(.done)
                     .onSubmit {
-                        isNameFocused.wrappedValue = false
+                        finishEditing()
                     }
             }
         }
@@ -55,7 +91,12 @@ struct RenameTrackListSheet: View {
         /// Автоматически устанавливаем фокус при появлении шита,
         /// чтобы сразу открыть клавиатуру без дополнительного тапа.
         .task {
-            isNameFocused.wrappedValue = true
+            isNameFocused = true
         }
+    }
+
+    /// Снимает фокус с поля ввода перед закрытием или подтверждением.
+    private func finishEditing() {
+        isNameFocused = false
     }
 }

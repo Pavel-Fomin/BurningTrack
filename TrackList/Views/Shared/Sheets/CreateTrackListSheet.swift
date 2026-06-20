@@ -17,18 +17,34 @@ struct CreateTrackListSheet: View {
     @Binding var name: String   /// Название нового треклиста.
     
     let canSubmit: Bool  /// Можно ли выполнить действие с текущим названием.
-    let onAddTracks: () -> Void  // Действие "Добавить треки".
-    let onAddLater: () -> Void  /// Действие "Добавить треки позже".
+    let onCreateEmpty: () -> Void  /// Действие "Добавить треки позже".
+    let onAddTracks: () -> Void  /// Действие "Добавить треки".
+    let onCancel: () -> Void  /// Действие закрытия sheet.
     
     // MARK: - Focus
     
     /// Состояние фокуса поля ввода.
-    /// Управляется контейнером, чтобы снимать focus до закрытия или перехода к другому sheet.
-    let isNameFocused: FocusState<Bool>.Binding
+    /// Управляется sheet-компонентом, чтобы снимать focus до закрытия или перехода к другому sheet.
+    @FocusState private var isNameFocused: Bool
     
     // MARK: - UI
     
     var body: some View {
+        NavigationBarHost(
+            title: "Новый треклист",
+            rightButtonImage: nil,
+            isRightEnabled: .constant(false),
+            onClose: {
+                finishEditing()
+                onCancel()
+            }
+        ) {
+            form
+        }
+    }
+
+    /// Содержимое формы создания треклиста.
+    private var form: some View {
         VStack(spacing: 20) {
             
             /// Поле ввода — оставляем как в SaveTrackListSheet
@@ -36,14 +52,14 @@ struct CreateTrackListSheet: View {
                 Section {
                     TextField("Название треклиста", text: $name)
                         .clearable($name)
-                        .focused(isNameFocused)
+                        .focused($isNameFocused)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled(true)
                         .textContentType(.none)
                         .keyboardType(.default)
                         .submitLabel(.done)
                         .onSubmit {
-                            isNameFocused.wrappedValue = false
+                            finishEditing()
                         }
                 }
             }
@@ -54,6 +70,7 @@ struct CreateTrackListSheet: View {
             VStack(spacing: 12) {
                 
                 Button {
+                    finishEditing()
                     onAddTracks()
                 } label: {
                     Text("Добавить треки")
@@ -63,7 +80,8 @@ struct CreateTrackListSheet: View {
                 .disabled(!canSubmit)
                 
                 Button {
-                    onAddLater()
+                    finishEditing()
+                    onCreateEmpty()
                 } label: {
                     Text("Добавить треки позже")
                         .frame(maxWidth: .infinity)
@@ -78,7 +96,12 @@ struct CreateTrackListSheet: View {
         
         /// автофокус как в остальных шитах
         .task {
-            isNameFocused.wrappedValue = true
+            isNameFocused = true
         }
+    }
+
+    /// Снимает фокус с поля ввода перед закрытием или сменой sheet.
+    private func finishEditing() {
+        isNameFocused = false
     }
 }

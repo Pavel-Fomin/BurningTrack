@@ -26,7 +26,6 @@ struct TrackListsScreenStateBuilder {
 
         return TrackListsScreenState(
             rows: rows,
-            isEmpty: rows.isEmpty,
             pendingDeleteTrackListId: nil,
             isShowingDeleteConfirmation: false
         )
