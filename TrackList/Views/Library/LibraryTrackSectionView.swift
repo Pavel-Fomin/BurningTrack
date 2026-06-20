@@ -56,7 +56,7 @@ struct LibraryTrackSectionView: View {
             selection.toggle(rowId)
         }
 
-        return LibraryTrackRowWrapper(
+        return LibraryTrackRowContainer(
             track: track,
             allTracks: allTracks,
             trackListNamesById: trackListNamesById,

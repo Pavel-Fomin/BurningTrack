@@ -3,7 +3,7 @@
 //  TrackList
 //
 //  ViewModel для треков внутри папки
-//  Отвечает за данные треков и операции над ними
+//  Отвечает за список, выбор и runtime-снимки фонотеки
 //
 //  Created by Pavel Fomin on 12.12.2025.
 //
@@ -11,29 +11,6 @@
 import Foundation
 import SwiftUI
 import Combine
-
-/// Ограничивает количество одновременно выполняемых задач.
-/// Нужен для безопасной загрузки metadata большого количества файлов.
-private actor AsyncLimiter {
-    private let limit: Int
-    private var running = 0
-
-    init(limit: Int) {
-        self.limit = limit
-    }
-
-    func acquire() async {
-        while running >= limit {
-            await Task.yield()
-        }
-
-        running += 1
-    }
-
-    func release() {
-        running -= 1
-    }
-}
 
 @MainActor
 final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
@@ -43,39 +20,77 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
     let folderURL: URL
     let folderId: UUID
 
-    // MARK: - Состояния
+    // MARK: - Состояние списка
 
     @Published var trackSections: [TrackSection] = []
     @Published var trackListNamesById: [UUID: [String]] = [:]
-    @Published private(set) var snapshotsByTrackId: [UUID: TrackRuntimeSnapshot] = [:] /// Runtime-снимки треков по id
-    @Published var bulkSelection = BulkSelectionState<UUID, BulkTrackAction>()
-    @Published private(set) var batchFilenameRenameFlow = BatchFilenameRenameFlow()
     @Published var isLoading = false
     @Published private(set) var didLoad = false
+
+    // MARK: - Состояние выбора
+
+    @Published var bulkSelection = BulkSelectionState<UUID, BulkTrackAction>()
+
+    // MARK: - Состояние runtime-снимков
+
+    @Published private(set) var snapshotsByTrackId: [UUID: TrackRuntimeSnapshot] = [:] /// Runtime-снимки треков по id
     
     // MARK: - Зависимости
 
     private let tracksProvider: LibraryTracksProvider
     private let badgeProvider: TrackListBadgeProvider
+    /// Собирает UI-состояние выбора строк фонотеки.
+    private let selectionStateBuilder = LibrarySelectionStateBuilder()
+    /// Обрабатывает подготовку и применение массового переименования файлов.
+    private lazy var batchRenameHandler = LibraryBatchRenameHandler(
+        snapshotProvider: { [weak self] trackId in
+            self?.snapshotsByTrackId[trackId]
+        },
+        snapshotStore: { [weak self] trackId, snapshot in
+            self?.snapshotsByTrackId[trackId] = snapshot
+        },
+        tracksProvider: { [weak self] in
+            self?.trackSections.flatMap(\.tracks) ?? []
+        }
+    )
+    /// Обрабатывает массовое редактирование тегов.
+    private let batchTagEditHandler = LibraryBatchTagEditHandler()
+    /// Маршрутизирует зафиксированные массовые действия в текущие массовые сценарии.
+    private lazy var batchActionHandler = LibraryBatchActionHandler(
+        onRenameFiles: { [weak self] pendingAction in
+            self?.batchRenameHandler.startRename(with: pendingAction)
+        },
+        onEditTags: { [weak self] pendingAction in
+            self?.batchTagEditHandler.startEdit(with: pendingAction)
+        }
+    )
 
     /// Общий обработчик переименования файлов треков.
     private let renameActionHandler: TrackFileRenameActionHandler
 
     private var cancellables = Set<AnyCancellable>()
 
-    /// Общее количество треков в текущих секциях.
+    // MARK: - Производное состояние
+
+    /// Состояние массового переименования файлов для существующего модального окна.
+    var batchFilenameRenameFlow: BatchFilenameRenameFlow {
+        batchRenameHandler.flow
+    }
+
+    /// Общее количество видимых строк в текущих секциях.
     var totalVisibleTrackCount: Int {
-        trackSections.reduce(0) { result, section in
-            result + section.tracks.count
-        }
+        selectionStateBuilder.visibleRowIds(from: trackSections).count
     }
 
-    /// Показывает, выбраны ли все видимые треки.
+    /// Показывает, выбраны ли все видимые строки.
     var areAllVisibleTracksSelected: Bool {
-        totalVisibleTrackCount > 0 && bulkSelection.selectedCount == totalVisibleTrackCount
+        selectionStateBuilder.areAllVisibleRowsSelected(
+            sections: trackSections,
+            selection: bulkSelection.selection
+        )
     }
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     init(
         folderURL: URL,
@@ -90,7 +105,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         self.tracksProvider = tracksProvider
         self.badgeProvider = badgeProvider
 
-        bindBatchFilenameRenameFlow()
+        bindBatchRenameHandler()
 
         NotificationCenter.default.addObserver(
             forName: .trackDidUpdate,
@@ -144,7 +159,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
             .store(in: &cancellables)
     }
 
-    // MARK: - Rename
+    // MARK: - Переименование
 
     /// Запускает сценарий переименования файла трека из фонотеки.
     func renameTrack(
@@ -170,16 +185,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         renameActionHandler.handle(request)
     }
     
-    // MARK: - Load
-
-    /// Пробрасывает изменения flow наружу для подписчиков ViewModel.
-    private func bindBatchFilenameRenameFlow() {
-        batchFilenameRenameFlow.objectWillChange
-            .sink { [weak self] _ in
-                self?.objectWillChange.send()
-            }
-            .store(in: &cancellables)
-    }
+    // MARK: - Загрузка
 
     func loadTracksIfNeeded() async {
         // Если уже загружали — ничего не делаем
@@ -189,7 +195,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         await refresh()
     }
 
-    // MARK: - Refresh
+    // MARK: - Обновление
 
     /// Явное обновление данных.
     /// Вызывается строго из UX-слоя.
@@ -226,7 +232,38 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         await updateAvailabilityInBackground()
     }
 
-    // MARK: - Badges
+    /// Проверяет доступность треков после первичного отображения списка.
+    private func updateAvailabilityInBackground() async {
+        let tracks = trackSections.flatMap { $0.tracks }
+        var availabilityByRowId: [UUID: Bool] = [:]
+
+        for track in tracks {
+            availabilityByRowId[track.id] = await BookmarkResolver.url(forTrack: track.trackId) != nil
+        }
+
+        trackSections = trackSections.map { section in
+            let updatedTracks = section.tracks.map { track in
+                let isAvailable = availabilityByRowId[track.id] ?? track.isAvailable
+                return LibraryTrack(
+                    id: track.id,
+                    fileURL: track.fileURL,
+                    title: track.title,
+                    artist: track.artist,
+                    duration: track.duration,
+                    addedDate: track.addedDate,
+                    isAvailable: isAvailable
+                )
+            }
+
+            return TrackSection(
+                id: section.id,
+                title: section.title,
+                tracks: updatedTracks
+            )
+        }
+    }
+
+    // MARK: - Бейджи
 
     /// Обновляет бейджи треклистов для уже загруженных треков.
     /// Не перезагружает сами треки и не меняет секции.
@@ -235,7 +272,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         trackListNamesById = badgeProvider.badges(for: ids)
     }
 
-    // MARK: - Bulk Selection
+    // MARK: - Выбор
 
     /// Включает режим массового выбора без заранее выбранного действия.
     func activateBulkSelection() {
@@ -247,7 +284,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         bulkSelection.reset()
     }
 
-    /// Выбирает все видимые треки или снимает выбор со всех, если уже выбраны все.
+    /// Выбирает все видимые строки или снимает выбор со всех, если уже выбраны все.
     func toggleSelectAllVisibleTracks() {
         guard bulkSelection.isActive else { return }
 
@@ -256,9 +293,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
             return
         }
 
-        let ids = trackSections.flatMap { section in
-            section.tracks.map { $0.id }
-        }
+        let ids = selectionStateBuilder.visibleRowIds(from: trackSections)
 
         bulkSelection.replaceSelection(with: ids)
     }
@@ -284,306 +319,41 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         applyBulkAction(action)
     }
 
+    // MARK: - Массовые действия
+
     /// Передаёт зафиксированный выбор в flow выбранного массового действия.
     private func applyBulkAction(_ action: BulkTrackAction) {
         guard bulkSelection.hasSelection else { return }
 
-        let pendingAction = PendingBulkTrackAction(
-            action: action,
-            trackIDs: bulkSelection.selection.ids
+        let selectedTrackIds = selectionStateBuilder.selectedTrackIds(
+            selection: bulkSelection.selection,
+            sections: trackSections
         )
 
-        guard !pendingAction.isEmpty else { return }
+        let pendingAction = PendingBulkTrackAction(
+            action: action,
+            trackIDs: selectedTrackIds
+        )
 
-        switch action {
-        case .renameFiles:
-            startBatchFilenameRenameLoading(with: pendingAction)
-            Task { @MainActor in
-                await prepareBatchFilenameRename(with: pendingAction)
-            }
-        case .editTags:
-            startBatchTagEditFlow(pendingAction: pendingAction)
-        case .addToPlayer, .addToTrackList:
-            break
-        }
-
+        batchActionHandler.handle(pendingAction)
         bulkSelection.reset()
     }
 
-    /// Запускает flow массового редактирования тегов.
-    private func startBatchTagEditFlow(pendingAction: PendingBulkTrackAction) {
-        let loadingFlow = BatchTagEditFlow(
-            pendingAction: pendingAction,
-            phase: .loadingMetadata,
-            tracks: [],
-            fields: [],
-            trackFieldOverrides: [:],
-            artwork: BatchTagArtworkEditState(
-                summary: .none,
-                previewSummary: BatchTagArtworkPreviewSummary(
-                    selectedCount: pendingAction.trackIDs.count,
-                    artworkCount: 0,
-                    missingArtworkCount: pendingAction.trackIDs.count
-                ),
-                previewItems: [],
-                selectedTarget: nil
-            )
-        )
-
-        SheetManager.shared.presentBatchTagEdit(
-            flow: loadingFlow,
-            onSave: { [weak self] in
-                await self?.applyBatchTagEdit()
+    /// Пробрасывает изменения handler массового переименования наружу для подписчиков ViewModel.
+    private func bindBatchRenameHandler() {
+        batchRenameHandler.objectWillChange
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
             }
-        )
-
-        Task { [pendingAction] in
-            let loadedFlow = await BatchTagMetadataLoader().loadFlow(
-                pendingAction: pendingAction
-            )
-            guard SheetManager.shared.batchTagEditFlow.pendingAction?.trackIDs == pendingAction.trackIDs else { return }
-            SheetManager.shared.batchTagEditFlow = loadedFlow
-        }
+            .store(in: &cancellables)
     }
 
-    /// Сохраняет массовые изменения тегов.
-    private func applyBatchTagEdit() async {
-        let flow = SheetManager.shared.batchTagEditFlow
-        let pendingAction = flow.pendingAction
-        let selectedTarget = flow.artwork.selectedTarget
-
-        guard let pendingAction else {
-            ToastManager.shared.handle(.batchTagsUpdateFailed(failed: flow.tracks.count))
-            return
-        }
-
-        do {
-            let plan = try BatchTagEditSavePlanner.makePlan(from: flow)
-            let result = await BatchTagEditSaveExecutor().execute(plan: plan)
-
-            if result.failedCount == 0 {
-                ToastManager.shared.handle(.batchTagsUpdated(count: result.succeededCount))
-            } else if result.succeededCount > 0 {
-                ToastManager.shared.handle(
-                    .batchTagsPartiallyUpdated(
-                        succeeded: result.succeededCount,
-                        failed: result.failedCount
-                    )
-                )
-            } else {
-                ToastManager.shared.handle(.batchTagsUpdateFailed(failed: result.failedCount))
-            }
-
-            if result.succeededCount > 0 {
-                await reloadBatchTagEditFlowAfterSave(
-                    pendingAction: pendingAction,
-                    selectedTarget: selectedTarget
-                )
-            }
-        } catch {
-            ToastManager.shared.handle(.batchTagsUpdateFailed(failed: flow.tracks.count))
-        }
-    }
-
-    /// Обновляет данные открытого sheet массового редактирования тегов после сохранения.
-    private func reloadBatchTagEditFlowAfterSave(
-        pendingAction: PendingBulkTrackAction,
-        selectedTarget: BatchTagArtworkActionTarget?
-    ) async {
-        let reloadedFlow = await BatchTagMetadataLoader().loadFlow(
-            pendingAction: pendingAction
-        )
-
-        guard SheetManager.shared.batchTagEditFlow.pendingAction?.trackIDs == pendingAction.trackIDs else { return }
-        var updatedFlow = reloadedFlow
-        updatedFlow.artwork.selectedTarget = selectedTarget ?? .summary
-        updatedFlow.phase = .editing
-        SheetManager.shared.batchTagEditFlow = updatedFlow
-    }
-
-    /// Применяет массовое переименование файлов для готовых строк плана.
+    /// Применяет массовое переименование файлов через batch rename handler.
     func applyBatchFilenameRename(using playerManager: PlayerManager) async {
-        guard !batchFilenameRenameFlow.isBusy else { return }
-        // До выбора стратегии targetFileName равен текущему имени, поэтому применять такой план нельзя.
-        guard batchFilenameRenameFlow.strategy != nil else { return }
-
-        let commands = batchFilenameRenameFlow.items
-            .filter { $0.status == .ready }
-            .map { item in
-                BatchFilenameRenameCommand(
-                    trackId: item.trackId,
-                    currentFileName: item.currentFileName,
-                    targetFileName: item.targetFileName
-                )
-            }
-
-        guard !commands.isEmpty else { return }
-
-        batchFilenameRenameFlow.startApplyingRename(totalCount: commands.count)
-        defer {
-            batchFilenameRenameFlow.finishApplyingRename()
-        }
-
-        let result = await AppCommandExecutor.shared.renameTrackFilesBatch(
-            commands,
-            using: playerManager,
-            progress: { [weak self] processed, _ in
-                self?.batchFilenameRenameFlow.updateApplyingRenameProgress(
-                    processedCount: processed
-                )
-            }
-        )
-
-        batchFilenameRenameFlow.applyResult(result)
+        await batchRenameHandler.applyRename(using: playerManager)
     }
 
-    /// Сразу открывает sheet массового переименования,
-    /// пока metadata выбранных файлов ещё загружается.
-    private func startBatchFilenameRenameLoading(with pendingAction: PendingBulkTrackAction) {
-        batchFilenameRenameFlow.startLoadingMetadata(
-            with: pendingAction,
-            tracks: filenameRenameTracks(for: pendingAction.trackIDs)
-        )
-        batchFilenameRenameFlow.startPreparingRename(
-            totalCount: pendingAction.trackIDs.count
-        )
-    }
-
-    /// Подготавливает flow массового переименования после загрузки runtime metadata.
-    private func prepareBatchFilenameRename(with pendingAction: PendingBulkTrackAction) async {
-        defer {
-            batchFilenameRenameFlow.finishPreparingRename()
-        }
-
-        await ensureSnapshotsForBatchRename(trackIDs: pendingAction.trackIDs)
-
-        guard batchFilenameRenameFlow.pendingAction?.action == .renameFiles else { return }
-
-        let currentTrackIDs = batchFilenameRenameFlow.pendingAction?.trackIDs ?? []
-        guard !currentTrackIDs.isEmpty else { return }
-
-        batchFilenameRenameFlow.prepare(
-            with: PendingBulkTrackAction(
-                action: .renameFiles,
-                trackIDs: currentTrackIDs
-            ),
-            tracks: filenameRenameTracks(for: currentTrackIDs)
-        )
-        batchFilenameRenameFlow.validateRequiredMetadata()
-    }
-
-    /// Загружает runtime snapshots для batch rename.
-    /// Использует существующий runtime pipeline:
-    /// TrackRuntimeStore -> TrackRuntimeSnapshotBuilder.
-    private func ensureSnapshotsForBatchRename(trackIDs: [UUID]) async {
-        let limiter = AsyncLimiter(limit: 6)
-        var preparedCount = 0
-
-        /// Фиксирует завершение подготовки одного трека.
-        func updatePreparedCount() {
-            preparedCount += 1
-            batchFilenameRenameFlow.updatePreparingRenameProgress(
-                preparedCount: preparedCount
-            )
-        }
-
-        await withTaskGroup(of: Void.self) { group in
-            for trackID in trackIDs {
-                if snapshotsByTrackId[trackID] != nil {
-                    updatePreparedCount()
-                    continue
-                }
-
-                group.addTask { [weak self] in
-                    guard let self else { return }
-
-                    await limiter.acquire()
-
-                    if let storedSnapshot = await TrackRuntimeStore.shared.snapshot(forTrackId: trackID) {
-                        await MainActor.run {
-                            self.snapshotsByTrackId[trackID] = storedSnapshot
-                        }
-                        await limiter.release()
-                        return
-                    }
-
-                    guard let snapshot = await TrackRuntimeSnapshotBuilder.shared.buildSnapshot(forTrackId: trackID) else {
-                        await limiter.release()
-                        return
-                    }
-
-                    await TrackRuntimeStore.shared.storeSnapshot(snapshot)
-
-                    await MainActor.run {
-                        self.snapshotsByTrackId[trackID] = snapshot
-                    }
-
-                    await limiter.release()
-                }
-            }
-
-            for await _ in group {
-                updatePreparedCount()
-            }
-        }
-    }
-
-    /// Собирает входные данные для плана переименования в порядке выбранных trackIDs.
-    private func filenameRenameTracks(for trackIDs: [UUID]) -> [BatchFilenameRenameTrack] {
-        let tracksById = Dictionary(
-            uniqueKeysWithValues: trackSections
-                .flatMap(\.tracks)
-                .map { ($0.id, $0) }
-        )
-
-        return trackIDs.compactMap { trackId in
-            guard let track = tracksById[trackId] else { return nil }
-
-            let snapshot = snapshotsByTrackId[trackId]
-
-            return BatchFilenameRenameTrack(
-                trackId: trackId,
-                folderPath: track.fileURL.deletingLastPathComponent().standardizedFileURL.path,
-                currentFileName: track.fileURL.lastPathComponent,
-                artist: snapshot?.artist ?? track.artist,
-                title: snapshot?.title ?? track.title
-            )
-        }
-    }
-    
-    /// Проверяет доступность треков после первичного отображения списка.
-    private func updateAvailabilityInBackground() async {
-        let tracks = trackSections.flatMap { $0.tracks }
-        var availabilityById: [UUID: Bool] = [:]
-
-        for track in tracks {
-            availabilityById[track.id] = await BookmarkResolver.url(forTrack: track.id) != nil
-        }
-
-        trackSections = trackSections.map { section in
-            let updatedTracks = section.tracks.map { track in
-                let isAvailable = availabilityById[track.id] ?? track.isAvailable
-                return LibraryTrack(
-                    id: track.id,
-                    fileURL: track.fileURL,
-                    title: track.title,
-                    artist: track.artist,
-                    duration: track.duration,
-                    addedDate: track.addedDate,
-                    isAvailable: isAvailable
-                )
-            }
-
-            return TrackSection(
-                id: section.id,
-                title: section.title,
-                tracks: updatedTracks
-            )
-        }
-    }
-    
-
-    // MARK: - TrackRuntimeProviding
+    // MARK: - Runtime-снимки
 
     /// Возвращает runtime snapshot трека по его идентификатору.
     ///
@@ -621,11 +391,13 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         snapshotsByTrackId.removeAll()
         let trackIds = trackSections
             .flatMap { $0.tracks }
-            .map { $0.id }
+            .map { $0.trackId }
         for trackId in trackIds {
             requestSnapshotIfNeeded(for: trackId)
         }
     }
+
+    // MARK: - Обновления треков
 
     /// Применяет единое событие обновления трека к состоянию фонотеки.
     ///
@@ -650,7 +422,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
 
         trackSections = trackSections.map { section in
             let updatedTracks = section.tracks.map { track in
-                guard let updateEvent = eventsByTrackId[track.id] else { return track }
+                guard let updateEvent = eventsByTrackId[track.trackId] else { return track }
                 return updatedLibraryTrack(from: track, using: updateEvent)
             }
 
