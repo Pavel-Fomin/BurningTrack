@@ -15,7 +15,7 @@ struct LibraryMasterActionHandlerFactory {
     /// Создаёт production action handler без DI-контейнера.
     func make(
         playerViewModel: PlayerViewModel,
-        viewModel: LibraryMasterViewModel,
+        output: any LibraryMasterActionOutput,
         requestFolderPicker: @escaping @MainActor () -> Void
     ) -> LibraryMasterActionHandler {
         LibraryMasterActionHandler(
@@ -23,7 +23,7 @@ struct LibraryMasterActionHandlerFactory {
             navigationCoordinator: NavigationCoordinator.shared,
             toastPresenter: ToastManager.shared,
             playerViewModel: playerViewModel,
-            viewModel: viewModel,
+            output: output,
             requestFolderPicker: requestFolderPicker
         )
     }

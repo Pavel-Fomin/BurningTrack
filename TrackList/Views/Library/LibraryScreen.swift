@@ -5,8 +5,7 @@
 //  Вкладка “Фонотека”.
 //  Управляет только отображением содержимого фонотеки:
 //  — корневой список папок,
-//  — содержимое конкретной папки,
-//  — обработка события "показать трек во фонотеке".
+//  — содержимое конкретной папки.
 //
 //  Навигация между вкладками → ScenePhaseHandler.
 //  Маршруты внутри фонотеки → NavigationCoordinator.libraryRoute.
@@ -40,27 +39,53 @@ struct LibraryScreen: View {
 
     // MARK: - Зависимости
 
-    private let musicLibraryManager = MusicLibraryManager.shared
     /// Фабрика production action handler для корневого flow фонотеки.
     private let actionHandlerFactory = LibraryMasterActionHandlerFactory()
 
     let playerViewModel: PlayerViewModel
-    
-    @ObservedObject private var nav = NavigationCoordinator.shared
+
+    // MARK: - ViewModels
+
+    /// ViewModel контейнера фонотеки.
+    @StateObject private var viewModel: LibraryScreenViewModel
     /// ViewModel корневого экрана фонотеки.
-    @StateObject private var masterViewModel = LibraryMasterViewModel()
+    @StateObject private var masterViewModel: LibraryMasterViewModel
+
+    // MARK: - State
 
     @State private var isShowingFolderPicker = false
     /// Конфигурация верхней нижней панели для текущего экрана фонотеки.
     @State private var selectionActionBarConfig: SelectionActionBarConfig?
 
+    // MARK: - Init
+
+    init(playerViewModel: PlayerViewModel) {
+        self.playerViewModel = playerViewModel
+        self._viewModel = StateObject(
+            wrappedValue: LibraryScreenViewModelFactory.make()
+        )
+        self._masterViewModel = StateObject(
+            wrappedValue: LibraryMasterViewModelFactory.make()
+        )
+    }
+
     /// Обработчик действий корневого flow фонотеки.
     private var actionHandler: LibraryMasterActionHandler {
         actionHandlerFactory.make(
             playerViewModel: playerViewModel,
-            viewModel: masterViewModel,
+            output: masterViewModel,
             requestFolderPicker: {
                 isShowingFolderPicker = true
+            }
+        )
+    }
+
+    /// Binding пути навигации, который отправляет изменения через action.
+    private var libraryPathBinding: Binding<[NavigationCoordinator.LibraryRoute]> {
+        Binding(
+            get: { viewModel.screenState.libraryPath },
+            set: { libraryPath in
+                viewModel.handle(.libraryPathChanged(libraryPath))
             }
         )
     }
@@ -68,13 +93,15 @@ struct LibraryScreen: View {
     // MARK: - UI
 
     var body: some View {
-        NavigationStack(path: $nav.libraryPath) {
+        NavigationStack(path: libraryPathBinding) {
             rootContent
                 .libraryToolbar(title: "Фонотека")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color(.systemBackground))
                 .navigationDestination(for: NavigationCoordinator.LibraryRoute.self) { route in
-                    destination(for: route)
+                    destination(
+                        for: viewModel.screenState.destination(for: route)
+                    )
                 }
         }
         .bottomPanelsHost(
@@ -94,7 +121,7 @@ struct LibraryScreen: View {
             }
         }
         .onAppear {
-            handlePendingShowTrack()
+            viewModel.handle(.appeared)
         }
         // Выбор папки
         .fileImporter(
@@ -133,59 +160,30 @@ struct LibraryScreen: View {
     // MARK: - Navigation destinations
 
     @ViewBuilder
-    private func destination(for route: NavigationCoordinator.LibraryRoute) -> some View {
-        switch route {
+    private func destination(for destination: LibraryScreenDestinationState) -> some View {
+        switch destination {
 
         case .root:
             rootContent
                 .libraryToolbar(title: "Фонотека")
 
-        case .folder(let folderId):
-            if let folder = musicLibraryManager.folder(for: folderId) {
-                LibraryFolderContainer(
-                    folder: folder,
-                    revealRequest: revealRequest(for: folderId),
-                    onRevealHandled: { requestId in
-                        nav.clearRevealRequest(requestId: requestId)
-                    },
-                    playerViewModel: playerViewModel,
-                    selectionActionBarConfig: $selectionActionBarConfig
-                )
-            } else {
-                Text("Папка не найдена")
-                    .libraryToolbar(title: "Ошибка")
-                    .onAppear {
-                        ToastManager.shared.handle(.folderNotFound)
-                    }
-            }
+        case .folder(let destination):
+            LibraryFolderContainer(
+                folder: destination.folder,
+                revealRequest: destination.revealRequest,
+                onRevealHandled: { requestId in
+                    viewModel.handle(.revealHandled(requestId))
+                },
+                playerViewModel: playerViewModel,
+                selectionActionBarConfig: $selectionActionBarConfig
+            )
+
+        case .missingFolder:
+            Text("Папка не найдена")
+                .libraryToolbar(title: "Ошибка")
+                .onAppear {
+                    viewModel.handle(.folderMissingAppeared)
+                }
         }
-    }
-
-    // MARK: - Переадресация
-
-    private func handlePendingShowTrack() {
-        guard let trackId = nav.consumePendingShowTrackId() else { return }
-
-        Task { @MainActor in
-            guard let entry = await TrackRegistry.shared.entry(for: trackId) else {
-                ToastManager.shared.handle(.showInLibraryTargetMissing)
-                return
-            }
-
-            let folderId = entry.folderId
-
-            guard musicLibraryManager.folder(for: folderId) != nil else {
-                ToastManager.shared.handle(.folderNotFound)
-                return
-            }
-
-            nav.setPendingRevealRequest(folderId: folderId, targetTrackId: trackId)
-            nav.openFolder(folderId)
-        }
-    }
-
-    private func revealRequest(for folderId: UUID) -> LibraryRevealRequest? {
-        guard nav.pendingRevealRequest?.folderId == folderId else { return nil }
-        return nav.pendingRevealRequest
     }
 }

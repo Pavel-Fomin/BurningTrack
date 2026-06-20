@@ -8,7 +8,7 @@
 //  - выполняет только UI и пользовательские действия.
 //
 //  Вся навигация:
-//  - переход на подпапку → NavigationCoordinator.openFolder(_)
+//  - переход на подпапку → LibraryFolderActionHandler
 //  - reveal/переадресация → обрабатывается в LibraryScreen, не здесь.
 //
 //  Created by Pavel Fomin on 27.06.2025.
@@ -17,6 +17,9 @@
 import SwiftUI
 
 struct LibraryFolderView: View {
+    // MARK: - State
+
+    let state: LibraryFolderScreenState
 
     // MARK: - Входные данные
 
@@ -25,20 +28,19 @@ struct LibraryFolderView: View {
     let playerViewModel: PlayerViewModel
     @Binding var selectionActionBarConfig: SelectionActionBarConfig?
 
-    // MARK: - Навигация и ViewModel
+    // MARK: - Actions
 
-    @ObservedObject private var nav = NavigationCoordinator.shared
-    @EnvironmentObject var viewModel: LibraryFolderViewModel
+    let onAction: (LibraryFolderAction) -> Void
 
     // MARK: - UI
 
     var body: some View {
         Group {
-            switch viewModel.displayMode {
+            switch state.displayMode {
 
             case .tracks:
                 LibraryTracksView(
-                    folder: viewModel.folder,
+                    folder: state.folder,
                     revealRequest: revealRequest,
                     onRevealHandled: onRevealHandled,
                     playerViewModel: playerViewModel,
@@ -49,16 +51,16 @@ struct LibraryFolderView: View {
             case .subfolders:
                 List { folderSectionView() }
                     .listStyle(.insetGrouped)
-                    .libraryToolbar(title: viewModel.folder.name)
+                    .libraryToolbar(title: state.title)
                     .onAppear {
-                        selectionActionBarConfig = nil
+                        onAction(.appeared)
                     }
 
             case .empty:
                 Color.clear
-                    .libraryToolbar(title: viewModel.folder.name)
+                    .libraryToolbar(title: state.title)
                     .onAppear {
-                        selectionActionBarConfig = nil
+                        onAction(.appeared)
                     }
             }
         }
@@ -69,7 +71,7 @@ struct LibraryFolderView: View {
     @ViewBuilder
     private func folderSectionView() -> some View {
         Section {
-            ForEach(viewModel.subfolders) { subfolder in
+            ForEach(state.subfolders) { subfolder in
                 HStack(spacing: 12) {
                     Image(systemName: "folder.fill")
                         .foregroundColor(.blue)
@@ -81,7 +83,7 @@ struct LibraryFolderView: View {
                 .padding(.vertical, 4)
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    nav.pushFolder(subfolder.url.libraryFolderId)
+                    onAction(.subfolderTapped(subfolder))
                 }
             }
         }

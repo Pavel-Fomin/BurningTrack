@@ -12,7 +12,7 @@ import Combine
 import Foundation
 
 @MainActor
-final class LibraryMasterViewModel: ObservableObject {
+final class LibraryMasterViewModel: ObservableObject, LibraryMasterActionOutput {
 
     /// Готовое состояние корневого экрана фонотеки.
     @Published private(set) var screenState = LibraryMasterScreenState(
@@ -31,14 +31,6 @@ final class LibraryMasterViewModel: ObservableObject {
     private let stateBuilder: LibraryMasterScreenStateBuilder
     /// Подписки на изменения менеджера.
     private var cancellables = Set<AnyCancellable>()
-
-    init() {
-        self.manager = MusicLibraryManager.shared
-        self.stateBuilder = LibraryMasterScreenStateBuilder()
-
-        observeManager()
-        refreshState()
-    }
 
     init(
         manager: MusicLibraryManager,

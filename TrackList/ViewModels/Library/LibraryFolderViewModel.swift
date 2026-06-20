@@ -12,31 +12,28 @@ import SwiftUI
 
 @MainActor
 final class LibraryFolderViewModel: ObservableObject {
-    
-    // MARK: - Input (immutable)
-    
-    let folder: LibraryFolder
-    
     // MARK: - Output
-    
-    @Published private(set) var subfolders: [LibraryFolder]
-    @Published private(set) var displayMode: DisplayMode
-    
-    enum DisplayMode {
-        case subfolders
-        case tracks
-        case empty
-    }
-    
+
+    @Published private(set) var screenState: LibraryFolderScreenState
+
+    // MARK: - Dependencies
+
+    private let actionHandler: LibraryFolderActionHandler
+
     // MARK: - Init
-    
-    init(folder: LibraryFolder) {
-        self.folder = folder
-        self.subfolders = folder.subfolders
-        self.displayMode = folder.subfolders.isEmpty ? .tracks : .subfolders
+
+    init(
+        folder: LibraryFolder,
+        stateBuilder: LibraryFolderStateBuilder,
+        actionHandler: LibraryFolderActionHandler
+    ) {
+        self.screenState = stateBuilder.build(folder: folder)
+        self.actionHandler = actionHandler
     }
-    
-    // MARK: - Helpers
-    
-    
+
+    // MARK: - Actions
+
+    func handle(_ action: LibraryFolderAction) {
+        actionHandler.handle(action)
+    }
 }

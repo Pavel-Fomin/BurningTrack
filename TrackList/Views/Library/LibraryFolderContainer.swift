@@ -79,18 +79,28 @@ private struct LibraryFolderContent: View {
         self.onRevealHandled = onRevealHandled
         self.playerViewModel = playerViewModel
         self._selectionActionBarConfig = selectionActionBarConfig
-        self._viewModel = StateObject(wrappedValue: LibraryFolderViewModel(folder: folder))
+        // Сохраняем Binding локально, чтобы action handler очищал текущую панель выбора.
+        let selectionActionBarConfig = selectionActionBarConfig
+        self._viewModel = StateObject(
+            wrappedValue: LibraryFolderViewModelFactory.make(
+                folder: folder,
+                clearSelectionActionBar: {
+                    selectionActionBarConfig.wrappedValue = nil
+                }
+            )
+        )
     }
 
     // MARK: - UI
 
     var body: some View {
         LibraryFolderView(
+            state: viewModel.screenState,
             revealRequest: revealRequest,
             onRevealHandled: onRevealHandled,
             playerViewModel: playerViewModel,
-            selectionActionBarConfig: $selectionActionBarConfig
+            selectionActionBarConfig: $selectionActionBarConfig,
+            onAction: viewModel.handle
         )
-        .environmentObject(viewModel)
     }
 }

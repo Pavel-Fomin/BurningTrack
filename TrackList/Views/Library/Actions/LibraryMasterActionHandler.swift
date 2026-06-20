@@ -20,8 +20,8 @@ final class LibraryMasterActionHandler {
     private let toastPresenter: any ToastPresenting
     /// ViewModel плеера для проверки и остановки воспроизведения.
     private let playerViewModel: PlayerViewModel
-    /// ViewModel корневого экрана фонотеки.
-    private let viewModel: LibraryMasterViewModel
+    /// Output корневого flow для изменения экранного состояния.
+    private let output: any LibraryMasterActionOutput
     /// Запрашивает показ системного picker'а папки на уровне экрана.
     private let requestFolderPicker: @MainActor () -> Void
 
@@ -30,14 +30,14 @@ final class LibraryMasterActionHandler {
         navigationCoordinator: NavigationCoordinator,
         toastPresenter: any ToastPresenting,
         playerViewModel: PlayerViewModel,
-        viewModel: LibraryMasterViewModel,
+        output: any LibraryMasterActionOutput,
         requestFolderPicker: @escaping @MainActor () -> Void
     ) {
         self.manager = manager
         self.navigationCoordinator = navigationCoordinator
         self.toastPresenter = toastPresenter
         self.playerViewModel = playerViewModel
-        self.viewModel = viewModel
+        self.output = output
         self.requestFolderPicker = requestFolderPicker
     }
 
@@ -48,7 +48,7 @@ final class LibraryMasterActionHandler {
         switch action {
 
         case .onAppear:
-            viewModel.refreshState()
+            output.refreshState()
 
         case .addFolderTapped:
             requestFolderPicker()
@@ -71,7 +71,7 @@ final class LibraryMasterActionHandler {
             confirmStopAndDetachFolder()
 
         case .cancelDetachFolder:
-            viewModel.clearPendingDetachFolder()
+            output.clearPendingDetachFolder()
         }
     }
 
@@ -122,15 +122,15 @@ final class LibraryMasterActionHandler {
             if canDetach {
                 await detachFolder(folder)
             } else {
-                viewModel.setPendingDetachFolder(folder)
+                output.setPendingDetachFolder(folder)
             }
         }
     }
 
     /// Подтверждает остановку воспроизведения и открепляет ожидающую папку.
     private func confirmStopAndDetachFolder() {
-        guard let folder = viewModel.pendingDetachFolder else {
-            viewModel.clearPendingDetachFolder()
+        guard let folder = output.pendingDetachFolder else {
+            output.clearPendingDetachFolder()
             return
         }
 
@@ -141,7 +141,7 @@ final class LibraryMasterActionHandler {
 
         Task { @MainActor in
             await detachFolder(folder)
-            viewModel.clearPendingDetachFolder()
+            output.clearPendingDetachFolder()
         }
     }
 
