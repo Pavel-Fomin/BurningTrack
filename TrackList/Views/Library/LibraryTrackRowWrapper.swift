@@ -2,217 +2,182 @@
 //  LibraryTrackRowWrapper.swift
 //  TrackList
 //
-//  Обёртка для TrackRowView с реакцией на playerViewModel.
-//  Чистый UI-компонент — не содержит навигации.
-//  NavigationCoordinator и маршруты здесь НЕ используются.
+//  Адаптер для TrackRowView в контексте фонотеки.
+//  Не содержит самостоятельной бизнес-логики строки:
+//  состояние, отображение и команды вынесены в отдельные handler'ы.
 //
 //  Created by Pavel Fomin on 03.08.2025.
 //
-
 import SwiftUI
 import UIKit
 
 struct LibraryTrackRowWrapper: View {
-    
+
     // MARK: - Input
-    
+
     let track: LibraryTrack                       /// Текущий трек строки
     let allTracks: [LibraryTrack]                 /// Контекст всех треков (для переключения)
-    
     let trackListNamesById: [UUID: [String]]      /// Названия треклистов, в которые входит трек
-    
     let metadataProvider: TrackMetadataProviding  /// Провайдер runtime snapshot
-    
     let isScrollingFast: Bool                     /// Флаг быстрого скролла (для оптимизации загрузки)
     let isRevealed: Bool                          /// Состояние раскрытия (для свайпов)
-    
     let showsSelection: Bool                      /// Включён ли режим выбора
     let isSelected: Bool                          /// Выбран ли текущий трек
-    
     let onToggleSelection: () -> Void             /// Обработчик выбора
     let onRenameTrack: (UUID, FileRenameStrategy) -> Void /// Обработчик переименования трека
-    
     @ObservedObject var playerViewModel: PlayerViewModel   /// ViewModel плеера
     @ObservedObject private var settingsManager = AppSettingsManager.shared /// Менеджер настроек отображения
     @EnvironmentObject var sheetManager: SheetManager      /// Менеджер шитов
-    
-    // MARK: - Player state
-    
-    /// Является ли трек текущим (играющим)
-    private var isCurrent: Bool {
-        playerViewModel.isCurrent(track, in: .library)
-    }
-    
-    /// Находится ли трек в состоянии воспроизведения
-    private var isPlaying: Bool {
-        isCurrent && playerViewModel.isPlaying
-    }
-    
-    /// Названия треклистов, в которых находится трек
-    private var trackListNames: [String] {
-        trackListNamesById[track.trackId] ?? []
-    }
-    
-    /// Подсветка строки (например при возврате из sheet)
-    private var isHighlighted: Bool {
-        sheetManager.highlightedRowID == track.id
-    }
-    
-    
-    // MARK: - Snapshot
-    
-    /// Runtime snapshot трека (единый источник метаданных)
-    private var snapshot: TrackRuntimeSnapshot? {
-        metadataProvider.snapshot(for: track.trackId)
-    }
-    
-    /// Обложка трека (строится из snapshot.artworkData)
-    private var artwork: UIImage? {
-        guard AppSettingsManager.shared.settings.visible.metadata.isTagReadingEnabled else { return nil }
-        guard let data = snapshot?.artworkData else { return nil }
-        
-        return ArtworkProvider.shared.image(
-            trackId: track.trackId,
-            artworkData: data,
-            purpose: .trackList
+
+    // MARK: - Handlers
+
+    /// Обработчик воспроизведения строки.
+    private var playbackHandler: LibraryTrackPlaybackHandler {
+        LibraryTrackPlaybackHandler(
+            playerViewModel: playerViewModel
         )
     }
 
-    /// Актуальное имя файла из runtime snapshot с fallback на модель строки.
-    private var displayFileName: String {
-        snapshot?.fileName ?? track.fileName
+    /// Обработчик подготовки данных отображения строки.
+    private var presentationHandler: LibraryTrackPresentationHandler {
+        LibraryTrackPresentationHandler(
+            metadataProvider: metadataProvider
+        )
     }
-    
-    // MARK: - UI
-    
-    var body: some View {
+
+    /// Обработчик команд строки.
+    private var commandHandler: LibraryTrackCommandHandler {
+        LibraryTrackCommandHandler(
+            sheetManager: sheetManager,
+            playbackHandler: playbackHandler,
+            presentationHandler: presentationHandler,
+            onToggleSelection: onToggleSelection,
+            onRenameTrack: onRenameTrack
+        )
+    }
+
+    // MARK: - State
+
+    /// Runtime snapshot трека (единый источник метаданных).
+    private var snapshot: TrackRuntimeSnapshot? {
+        presentationHandler.snapshot(for: track.trackId)
+    }
+
+    /// Названия треклистов, в которых находится трек.
+    private var trackListNames: [String] {
+        trackListNamesById[track.trackId] ?? []
+    }
+
+    /// Подсветка строки при возврате из sheet.
+    private var isSheetHighlighted: Bool {
+        sheetManager.highlightedRowID == track.id
+    }
+
+    /// Готовое состояние строки для TrackRowView.
+    private var rowState: LibraryTrackRowState {
         let shouldShowTags = settingsManager.settings.visible.metadata.isTagReadingEnabled
         let shouldShowTrackListMembership = settingsManager.settings.visible.library.isTrackListMembershipVisible
         let shouldShowFileFormat = settingsManager.settings.visible.library.isFileFormatVisible
-
-        TrackRowView(
+        return presentationHandler.makeState(
             track: track,
-            isCurrent: isCurrent,
-            isPlaying: isPlaying,
-            isHighlighted: isRevealed || isHighlighted,
-            artwork: artwork,
-            
-            // Данные отображения берём из snapshot (если он есть),
-            // иначе используем fallback из модели трека
-            title: shouldShowTags ? (snapshot?.title ?? track.title ?? displayFileName) : displayFileName,
-            artist: shouldShowTags ? (snapshot?.artist ?? track.artist ?? "") : "",
-            duration: snapshot?.duration ?? track.duration,
-            
-            onRowTap: {
-                // Если тап по текущему треку — пауза/воспроизведение
-                if isCurrent {
-                    playerViewModel.togglePlayPause()
-                } else {
-                    // Иначе запускаем новый трек в контексте
-                    playerViewModel.play(track: track, context: allTracks)
-                }
-            },
-            onArtworkTap: {
-                // Открытие экрана деталей трека
-                sheetManager.present(.trackDetail(track))
-            },
+            snapshot: snapshot,
+            isCurrent: playbackHandler.isCurrent(track),
+            isPlaying: playbackHandler.isPlaying(track),
+            isHighlighted: isRevealed || isSheetHighlighted,
+            trackListNames: trackListNames,
             showsSelection: showsSelection,
             isSelected: isSelected,
-            onToggleSelection: onToggleSelection,
+            shouldShowTags: shouldShowTags,
+            shouldShowTrackListMembership: shouldShowTrackListMembership,
+            shouldShowFileFormat: shouldShowFileFormat
+        )
+    }
+
+    // MARK: - UI
+
+    var body: some View {
+        TrackRowView(
+            track: rowState.track,
+            isCurrent: rowState.isCurrent,
+            isPlaying: rowState.isPlaying,
+            isHighlighted: rowState.isHighlighted,
+            artwork: rowState.artwork,
+            // Данные отображения берём из LibraryTrackRowState.
+            title: rowState.title,
+            artist: rowState.artist,
+            duration: rowState.duration,
+            onRowTap: {
+                commandHandler.handle(
+                    .tapRow(
+                        track: track,
+                        context: allTracks
+                    )
+                )
+            },
+            onArtworkTap: {
+                commandHandler.handle(
+                    .tapArtwork(track: track)
+                )
+            },
+            showsSelection: rowState.showsSelection,
+            isSelected: rowState.isSelected,
+            onToggleSelection: {
+                commandHandler.handle(.toggleSelection)
+            },
             selectionPlacement: .trailing,
-            showsFileFormat: shouldShowFileFormat,
-            trackListNames: shouldShowTrackListMembership ? trackListNames : nil
+            showsFileFormat: rowState.showsFileFormat,
+            trackListNames: rowState.trackListNames
         )
         .trackFileRenameMenu(
             artist: snapshot?.artist,
             title: snapshot?.title,
             isEnabled: !showsSelection,
             onRename: { strategy in
-                onRenameTrack(track.trackId, strategy)
+                commandHandler.handle(
+                    .rename(
+                        trackId: track.trackId,
+                        strategy: strategy
+                    )
+                )
             }
         )
-        
-        // Загружаем snapshot при появлении строки
-        // Больше не используем metadata cache и revision
+        // Загружаем snapshot при появлении строки.
+        // Быстрый скролл остаётся частью id, чтобы сохранить прежнее поведение обновления task.
         .task(id: track.trackId.uuidString + "|" + (isScrollingFast ? "1" : "0")) {
-            metadataProvider.requestSnapshotIfNeeded(for: track.trackId)
+            commandHandler.handle(
+                .requestSnapshot(trackId: track.trackId)
+            )
         }
-        
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             if !showsSelection {
-
                 // Добавить в плеер
                 Button {
-                    Task {
-                        do {
-                            try await AppCommandExecutor.shared.addTrackToPlayer(
-                                trackId: track.trackId
-                            )
-                        } catch let appError as AppError {
-                            ToastManager.shared.handle(appError)
-                        } catch {
-                            ToastManager.shared.handle(
-                                .operationFailed(
-                                    message: "Не удалось добавить трек в плеер"
-                                )
-                            )
-                        }
-                    }
+                    commandHandler.handle(
+                        .addToPlayer(trackId: track.trackId)
+                    )
                 } label: {
                     Label("В плеер", systemImage: "waveform")
                 }
                 .tint(.blue)
-
                 // Добавить в треклист
                 Button {
-                    sheetManager.present(
-                        .addToTrackList(
-                            AddToTrackListSheetData(
-                                track: track,
-                                sourceTrackListId: nil
-                            )
-                        )
+                    commandHandler.handle(
+                        .addToTrackList(track: track)
                     )
                 } label: {
                     Label("В треклист", systemImage: "list.star")
                 }
                 .tint(.green)
-
                 // Переместить трек в другую папку
                 Button {
-                    SheetActionCoordinator.shared.handle(
-                        action: .moveToFolder,
-                        track: track,
-                        context: .library
+                    commandHandler.handle(
+                        .moveToFolder(track: track)
                     )
                 } label: {
                     Label("Переместить", systemImage: "arrow.right.doc.on.clipboard")
                 }
                 .tint(.gray)
             }
-        }
-    }
-
-}
-
-// MARK: - Helpers
-
-private extension View {
-    
-    // Условное применение swipeActions
-    ///
-    /// - Parameters:
-    ///   - enabled: включены ли свайпы
-    ///   - actions: содержимое свайпов
-    @ViewBuilder
-    func swipeIf(
-        _ enabled: Bool,
-        @ViewBuilder actions: (Self) -> some View
-    ) -> some View {
-        if enabled {
-            actions(self)
-        } else {
-            self
         }
     }
 }
