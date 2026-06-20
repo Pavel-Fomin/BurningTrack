@@ -1,0 +1,49 @@
+//
+//  LibraryMasterScreenStateBuilder.swift
+//  TrackList
+//
+//  Собирает состояние корневого экрана фонотеки из MusicLibraryManager.
+//
+//  Created by Pavel Fomin on 20.06.2026.
+//
+
+import Foundation
+
+struct LibraryMasterScreenStateBuilder {
+
+    /// Собирает состояние экрана с учётом текущей папки, ожидающей открепления.
+    @MainActor
+    func build(
+        manager: MusicLibraryManager,
+        pendingDetachFolder: LibraryFolder?
+    ) -> LibraryMasterScreenState {
+
+        let folders = manager.attachedFolders.map { folder in
+            LibraryMasterFolderRowState(
+                id: folder.id,
+                name: folder.name,
+                url: folder.url,
+                isAttaching: manager.isAttachingFolder(folder.id)
+            )
+        }
+
+        return LibraryMasterScreenState(
+            accessState: manager.accessState,
+            folders: folders,
+            isEmpty: folders.isEmpty,
+            detachAlert: detachAlert(for: pendingDetachFolder)
+        )
+    }
+
+    /// Собирает предупреждение только тогда, когда открепление требует остановить воспроизведение.
+    private func detachAlert(
+        for pendingDetachFolder: LibraryFolder?
+    ) -> LibraryMasterDetachAlertState? {
+        guard pendingDetachFolder != nil else { return nil }
+
+        return LibraryMasterDetachAlertState(
+            title: "Чтобы открепить папку, остановите воспроизведение",
+            message: "Сейчас воспроизводится трек из этой папки."
+        )
+    }
+}

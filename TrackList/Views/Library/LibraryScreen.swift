@@ -41,14 +41,29 @@ struct LibraryScreen: View {
     // MARK: - Зависимости
 
     private let musicLibraryManager = MusicLibraryManager.shared
+    /// Фабрика production action handler для корневого flow фонотеки.
+    private let actionHandlerFactory = LibraryMasterActionHandlerFactory()
 
     let playerViewModel: PlayerViewModel
     
     @ObservedObject private var nav = NavigationCoordinator.shared
+    /// ViewModel корневого экрана фонотеки.
+    @StateObject private var masterViewModel = LibraryMasterViewModel()
 
     @State private var isShowingFolderPicker = false
     /// Конфигурация верхней нижней панели для текущего экрана фонотеки.
     @State private var selectionActionBarConfig: SelectionActionBarConfig?
+
+    /// Обработчик действий корневого flow фонотеки.
+    private var actionHandler: LibraryMasterActionHandler {
+        actionHandlerFactory.make(
+            playerViewModel: playerViewModel,
+            viewModel: masterViewModel,
+            requestFolderPicker: {
+                isShowingFolderPicker = true
+            }
+        )
+    }
 
     // MARK: - UI
 
@@ -90,25 +105,12 @@ struct LibraryScreen: View {
             switch result {
             case .success(let urls):
                 if let folderURL = urls.first {
-                    Task {
-                        do {
-                            try await musicLibraryManager.saveBookmark(for: folderURL)
-                            ToastManager.shared.handle(
-                                .folderAdded(name: folderURL.lastPathComponent)
-                            )
-                        } catch let appError as AppError {
-                            ToastManager.shared.handle(appError)
-                        } catch {
-                            ToastManager.shared.handle(
-                                .operationFailed(message: "Не удалось добавить папку")
-                            )
-                        }
-                    }
+                    actionHandler.handle(.folderPicked(folderURL))
+                } else {
+                    actionHandler.handle(.folderPickFailed)
                 }
             case .failure:
-                ToastManager.shared.handle(
-                    .operationFailed(message: "Не удалось выбрать папку")
-                )
+                actionHandler.handle(.folderPickFailed)
             }
         }
     }
@@ -118,8 +120,10 @@ struct LibraryScreen: View {
     @ViewBuilder
     private var rootContent: some View {
         MusicLibraryView(
-            playerViewModel: playerViewModel,
-            onAddFolder: { isShowingFolderPicker = true }
+            state: masterViewModel.screenState,
+            onAction: { action in
+                actionHandler.handle(action)
+            }
         )
         .onAppear {
             selectionActionBarConfig = nil
