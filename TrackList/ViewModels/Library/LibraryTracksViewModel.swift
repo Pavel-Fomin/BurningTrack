@@ -3,13 +3,12 @@
 //  TrackList
 //
 //  ViewModel для треков внутри папки
-//  Отвечает за список, выбор и runtime-снимки фонотеки
+//  Отвечает за список, выбор и координацию runtime-снимков фонотеки
 //
 //  Created by Pavel Fomin on 12.12.2025.
 //
 
 import Foundation
-import SwiftUI
 import Combine
 
 @MainActor
@@ -17,37 +16,36 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
 
     // MARK: - Входные данные
 
-    let folderURL: URL
-    let folderId: UUID
+    private let folderId: UUID
 
     // MARK: - Состояние списка
 
-    @Published var trackSections: [TrackSection] = []
-    @Published var trackListNamesById: [UUID: [String]] = [:]
-    @Published var isLoading = false
+    @Published private(set) var trackSections: [TrackSection] = []
+    @Published private(set) var trackListNamesById: [UUID: [String]] = [:]
+    @Published private(set) var isLoading = false
     @Published private(set) var didLoad = false
 
     // MARK: - Состояние выбора
 
     @Published var bulkSelection = BulkSelectionState<UUID, BulkTrackAction>()
 
-    // MARK: - Состояние runtime-снимков
-
-    @Published private(set) var snapshotsByTrackId: [UUID: TrackRuntimeSnapshot] = [:] /// Runtime-снимки треков по id
-    
     // MARK: - Зависимости
 
     private let tracksProvider: LibraryTracksProvider
     private let badgeProvider: TrackListBadgeProvider
+    /// Предоставляет события обновления треков фонотеки.
+    private let eventProvider: LibraryTrackEventProvider
+    /// Управляет runtime snapshot pipeline фонотеки.
+    private let runtimeController: LibraryTrackRuntimeController
     /// Собирает UI-состояние выбора строк фонотеки.
     private let selectionStateBuilder = LibrarySelectionStateBuilder()
     /// Обрабатывает подготовку и применение массового переименования файлов.
     private lazy var batchRenameHandler = LibraryBatchRenameHandler(
         snapshotProvider: { [weak self] trackId in
-            self?.snapshotsByTrackId[trackId]
+            self?.runtimeController.snapshot(for: trackId)
         },
-        snapshotStore: { [weak self] trackId, snapshot in
-            self?.snapshotsByTrackId[trackId] = snapshot
+        snapshotLoader: { [weak self] trackId in
+            await self?.runtimeController.loadSnapshotIfNeeded(for: trackId)
         },
         tracksProvider: { [weak self] in
             self?.trackSections.flatMap(\.tracks) ?? []
@@ -77,11 +75,6 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         batchRenameHandler.flow
     }
 
-    /// Общее количество видимых строк в текущих секциях.
-    var totalVisibleTrackCount: Int {
-        selectionStateBuilder.visibleRowIds(from: trackSections).count
-    }
-
     /// Показывает, выбраны ли все видимые строки.
     var areAllVisibleTracksSelected: Bool {
         selectionStateBuilder.areAllVisibleRowsSelected(
@@ -96,67 +89,23 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         folderURL: URL,
         renameActionHandler: TrackFileRenameActionHandler,
         tracksProvider: LibraryTracksProvider = FastLibraryTracksProvider(),
-        badgeProvider: TrackListBadgeProvider = DefaultTrackListBadgeProvider()
+        badgeProvider: TrackListBadgeProvider = DefaultTrackListBadgeProvider(),
+        eventProvider: LibraryTrackEventProvider = NotificationLibraryTrackEventProvider(),
+        runtimeController: LibraryTrackRuntimeController = LibraryTrackRuntimeController()
     ) {
-        self.folderURL = folderURL
         self.folderId = folderURL.libraryFolderId
 
         self.renameActionHandler = renameActionHandler
         self.tracksProvider = tracksProvider
         self.badgeProvider = badgeProvider
+        self.eventProvider = eventProvider
+        self.runtimeController = runtimeController
 
+        bindRuntimeController()
         bindBatchRenameHandler()
-
-        NotificationCenter.default.addObserver(
-            forName: .trackDidUpdate,
-            object: nil,
-            queue: .main
-        ) { [weak self] notification in
-            guard let self else { return }
-            guard let updateEvent = notification.object as? TrackUpdateEvent else { return }
-
-            Task { @MainActor in
-                self.applyTrackUpdateEvent(updateEvent)
-            }
-        }
-
-        NotificationCenter.default.addObserver(
-            forName: .trackBatchDidUpdate,
-            object: nil,
-            queue: .main
-        ) { [weak self] notification in
-            guard let self else { return }
-            guard let events = notification.userInfo?["events"] as? [TrackUpdateEvent] else { return }
-
-            Task { @MainActor in
-                self.applyTrackUpdateEvents(events)
-            }
-        }
-
-        NotificationCenter.default.publisher(for: .appSettingsDidChange)
-            .sink { [weak self] _ in
-                Task { @MainActor in
-                    guard let self else { return }
-                    self.reloadSnapshotsAfterSettingsChange()
-                }
-            }
-            .store(in: &cancellables)
-
-        NotificationCenter.default.publisher(for: .trackListsDidChange)
-            .sink { [weak self] _ in
-                Task { @MainActor in
-                    self?.reloadTrackListBadges()
-                }
-            }
-            .store(in: &cancellables)
-
-        NotificationCenter.default.publisher(for: .trackListTracksDidChange)
-            .sink { [weak self] _ in
-                Task { @MainActor in
-                    self?.reloadTrackListBadges()
-                }
-            }
-            .store(in: &cancellables)
+        bindTrackUpdateEvents()
+        bindSettingsEvents()
+        bindBadgeEvents()
     }
 
     // MARK: - Переименование
@@ -173,7 +122,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
             return
         }
 
-        let snapshot = snapshotsByTrackId[track.trackId]
+        let snapshot = runtimeController.snapshot(for: track.trackId)
         let request = TrackFileRenameRequest(
             trackId: track.trackId,
             rowId: track.id,
@@ -348,6 +297,56 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
             .store(in: &cancellables)
     }
 
+    /// Пробрасывает изменения runtime controller наружу для подписчиков ViewModel.
+    private func bindRuntimeController() {
+        runtimeController.objectWillChange
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
+    }
+
+    /// Подписывается на события обновления треков через event provider.
+    private func bindTrackUpdateEvents() {
+        eventProvider.trackDidUpdate
+            .sink { [weak self] updateEvent in
+                Task { @MainActor in
+                    self?.applyTrackUpdateEvent(updateEvent)
+                }
+            }
+            .store(in: &cancellables)
+
+        eventProvider.trackBatchDidUpdate
+            .sink { [weak self] events in
+                Task { @MainActor in
+                    self?.applyTrackUpdateEvents(events)
+                }
+            }
+            .store(in: &cancellables)
+    }
+
+    /// Подписывается на событие изменения настроек приложения через event provider.
+    private func bindSettingsEvents() {
+        eventProvider.appSettingsDidChange
+            .sink { [weak self] in
+                Task { @MainActor in
+                    self?.reloadSnapshotsAfterSettingsChange()
+                }
+            }
+            .store(in: &cancellables)
+    }
+
+    /// Подписывается на события изменения треклистов через event provider.
+    private func bindBadgeEvents() {
+        eventProvider.trackListBadgesDidChange
+            .sink { [weak self] in
+                Task { @MainActor in
+                    self?.reloadTrackListBadges()
+                }
+            }
+            .store(in: &cancellables)
+    }
+
     /// Применяет массовое переименование файлов через batch rename handler.
     func applyBatchFilenameRename(using playerManager: PlayerManager) async {
         await batchRenameHandler.applyRename(using: playerManager)
@@ -360,35 +359,19 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
     /// - Parameter trackId: Идентификатор трека
     /// - Returns: TrackRuntimeSnapshot или nil
     func snapshot(for trackId: UUID) -> TrackRuntimeSnapshot? {
-        snapshotsByTrackId[trackId]
+        runtimeController.snapshot(for: trackId)
     }
 
     /// Запрашивает runtime snapshot трека, если он ещё не загружен.
     ///
     /// - Parameter trackId: Идентификатор трека
     func requestSnapshotIfNeeded(for trackId: UUID) {
-        if snapshotsByTrackId[trackId] != nil { return }
-
-        Task {
-            let snapshot: TrackRuntimeSnapshot?
-
-            if let storedSnapshot = TrackRuntimeStore.shared.snapshot(forTrackId: trackId) {
-                snapshot = storedSnapshot
-            } else {
-                snapshot = await TrackRuntimeSnapshotBuilder.shared.buildSnapshot(forTrackId: trackId)
-            }
-
-            guard let snapshot else { return }
-
-            await MainActor.run {
-                snapshotsByTrackId[trackId] = snapshot
-            }
-        }
+        runtimeController.requestSnapshotIfNeeded(for: trackId)
     }
 
     /// Пересобирает runtime snapshot загруженных треков после изменения настроек приложения.
     private func reloadSnapshotsAfterSettingsChange() {
-        snapshotsByTrackId.removeAll()
+        runtimeController.clearSnapshots()
         let trackIds = trackSections
             .flatMap { $0.tracks }
             .map { $0.trackId }
@@ -414,11 +397,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
             result[event.trackId] = event
         }
 
-        var updatedSnapshots = snapshotsByTrackId
-        for event in events {
-            updatedSnapshots[event.trackId] = event.snapshot
-        }
-        snapshotsByTrackId = updatedSnapshots
+        runtimeController.applyTrackUpdateEvents(events)
 
         trackSections = trackSections.map { section in
             let updatedTracks = section.tracks.map { track in

@@ -10,21 +10,6 @@
 
 import SwiftUI
 
-// Типизирует причину программной прокрутки фонотеки.
-private enum LibraryScrollRequest: Equatable {
-    case reveal(UUID)
-    case activeTrack(UUID)
-
-    var targetId: UUID {
-        switch self {
-        case .reveal(let id):
-            return id
-        case .activeTrack(let id):
-            return id
-        }
-    }
-}
-
 struct LibraryTracksView: View {
 
     let folder: LibraryFolder
@@ -37,13 +22,13 @@ struct LibraryTracksView: View {
     @EnvironmentObject var sheetManager: SheetManager
     @StateObject private var tracksViewModel: LibraryTracksViewModel
     @StateObject private var scrollSpeed = ScrollSpeedModel(thresholdPtPerSec: 1500,debounceMs: 180)
+    @StateObject private var revealCoordinator: LibraryTrackRevealCoordinator
+    private let selectionActionBarCoordinator = LibrarySelectionActionBarCoordinator()
+    private let sheetCoordinator = LibraryTracksSheetCoordinator()
 
-    // MARK: -  Локальное состояние для скролла/подсветки
+    // MARK: -  Локальное состояние для скролла
     
     @State private var scrollRequest: LibraryScrollRequest?
-    @State private var revealedTrackID: UUID?
-    @State private var revealedRequestId: UUID?
-    @State private var pendingRevealRequest: LibraryRevealRequest?
 
     /// Показывает, активен ли локальный режим выбора фонотеки.
     private var isSelecting: Bool {
@@ -77,7 +62,11 @@ struct LibraryTracksView: View {
         self.onRevealHandled = onRevealHandled
         self.playerViewModel = playerViewModel
         self._selectionActionBarConfig = selectionActionBarConfig
-        self._pendingRevealRequest = State(initialValue: revealRequest)
+        self._revealCoordinator = StateObject(
+            wrappedValue: LibraryTrackRevealCoordinator(
+                initialRequest: revealRequest
+            )
+        )
         self._tracksViewModel = StateObject(
             wrappedValue: LibraryTracksViewModel(
                 folderURL: folder.url,
@@ -111,10 +100,23 @@ struct LibraryTracksView: View {
             }
             .task {
                 await tracksViewModel.loadTracksIfNeeded()
-                revealTrackIfNeeded()
+                handleRevealDecision(
+                    revealCoordinator.evaluateReveal(
+                        trackSections: tracksViewModel.trackSections,
+                        didLoad: tracksViewModel.didLoad,
+                        isLoading: tracksViewModel.isLoading
+                    )
+                )
             }
             .onChange(of: revealRequest?.requestId) { _, _ in
-                handleRevealRequestChange()
+                handleRevealDecision(
+                    revealCoordinator.receiveRevealRequest(
+                        revealRequest,
+                        trackSections: tracksViewModel.trackSections,
+                        didLoad: tracksViewModel.didLoad,
+                        isLoading: tracksViewModel.isLoading
+                    )
+                )
             }
             .onChange(of: sheetManager.dismissCounter) { _, _ in
                 handleSheetDismissCounterChange()
@@ -150,7 +152,7 @@ struct LibraryTracksView: View {
                     metadataProvider: tracksViewModel,
                     playerViewModel: playerViewModel,
                     isScrollingFast: scrollSpeed.isFast,
-                    revealedTrackID: revealedTrackID,
+                    revealedTrackID: revealCoordinator.revealedTrackID,
                     onRenameTrack: { trackId, strategy in
                         tracksViewModel.renameTrack(
                             trackId: trackId,
@@ -172,7 +174,13 @@ struct LibraryTracksView: View {
                 handleScrollRequest(request, proxy: proxy)
             }
             .onChange(of: tracksViewModel.trackSections) { _, _ in
-                revealTrackIfNeeded()
+                handleRevealDecision(
+                    revealCoordinator.evaluateReveal(
+                        trackSections: tracksViewModel.trackSections,
+                        didLoad: tracksViewModel.didLoad,
+                        isLoading: tracksViewModel.isLoading
+                    )
+                )
             }
             .onChange(of: playerViewModel.currentTrackDisplayable?.id) { _, _ in
                 requestActiveTrackScrollIfNeeded()
@@ -241,6 +249,11 @@ struct LibraryTracksView: View {
             proxy.scrollTo(targetId, anchor: .center)
         }
 
+        if case .reveal(let revealRequest) = request,
+           let handledRequestId = revealCoordinator.markRevealScrollPerformed(revealRequest) {
+            onRevealHandled(handledRequestId)
+        }
+
         scrollRequest = nil
     }
 
@@ -250,25 +263,27 @@ struct LibraryTracksView: View {
         requestActiveTrackScrollIfNeeded()
     }
 
-    /// Обрабатывает новый внешний reveal-запрос.
-    private func handleRevealRequestChange() {
-        pendingRevealRequest = revealRequest
-        revealTrackIfNeeded()
-    }
-
     /// Обновляет список после закрытия глобального sheet.
     private func handleSheetDismissCounterChange() {
-        guard sheetManager.lastDismissedSheetKind != .batchFilenameRename else { return }
+        guard sheetCoordinator.shouldRefreshAfterDismiss(
+            lastDismissedSheetKind: sheetManager.lastDismissedSheetKind,
+            isLoading: tracksViewModel.isLoading
+        ) else {
+            return
+        }
 
         Task {
-            if tracksViewModel.isLoading {return}
             await tracksViewModel.refresh()
         }
     }
 
     /// Открывает глобальный sheet при запуске flow массового переименования.
     private func handleBatchFilenameRenameFlowActivityChange(_ isActive: Bool) {
-        guard isActive else { return }
+        guard sheetCoordinator.shouldPresentBatchFilenameRename(
+            isActive: isActive
+        ) else {
+            return
+        }
 
         sheetManager.presentBatchFilenameRename(
             flow: tracksViewModel.batchFilenameRenameFlow,
@@ -281,26 +296,12 @@ struct LibraryTracksView: View {
         )
     }
 
-    /// Проверяем, есть ли трек с данным id в текущих секциях.
-    private func containsTrack(id: UUID) -> Bool {
-        tracksViewModel.trackSections.contains { section in
-            section.tracks.contains { $0.id == id }
-        }
-    }
-
-    /// Обновляет конфигурацию нижней панели подтверждения для родительского host.
+    /// Синхронизирует конфигурацию нижней панели подтверждения для родительского host.
     private func updateSelectionActionBarConfig() {
-        guard let action = tracksViewModel.bulkSelection.pendingAction else {
-            selectionActionBarConfig = nil
-            return
-        }
-
-        selectionActionBarConfig = SelectionActionBarConfig(
-            title: action.title,
-            subtitle: "Выбрано: \(tracksViewModel.bulkSelection.selectedCount)",
-            primaryTitle: "Применить",
-            iconName: action.iconName,
-            isPrimaryEnabled: tracksViewModel.bulkSelection.hasSelection,
+        selectionActionBarConfig = selectionActionBarCoordinator.makeConfig(
+            pendingAction: tracksViewModel.bulkSelection.pendingAction,
+            selectedCount: tracksViewModel.bulkSelection.selectedCount,
+            hasSelection: tracksViewModel.bulkSelection.hasSelection,
             onPrimaryTap: applySelectedBatchAction
         )
     }
@@ -308,7 +309,7 @@ struct LibraryTracksView: View {
     /// Сбрасывает режим мультиселекта и очищает нижнюю панель.
     private func resetMultiselect() {
         tracksViewModel.resetBulkSelection()
-        selectionActionBarConfig = nil
+        updateSelectionActionBarConfig()
     }
 
     /// Обрабатывает выбор batch-действия с учётом текущего режима и выбора.
@@ -325,42 +326,36 @@ struct LibraryTracksView: View {
 
     /// Запрашивает прокрутку к активному треку, если она не конфликтует с reveal.
     private func requestActiveTrackScrollIfNeeded() {
-        guard pendingRevealRequest == nil else { return }
-        guard scrollRequest == nil else { return }
-        guard playerViewModel.currentContext == .library else { return }
-        guard let currentTrackId = playerViewModel.currentTrackDisplayable?.id else { return }
-        guard containsTrack(id: currentTrackId) else { return }
-
-        scrollRequest = .activeTrack(currentTrackId)
-    }
-
-    /// Показываем целевой трек только после появления строки в списке.
-    private func revealTrackIfNeeded() {
-        guard let request = pendingRevealRequest else { return }
-        let targetTrackId = request.targetTrackId
-        let revealRequestId = request.requestId
-
-        guard containsTrack(id: targetTrackId) else {
-            guard tracksViewModel.didLoad && !tracksViewModel.isLoading else { return }
-            pendingRevealRequest = nil
-            onRevealHandled(revealRequestId)
+        guard let request = revealCoordinator.activeTrackScrollRequestIfNeeded(
+            currentTrack: playerViewModel.currentTrackDisplayable,
+            currentContext: playerViewModel.currentContext,
+            trackSections: tracksViewModel.trackSections,
+            hasPendingScrollRequest: scrollRequest != nil
+        ) else {
             return
         }
 
-        pendingRevealRequest = nil
-        revealedTrackID = targetTrackId
-        revealedRequestId = revealRequestId
+        scrollRequest = request
+    }
 
-        Task { @MainActor in
-            // Даём List один проход на создание строки перед scrollTo.
-            await Task.yield()
-            scrollRequest = .reveal(targetTrackId)
-            onRevealHandled(revealRequestId)
+    /// Выполняет SwiftUI-эффекты по готовому решению reveal coordinator.
+    private func handleRevealDecision(_ decision: LibraryTrackRevealDecision) {
+        switch decision {
+        case .none,
+             .waitForTracks:
+            return
 
-            try? await Task.sleep(nanoseconds: 1_200_000_000)
-            if revealedTrackID == targetTrackId && revealedRequestId == revealRequestId {
-                revealedTrackID = nil
-                revealedRequestId = nil
+        case .complete(let requestId):
+            onRevealHandled(requestId)
+
+        case .reveal(let revealRequest):
+            Task { @MainActor in
+                // Даём List один проход на создание строки перед scrollTo.
+                await Task.yield()
+                scrollRequest = .reveal(revealRequest)
+
+                try? await Task.sleep(nanoseconds: 1_200_000_000)
+                revealCoordinator.clearRevealHighlightIfCurrent(revealRequest)
             }
         }
     }

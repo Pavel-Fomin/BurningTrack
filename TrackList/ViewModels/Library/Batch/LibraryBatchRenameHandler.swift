@@ -46,7 +46,7 @@ final class LibraryBatchRenameHandler: ObservableObject {
     // MARK: - Dependencies
 
     private let snapshotProvider: @MainActor (UUID) -> TrackRuntimeSnapshot?
-    private let snapshotStore: @MainActor (UUID, TrackRuntimeSnapshot) -> Void
+    private let snapshotLoader: @MainActor (UUID) async -> TrackRuntimeSnapshot?
     private let tracksProvider: @MainActor () -> [LibraryTrack]
     private let commandExecutor: AppCommandExecutor
     private var cancellables = Set<AnyCancellable>()
@@ -55,12 +55,12 @@ final class LibraryBatchRenameHandler: ObservableObject {
 
     init(
         snapshotProvider: @escaping @MainActor (UUID) -> TrackRuntimeSnapshot?,
-        snapshotStore: @escaping @MainActor (UUID, TrackRuntimeSnapshot) -> Void,
+        snapshotLoader: @escaping @MainActor (UUID) async -> TrackRuntimeSnapshot?,
         tracksProvider: @escaping @MainActor () -> [LibraryTrack],
         commandExecutor: AppCommandExecutor = .shared
     ) {
         self.snapshotProvider = snapshotProvider
-        self.snapshotStore = snapshotStore
+        self.snapshotLoader = snapshotLoader
         self.tracksProvider = tracksProvider
         self.commandExecutor = commandExecutor
 
@@ -161,8 +161,7 @@ final class LibraryBatchRenameHandler: ObservableObject {
     }
 
     /// Загружает runtime snapshots для batch rename.
-    /// Использует существующий runtime pipeline:
-    /// TrackRuntimeStore -> TrackRuntimeSnapshotBuilder.
+    /// Использует runtime-controller фонотеки как единую точку доступа к snapshot pipeline.
     private func ensureSnapshots(trackIDs: [UUID]) async {
         let limiter = LibraryBatchRenameAsyncLimiter(limit: 6)
         var preparedCount = 0
@@ -187,25 +186,8 @@ final class LibraryBatchRenameHandler: ObservableObject {
 
                     await limiter.acquire()
 
-                    if let storedSnapshot = await TrackRuntimeStore.shared.snapshot(forTrackId: trackID) {
-                        await MainActor.run {
-                            self.snapshotStore(trackID, storedSnapshot)
-                        }
-                        await limiter.release()
-                        return
-                    }
-
-                    guard let snapshot = await TrackRuntimeSnapshotBuilder.shared.buildSnapshot(forTrackId: trackID) else {
-                        await limiter.release()
-                        return
-                    }
-
-                    await TrackRuntimeStore.shared.storeSnapshot(snapshot)
-
-                    await MainActor.run {
-                        self.snapshotStore(trackID, snapshot)
-                    }
-
+                    // Loader сам решает, брать snapshot из store или собирать его через builder.
+                    _ = await self.snapshotLoader(trackID)
                     await limiter.release()
                 }
             }
