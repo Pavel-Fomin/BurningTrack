@@ -57,11 +57,24 @@ struct TrackListScreen: View {
                 )
             }
         }
-        .trackListToolbar(
-            title: viewModel.screenState?.title ?? viewModel.name,
-            onAction: { action in
-                actionHandler.handle(action)
+        .navigationTitle(viewModel.screenState?.title ?? viewModel.name)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button("Добавить трек") {
+                        actionHandler.handle(.addTrack)
+                    }
+                    Button("Экспорт") {
+                        actionHandler.handle(.export)
+                    }
+                    Button("Переименовать") {
+                        actionHandler.handle(.renameTrackList)
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                }
             }
-        )
+        }
     }
 }

@@ -38,18 +38,33 @@ struct PlayerScreen: View {
                     )
                 }
             }
-            .playerToolbar(
-                trackCount: screenViewModel.state.trackCount,
-                onSave: {
-                    screenViewModel.handle(.saveTrackList)
-                },
-                onExport: {
-                    screenViewModel.handle(.exportTrackList)
-                },
-                onClear: {
-                    screenViewModel.handle(.clearTrackList)
+            .navigationTitle("Плеер")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Button("Сохранить треклист") {
+                            screenViewModel.handle(.saveTrackList)
+                        }
+
+                        Button {
+                            screenViewModel.handle(.exportTrackList)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Записать треклист")
+                                Text("с префиксом")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+
+                        Button("Очистить треклист", role: .destructive) {
+                            screenViewModel.handle(.clearTrackList)
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                    }
                 }
-            )
+            }
         }
         .miniPlayerHost(
             playerViewModel: playerViewModel

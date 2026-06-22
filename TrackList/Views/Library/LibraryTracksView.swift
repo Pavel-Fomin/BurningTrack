@@ -85,16 +85,12 @@ struct LibraryTracksView: View {
 
     var body: some View {
         contentView
-        // Тулбар подключается снаружи списка, чтобы не влиять на строки.
-            .libraryTracksToolbar(
-                title: folder.name,
-                isSelecting: isSelecting,
-                isAllSelected: tracksViewModel.areAllVisibleTracksSelected,
-                onTapSelect: handleTapSelect,
-                onToggleSelectAll: handleToggleSelectAll,
-                onSelectBatchAction: handleBatchActionSelection,
-                onTapCancel: handleTapCancel
-            )
+            // Навигационный toolbar подключается снаружи списка, чтобы не влиять на строки.
+            .navigationTitle(folder.name)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                navigationToolbarContent
+            }
             .refreshable {
                 await tracksViewModel.refresh()
             }
@@ -130,6 +126,89 @@ struct LibraryTracksView: View {
             .onDisappear {
                 selectionActionBarConfig = nil
             }
+    }
+
+    // Контент справа отдаёт наружу только пользовательские намерения.
+    @ToolbarContentBuilder
+    private var navigationToolbarContent: some ToolbarContent {
+
+        if isSelecting {
+
+            // Меню batch-действий в режиме выбора.
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button(action: handleToggleSelectAll) {
+                        Label(
+                            tracksViewModel.areAllVisibleTracksSelected ? "Снять все" : "Выбрать все",
+                            systemImage: tracksViewModel.areAllVisibleTracksSelected ? "circle" : "checkmark.circle"
+                        )
+                    }
+
+                    Divider()
+
+                    batchActionMenuItems
+                } label: {
+                    Image(systemName: "ellipsis")
+                }
+            }
+
+            /// Закрывает режим выбора и очищает текущий selection.
+            ToolbarItem(placement: .topBarTrailing) {
+                Button(action: handleTapCancel) {
+                    Image(systemName: "xmark")
+                }
+            }
+
+        } else {
+
+            /// Меню обычного режима.
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button(action: handleTapSelect) {
+                        Label("Выбрать", systemImage: "checkmark.circle")
+                    }
+
+                    Divider()
+
+                    batchActionMenuItems
+                } label: {
+                    Image(systemName: "ellipsis")
+                }
+            }
+        }
+    }
+
+    /// Общие пункты batch-действий без выполнения самих действий.
+    @ViewBuilder
+    private var batchActionMenuItems: some View {
+        // Системные секции меню выравнивают заголовки отдельно от пунктов с иконками.
+        Section("Добавить") {
+            Button {
+                handleBatchActionSelection(.addToPlayer)
+            } label: {
+                Label("В плеер", systemImage: "waveform")
+            }
+
+            Button {
+                handleBatchActionSelection(.addToTrackList)
+            } label: {
+                Label("В треклист", systemImage: "list.star")
+            }
+        }
+
+        Section("Изменить") {
+            Button {
+                handleBatchActionSelection(.renameFiles)
+            } label: {
+                Label("Переименовать файлы", systemImage: "pencil")
+            }
+
+            Button {
+                handleBatchActionSelection(.editTags)
+            } label: {
+                Label("Редактировать теги", systemImage: "tag")
+            }
+        }
     }
 
     /// Основной контент экрана: список и слой загрузки.

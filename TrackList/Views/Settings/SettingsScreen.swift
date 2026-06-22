@@ -48,7 +48,8 @@ struct SettingsScreen: View {
                 state: viewModel.state,
                 onAction: viewModel.handle
             )
-                .settingsToolbar()
+                // Системный заголовок даёт экрану нативный Navigation Bar.
+                .navigationTitle("Настройки")
         }
         .miniPlayerHost(
             playerViewModel: playerViewModel

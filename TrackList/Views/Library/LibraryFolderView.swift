@@ -51,14 +51,18 @@ struct LibraryFolderView: View {
             case .subfolders:
                 List { folderSectionView() }
                     .listStyle(.insetGrouped)
-                    .libraryToolbar(title: state.title)
+                    // Системный inline-заголовок сохраняет нативную back-кнопку вложенного экрана.
+                    .navigationTitle(state.title)
+                    .navigationBarTitleDisplayMode(.inline)
                     .onAppear {
                         onAction(.appeared)
                     }
 
             case .empty:
                 Color.clear
-                    .libraryToolbar(title: state.title)
+                    // Пустая папка остаётся обычным destination внутри родительского NavigationStack.
+                    .navigationTitle(state.title)
+                    .navigationBarTitleDisplayMode(.inline)
                     .onAppear {
                         onAction(.appeared)
                     }

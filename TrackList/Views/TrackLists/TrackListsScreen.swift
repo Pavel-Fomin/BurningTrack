@@ -41,11 +41,20 @@ struct TrackListsScreen: View {
                 }
             )
             .background(Color(.systemGroupedBackground))
-            .trackListsToolbar(
-                onCreateTrackList: {
-                    actionHandler.handle(.createTrackList)
+            .navigationTitle("Треклисты")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Button {
+                            actionHandler.handle(.createTrackList)
+                        } label: {
+                            Label("Новый треклист", systemImage: "plus")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                    }
                 }
-            )
+            }
         }
         .miniPlayerHost(
             playerViewModel: playerViewModel

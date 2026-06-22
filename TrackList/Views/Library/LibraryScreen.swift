@@ -95,7 +95,7 @@ struct LibraryScreen: View {
     var body: some View {
         NavigationStack(path: libraryPathBinding) {
             rootContent
-                .libraryToolbar(title: "Фонотека")
+                .navigationTitle("Фонотека")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color(.systemBackground))
                 .navigationDestination(for: NavigationCoordinator.LibraryRoute.self) { route in
@@ -165,7 +165,7 @@ struct LibraryScreen: View {
 
         case .root:
             rootContent
-                .libraryToolbar(title: "Фонотека")
+                .navigationTitle("Фонотека")
 
         case .folder(let destination):
             LibraryFolderContainer(
@@ -180,7 +180,8 @@ struct LibraryScreen: View {
 
         case .missingFolder:
             Text("Папка не найдена")
-                .libraryToolbar(title: "Ошибка")
+                .navigationTitle("Ошибка")
+                .navigationBarTitleDisplayMode(.inline)
                 .onAppear {
                     viewModel.handle(.folderMissingAppeared)
                 }
