@@ -47,6 +47,9 @@ enum ToastEvent: Equatable {
 
     /// Файлы подготовлены к экспорту
     case exportPrepared(targetName: String)
+
+    /// Тестовый Pioneer USB Export завершён.
+    case pioneerUSBExportCompleted(trackListName: String)
     
 
     // MARK: Фонотека

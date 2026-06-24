@@ -14,6 +14,8 @@ struct TrackListScreen: View {
     let trackList: TrackList
     let playerViewModel: PlayerViewModel
     @StateObject private var viewModel: TrackListViewModel
+    /// Управляет показом системного picker'а папки назначения Pioneer USB Export.
+    @State private var isShowingPioneerExportPicker = false
 
     /// Фабрика production ViewModel для detail-flow одного треклиста.
     private static let viewModelFactory = TrackListViewModelFactory()
@@ -27,7 +29,10 @@ struct TrackListScreen: View {
             reader: viewModel,
             playbackManager: playerViewModel,
             mutator: viewModel,
-            renamer: viewModel
+            renamer: viewModel,
+            requestPioneerDestinationPicker: {
+                isShowingPioneerExportPicker = true
+            }
         )
     }
 
@@ -68,12 +73,31 @@ struct TrackListScreen: View {
                     Button("Экспорт") {
                         actionHandler.handle(.export)
                     }
+                    Button("Pioneer USB Export (тест)") {
+                        actionHandler.handle(.pioneerUSBExport)
+                    }
                     Button("Переименовать") {
                         actionHandler.handle(.renameTrackList)
                     }
                 } label: {
                     Image(systemName: "ellipsis")
                 }
+            }
+        }
+        .fileImporter(
+            isPresented: $isShowingPioneerExportPicker,
+            allowedContentTypes: [.folder],
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case .success(let urls):
+                if let destinationURL = urls.first {
+                    actionHandler.handle(.pioneerUSBExportDestinationPicked(destinationURL))
+                } else {
+                    actionHandler.handle(.pioneerUSBExportDestinationPickFailed)
+                }
+            case .failure:
+                actionHandler.handle(.pioneerUSBExportDestinationPickFailed)
             }
         }
     }

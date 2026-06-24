@@ -138,6 +138,13 @@ final class ToastManager: ObservableObject {
                 message: "Файлы «\(targetName)» подготовлены к экспорту"
             )
 
+        case let .pioneerUSBExportCompleted(trackListName):
+            return ToastData(
+                style: .trackList(name: trackListName),
+                artworkImage: nil,
+                message: "Pioneer USB Export завершён"
+            )
+
         // MARK: - Фонотека
 
         case let .trackAddedToPlayer(title, artist, artwork):

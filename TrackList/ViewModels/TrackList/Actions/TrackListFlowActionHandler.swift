@@ -24,6 +24,9 @@ final class TrackListFlowActionHandler {
     /// Обработчик export-flow одного треклиста.
     private let exportHandler: TrackListExportHandler
 
+    /// Обработчик тестового Pioneer USB Export.
+    private let pioneerExportHandler: TrackListPioneerExportHandler
+
     /// Обработчик rename-flow файла трека.
     private let renameHandler: TrackListRenameHandler
 
@@ -35,8 +38,10 @@ final class TrackListFlowActionHandler {
         renamer: any TrackListRenaming,
         presenter: any TrackListPresenting,
         exporter: any TrackExporting,
+        pioneerExportService: PioneerDeckExportService,
         viewControllerProvider: any ViewControllerProviding,
-        toastPresenter: any ToastPresenting
+        toastPresenter: any ToastPresenting,
+        requestPioneerDestinationPicker: @escaping @MainActor () -> Void
     ) {
         self.presentationHandler = TrackListPresentationHandler(
             reader: reader,
@@ -53,6 +58,12 @@ final class TrackListFlowActionHandler {
             viewControllerProvider: viewControllerProvider,
             toastPresenter: toastPresenter
         )
+        self.pioneerExportHandler = TrackListPioneerExportHandler(
+            reader: reader,
+            exportService: pioneerExportService,
+            toastPresenter: toastPresenter,
+            requestDestinationPicker: requestPioneerDestinationPicker
+        )
         self.renameHandler = TrackListRenameHandler(renamer: renamer)
     }
 
@@ -65,6 +76,15 @@ final class TrackListFlowActionHandler {
 
         case .export:
             exportHandler.exportTracks()
+
+        case .pioneerUSBExport:
+            pioneerExportHandler.requestExport()
+
+        case .pioneerUSBExportDestinationPicked(let destinationURL):
+            pioneerExportHandler.export(to: destinationURL)
+
+        case .pioneerUSBExportDestinationPickFailed:
+            pioneerExportHandler.handleDestinationPickFailed()
 
         case .renameTrackList:
             presentationHandler.presentRenameTrackList()

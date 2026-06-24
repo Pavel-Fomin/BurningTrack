@@ -16,7 +16,8 @@ struct TrackListFlowActionHandlerFactory {
         reader: any TrackListReading,
         playbackManager: any TrackListPlaybackManaging,
         mutator: any TrackListMutating,
-        renamer: any TrackListRenaming
+        renamer: any TrackListRenaming,
+        requestPioneerDestinationPicker: @escaping @MainActor () -> Void
     ) -> TrackListFlowActionHandler {
         TrackListFlowActionHandler(
             reader: reader,
@@ -28,8 +29,10 @@ struct TrackListFlowActionHandlerFactory {
                 sheetActionCoordinator: SheetActionCoordinator.shared
             ),
             exporter: ExportManager.shared,
+            pioneerExportService: PioneerDeckExportService(),
             viewControllerProvider: ApplicationViewControllerProvider(),
-            toastPresenter: ToastManager.shared
+            toastPresenter: ToastManager.shared,
+            requestPioneerDestinationPicker: requestPioneerDestinationPicker
         )
     }
 }

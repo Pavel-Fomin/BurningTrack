@@ -28,6 +28,15 @@ enum TrackListAction {
     /// Пользователь запросил экспорт треклиста.
     case export
 
+    /// Пользователь запросил тестовый Pioneer USB Export.
+    case pioneerUSBExport
+
+    /// Пользователь выбрал папку назначения для Pioneer USB Export.
+    case pioneerUSBExportDestinationPicked(URL)
+
+    /// Пользователь не смог выбрать папку назначения для Pioneer USB Export.
+    case pioneerUSBExportDestinationPickFailed
+
     /// Пользователь запросил переименование треклиста.
     case renameTrackList
 

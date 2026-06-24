@@ -27,6 +27,9 @@ final class TrackListViewModel: ObservableObject {
     /// Готовое состояние экрана одного треклиста.
     @Published private(set) var screenState: TrackListScreenState?
 
+    /// Дата создания текущего треклиста для read-only snapshot-модели.
+    private let createdAt: Date
+
     /// Запускает общий rename-flow файлов треков.
     private let fileRenamer: any TrackFileRenaming
     /// Управляет содержимым одного треклиста.
@@ -78,6 +81,7 @@ final class TrackListViewModel: ObservableObject {
         self.toastPresenter = toastPresenter
         self.commandExecutor = commandExecutor
         self.eventProvider = eventProvider
+        self.createdAt = trackList.createdAt
         self.playbackStateProvider = playbackStateProvider
         self.runtimeSnapshotProvider = runtimeSnapshotProvider
         self.runtimeSnapshotBuilder = runtimeSnapshotBuilder
@@ -137,6 +141,17 @@ final class TrackListViewModel: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+    }
+
+    /// Снимок текущего треклиста для action handlers, которым нужна полная модель.
+    var currentTrackList: TrackList? {
+        guard let currentListId else { return nil }
+        return TrackList(
+            id: currentListId,
+            name: name,
+            createdAt: createdAt,
+            tracks: tracks
+        )
     }
 
     // MARK: - Rename

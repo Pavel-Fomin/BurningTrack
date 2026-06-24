@@ -1,0 +1,45 @@
+{
+  "playlistId": 1,
+  "playlistName": "UnknownAlbum",
+  "tracks": [
+    {
+      "trackId": 1,
+      "sourceFilePath": "/Users/pavelfomin/Desktop/UnknownAlbum/Hate U - Yansyet.flac",
+      "title": "Hate U",
+      "artist": "Yansyet",
+      "album": "RAVE THERAPY vol.5",
+      "fileName": "Hate U - Yansyet.flac",
+      "durationSeconds": 279,
+      "sampleRate": 44100,
+      "sampleDepth": 16,
+      "tempoX100": 13800,
+      "analyzeDate": "2026-06-23"
+    },
+    {
+      "trackId": 2,
+      "sourceFilePath": "/Users/pavelfomin/Desktop/UnknownAlbum/Aarne, Toxi$, Big Baby Tape - NOBODY2.flac",
+      "title": "Aarne, Toxi$, Big Baby Tape - NOBODY2",
+      "artist": "",
+      "album": "Slang",
+      "fileName": "Aarne, Toxi$, Big Baby Tape - NOBODY2.flac",
+      "durationSeconds": 180,
+      "sampleRate": 44100,
+      "sampleDepth": 24,
+      "tempoX100": 12000,
+      "analyzeDate": "2026-06-23"
+    },
+    {
+      "trackId": 3,
+      "sourceFilePath": "/Users/pavelfomin/Desktop/UnknownAlbum/Vid - Unindivid (Original Mix).flac",
+      "title": "Unindivid (Original Mix)",
+      "artist": "Vid",
+      "album": "Bipolar EP",
+      "fileName": "Vid - Unindivid (Original Mix).flac",
+      "durationSeconds": 463,
+      "sampleRate": 44100,
+      "sampleDepth": 16,
+      "tempoX100": 12100,
+      "analyzeDate": "2026-06-23"
+    }
+  ]
+}

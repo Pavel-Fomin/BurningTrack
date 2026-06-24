@@ -18,4 +18,7 @@ protocol TrackListReading {
 
     /// Текущие треки треклиста.
     var tracks: [Track] { get }
+
+    /// Снимок текущего треклиста для app-level export-сервисов.
+    var currentTrackList: TrackList? { get }
 }
