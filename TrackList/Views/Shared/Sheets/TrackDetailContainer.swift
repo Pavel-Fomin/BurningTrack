@@ -26,6 +26,16 @@ struct TrackDetailContainer: View {
     let track: any TrackDisplayable
     let playerManager: PlayerManager
     
+    /// Создаёт контейнер detail-sheet с нужным стартовым режимом.
+    init(
+        track: any TrackDisplayable,
+        playerManager: PlayerManager,
+        initialMode: TrackDetailSheet.Mode = .view
+    ) {
+        self.track = track
+        self.playerManager = playerManager
+        self._mode = State(initialValue: initialMode)
+    }
     
     @ObservedObject private var sheetManager = SheetManager.shared
     

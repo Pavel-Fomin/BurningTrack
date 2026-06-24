@@ -42,4 +42,7 @@ enum TrackListAction {
 
     /// Пользователь запросил перемещение файла трека в папку.
     case moveToFolder(rowId: UUID)
+
+    /// Пользователь запросил редактирование тегов трека.
+    case editTags(rowId: UUID)
 }

@@ -8,6 +8,7 @@ enum LibraryTrackAction {
     case addToPlayer(trackId: UUID)
     case addToTrackList(track: LibraryTrack)
     case moveToFolder(track: LibraryTrack)
+    case editTags(track: LibraryTrack)
     case rename(trackId: UUID, strategy: FileRenameStrategy)
     case toggleSelection
     case requestSnapshot(trackId: UUID)

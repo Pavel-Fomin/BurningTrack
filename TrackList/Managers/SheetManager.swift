@@ -76,7 +76,7 @@ struct NewTrackListSelectionSheetData: Identifiable, Equatable {
 
 struct AddToTrackListSheetData: Identifiable, Equatable {
     let id = UUID()
-    let track: LibraryTrack
+    let track: any TrackDisplayable
     let sourceTrackListId: UUID?   // ← ВАЖНО
 
     static func == (
@@ -148,6 +148,7 @@ enum AppSheetKind: Equatable {
 enum AppSheet: Identifiable, Equatable {
     case moveToFolder(MoveToFolderSheetData)
     case trackDetail(any TrackDisplayable)
+    case trackDetailEdit(any TrackDisplayable)
     case addToTrackList(AddToTrackListSheetData)
     case renameTrackList(RenameTrackListSheetData)
     case renameTrackFile(RenameTrackFileSheetData)
@@ -162,6 +163,7 @@ enum AppSheet: Identifiable, Equatable {
         switch self {
         case .moveToFolder(let data): return "moveToFolder_\(data.id)"
         case .trackDetail(let track): return "trackDetail_\(track.id)"
+        case .trackDetailEdit(let track): return "trackDetailEdit_\(track.id)"
         case .addToTrackList(let data): return "addToTrackList_\(data.id)"
         case .renameTrackList(let data): return "renameTrackList_\(data.id)"
         case .renameTrackFile(let data): return "renameTrackFile_\(data.id)"
@@ -181,7 +183,8 @@ enum AppSheet: Identifiable, Equatable {
     var kind: AppSheetKind {
         switch self {
         case .moveToFolder: return .moveToFolder
-        case .trackDetail: return .trackDetail
+        case .trackDetail,
+             .trackDetailEdit: return .trackDetail
         case .addToTrackList: return .addToTrackList
         case .renameTrackList: return .renameTrackList
         case .renameTrackFile: return .renameTrackFile
@@ -305,8 +308,13 @@ final class SheetManager: ObservableObject {
         present(.trackDetail(track))
     }
 
+    /// Открывает карточку трека сразу в режиме редактирования тегов.
+    func presentTrackDetailForEditing(_ track: any TrackDisplayable) {
+        present(.trackDetailEdit(track))
+    }
+
     func presentAddToTrackList(
-        for track: LibraryTrack,
+        for track: any TrackDisplayable,
         sourceTrackListId: UUID? = nil
     ) {
         let data = AddToTrackListSheetData(
@@ -412,6 +420,7 @@ final class SheetManager: ObservableObject {
 
         case .moveToFolder,
              .trackDetail,
+             .trackDetailEdit,
              .addToTrackList,
              .renameTrackList,
              .renameTrackFile,
@@ -453,6 +462,7 @@ private extension AppSheet {
         switch self {
         case .moveToFolder(let d): return d.track.id
         case .trackDetail(let t): return t.id
+        case .trackDetailEdit(let t): return t.id
         case .addToTrackList(let data): return data.track.id
         case .renameTrackList: return nil
         case .renameTrackFile(let data): return data.rowId

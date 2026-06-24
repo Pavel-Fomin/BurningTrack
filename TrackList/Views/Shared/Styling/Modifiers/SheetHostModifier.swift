@@ -70,6 +70,16 @@ struct SheetHostModifier: ViewModifier {
                     .appSheet(detents: [.large])
                     .toastHost()
 
+                /// Редактирование тегов трека
+            case .trackDetailEdit(let track):
+                    TrackDetailContainer(
+                        track: track,
+                        playerManager: playerManager,
+                        initialMode: .edit
+                    )
+                    .appSheet(detents: [.large])
+                    .toastHost()
+
                 
                 /// Добавить в треклист
             case .addToTrackList(let data):

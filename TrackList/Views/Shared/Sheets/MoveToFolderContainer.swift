@@ -44,7 +44,7 @@ struct MoveToFolderContainer: View {
 
     var body: some View {
         NavigationBarHost(
-            title: "Переместить в папку",
+            title: "Переместить",
 
             /// Кнопка подтверждения (✓)
             rightButtonImage: "checkmark",

@@ -18,6 +18,8 @@ struct PlayerView: View {
     let onDeleteTrack: (UUID) -> Void
     let onShowInLibrary: (UUID) -> Void
     let onMoveToFolder: (UUID) -> Void
+    let onAddToTrackList: (UUID) -> Void  /// Добавление элемента очереди в треклист
+    let onEditTags: (UUID) -> Void        /// Редактирование тегов элемента очереди
     let onArtworkTap: (UUID) -> Void
     let onRequestSnapshot: (UUID) -> Void
     let onRenameTrack: (UUID, FileRenameStrategy) -> Void
@@ -32,6 +34,8 @@ struct PlayerView: View {
                     onDeleteTrack: onDeleteTrack,
                     onShowInLibrary: onShowInLibrary,
                     onMoveToFolder: onMoveToFolder,
+                    onAddToTrackList: onAddToTrackList,
+                    onEditTags: onEditTags,
                     onArtworkTap: onArtworkTap,
                     onRequestSnapshot: onRequestSnapshot,
                     onRenameTrack: onRenameTrack
@@ -72,6 +76,8 @@ struct PlayerView: View {
         let onDeleteTrack: (UUID) -> Void
         let onShowInLibrary: (UUID) -> Void
         let onMoveToFolder: (UUID) -> Void
+        let onAddToTrackList: (UUID) -> Void  /// Добавление элемента очереди в треклист
+        let onEditTags: (UUID) -> Void        /// Редактирование тегов элемента очереди
         let onArtworkTap: (UUID) -> Void
         let onRequestSnapshot: (UUID) -> Void
         let onRenameTrack: (UUID, FileRenameStrategy) -> Void
@@ -85,6 +91,8 @@ struct PlayerView: View {
                     onDeleteTrack: onDeleteTrack,
                     onShowInLibrary: onShowInLibrary,
                     onMoveToFolder: onMoveToFolder,
+                    onAddToTrackList: onAddToTrackList,
+                    onEditTags: onEditTags,
                     onArtworkTap: onArtworkTap,
                     onRequestSnapshot: onRequestSnapshot,
                     onRenameTrack: onRenameTrack

@@ -22,6 +22,9 @@ protocol TrackListPresenting {
     /// Открывает детали трека.
     func presentTrackDetail(_ track: Track)
 
+    /// Открывает редактирование тегов трека.
+    func presentTrackTagsEditor(_ track: Track)
+
     /// Показывает трек в фонотеке.
     func showInLibrary(_ track: Track)
 

@@ -84,6 +84,9 @@ final class TrackListFlowActionHandler {
         case .artworkTapped(let rowId):
             presentationHandler.presentTrackDetail(rowId: rowId)
 
+        case .editTags(let rowId):
+            presentationHandler.presentTrackTagsEditor(rowId: rowId)
+
         case .showInLibrary(let rowId):
             presentationHandler.showInLibrary(rowId: rowId)
 

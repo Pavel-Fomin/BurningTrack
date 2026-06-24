@@ -51,6 +51,13 @@ final class TrackListPresentationHandler {
         presenter.presentTrackDetail(track)
     }
 
+    /// Открывает редактирование тегов строки треклиста.
+    func presentTrackTagsEditor(rowId: UUID) {
+        guard let track = reader.tracks.first(where: { $0.id == rowId }) else { return }
+
+        presenter.presentTrackTagsEditor(track)
+    }
+
     /// Показывает трек из строки треклиста в фонотеке.
     func showInLibrary(rowId: UUID) {
         guard let track = reader.tracks.first(where: { $0.id == rowId }) else { return }

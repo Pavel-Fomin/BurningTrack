@@ -28,8 +28,7 @@ private func makeTrackRowPreview(
             title: track.title,
             artist: track.artist,
             duration: track.duration,
-            onRowTap: {},
-            onArtworkTap: {}
+            onRowTap: {}
         )
     }
     .listStyle(.plain)

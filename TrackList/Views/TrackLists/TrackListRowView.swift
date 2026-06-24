@@ -21,7 +21,11 @@ struct TrackListRowView: View {
     let state: TrackListRowState /// Готовое состояние строки треклиста
     let onTap: () -> Void        /// Тап по строке (воспроизведение / пауза)
     let onDelete: () -> Void     /// Удаление строки (локальное действие)
-    let onArtworkTap: () -> Void /// Тап по обложке
+    let onRenameTrack: (FileRenameStrategy) -> Void /// Переименование файла трека
+    let onEditTags: () -> Void    /// Редактирование тегов трека
+    let onArtworkTap: () -> Void /// Открытие карточки трека из меню
+    let onShowInLibrary: () -> Void /// Переход к треку в фонотеке
+    let onMoveToFolder: () -> Void  /// Перемещение файла трека в папку
     
     // MARK: - UI
     
@@ -44,14 +48,74 @@ struct TrackListRowView: View {
             artist: state.artist,
             duration: state.duration,
             onRowTap: onTap,                    /// Правая зона — воспроизведение / пауза
-            onArtworkTap: onArtworkTap,         /// Левая зона — делегируется выше (wrapper решает, что делать)
             showsFileFormat: state.showsFileFormat
-        )
+        ) {
+            trackListActionMenuContent
+        }
         
         .padding(.vertical, 4)
         .listRowInsets(EdgeInsets())
         .listRowBackground(Color.clear)
         .padding(.vertical, 8)
         .padding(.horizontal, 16)
+    }
+
+    /// Меню действий строки треклиста.
+    @ViewBuilder
+    private var trackListActionMenuContent: some View {
+        Button {
+            onArtworkTap()
+        } label: {
+            Label("О треке", systemImage: "info.circle")
+        }
+
+        Button {
+            onShowInLibrary()
+        } label: {
+            Label("Показать в папке", systemImage: "scope")
+        }
+
+        Button {
+            onMoveToFolder()
+        } label: {
+            Label("Переместить", systemImage: "arrow.forward.folder")
+        }
+
+        Menu {
+            Button {
+                onEditTags()
+            } label: {
+                Label("Теги", systemImage: "tag")
+            }
+
+            // Системная секция делает "Название файла" подписью, а не пунктом меню.
+            Section("Название файла") {
+                Button {
+                    onRenameTrack(.artistTitle)
+                } label: {
+                    Text("Артист - Название")
+                }
+
+                Button {
+                    onRenameTrack(.titleArtist)
+                } label: {
+                    Text("Название - Артист")
+                }
+
+                Button {
+                    onRenameTrack(.manual)
+                } label: {
+                    Text("Вручную")
+                }
+            }
+        } label: {
+            Label("Редактировать", systemImage: "square.and.pencil")
+        }
+
+        Button(role: .destructive) {
+            onDelete()
+        } label: {
+            Label("Удалить из треклиста", systemImage: "trash")
+        }
     }
 }

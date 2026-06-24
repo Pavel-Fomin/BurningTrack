@@ -49,6 +49,9 @@ struct TrackListView: View {
                                 )
                             )
                         },
+                        onEditTags: { rowId in
+                            onAction(.editTags(rowId: rowId))
+                        },
                         onArtworkTap: { rowId in
                             onAction(.artworkTapped(rowId: rowId))
                         },
@@ -106,6 +109,7 @@ struct TrackListView: View {
                 let onTap: (UUID) -> Void
                 let onDelete: (UUID) -> Void
                 let onRenameTrack: (UUID, FileRenameStrategy) -> Void
+                let onEditTags: (UUID) -> Void
                 let onArtworkTap: (UUID) -> Void
                 let onShowInLibrary: (UUID) -> Void
                 let onMoveToFolder: (UUID) -> Void
@@ -121,16 +125,20 @@ struct TrackListView: View {
                             onDelete: {
                                 onDelete(row.id)
                             },
+                            onRenameTrack: { strategy in
+                                onRenameTrack(row.id, strategy)
+                            },
+                            onEditTags: {
+                                onEditTags(row.id)
+                            },
                             onArtworkTap: {
                                 onArtworkTap(row.id)
-                            }
-                        )
-                        .trackFileRenameMenu(
-                            artist: row.renameArtist,
-                            title: row.renameTitle,
-                            isEnabled: true,
-                            onRename: { strategy in
-                                onRenameTrack(row.id, strategy)
+                            },
+                            onShowInLibrary: {
+                                onShowInLibrary(row.id)
+                            },
+                            onMoveToFolder: {
+                                onMoveToFolder(row.id)
                             }
                         )
                         .task(id: row.trackId) {
@@ -159,7 +167,7 @@ struct TrackListView: View {
                             Button {
                                 onMoveToFolder(row.id)
                             } label: {
-                                Label("Переместить", systemImage: "arrow.right.doc.on.clipboard")
+                                Label("Переместить", systemImage: "arrow.forward.folder")
                             }
                             .tint(.blue)
                         }

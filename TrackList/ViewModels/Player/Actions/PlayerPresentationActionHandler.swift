@@ -71,6 +71,20 @@ final class PlayerPresentationActionHandler {
         )
     }
 
+    /// Открывает выбор треклиста для элемента очереди плеера.
+    func addToTrackList(queueItemId: UUID) {
+        guard let track = track(queueItemId: queueItemId) else { return }
+
+        sheetManager.presentAddToTrackList(for: track)
+    }
+
+    /// Открывает карточку элемента очереди сразу в режиме редактирования тегов.
+    func editTags(queueItemId: UUID) {
+        guard let track = track(queueItemId: queueItemId) else { return }
+
+        sheetManager.presentTrackDetailForEditing(track)
+    }
+
     /// Открывает карточку выбранного элемента очереди плеера.
     func artworkTap(queueItemId: UUID) {
         guard let track = track(queueItemId: queueItemId) else { return }

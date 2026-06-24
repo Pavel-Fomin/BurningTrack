@@ -51,6 +51,20 @@ struct PlayerPlaylistView: View {
                     )
                 )
             },
+            onAddToTrackList: { queueItemId in
+                screenViewModel.handle(
+                    .addToTrackList(
+                        queueItemId: queueItemId
+                    )
+                )
+            },
+            onEditTags: { queueItemId in
+                screenViewModel.handle(
+                    .editTags(
+                        queueItemId: queueItemId
+                    )
+                )
+            },
             onArtworkTap: { queueItemId in
                 screenViewModel.handle(
                     .artworkTap(

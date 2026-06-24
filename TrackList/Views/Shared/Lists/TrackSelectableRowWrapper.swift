@@ -57,7 +57,6 @@ struct TrackSelectableRowWrapper: View {
             onRowTap: {
                 onToggleSelection()
             },
-            onArtworkTap: nil,
             showsSelection: true,
             isSelected: isSelected,
             onToggleSelection: onToggleSelection,

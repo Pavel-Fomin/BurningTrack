@@ -42,6 +42,10 @@ final class SheetTrackListPresenter: TrackListPresenting {
         sheetManager.present(.trackDetail(track))
     }
 
+    func presentTrackTagsEditor(_ track: Track) {
+        sheetManager.presentTrackDetailForEditing(track)
+    }
+
     func showInLibrary(_ track: Track) {
         sheetActionCoordinator.handle(
             action: .showInLibrary,

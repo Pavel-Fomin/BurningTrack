@@ -16,7 +16,9 @@ struct PlayerTrackRowWrapper: View {
     let onDeleteTrack: (UUID) -> Void                    /// Обработчик удаления элемента очереди
     let onShowInLibrary: (UUID) -> Void                  /// Обработчик показа элемента очереди в фонотеке
     let onMoveToFolder: (UUID) -> Void                   /// Обработчик перемещения элемента очереди в папку
-    let onArtworkTap: (UUID) -> Void                     /// Обработчик тапа по обложке элемента очереди
+    let onAddToTrackList: (UUID) -> Void                 /// Обработчик добавления элемента очереди в треклист
+    let onEditTags: (UUID) -> Void                       /// Обработчик редактирования тегов элемента очереди
+    let onArtworkTap: (UUID) -> Void                     /// Обработчик пункта меню "О треке"
     let onRequestSnapshot: (UUID) -> Void                /// Обработчик запроса runtime snapshot трека
     let onRenameTrack: (UUID, FileRenameStrategy) -> Void /// Обработчик переименования элемента очереди
     
@@ -33,19 +35,10 @@ struct PlayerTrackRowWrapper: View {
             artist: row.artist,
             duration: row.duration,
             onRowTap: onTap,
-            onArtworkTap: {
-                onArtworkTap(row.id)
-            },
             showsFileFormat: row.showsFileFormat
-        )
-        .trackFileRenameMenu(
-            artist: row.renameArtist,
-            title: row.renameTitle,
-            isEnabled: true,
-            onRename: { strategy in
-                onRenameTrack(row.id, strategy)
-            }
-        )
+        ) {
+            playerActionMenuContent
+        }
         .task(id: row.trackId) {
             onRequestSnapshot(row.trackId)
         }
@@ -73,9 +66,75 @@ struct PlayerTrackRowWrapper: View {
             Button {
                 onMoveToFolder(row.id)
             } label: {
-                Label("Переместить", systemImage: "arrow.right.doc.on.clipboard")
+                Label("Переместить", systemImage: "arrow.forward.folder")
             }
             .tint(.blue)
+        }
+    }
+
+    /// Меню действий строки плеера.
+    @ViewBuilder
+    private var playerActionMenuContent: some View {
+        Button {
+            onArtworkTap(row.id)
+        } label: {
+            Label("О треке", systemImage: "info.circle")
+        }
+
+        Button {
+            onShowInLibrary(row.id)
+        } label: {
+            Label("Показать в папке", systemImage: "scope")
+        }
+
+        // Пункт меню использует тот же flow перемещения, что и свайп строки.
+        Button {
+            onMoveToFolder(row.id)
+        } label: {
+            Label("Переместить", systemImage: "arrow.forward.folder")
+        }
+
+        Button {
+            onAddToTrackList(row.id)
+        } label: {
+            Label("В треклист", systemImage: "list.star")
+        }
+
+        Menu {
+            Button {
+                onEditTags(row.id)
+            } label: {
+                Label("Теги", systemImage: "tag")
+            }
+
+            // Системная секция делает "Название файла" подписью, а не пунктом меню.
+            Section("Название файла") {
+                Button {
+                    onRenameTrack(row.id, .artistTitle)
+                } label: {
+                    Text("Артист - Название")
+                }
+
+                Button {
+                    onRenameTrack(row.id, .titleArtist)
+                } label: {
+                    Text("Название - Артист")
+                }
+
+                Button {
+                    onRenameTrack(row.id, .manual)
+                } label: {
+                    Text("Вручную")
+                }
+            }
+        } label: {
+            Label("Редактировать", systemImage: "square.and.pencil")
+        }
+
+        Button(role: .destructive) {
+            onDeleteTrack(row.id)
+        } label: {
+            Label("Удалить из плеера", systemImage: "trash")
         }
     }
 }

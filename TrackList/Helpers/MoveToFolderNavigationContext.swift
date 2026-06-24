@@ -43,7 +43,7 @@ final class MoveToFolderNavigationContext: ObservableObject {
         if let id = currentFolderId, let folder = library.folder(for: id) {
             return folder.name
         }
-        return "Переместить в папку"
+        return "Переместить"
     }
 
     var rows: [FolderRow] {

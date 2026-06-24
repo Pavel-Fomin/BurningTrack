@@ -45,6 +45,16 @@ enum PlayerScreenAction {
         queueItemId: UUID
     )
 
+    /// Открывает сценарий добавления элемента очереди в треклист.
+    case addToTrackList(
+        queueItemId: UUID
+    )
+
+    /// Открывает редактирование тегов элемента очереди.
+    case editTags(
+        queueItemId: UUID
+    )
+
     /// Открывает или выполняет сценарий переименования файла трека.
     case renameTrack(
         queueItemId: UUID,

@@ -19,20 +19,15 @@ struct LibraryTrackCommandHandler {
         case .addToPlayer(let trackId):
             addToPlayer(trackId: trackId)
         case .addToTrackList(let track):
-            sheetManager.present(
-                .addToTrackList(
-                    AddToTrackListSheetData(
-                        track: track,
-                        sourceTrackListId: nil
-                    )
-                )
-            )
+            sheetManager.presentAddToTrackList(for: track)
         case .moveToFolder(let track):
             SheetActionCoordinator.shared.handle(
                 action: .moveToFolder,
                 track: track,
                 context: .library
             )
+        case .editTags(let track):
+            sheetManager.presentTrackDetailForEditing(track)
         case .rename(let trackId, let strategy):
             onRenameTrack(trackId, strategy)
         case .toggleSelection:

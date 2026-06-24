@@ -15,7 +15,7 @@ enum TrackRowSelectionPlacement {
     case trailing
 }
 
-struct TrackRowView: View {
+struct TrackRowView<ActionMenuContent: View>: View {
 
     // MARK: - Входные параметры
 
@@ -28,7 +28,6 @@ struct TrackRowView: View {
     let artist: String?
     let duration: Double?
     let onRowTap: () -> Void          /// Тап по правой части строки (воспроизведение / пауза)
-    let onArtworkTap: (() -> Void)?   /// Тап по обложке (например, открытие экрана "О треке")
     let showsSelection: Bool          /// Показывать radio или нет
     let isSelected: Bool              /// Radio (пустой / выбранный)
     let onToggleSelection: (() -> Void)?
@@ -37,6 +36,8 @@ struct TrackRowView: View {
     
     var trackListNames: [String]? = nil
     var useNativeSwipeActions: Bool = false
+    /// Внешнее содержимое меню действий строки.
+    private let actionMenuContent: (() -> ActionMenuContent)?
 
     
     init(
@@ -49,14 +50,54 @@ struct TrackRowView: View {
         artist: String?,
         duration: Double?,
         onRowTap: @escaping () -> Void,
-        onArtworkTap: (() -> Void)?,
         showsSelection: Bool = false,
         isSelected: Bool = false,
         onToggleSelection: (() -> Void)? = nil,
         selectionPlacement: TrackRowSelectionPlacement = .leading,
         showsFileFormat: Bool = true,
         trackListNames: [String]? = nil,
-        useNativeSwipeActions: Bool = false
+        useNativeSwipeActions: Bool = false,
+        @ViewBuilder actionMenuContent: @escaping () -> ActionMenuContent
+    ) {
+        self.init(
+            track: track,
+            isCurrent: isCurrent,
+            isPlaying: isPlaying,
+            isHighlighted: isHighlighted,
+            artwork: artwork,
+            title: title,
+            artist: artist,
+            duration: duration,
+            onRowTap: onRowTap,
+            showsSelection: showsSelection,
+            isSelected: isSelected,
+            onToggleSelection: onToggleSelection,
+            selectionPlacement: selectionPlacement,
+            showsFileFormat: showsFileFormat,
+            trackListNames: trackListNames,
+            useNativeSwipeActions: useNativeSwipeActions,
+            storedActionMenuContent: actionMenuContent
+        )
+    }
+
+    fileprivate init(
+        track: any TrackDisplayable,
+        isCurrent: Bool,
+        isPlaying: Bool,
+        isHighlighted: Bool,
+        artwork: UIImage?,
+        title: String?,
+        artist: String?,
+        duration: Double?,
+        onRowTap: @escaping () -> Void,
+        showsSelection: Bool = false,
+        isSelected: Bool = false,
+        onToggleSelection: (() -> Void)? = nil,
+        selectionPlacement: TrackRowSelectionPlacement = .leading,
+        showsFileFormat: Bool = true,
+        trackListNames: [String]? = nil,
+        useNativeSwipeActions: Bool = false,
+        storedActionMenuContent: (() -> ActionMenuContent)?
     ) {
         self.track = track
         self.isCurrent = isCurrent
@@ -67,7 +108,6 @@ struct TrackRowView: View {
         self.artist = artist
         self.duration = duration
         self.onRowTap = onRowTap
-        self.onArtworkTap = onArtworkTap
         self.showsSelection = showsSelection
         self.isSelected = isSelected
         self.onToggleSelection = onToggleSelection
@@ -75,6 +115,7 @@ struct TrackRowView: View {
         self.showsFileFormat = showsFileFormat
         self.trackListNames = trackListNames
         self.useNativeSwipeActions = useNativeSwipeActions
+        self.actionMenuContent = storedActionMenuContent
     }
     // MARK: - UI
 
@@ -111,31 +152,10 @@ struct TrackRowView: View {
                 selectionButton
             }
 
-            // Левая зона — обложка
-            artworkView
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    guard track.isAvailable else {
-                        ToastManager.shared.handle(
-                            .trackUnavailable(title: track.title ?? track.fileName)
-                        )
-                        return
-                    }
-                    onArtworkTap?()
-                }
+            rowTapContent
 
-            // Правая зона — информация о треке
-            trackInfoView
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    guard track.isAvailable else {
-                        ToastManager.shared.handle(
-                            .trackUnavailable(title: track.title ?? track.fileName)
-                        )
-                        return
-                    }
-                    onRowTap()
-                }
+            // Кнопка меню показывается только если экран передал пункты действий.
+            trackActionsMenu
 
             if showsSelection && selectionPlacement == .trailing {
                 selectionButton
@@ -145,6 +165,31 @@ struct TrackRowView: View {
         .padding(.horizontal, 4)
         .opacity(track.isAvailable ? 1 : 0.4)
         .listRowBackground(rowHighlightColor)
+    }
+
+    /// Единая область тапа для обложки и текстовой части строки.
+    private var rowTapContent: some View {
+        HStack(alignment: rowContentAlignment, spacing: 12) {
+            artworkView
+
+            trackInfoView
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            handleRowTap()
+        }
+    }
+
+    /// Выполняет единое действие строки для основной области строки.
+    private func handleRowTap() {
+        guard track.isAvailable else {
+            ToastManager.shared.handle(
+                .trackUnavailable(title: track.title ?? track.fileName)
+            )
+            return
+        }
+
+        onRowTap()
     }
 
     private var selectionButton: some View {
@@ -162,6 +207,23 @@ struct TrackRowView: View {
         .buttonStyle(.plain)
         .frame(width: 44, height: 44)         // ← фикс: одинаково для всех строк
         .contentShape(Rectangle())
+    }
+
+    /// Меню действий, состав которого передаётся внешним экраном
+    @ViewBuilder
+    private var trackActionsMenu: some View {
+        if let actionMenuContent {
+            Menu {
+                actionMenuContent()
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
     }
 
     // MARK: - Обложка
@@ -259,5 +321,47 @@ struct TrackRowView: View {
         } else {
             return Color.clear
         }
+    }
+}
+
+extension TrackRowView where ActionMenuContent == EmptyView {
+    /// Создаёт строку без меню действий.
+    init(
+        track: any TrackDisplayable,
+        isCurrent: Bool,
+        isPlaying: Bool,
+        isHighlighted: Bool,
+        artwork: UIImage?,
+        title: String?,
+        artist: String?,
+        duration: Double?,
+        onRowTap: @escaping () -> Void,
+        showsSelection: Bool = false,
+        isSelected: Bool = false,
+        onToggleSelection: (() -> Void)? = nil,
+        selectionPlacement: TrackRowSelectionPlacement = .leading,
+        showsFileFormat: Bool = true,
+        trackListNames: [String]? = nil,
+        useNativeSwipeActions: Bool = false
+    ) {
+        self.init(
+            track: track,
+            isCurrent: isCurrent,
+            isPlaying: isPlaying,
+            isHighlighted: isHighlighted,
+            artwork: artwork,
+            title: title,
+            artist: artist,
+            duration: duration,
+            onRowTap: onRowTap,
+            showsSelection: showsSelection,
+            isSelected: isSelected,
+            onToggleSelection: onToggleSelection,
+            selectionPlacement: selectionPlacement,
+            showsFileFormat: showsFileFormat,
+            trackListNames: trackListNames,
+            useNativeSwipeActions: useNativeSwipeActions,
+            storedActionMenuContent: nil
+        )
     }
 }

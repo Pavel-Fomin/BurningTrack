@@ -115,11 +115,6 @@ struct LibraryTrackRowContainer: View {
                     )
                 )
             },
-            onArtworkTap: {
-                commandHandler.handle(
-                    .tapArtwork(track: track)
-                )
-            },
             showsSelection: rowState.showsSelection,
             isSelected: rowState.isSelected,
             onToggleSelection: {
@@ -128,20 +123,9 @@ struct LibraryTrackRowContainer: View {
             selectionPlacement: .trailing,
             showsFileFormat: rowState.showsFileFormat,
             trackListNames: rowState.trackListNames
-        )
-        .trackFileRenameMenu(
-            artist: snapshot?.artist,
-            title: snapshot?.title,
-            isEnabled: !showsSelection,
-            onRename: { strategy in
-                commandHandler.handle(
-                    .rename(
-                        trackId: track.trackId,
-                        strategy: strategy
-                    )
-                )
-            }
-        )
+        ) {
+            libraryActionMenuContent
+        }
         // Загружаем snapshot при появлении строки.
         // Быстрый скролл остаётся частью id, чтобы сохранить прежнее поведение обновления task.
         .task(id: track.trackId.uuidString + "|" + (isScrollingFast ? "1" : "0")) {
@@ -175,10 +159,86 @@ struct LibraryTrackRowContainer: View {
                         .moveToFolder(track: track)
                     )
                 } label: {
-                    Label("Переместить", systemImage: "arrow.right.doc.on.clipboard")
+                    Label("Переместить", systemImage: "arrow.forward.folder")
                 }
                 .tint(.gray)
             }
+        }
+    }
+
+    /// Меню действий строки фонотеки.
+    @ViewBuilder
+    private var libraryActionMenuContent: some View {
+        Button {
+            commandHandler.handle(
+                .tapArtwork(track: track)
+            )
+        } label: {
+            Label("О треке", systemImage: "info.circle")
+        }
+
+        Button {
+            commandHandler.handle(
+                .moveToFolder(track: track)
+            )
+        } label: {
+            Label("Переместить", systemImage: "arrow.forward.folder")
+        }
+
+        Button {
+            commandHandler.handle(
+                .addToTrackList(track: track)
+            )
+        } label: {
+            Label("В треклист", systemImage: "list.star")
+        }
+
+        Menu {
+            Button {
+                commandHandler.handle(
+                    .editTags(track: track)
+                )
+            } label: {
+                Label("Теги", systemImage: "tag")
+            }
+
+            // Системная секция делает "Название файла" подписью, а не пунктом меню.
+            Section("Название файла") {
+                Button {
+                    commandHandler.handle(
+                        .rename(
+                            trackId: track.trackId,
+                            strategy: .artistTitle
+                        )
+                    )
+                } label: {
+                    Text("Артист - Название")
+                }
+
+                Button {
+                    commandHandler.handle(
+                        .rename(
+                            trackId: track.trackId,
+                            strategy: .titleArtist
+                        )
+                    )
+                } label: {
+                    Text("Название - Артист")
+                }
+
+                Button {
+                    commandHandler.handle(
+                        .rename(
+                            trackId: track.trackId,
+                            strategy: .manual
+                        )
+                    )
+                } label: {
+                    Text("Вручную")
+                }
+            }
+        } label: {
+            Label("Редактировать", systemImage: "square.and.pencil")
         }
     }
 }
