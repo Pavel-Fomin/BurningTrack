@@ -42,23 +42,28 @@ struct PlayerScreen: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
-                        Button("Сохранить треклист") {
+                        Button {
                             screenViewModel.handle(.saveTrackList)
+                        } label: {
+                            Label("Сохранить", systemImage: "text.badge.checkmark")
                         }
 
                         Button {
                             screenViewModel.handle(.exportTrackList)
                         } label: {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Записать треклист")
-                                Text("с префиксом")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
+                            Label {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Экспорт")
+                                }
+                            } icon: {
+                                Image(systemName: "externaldrive")
                             }
                         }
 
-                        Button("Очистить треклист", role: .destructive) {
+                        Button(role: .destructive) {
                             screenViewModel.handle(.clearTrackList)
+                        } label: {
+                            Label("Очистить плеер", systemImage: "paintbrush")
                         }
                     } label: {
                         Image(systemName: "ellipsis")

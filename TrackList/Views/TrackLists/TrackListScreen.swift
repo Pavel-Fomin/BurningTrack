@@ -62,14 +62,22 @@ struct TrackListScreen: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
-                    Button("Добавить трек") {
+                    Button {
                         actionHandler.handle(.addTrack)
+                    } label: {
+                        Label("Добавить трек", systemImage: "plus.app")
                     }
-                    Button("Экспорт") {
+
+                    Button {
                         actionHandler.handle(.export)
+                    } label: {
+                        Label("Экспорт", systemImage: "externaldrive")
                     }
-                    Button("Переименовать") {
+
+                    Button {
                         actionHandler.handle(.renameTrackList)
+                    } label: {
+                        Label("Переименовать", systemImage: "textformat")
                     }
                 } label: {
                     Image(systemName: "ellipsis")
