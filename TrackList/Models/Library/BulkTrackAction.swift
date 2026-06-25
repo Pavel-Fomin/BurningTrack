@@ -30,9 +30,9 @@ extension BulkTrackAction {
         case .addToTrackList:
             return "В треклист"
         case .renameFiles:
-            return "Переименовать файлы"
+            return "Имя файла"
         case .editTags:
-            return "Редактировать теги"
+            return "Теги"
         }
     }
 

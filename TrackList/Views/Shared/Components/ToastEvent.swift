@@ -57,6 +57,9 @@ enum ToastEvent: Equatable {
         artist: String,
         artwork: Image?)
 
+    /// Несколько треков добавлены в плеер
+    case tracksAddedToPlayer(count: Int)
+
     /// Добавлен в треклист
     case trackAddedToTrackList(
         title: String,

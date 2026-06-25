@@ -76,8 +76,39 @@ struct NewTrackListSelectionSheetData: Identifiable, Equatable {
 
 struct AddToTrackListSheetData: Identifiable, Equatable {
     let id = UUID()
-    let track: any TrackDisplayable
+    let tracks: [any TrackDisplayable]
+    let libraryBatchTracks: [LibraryTrack]?
     let sourceTrackListId: UUID?   // ← ВАЖНО
+
+    /// Создаёт payload одиночного добавления без изменения существующего swipe-flow.
+    init(
+        track: any TrackDisplayable,
+        sourceTrackListId: UUID? = nil
+    ) {
+        self.tracks = [track]
+        self.libraryBatchTracks = nil
+        self.sourceTrackListId = sourceTrackListId
+    }
+
+    /// Создаёт payload массового добавления треков фонотеки.
+    init(
+        libraryBatchTracks: [LibraryTrack],
+        sourceTrackListId: UUID? = nil
+    ) {
+        self.tracks = libraryBatchTracks.map { $0 as any TrackDisplayable }
+        self.libraryBatchTracks = libraryBatchTracks
+        self.sourceTrackListId = sourceTrackListId
+    }
+
+    /// Идентификаторы треков в порядке выбора.
+    var trackIds: [UUID] {
+        tracks.map { $0.trackId }
+    }
+
+    /// Первый трек нужен только для совместимости с подсветкой одиночного row-flow.
+    var firstTrack: (any TrackDisplayable)? {
+        tracks.first
+    }
 
     static func == (
         lhs: AddToTrackListSheetData,
@@ -142,6 +173,7 @@ enum AppSheetKind: Equatable {
     case newTrackListSelection
     case batchTagEdit
     case batchFilenameRename
+    case batchAddToTrackList
     case createTrackList
 }
 
@@ -156,6 +188,7 @@ enum AppSheet: Identifiable, Equatable {
     case newTrackListSelection(NewTrackListSelectionSheetData)
     case batchTagEdit(BatchTagEditSheetData)
     case batchFilenameRename(BatchFilenameRenameSheetData)
+    case batchAddToTrackList(AddToTrackListSheetData)
     case createTrackList
     
 
@@ -171,6 +204,7 @@ enum AppSheet: Identifiable, Equatable {
         case .newTrackListSelection(let data): return "newTrackListSelection_\(data.id)"
         case .batchTagEdit(let data): return "batchTagEdit_\(data.id)"
         case .batchFilenameRename(let data): return "batchFilenameRename_\(data.id)"
+        case .batchAddToTrackList(let data): return "batchAddToTrackList_\(data.id)"
         case .createTrackList: return "createTrackList"
         }
     }
@@ -192,6 +226,7 @@ enum AppSheet: Identifiable, Equatable {
         case .newTrackListSelection: return .newTrackListSelection
         case .batchTagEdit: return .batchTagEdit
         case .batchFilenameRename: return .batchFilenameRename
+        case .batchAddToTrackList: return .batchAddToTrackList
         case .createTrackList: return .createTrackList
         }
     }
@@ -324,6 +359,16 @@ final class SheetManager: ObservableObject {
         present(.addToTrackList(data))
     }
 
+    /// Открывает существующий sheet выбора треклиста для массового добавления из фонотеки.
+    func presentBatchAddToTrackList(for tracks: [LibraryTrack]) {
+        guard !tracks.isEmpty else { return }
+
+        let data = AddToTrackListSheetData(
+            libraryBatchTracks: tracks
+        )
+        present(.batchAddToTrackList(data))
+    }
+
     func closeActive() {
         activeSheet = nil
     }
@@ -422,6 +467,7 @@ final class SheetManager: ObservableObject {
              .trackDetail,
              .trackDetailEdit,
              .addToTrackList,
+             .batchAddToTrackList,
              .renameTrackList,
              .renameTrackFile,
              .saveTrackList,
@@ -463,13 +509,14 @@ private extension AppSheet {
         case .moveToFolder(let d): return d.track.id
         case .trackDetail(let t): return t.id
         case .trackDetailEdit(let t): return t.id
-        case .addToTrackList(let data): return data.track.id
+        case .addToTrackList(let data): return data.firstTrack?.id
         case .renameTrackList: return nil
         case .renameTrackFile(let data): return data.rowId
         case .saveTrackList: return nil
         case .newTrackListSelection: return nil
         case .batchTagEdit: return nil
         case .batchFilenameRename: return nil
+        case .batchAddToTrackList(let data): return data.firstTrack?.id
         case .createTrackList: return nil
         }
     }

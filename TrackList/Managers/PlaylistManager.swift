@@ -157,6 +157,22 @@ final class PlaylistManager: ObservableObject {
     
     // MARK: - Добавление треков в плеер
     @discardableResult
+    func addTracks(_ tracksToAdd: [PlayerTrack]) -> Bool {
+        guard !tracksToAdd.isEmpty else { return true }
+
+        // Откат нужен, чтобы runtime-очередь не расходилась с player.json при ошибке записи.
+        let previousTracks = tracks
+        tracks.append(contentsOf: tracksToAdd)
+
+        guard saveToDisk() else {
+            tracks = previousTracks
+            return false
+        }
+
+        return true
+    }
+
+    @discardableResult
     func addTracks(ids: [UUID]) async -> Bool {
         for trackId in ids {
             let item = PlayerFileItem(queueItemId: UUID(), trackId: trackId)

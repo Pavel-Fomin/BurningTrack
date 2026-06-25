@@ -86,6 +86,11 @@ struct SheetHostModifier: ViewModifier {
                 AddToTrackListContainer(data: data)
                     .appSheet(detents: [.fraction(0.6), .medium])
 
+                /// Массовое добавление в треклист через тот же UI выбора треклиста.
+            case .batchAddToTrackList(let data):
+                AddToTrackListContainer(data: data)
+                    .appSheet(detents: [.fraction(0.6), .medium])
+
                 /// Выбор треков для нового треклиста
             case .newTrackListSelection(let data):
                 NewTrackListSelectionContainer(

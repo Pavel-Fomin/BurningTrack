@@ -200,13 +200,13 @@ struct LibraryTracksView: View {
             Button {
                 handleBatchActionSelection(.renameFiles)
             } label: {
-                Label("Переименовать файлы", systemImage: "pencil")
+                Label("Имя файла", systemImage: "pencil")
             }
 
             Button {
                 handleBatchActionSelection(.editTags)
             } label: {
-                Label("Редактировать теги", systemImage: "tag")
+                Label("Теги", systemImage: "tag")
             }
         }
     }

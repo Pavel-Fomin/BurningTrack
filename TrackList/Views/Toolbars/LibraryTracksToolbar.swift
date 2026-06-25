@@ -114,13 +114,13 @@ struct LibraryTracksToolbar: ViewModifier {
             Button {
                 onSelectBatchAction(.renameFiles)
             } label: {
-                Label("Переименовать файлы", systemImage: "pencil")
+                Label("Имя файла", systemImage: "pencil")
             }
 
             Button {
                 onSelectBatchAction(.editTags)
             } label: {
-                Label("Редактировать теги", systemImage: "tag")
+                Label("Теги", systemImage: "tag")
             }
         }
     }

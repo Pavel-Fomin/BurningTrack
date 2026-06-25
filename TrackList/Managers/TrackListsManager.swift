@@ -195,13 +195,10 @@ final class TrackListsManager {
     func addTracks(_ libraryTracks: [LibraryTrack], to trackListId: UUID) throws -> Bool {
         guard !libraryTracks.isEmpty else { return true }
 
-        var currentTracks = try TrackListManager.shared.loadTracks(for: trackListId)
+        // Конвертация остаётся на уровне manager-а списка треклистов,
+        // а сохранение одного файла делегируется TrackListManager.
         let newTracks = libraryTracks.map { Track(libraryTrack: $0) }
-
-        currentTracks.append(contentsOf: newTracks)
-        guard TrackListManager.shared.saveTracks(currentTracks, for: trackListId) else {
-            throw TrackListStorageError.saveFailed(trackListId: trackListId)
-        }
+        try TrackListManager.shared.addTracks(newTracks, to: trackListId)
 
         return true
     }

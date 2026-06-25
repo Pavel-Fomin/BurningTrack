@@ -2,13 +2,13 @@
 //  AddToTrackListContainer.swift
 //  TrackList
 //
-//  UI-контейнер экрана добавления трека в треклист.
+//  UI-контейнер экрана добавления трека или выбранных треков в треклист.
 //
 //  Контейнер выполняет роль координатора:
 //  - владеет состоянием выбора (selectedTrackListId)
 //  - принимает контекст открытия sheet’а (sourceTrackListId)
 //  - управляет кнопками navigation bar (✓ / ×)
-//  - выполняет бизнес-команду добавления трека
+//  - выполняет бизнес-команду добавления треков
 //
 //  ВАЖНО:
 //  - контейнер не содержит UI-разметки списка
@@ -83,9 +83,9 @@ struct AddToTrackListContainer: View {
                 SheetManager.shared.closeActive()
             },
 
-            /// Подтверждение добавления трека
+            /// Подтверждение добавления трека или batch-выбора
             onRightTap: {
-                Task { await addTrack() }
+                Task { await addTracks() }
             }
         ) {
             /// Чистый UI-компонент без логики
@@ -99,15 +99,28 @@ struct AddToTrackListContainer: View {
 
     // MARK: - Actions
 
-    /// Добавление трека в выбранный треклист
-    private func addTrack() async {
+    /// Добавляет один трек или batch-выбор в выбранный треклист.
+    private func addTracks() async {
         guard let trackListId = selectedTrackListId else { return }
+        guard !data.trackIds.isEmpty else { return }
 
         do {
-            try await AppCommandExecutor.shared.addTrackToTrackList(
-                trackId: data.track.trackId,
-                trackListId: trackListId
-            )
+            if let libraryBatchTracks = data.libraryBatchTracks {
+                try await addLibraryBatchTracks(
+                    libraryBatchTracks,
+                    to: trackListId
+                )
+            } else if data.trackIds.count == 1, let trackId = data.trackIds.first {
+                try await AppCommandExecutor.shared.addTrackToTrackList(
+                    trackId: trackId,
+                    trackListId: trackListId
+                )
+            } else {
+                try await AppCommandExecutor.shared.addTracksToTrackList(
+                    trackIds: data.trackIds,
+                    trackListId: trackListId
+                )
+            }
             SheetManager.shared.closeActive()
         } catch let appError as AppError {
             print("❌ Ошибка добавления трека в треклист: \(appError)")
@@ -116,5 +129,52 @@ struct AddToTrackListContainer: View {
             print("❌ Ошибка добавления трека в треклист: \(error)")
             ToastManager.shared.handle(AppError.trackListSaveFailed)
         }
+    }
+
+    /// Добавляет batch из фонотеки через существующий manager треклистов.
+    private func addLibraryBatchTracks(
+        _ tracks: [LibraryTrack],
+        to trackListId: UUID
+    ) async throws {
+        guard !tracks.isEmpty else { return }
+
+        let trackListName = trackListName(for: trackListId)
+
+        try TrackListsManager.shared.addTracks(
+            tracks,
+            to: trackListId
+        )
+
+        await showAddedLibraryTracksToast(
+            tracks,
+            trackListName: trackListName
+        )
+    }
+
+    /// Возвращает имя треклиста для итогового toast.
+    private func trackListName(for trackListId: UUID) -> String {
+        trackLists.first { $0.id == trackListId }?.name ?? "Треклист"
+    }
+
+    /// Показывает один итоговый toast для batch-добавления.
+    private func showAddedLibraryTracksToast(
+        _ tracks: [LibraryTrack],
+        trackListName: String
+    ) async {
+        if tracks.count == 1, let track = tracks.first {
+            let event = await TrackToastEventBuilder.trackAddedToTrackList(
+                track: track,
+                trackListName: trackListName
+            )
+            ToastManager.shared.handle(event)
+            return
+        }
+
+        ToastManager.shared.handle(
+            .tracksAddedToTrackList(
+                count: tracks.count,
+                name: trackListName
+            )
+        )
     }
 }

@@ -143,6 +143,30 @@ final class TrackListManager {
             tracks: tracks
         )
     }
+
+    // MARK: - Добавление треков
+
+    /// Добавляет готовые модели Track в существующий треклист и сохраняет файл треклиста.
+    /// Повторные вхождения одного trackId разрешены, потому что это отдельные элементы треклиста.
+    @discardableResult
+    func addTracks(
+        _ tracksToAdd: [Track],
+        to trackListId: UUID
+    ) throws -> TrackList {
+        var list = try getTrackListById(trackListId)
+
+        guard !tracksToAdd.isEmpty else {
+            return list
+        }
+
+        list.tracks.append(contentsOf: tracksToAdd)
+
+        guard saveTracks(list.tracks, for: list.id) else {
+            throw TrackListStorageError.saveFailed(trackListId: list.id)
+        }
+
+        return list
+    }
     
     
     // MARK: - Валидация имени

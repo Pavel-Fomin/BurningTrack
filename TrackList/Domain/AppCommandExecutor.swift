@@ -253,6 +253,53 @@ actor AppCommandExecutor {
             ToastManager.shared.handle(event)
         }
     }
+
+    /// Добавляет несколько треков в треклист одним сохранением.
+    /// Используется как общий fallback для batch-flow, где нет LibraryTrack-моделей.
+    func addTracksToTrackList(
+        trackIds: [UUID],
+        trackListId: UUID
+    ) async throws {
+        guard !trackIds.isEmpty else { return }
+
+        var importedTracks: [Track] = []
+
+        for trackId in trackIds {
+            /// 1. Резолвим URL трека через bookmark.
+            guard let url = await BookmarkResolver.url(forTrack: trackId) else {
+                throw AppError.bookmarkResolveFailed
+            }
+
+            /// 2. Используем runtime snapshot, чтобы сохранить актуальные display-данные.
+            let snapshot = await resolveSnapshot(for: trackId)
+            let imported = Track(
+                trackId: trackId,
+                title: snapshot?.title,
+                artist: snapshot?.artist,
+                duration: snapshot?.duration ?? 0,
+                fileName: snapshot?.fileName ?? url.lastPathComponent,
+                isAvailable: true
+            )
+            importedTracks.append(imported)
+        }
+
+        /// 3. Сохраняем треклист одним append.
+        let list = try TrackListManager.shared.addTracks(
+            importedTracks,
+            to: trackListId
+        )
+        let addedCount = importedTracks.count
+
+        /// 4. Показываем один итоговый toast для batch-сценария.
+        await MainActor.run {
+            ToastManager.shared.handle(
+                .tracksAddedToTrackList(
+                    count: addedCount,
+                    name: list.name
+                )
+            )
+        }
+    }
     
     // MARK: - Создать треклист
     
@@ -367,50 +414,55 @@ actor AppCommandExecutor {
     // MARK: - Добавить в плеер
     
     func addTrackToPlayer(trackId: UUID) async throws {
-        
-        /// 1. Резолвим URL
-        guard let url = await BookmarkResolver.url(forTrack: trackId) else {
-            throw AppError.bookmarkResolveFailed
-        }
-        
-        /// 2. Получаем snapshot трека
-        let snapshot = await resolveSnapshot(for: trackId)
-        
-        /// 3. Формируем PlayerTrack
-        let track = PlayerTrack(
-            trackId: trackId,
-            title: snapshot?.title,
-            artist: snapshot?.artist,
-            duration: snapshot?.duration ?? 0,
-            fileName: snapshot?.fileName ?? url.lastPathComponent,
-            isAvailable: true
-        )
-        
-        /// 4. Мутация плеера — строго на MainActor
+        /// 1. Формируем runtime-модель очереди из актуального snapshot.
+        let importItem = try await makePlayerTrackImportItem(trackId: trackId)
+
+        /// 2. Мутация плеера — строго на MainActor.
         let didSave = await MainActor.run {
-            PlaylistManager.shared.tracks.append(track)
-            return PlaylistManager.shared.saveToDisk()
+            PlaylistManager.shared.addTracks([importItem.track])
         }
         guard didSave else {
-            await MainActor.run {
-                PlaylistManager.shared.tracks.removeAll { $0.id == track.id }
-            }
             throw AppError.playlistSaveFailed
         }
+
+        /// 3. ToastEvent.
+        let event = trackAddedToPlayerEvent(for: importItem)
         
-        /// 5. ToastEvent
-        let event = ToastEvent.trackAddedToPlayer(
-            title: snapshot?.title ?? track.fileName,
-            artist: snapshot?.artist ?? "",
-            artwork: snapshot.flatMap {
-                ArtworkProvider.shared.image(
-                    trackId: trackId,
-                    artworkData: $0.artworkData,
-                    purpose: .toast
-                ).map { Image(uiImage: $0) }
-            }
-        )
-        
+        await MainActor.run {
+            ToastManager.shared.handle(event)
+        }
+    }
+
+    /// Добавляет несколько треков в плеер одним сохранением player.json.
+    func addTracksToPlayer(trackIds: [UUID]) async throws {
+        guard !trackIds.isEmpty else { return }
+
+        var importItems: [PlayerTrackImportItem] = []
+
+        for trackId in trackIds {
+            importItems.append(
+                try await makePlayerTrackImportItem(trackId: trackId)
+            )
+        }
+
+        let playerTracks = importItems.map { $0.track }
+        let didSave = await MainActor.run {
+            PlaylistManager.shared.addTracks(
+                playerTracks
+            )
+        }
+
+        guard didSave else {
+            throw AppError.playlistSaveFailed
+        }
+
+        let event: ToastEvent
+        if importItems.count == 1, let item = importItems.first {
+            event = trackAddedToPlayerEvent(for: item)
+        } else {
+            event = .tracksAddedToPlayer(count: importItems.count)
+        }
+
         await MainActor.run {
             ToastManager.shared.handle(event)
         }
@@ -700,6 +752,52 @@ private enum PlayerTrackRemovalResult {
     case removed
     case notFound
     case saveFailed
+}
+
+/// Подготовленный элемент импорта в очередь плеера.
+/// Хранит и runtime-модель очереди, и snapshot для итогового toast.
+private struct PlayerTrackImportItem {
+    let track: PlayerTrack
+    let snapshot: TrackRuntimeSnapshot?
+}
+
+/// Собирает runtime-модель плеера для одного trackId.
+private func makePlayerTrackImportItem(trackId: UUID) async throws -> PlayerTrackImportItem {
+    guard let url = await BookmarkResolver.url(forTrack: trackId) else {
+        throw AppError.bookmarkResolveFailed
+    }
+
+    let snapshot = await resolveSnapshot(for: trackId)
+    let track = PlayerTrack(
+        trackId: trackId,
+        title: snapshot?.title,
+        artist: snapshot?.artist,
+        duration: snapshot?.duration ?? 0,
+        fileName: snapshot?.fileName ?? url.lastPathComponent,
+        isAvailable: true
+    )
+
+    return PlayerTrackImportItem(
+        track: track,
+        snapshot: snapshot
+    )
+}
+
+/// Строит одиночный toast добавления в плеер по подготовленному элементу.
+private func trackAddedToPlayerEvent(for item: PlayerTrackImportItem) -> ToastEvent {
+    let snapshot = item.snapshot
+
+    return ToastEvent.trackAddedToPlayer(
+        title: snapshot?.title ?? item.track.fileName,
+        artist: snapshot?.artist ?? "",
+        artwork: snapshot.flatMap {
+            ArtworkProvider.shared.image(
+                trackId: item.track.trackId,
+                artworkData: $0.artworkData,
+                purpose: .toast
+            ).map { Image(uiImage: $0) }
+        }
+    )
 }
 
 /// Преобразует файловую ошибку фонотеки в ошибку пользовательского уровня.

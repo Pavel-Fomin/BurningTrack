@@ -53,8 +53,22 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
     )
     /// Обрабатывает массовое редактирование тегов.
     private let batchTagEditHandler = LibraryBatchTagEditHandler()
+    /// Обрабатывает массовое добавление выбранных треков в плеер.
+    private let batchPlayerHandler = LibraryBatchPlayerHandler()
+    /// Обрабатывает открытие sheet массового добавления в треклист.
+    private lazy var batchTrackListHandler = LibraryBatchTrackListHandler(
+        tracksProvider: { [weak self] in
+            self?.trackSections.flatMap(\.tracks) ?? []
+        }
+    )
     /// Маршрутизирует зафиксированные массовые действия в текущие массовые сценарии.
     private lazy var batchActionHandler = LibraryBatchActionHandler(
+        onAddToPlayer: { [weak self] pendingAction in
+            self?.batchPlayerHandler.addToPlayer(with: pendingAction)
+        },
+        onAddToTrackList: { [weak self] pendingAction in
+            self?.batchTrackListHandler.startAddToTrackList(with: pendingAction)
+        },
         onRenameFiles: { [weak self] pendingAction in
             self?.batchRenameHandler.startRename(with: pendingAction)
         },

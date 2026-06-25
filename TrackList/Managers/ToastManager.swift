@@ -147,6 +147,13 @@ final class ToastManager: ObservableObject {
                 message: "Добавлен в плеер"
             )
 
+        case let .tracksAddedToPlayer(count):
+            return ToastData(
+                style: .trackList(name: ""),
+                artworkImage: nil,
+                message: "Добавлено \(count) треков в плеер"
+            )
+
         case let .trackAddedToTrackList(title, artist, artwork, trackListName):
             return ToastData(
                 style: .track(title: title, artist: artist),
