@@ -13,6 +13,10 @@ import SwiftUI
 struct LibraryTracksView: View {
 
     let folder: LibraryFolder
+    /// Подпапки текущей папки, которые нужно показать над секциями треков.
+    let subfolders: [LibraryFolder]
+    /// Передаёт навигационное действие владельцу flow фонотеки.
+    let onSubfolderTap: (LibraryFolder) -> Void
     let revealRequest: LibraryRevealRequest?
     let onRevealHandled: (UUID) -> Void
     @Binding var selectionActionBarConfig: SelectionActionBarConfig?
@@ -52,12 +56,16 @@ struct LibraryTracksView: View {
     
     init(
         folder: LibraryFolder,
+        subfolders: [LibraryFolder] = [],
+        onSubfolderTap: @escaping (LibraryFolder) -> Void = { _ in },
         revealRequest: LibraryRevealRequest? = nil,
         onRevealHandled: @escaping (UUID) -> Void = { _ in },
         playerViewModel: PlayerViewModel,
         selectionActionBarConfig: Binding<SelectionActionBarConfig?> = .constant(nil)
     ) {
         self.folder = folder
+        self.subfolders = subfolders
+        self.onSubfolderTap = onSubfolderTap
         self.revealRequest = revealRequest
         self.onRevealHandled = onRevealHandled
         self.playerViewModel = playerViewModel
@@ -224,6 +232,8 @@ struct LibraryTracksView: View {
     private var tracksListView: some View {
         ScrollViewReader { proxy in
             List {
+                folderSectionView()
+
                 LibraryTrackSectionsListView(
                     sections: tracksViewModel.trackSections,
                     allTracks: allVisibleTracks,
@@ -266,6 +276,37 @@ struct LibraryTracksView: View {
             }
             .onChange(of: scenePhase) { _, newPhase in
                 handleScenePhaseChange(newPhase)
+            }
+        }
+    }
+
+    // MARK: - Секция подпапок
+
+    @ViewBuilder
+    private func folderSectionView() -> some View {
+        if subfolders.isEmpty == false {
+            Section {
+                ForEach(subfolders) { subfolder in
+                    HStack(spacing: 12) {
+                        Image(systemName: "folder.fill")
+                            .foregroundColor(.blue)
+                            .frame(width: 24)
+
+                        Text(subfolder.name)
+                            .lineLimit(1)
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .font(.footnote)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .padding(.vertical, 4)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        onSubfolderTap(subfolder)
+                    }
+                }
             }
         }
     }

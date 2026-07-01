@@ -23,9 +23,8 @@ struct LibraryFolderStateBuilder {
     // MARK: - Private
 
     private func displayMode(for folder: LibraryFolder) -> LibraryFolderScreenState.DisplayMode {
-        if folder.subfolders.isEmpty {
-            return .tracks
-        }
-        return .subfolders
+        // Треки фонотеки загружаются отдельно через LibraryTracksViewModel / TrackRegistry.
+        // Поэтому на этом уровне нельзя определять пустоту папки через folder.audioFiles.
+        .content
     }
 }

@@ -67,8 +67,6 @@ final class LibraryScanner: LibraryScannerProtocol {
             options: [.skipsHiddenFiles]
         )) ?? []
 
-        print("📡 SCAN FOLDER RAW:", url.lastPathComponent, "items:", items.count)
-
         for item in items {
             let isDir = (try? item.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
 

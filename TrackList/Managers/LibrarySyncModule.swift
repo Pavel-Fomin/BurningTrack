@@ -60,13 +60,25 @@ actor LibrarySyncModule {
             return
         }
 
-        // 1) Открываем доступ к корневой папке на время синка
+        // 1) Открываем доступ к корневой папке на время синка.
+        // Если MusicLibraryManager уже держит root-доступ, повторный start может вернуть false.
+        // В этом случае продолжаем синк и не закрываем runtime-доступ менеджера.
+        let hasRuntimeRootAccess = await MainActor.run {
+            MusicLibraryManager.shared.hasActiveRootAccess(
+                rootFolderId: rootFolderId,
+                url: rootURL
+            )
+        }
         let started = rootURL.startAccessingSecurityScopedResource()
-        if !started {
+        if !started && hasRuntimeRootAccess == false {
             print("❌ syncRootFolder: не удалось начать доступ к папке:", rootURL.path)
             return
         }
-        defer { rootURL.stopAccessingSecurityScopedResource() }
+        defer {
+            if started {
+                rootURL.stopAccessingSecurityScopedResource()
+            }
+        }
 
         // 2) Сканируем все аудиофайлы рекурсивно
         let scanned = await scanner.scanRecursively(rootURL)
@@ -101,11 +113,6 @@ actor LibrarySyncModule {
                 fileValues?.contentModificationDate ??
                 fileValues?.creationDate ??
                 Date()
-            
-            if aliveIds.count == 1 {
-                print("🧷 sync folderURL:", file.folderURL.path)
-                print("🧷 sync folderId:", folderId)
-            }
             
             let rootPath = rootURL.standardizedFileURL.path.hasSuffix("/")
                 ? rootURL.standardizedFileURL.path

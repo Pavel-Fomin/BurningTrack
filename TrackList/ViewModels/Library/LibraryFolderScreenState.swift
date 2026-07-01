@@ -13,8 +13,9 @@ struct LibraryFolderScreenState {
     // MARK: - Режим отображения
 
     enum DisplayMode {
-        case subfolders
-        case tracks
+        /// Показываем всё содержимое папки: сначала подпапки, затем треки.
+        case content
+        /// Папка не содержит ни подпапок, ни собственных треков.
         case empty
     }
 

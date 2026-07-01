@@ -70,6 +70,16 @@ final class MusicLibraryManager: ObservableObject {
         attachingFolderIds.contains(folderId)
     }
 
+    /// Проверяет, удерживается ли root-доступ к папке на весь runtime.
+    func hasActiveRootAccess(rootFolderId: UUID, url: URL) -> Bool {
+        guard let activeURL = activeRootFolderAccess[rootFolderId] else { return false }
+
+        let activePath = activeURL.standardizedFileURL.resolvingSymlinksInPath().path
+        let requestedPath = url.standardizedFileURL.resolvingSymlinksInPath().path
+
+        return activePath == requestedPath
+    }
+
     // MARK: - Добавление папки: сохраняем bookmark, регистрируем, синхронизируем
 
     func saveBookmark(for url: URL) async throws {
@@ -293,6 +303,16 @@ final class MusicLibraryManager: ObservableObject {
         
         // 4) Обновляем UI сразу
         attachedFolders = liteFolders
+
+        // После быстрого lite-состояния пересобираем UI-дерево папок.
+        // Lite-модель нужна только для быстрого первого отображения,
+        // но экран фонотеки должен получать реальные подпапки и собственные аудиофайлы.
+        var restoredTrees: [LibraryFolder] = []
+        for root in rootsToSync {
+            let tree = await buildFolderTree(from: root.url)
+            restoredTrees.append(tree)
+        }
+        attachedFolders = restoredTrees
         
         /// Доступ к библиотеке подтверждён:
         /// хотя бы одна корневая папка успешно открыта.
@@ -418,8 +438,6 @@ final class MusicLibraryManager: ObservableObject {
     /// Важно: используется только для UI и навигации по фонотеке.
     private func buildFolderTree(from folderURL: URL) async -> LibraryFolder {
         let scanned = await scanner.scanFolder(folderURL)
-        print("📂 tree folder:", scanned.url.path)
-        print("📂 tree folderId:", scanned.url.libraryFolderId, "audio:", scanned.audioFiles.count)
 
         var subfoldersModels: [LibraryFolder] = []
 

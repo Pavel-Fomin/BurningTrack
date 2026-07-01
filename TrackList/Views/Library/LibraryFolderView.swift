@@ -3,8 +3,7 @@
 //  TrackList
 //
 //  Экран вложенной папки:
-//  - показывает подпапки,
-//  - либо список треков (через LibraryTracksView),
+//  - показывает всё содержимое папки через LibraryTracksView,
 //  - выполняет только UI и пользовательские действия.
 //
 //  Вся навигация:
@@ -38,25 +37,18 @@ struct LibraryFolderView: View {
         Group {
             switch state.displayMode {
 
-            case .tracks:
+            case .content:
                 LibraryTracksView(
                     folder: state.folder,
+                    subfolders: state.subfolders,
+                    onSubfolderTap: { subfolder in
+                        onAction(.subfolderTapped(subfolder))
+                    },
                     revealRequest: revealRequest,
                     onRevealHandled: onRevealHandled,
                     playerViewModel: playerViewModel,
                     selectionActionBarConfig: $selectionActionBarConfig
-                
                 )
-
-            case .subfolders:
-                List { folderSectionView() }
-                    .listStyle(.insetGrouped)
-                    // Системный inline-заголовок сохраняет нативную back-кнопку вложенного экрана.
-                    .navigationTitle(state.title)
-                    .navigationBarTitleDisplayMode(.inline)
-                    .onAppear {
-                        onAction(.appeared)
-                    }
 
             case .empty:
                 Color.clear
@@ -66,29 +58,6 @@ struct LibraryFolderView: View {
                     .onAppear {
                         onAction(.appeared)
                     }
-            }
-        }
-    }
-    
-    // MARK: - Секция подпапок
-
-    @ViewBuilder
-    private func folderSectionView() -> some View {
-        Section {
-            ForEach(state.subfolders) { subfolder in
-                HStack(spacing: 12) {
-                    Image(systemName: "folder.fill")
-                        .foregroundColor(.blue)
-                        .frame(width: 24)
-
-                    Text(subfolder.name)
-                        .lineLimit(1)
-                }
-                .padding(.vertical, 4)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    onAction(.subfolderTapped(subfolder))
-                }
             }
         }
     }
