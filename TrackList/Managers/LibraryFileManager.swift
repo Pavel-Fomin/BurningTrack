@@ -78,8 +78,6 @@ actor LibraryFileManager {
             throw LibraryFileError.trackIsPlaying
         }
 
-        
-
         // 2. Берём метаданные трека
         guard let entry = await TrackRegistry.shared.entry(for: trackId) else {
             throw LibraryFileError.trackNotFound
@@ -95,7 +93,15 @@ actor LibraryFileManager {
             throw LibraryFileError.destinationFolderUnavailable
         }
 
+        // 5. Определяем прикреплённый корень, внутри которого находится целевая папка.
+        // Bookmark существует только для корня, поэтому подпапку нельзя считать rootFolderId.
+        guard let destinationRootFolder = await MusicLibraryManager.shared.rootFolder(for: destinationFolderId) else {
+            throw LibraryFileError.destinationFolderUnavailable
+        }
+
         let destinationFolderURL = destinationFolder.url
+        let destinationRootFolderId = destinationRootFolder.id
+        let destinationRootFolderURL = destinationRootFolder.url
         let fileName = entry.fileName
         let destinationURL = destinationFolderURL.appendingPathComponent(fileName)
 
@@ -105,29 +111,34 @@ actor LibraryFileManager {
             return
         }
 
-        // 5. Проверяем, нет ли файла с таким именем в целевой папке
+        // 6. Проверяем, нет ли файла с таким именем в целевой папке
         if FileManager.default.fileExists(atPath: destinationURL.path) {
             throw LibraryFileError.destinationAlreadyExists
         }
 
-        // 6. Открываем security-scoped доступ
+        // 7. Открываем security-scoped доступ
         // ВАЖНО:
         // - доступ к подпапкам НЕ требует отдельных bookmark'ов
-        // - достаточно открыть доступ к исходному файлу и КОРНЕВОЙ папке
+        // - достаточно открыть доступ к исходному файлу и КОРНЕВОЙ папке назначения
         let sourceStarted = sourceURL.startAccessingSecurityScopedResource()
 
-        guard let rootFolderURL = await BookmarkResolver.url(forFolder: entry.rootFolderId) else {
+        let hasRuntimeDestinationRootAccess = await MusicLibraryManager.shared.hasActiveRootAccess(
+            rootFolderId: destinationRootFolderId,
+            url: destinationRootFolderURL
+        )
+        let destinationRootStarted = destinationRootFolderURL.startAccessingSecurityScopedResource()
+        if !destinationRootStarted && hasRuntimeDestinationRootAccess == false {
             throw LibraryFileError.destinationFolderUnavailable
         }
 
-        let rootStarted = rootFolderURL.startAccessingSecurityScopedResource()
-
         defer {
             if sourceStarted { sourceURL.stopAccessingSecurityScopedResource() }
-            if rootStarted { rootFolderURL.stopAccessingSecurityScopedResource() }
+            if destinationRootStarted {
+                destinationRootFolderURL.stopAccessingSecurityScopedResource()
+            }
         }
 
-        // 7. Перемещаем файл
+        // 8. Перемещаем файл
         do {
             try FileManager.default.moveItem(at: sourceURL, to: destinationURL)
             print("✅ Файл перемещён:\n    from: \(sourceURL.path)\n      to: \(destinationURL.path)")
@@ -135,7 +146,7 @@ actor LibraryFileManager {
             throw LibraryFileError.moveFailed(underlying: error)
         }
 
-        // 8. Создаём новый bookmark для обновлённого пути
+        // 9. Создаём новый bookmark для обновлённого пути
         guard let newBookmarkBase64 = BookmarkResolver.makeBookmarkBase64(for: destinationURL) else {
             throw LibraryFileError.bookmarkCreationFailed
         }
@@ -145,28 +156,23 @@ actor LibraryFileManager {
             base64: newBookmarkBase64
         )
 
-        // 9. Строим новый relativePath
-        // Получаем URL новой корневой папки
-        guard let newRootFolderURL = await BookmarkResolver.url(forFolder: destinationFolderId) else {
-            throw LibraryFileError.destinationFolderUnavailable
-        }
-
-        // Считаем relativePath относительно НОВОГО root
+        // 10. Строим новый relativePath относительно прикреплённого корня назначения.
         let newRelativePath = try makeRelativePath(
             fileURL: destinationURL,
-            rootFolderURL: newRootFolderURL
+            rootFolderURL: destinationRootFolderURL
         )
 
-        // 10. Обновляем метаданные трека в реестре
+        // 11. Обновляем метаданные трека в реестре
         await TrackRegistry.shared.upsertTrack(
             id: trackId,
             fileName: fileName,
             relativePath: newRelativePath,
             folderId: destinationFolderId,
-            rootFolderId: destinationFolderId
+            rootFolderId: destinationRootFolderId,
+            fileDate: entry.fileDate
         )
 
-        // 11. Обновляем library identity:
+        // 12. Обновляем library identity:
         // старый путь убираем, новый путь привязываем к тому же trackId
         try await TrackIdentityResolver.shared.unbindLibraryTrack(
             rootFolderId: entry.rootFolderId,
@@ -175,7 +181,7 @@ actor LibraryFileManager {
 
         try await TrackIdentityResolver.shared.bindLibraryTrack(
             id: trackId,
-            rootFolderId: destinationFolderId,
+            rootFolderId: destinationRootFolderId,
             relativePath: newRelativePath
         )
 

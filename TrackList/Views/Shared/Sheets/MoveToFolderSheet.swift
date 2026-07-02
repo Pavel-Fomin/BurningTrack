@@ -108,8 +108,8 @@ struct MoveToFolderSheet: View {
                 .buttonStyle(.plain)
 
                 // Правая зона — выбор папки назначения (radio)
-                // Показывается ТОЛЬКО для папок без подпапок и не для текущей папки
-                if row.id != trackCurrentFolderId && row.hasSubfolders == false {
+                // Показывается для любой папки, кроме текущей папки трека.
+                if row.id != trackCurrentFolderId {
                     Button {
                         selectedFolderId =
                             (selectedFolderId == row.id) ? nil : row.id

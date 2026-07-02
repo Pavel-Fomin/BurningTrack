@@ -229,6 +229,18 @@ final class MusicLibraryManager: ObservableObject {
         return search(in: attachedFolders)
     }
 
+    /// Возвращает прикреплённую корневую папку, внутри которой находится folderId.
+    /// Bookmark хранится только для корня, поэтому файловые операции в подпапках
+    /// должны открывать security-scoped доступ именно к найденному корню.
+    func rootFolder(for folderId: UUID) -> LibraryFolder? {
+        for root in attachedFolders {
+            if contains(folderId: folderId, in: root) {
+                return root
+            }
+        }
+        return nil
+    }
+
     // MARK: - Восстановление прикреплённых папок при запуске
 
     func restoreAccessAsync() async {
@@ -374,7 +386,7 @@ final class MusicLibraryManager: ObservableObject {
             rootFolderId = folder.id
         } else {
             // Подпапка: ищем root в дереве attachedFolders.
-            guard let root = findRootFolder(for: folderId) else {
+            guard let root = rootFolder(for: folderId) else {
                 print("❌ Root folder не найден для folderId: \(folderId)")
                 return
             }
@@ -414,16 +426,6 @@ final class MusicLibraryManager: ObservableObject {
     
 
     // MARK: - Приватные помощники: дерево
-
-    /// Ищет root папку, внутри которой находится folderId
-    private func findRootFolder(for folderId: UUID) -> LibraryFolder? {
-        for root in attachedFolders {
-            if contains(folderId: folderId, in: root) {
-                return root
-            }
-        }
-        return nil
-    }
 
     /// Рекурсивный поиск folderId в дереве
     private func contains(folderId: UUID, in folder: LibraryFolder) -> Bool {

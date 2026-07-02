@@ -325,7 +325,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         eventProvider.trackDidUpdate
             .sink { [weak self] updateEvent in
                 Task { @MainActor in
-                    self?.applyTrackUpdateEvent(updateEvent)
+                    await self?.applyTrackUpdateEvent(updateEvent)
                 }
             }
             .store(in: &cancellables)
@@ -333,7 +333,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         eventProvider.trackBatchDidUpdate
             .sink { [weak self] events in
                 Task { @MainActor in
-                    self?.applyTrackUpdateEvents(events)
+                    await self?.applyTrackUpdateEvents(events)
                 }
             }
             .store(in: &cancellables)
@@ -399,12 +399,12 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
     /// Применяет единое событие обновления трека к состоянию фонотеки.
     ///
     /// - Parameter updateEvent: Событие обновления трека
-    private func applyTrackUpdateEvent(_ updateEvent: TrackUpdateEvent) {
-        applyTrackUpdateEvents([updateEvent])
+    private func applyTrackUpdateEvent(_ updateEvent: TrackUpdateEvent) async {
+        await applyTrackUpdateEvents([updateEvent])
     }
 
     /// Пакетно применяет события обновления треков к секциям без полного refresh списка.
-    private func applyTrackUpdateEvents(_ events: [TrackUpdateEvent]) {
+    private func applyTrackUpdateEvents(_ events: [TrackUpdateEvent]) async {
         guard !events.isEmpty else { return }
 
         let eventsByTrackId = events.reduce(into: [UUID: TrackUpdateEvent]()) { result, event in
@@ -412,6 +412,13 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         }
 
         runtimeController.applyTrackUpdateEvents(events)
+
+        // При перемещении меняется folderId, поэтому точечного обновления строки недостаточно.
+        // Текущая папка должна заново взять состав треков из TrackRegistry.
+        if events.contains(where: { $0.reason == .fileMoved }) {
+            await reloadTracksAfterFileMove()
+            return
+        }
 
         trackSections = trackSections.map { section in
             let updatedTracks = section.tracks.map { track in
@@ -425,6 +432,13 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
                 tracks: updatedTracks
             )
         }
+    }
+
+    /// Перечитывает состав текущей папки после перемещения трека.
+    /// Это удаляет трек из старой папки и добавляет его в новую, если её ViewModel уже активна.
+    private func reloadTracksAfterFileMove() async {
+        await loadInitialTracks()
+        reloadTrackListBadges()
     }
 
     /// Собирает обновлённую модель строки фонотеки из runtime snapshot.
