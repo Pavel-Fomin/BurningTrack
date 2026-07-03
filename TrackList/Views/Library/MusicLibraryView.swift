@@ -3,6 +3,7 @@
 //  TrackList
 //
 //  Корневой экран фонотеки:
+//  — показывает виртуальный источник купленных треков iTunes,
 //  — показывает прикреплённые папки,
 //  — по нажатию переходит в LibraryFolderView,
 //  — не содержит логики вкладок,
@@ -30,11 +31,12 @@ struct MusicLibraryView: View {
 
             // MARK: - Нет прикреплённых папок
             } else if state.isEmpty {
-                emptyView
+                // В пустой фонотеке показываем доступные источники и состояние отсутствия папок.
+                libraryRootList
 
-            // MARK: - Папки есть → показываем список
+            // MARK: - Папки есть → показываем корневой список
             } else {
-                foldersList
+                libraryRootList
             }
         }
         .onAppear {
@@ -72,42 +74,68 @@ struct MusicLibraryView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // MARK: - Пустое состояние
+    // MARK: - Корневой список фонотеки
 
-    private var emptyView: some View {
-        VStack {
-            Spacer()
-            Button("Выбрать папку") {
-                onAction(.addFolderTapped)
+    private var libraryRootList: some View {
+        List {
+            if state.showsPurchasedITunesSource {
+                Section {
+                    purchasedITunesRow
+                }
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            Spacer()
+
+            Section {
+                if state.isEmpty {
+                    emptyFoldersRow
+                } else {
+                    ForEach(state.folders) { folder in
+                        folderRow(folder)
+                    }
+                }
+
+                addFolderRow
+            }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // MARK: - Список папок
+    /// Строит строку виртуального источника iTunes отдельно от реальных папок.
+    private var purchasedITunesRow: some View {
+        Button {
+            onAction(.openPurchasedITunes)
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "music.note.list")
+                    .foregroundColor(.blue)
+                    .frame(width: 24)
 
-    private var foldersList: some View {
-        List {
-            ForEach(state.folders) { folder in
-                folderRow(folder)
-            }
+                Text("Куплено в iTunes")
+                    .lineLimit(1)
 
-            // Добавить папку
-            Button {
-                onAction(.addFolderTapped)
-            } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: "folder.fill.badge.plus")
-                        .foregroundColor(.blue)
-                        .frame(width: 24)
-                    Text("Добавить папку")
-                }
-                .padding(.vertical, 4)
+                Spacer()
             }
+            .padding(.vertical, 4)
         }
+        .buttonStyle(.plain)
+    }
+
+    /// Показывает пустое состояние только для списка папок, не затрагивая виртуальные источники.
+    private var emptyFoldersRow: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "folder")
+                .foregroundColor(.secondary)
+                .frame(width: 24)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Нет добавленных папок")
+                    .foregroundColor(.primary)
+                Text("Добавьте папку с музыкой, чтобы видеть локальные файлы.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+        }
+        .padding(.vertical, 4)
     }
 
     /// Строит строку прикреплённой папки без прямого доступа к менеджерам.
@@ -145,6 +173,21 @@ struct MusicLibraryView: View {
                     Image(systemName: "pin.slash.fill")
                 }
             }
+        }
+    }
+
+    /// Строит строку добавления новой папки в общий корневой список.
+    private var addFolderRow: some View {
+        Button {
+            onAction(.addFolderTapped)
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "folder.fill.badge.plus")
+                    .foregroundColor(.blue)
+                    .frame(width: 24)
+                Text("Добавить папку")
+            }
+            .padding(.vertical, 4)
         }
     }
 }

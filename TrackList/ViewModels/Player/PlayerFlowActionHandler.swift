@@ -68,6 +68,8 @@ final class PlayerFlowActionHandler {
             presentationActionHandler.moveToFolder(queueItemId: queueItemId)
         case .addToTrackList(let queueItemId):
             presentationActionHandler.addToTrackList(queueItemId: queueItemId)
+        case .copyTrack(let queueItemId):
+            presentationActionHandler.copyTrack(queueItemId: queueItemId)
         case .editTags(let queueItemId):
             presentationActionHandler.editTags(queueItemId: queueItemId)
         case .renameTrack(

@@ -92,4 +92,13 @@ final class AppSettingsManager: ObservableObject, SettingsManaging {
 
         NotificationCenter.default.post(name: .appSettingsDidChange, object: nil)
     }
+
+    func setPurchasedITunesSourceVisible(_ value: Bool) {
+        guard settings.visible.library.isPurchasedITunesSourceVisible != value else { return }
+
+        settings.visible.library.isPurchasedITunesSourceVisible = value
+        save()
+
+        NotificationCenter.default.post(name: .appSettingsDidChange, object: nil)
+    }
 }

@@ -27,6 +27,13 @@ final class MiniPlayerStateBuilder {
         snapshot: TrackRuntimeSnapshot?
     ) -> MiniPlayerStaticState {
 
+        if let purchasedTrack = track as? (any TrackDisplayable & PurchasedITunesTrackRepresentable),
+           purchasedTrack.isPurchasedITunesRuntimeTrack {
+            return buildPurchasedITunesStaticState(
+                track: purchasedTrack
+            )
+        }
+
         let shouldShowTags = AppSettingsManager.shared.settings.visible.metadata.isTagReadingEnabled
 
         // Название берём из snapshot, если оно есть.
@@ -64,6 +71,41 @@ final class MiniPlayerStateBuilder {
                 purpose: .miniPlayer
             )
         }()
+
+        return MiniPlayerStaticState(
+            trackId: track.trackId,
+            title: title,
+            artist: artist,
+            artwork: artwork
+        )
+    }
+
+    /// Собирает состояние мини-плеера для iTunes-трека из runtime-данных MediaPlayer.
+    private static func buildPurchasedITunesStaticState(
+        track: any TrackDisplayable & PurchasedITunesTrackRepresentable
+    ) -> MiniPlayerStaticState {
+        let title: String = {
+            if track.title?.isEmpty == false {
+                return track.title ?? ""
+            }
+
+            return track.fileName
+        }()
+
+        let artist: String = {
+            if track.artist?.isEmpty == false {
+                return track.artist ?? ""
+            }
+
+            return "Неизвестный артист"
+        }()
+
+        // Для iTunes-трека не читаем файл и не используем TrackMetadataCacheManager.
+        let artwork = ArtworkProvider.shared.image(
+            trackId: track.trackId,
+            artworkData: track.artworkData,
+            purpose: .miniPlayer
+        )
 
         return MiniPlayerStaticState(
             trackId: track.trackId,

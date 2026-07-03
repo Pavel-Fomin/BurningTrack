@@ -30,16 +30,21 @@ final class PlayerPresentationActionHandler {
     /// Координатор sheet/navigation действий.
     private let sheetActionCoordinator: SheetActionCoordinator
 
+    /// Презентер пользовательских сообщений.
+    private let toastPresenter: any ToastPresenting
+
     // MARK: - Инициализация
 
     init(
         playlistManager: PlaylistManager,
         sheetManager: SheetManager,
-        sheetActionCoordinator: SheetActionCoordinator
+        sheetActionCoordinator: SheetActionCoordinator,
+        toastPresenter: any ToastPresenting
     ) {
         self.playlistManager = playlistManager
         self.sheetManager = sheetManager
         self.sheetActionCoordinator = sheetActionCoordinator
+        self.toastPresenter = toastPresenter
     }
 
     // MARK: - Actions
@@ -52,6 +57,7 @@ final class PlayerPresentationActionHandler {
     /// Открывает расположение элемента очереди плеера в фонотеке.
     func showInLibrary(queueItemId: UUID) {
         guard let track = track(queueItemId: queueItemId) else { return }
+        guard canUseFileActions(track) else { return }
 
         sheetActionCoordinator.handle(
             action: .showInLibrary,
@@ -63,6 +69,7 @@ final class PlayerPresentationActionHandler {
     /// Открывает сценарий перемещения элемента очереди плеера в другую папку.
     func moveToFolder(queueItemId: UUID) {
         guard let track = track(queueItemId: queueItemId) else { return }
+        guard canUseFileActions(track) else { return }
 
         sheetActionCoordinator.handle(
             action: .moveToFolder,
@@ -81,6 +88,7 @@ final class PlayerPresentationActionHandler {
     /// Открывает карточку элемента очереди сразу в режиме редактирования тегов.
     func editTags(queueItemId: UUID) {
         guard let track = track(queueItemId: queueItemId) else { return }
+        guard canUseFileActions(track) else { return }
 
         sheetManager.presentTrackDetailForEditing(track)
     }
@@ -92,10 +100,32 @@ final class PlayerPresentationActionHandler {
         sheetManager.present(.trackDetail(track))
     }
 
+    /// Открывает сценарий копирования iTunes-трека из очереди плеера.
+    func copyTrack(queueItemId: UUID) {
+        guard let track = track(queueItemId: queueItemId) else { return }
+        guard let purchasedTrack = track.asPurchasedITunesPlayableTrack() else { return }
+
+        sheetManager.presentCopyPurchasedITunesToFolder(for: purchasedTrack)
+    }
+
     // MARK: - Private
 
     /// Возвращает элемент очереди плеера по его идентификатору.
     private func track(queueItemId: UUID) -> PlayerTrack? {
         playlistManager.tracks.first(where: { $0.id == queueItemId })
+    }
+
+    /// Проверяет, можно ли запускать файловый flow для элемента очереди.
+    private func canUseFileActions(
+        _ track: PlayerTrack
+    ) -> Bool {
+        guard track.isPurchasedITunesRuntimeTrack else {
+            return true
+        }
+
+        toastPresenter.handle(
+            .operationFailed(message: "Это действие недоступно для iTunes-трека")
+        )
+        return false
     }
 }

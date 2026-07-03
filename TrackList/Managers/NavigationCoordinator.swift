@@ -4,7 +4,7 @@
 //
 //  Центральный координатор для межвкладочной навигации и фонотеки.
 //
-//  - Управляет только маршрутом фонотеки (libraryRoute)
+//  - Управляет только стеком маршрутов фонотеки (libraryPath)
 //  - Умеет переключать вкладки через ScenePhaseHandler
 //  - Принимает событие "показать трек во фонотеке" (showTrackInLibrary)
 //    и отдаёт его на потребление через consumePendingShowTrackId()
@@ -73,6 +73,11 @@ final class NavigationCoordinator: ObservableObject {
         libraryPath = [.folder(folderId)]
     }
 
+    /// Открытие виртуального источника купленных треков iTunes из корня фонотеки.
+    func openPurchasedITunes() {
+        libraryPath = [.purchasedITunes]
+    }
+
     /// Переход внутрь папки (вложенный уровень).
     func pushFolder(_ id: UUID) {
         libraryPath.append(.folder(id))
@@ -113,6 +118,8 @@ final class NavigationCoordinator: ObservableObject {
 
     enum LibraryRoute: Hashable {
         case root
+        /// Виртуальный источник купленных треков iTunes, не связанный с LibraryFolder.
+        case purchasedITunes
         case folder(UUID)
     }
 }

@@ -74,6 +74,13 @@ enum ToastEvent: Equatable {
         artwork: Image?,
         folderName: String)
 
+    /// Скопирован из iTunes в фонотеку
+    case trackCopiedFromITunes(
+        title: String,
+        artist: String,
+        artwork: Image?,
+        folderName: String?)
+
     case folderAdded(name: String)
 
     case folderRemoved(name: String)

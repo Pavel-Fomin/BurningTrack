@@ -41,6 +41,9 @@ extension AppError {
         case .fileRenameFailed:
             return .fileRenameFailed
 
+        case .purchasedITunesCopyFailed:
+            return .operationFailed(message: "Не удалось скопировать iTunes-трек")
+
         // MARK: - Закладки доступа
 
         case .bookmarkMissing:

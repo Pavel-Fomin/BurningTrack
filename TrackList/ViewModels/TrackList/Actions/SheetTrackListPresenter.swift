@@ -42,6 +42,10 @@ final class SheetTrackListPresenter: TrackListPresenting {
         sheetManager.present(.trackDetail(track))
     }
 
+    func presentCopyPurchasedITunesTrack(_ track: PurchasedITunesPlayableTrack) {
+        sheetManager.presentCopyPurchasedITunesToFolder(for: track)
+    }
+
     func presentTrackTagsEditor(_ track: Track) {
         sheetManager.presentTrackDetailForEditing(track)
     }

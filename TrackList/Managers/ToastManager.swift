@@ -168,6 +168,17 @@ final class ToastManager: ObservableObject {
                 message: "Перемещён в «\(folderName)»"
             )
 
+        case let .trackCopiedFromITunes(title, artist, artwork, folderName):
+            let message = folderName.map {
+                "Трек скопирован в «\($0)»"
+            } ?? "Трек скопирован"
+
+            return ToastData(
+                style: .track(title: title, artist: artist),
+                artworkImage: artwork,
+                message: message
+            )
+
         case let .folderAdded(name):
             return ToastData(
                 style: .trackList(name: name),

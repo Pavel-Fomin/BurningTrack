@@ -2,12 +2,12 @@
 //  MoveToFolderContainer.swift
 //  TrackList
 //
-//  UI-контейнер экрана перемещения трека в папку.
+//  UI-контейнер экрана выбора папки для файлового действия над треком.
 //
 //  Роль контейнера:
 //  - владеет состоянием выбора папки назначения
 //  - управляет подтверждением действия (✓) и закрытием sheet’а (×)
-//  - выполняет команду перемещения трека
+//  - выполняет команду, соответствующую режиму sheet’а
 //  - конфигурирует NavigationBarHost
 //
 //  Архитектурные принципы:
@@ -29,7 +29,8 @@ struct MoveToFolderContainer: View {
     /// Данные sheet’а, переданные через SheetManager
     let data: MoveToFolderSheetData
 
-    /// PlayerManager временно пробрасывается для выполнения команды перемещения
+    /// PlayerManager временно пробрасывается для выполнения команды перемещения.
+    /// Копирование iTunes-трека через этот объект не проходит.
     let playerManager: PlayerManager
 
     // MARK: - State
@@ -44,12 +45,13 @@ struct MoveToFolderContainer: View {
 
     var body: some View {
         NavigationBarHost(
-            title: "Переместить",
+            title: navigationTitle,
 
             /// Кнопка подтверждения (✓)
             rightButtonImage: "checkmark",
 
-            /// Активна только если папка выбрана и она отличается от текущей
+            /// Активна только если папка выбрана и она отличается от текущей.
+            /// Для iTunes-copy текущей папки нет, поэтому достаточно выбора назначения.
             isRightEnabled: Binding(
                 get: {
                     selectedFolderId != nil &&
@@ -63,9 +65,9 @@ struct MoveToFolderContainer: View {
                 SheetManager.shared.closeActive()
             },
 
-            /// Подтверждение перемещения
+            /// Подтверждение выбранной файловой операции
             onRightTap: {
-                Task { await moveTrack() }
+                Task { await performSelectedOperation() }
             }
         ) {
             MoveToFolderSheet(
@@ -79,10 +81,26 @@ struct MoveToFolderContainer: View {
         }
     }
 
+    /// Заголовок sheet зависит от операции, но список папок остаётся тем же.
+    private var navigationTitle: String {
+        switch data.operation {
+        case .move:
+            return "Переместить"
+        case .copyPurchasedITunes:
+            return "Копировать"
+        }
+    }
+
     // MARK: - Actions
 
-    /// Загружает текущую папку трека
+    /// Загружает текущую папку трека для move-flow.
+    /// У iTunes-трека нет папки в фонотеке, поэтому BookmarkResolver не используется.
     private func loadCurrentTrackFolder() async {
+        guard data.operation == .move else {
+            trackCurrentFolderId = nil
+            return
+        }
+
         if let entry = await TrackRegistry.shared.entry(for: data.track.trackId) {
             trackCurrentFolderId = entry.folderId
         } else {
@@ -90,10 +108,22 @@ struct MoveToFolderContainer: View {
         }
     }
 
-    /// Выполняет команду перемещения трека в выбранную папку
-    private func moveTrack() async {
+    /// Выполняет выбранную файловую операцию только после выбора папки.
+    private func performSelectedOperation() async {
         guard let folderId = selectedFolderId else { return }
 
+        switch data.operation {
+        case .move:
+            await moveTrack(to: folderId)
+        case .copyPurchasedITunes:
+            await copyPurchasedITunesTrack(to: folderId)
+        }
+    }
+
+    /// Выполняет команду перемещения трека в выбранную папку.
+    private func moveTrack(
+        to folderId: UUID
+    ) async {
         do {
             try await AppCommandExecutor.shared.moveTrack(
                 trackId: data.track.trackId,
@@ -105,6 +135,36 @@ struct MoveToFolderContainer: View {
             ToastManager.shared.handle(appError)
         } catch {
             ToastManager.shared.handle(.fileMoveFailed)
+        }
+    }
+
+    /// Передаёт iTunes-трек и выбранную папку в command-layer без прямой работы с файлами во View.
+    private func copyPurchasedITunesTrack(
+        to folderId: UUID
+    ) async {
+        guard let track = data.track.asPurchasedITunesPlayableTrack() else {
+            ToastManager.shared.handle(
+                .operationFailed(
+                    message: "Не удалось подготовить iTunes-трек к копированию"
+                )
+            )
+            return
+        }
+
+        do {
+            try await AppCommandExecutor.shared.copyPurchasedITunesTrack(
+                track,
+                toFolder: folderId
+            )
+            SheetManager.shared.closeActive()
+        } catch let appError as AppError {
+            ToastManager.shared.handle(appError)
+        } catch {
+            ToastManager.shared.handle(
+                .operationFailed(
+                    message: "Не удалось скопировать iTunes-трек"
+                )
+            )
         }
     }
 }

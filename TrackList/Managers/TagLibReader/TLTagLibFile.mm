@@ -29,6 +29,10 @@
 #include <ogg/vorbis/vorbisfile.h>
 #include <ogg/opus/opusfile.h>
 
+#include <mp4/mp4file.h>
+#include <mp4/mp4tag.h>
+#include <mp4/mp4item.h>
+
 static inline NSString *TLNSStringFromTagLibString(const TagLib::String &value) {
     if (value.isEmpty()) {return nil;}
 
@@ -90,6 +94,23 @@ static NSData *TLReadArtworkFromXiph(TagLib::Ogg::XiphComment *tag) {
     return TLNSDataFromByteVector(pictures.front()->data());
 }
 
+static NSData *TLReadArtworkFromMP4(TagLib::MP4::File *file) {
+    if (!file) {return nil;}
+
+    TagLib::MP4::Tag *tag = file->tag();
+    if (!tag) {return nil;}
+
+    // В MP4/M4A обложка хранится в item с ключом covr.
+    TagLib::MP4::Item item = tag->item(TagLib::String("covr"));
+    if (!item.isValid()) {return nil;}
+    if (item.type() != TagLib::MP4::Item::Type::CoverArtList) {return nil;}
+
+    const TagLib::MP4::CoverArtList covers = item.toCoverArtList();
+    if (covers.isEmpty()) {return nil;}
+
+    return TLNSDataFromByteVector(covers.front().data());
+}
+
 static NSData *TLReadArtwork(TagLib::FileRef &fileRef) {
     TagLib::File *baseFile = fileRef.file();
     if (!baseFile) {return nil;}
@@ -105,6 +126,9 @@ static NSData *TLReadArtwork(TagLib::FileRef &fileRef) {
 
     auto *opusFile = dynamic_cast<TagLib::Ogg::Opus::File *>(baseFile);
     if (opusFile) {return TLReadArtworkFromXiph(opusFile->tag());}
+
+    auto *mp4File = dynamic_cast<TagLib::MP4::File *>(baseFile);
+    if (mp4File) {return TLReadArtworkFromMP4(mp4File);}
 
     return nil;
 }

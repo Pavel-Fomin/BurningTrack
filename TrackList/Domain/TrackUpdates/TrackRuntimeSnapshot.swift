@@ -72,3 +72,44 @@ struct TrackRuntimeSnapshot: Equatable {
     let updatedAt: Date    /// Время последней сборки snapshot
 
 }
+
+extension TrackRuntimeSnapshot {
+    /// Собирает runtime snapshot для купленного iTunes-трека без BookmarkResolver и кэша метаданных.
+    init(
+        purchasedITunesTrack track: PurchasedITunesPlayableTrack
+    ) {
+        let fallbackFileName = track.title ?? "iTunes-трек"
+
+        self.init(
+            trackId: track.trackId,
+            fileName: track.fileName.isEmpty ? fallbackFileName : track.fileName,
+            isAvailable: track.isAvailable,
+            title: track.title,
+            artist: track.artist,
+            album: track.album,
+            albumArtist: nil,
+            genre: nil,
+            comment: nil,
+            composer: nil,
+            conductor: nil,
+            lyricist: nil,
+            remixer: nil,
+            grouping: nil,
+            bpm: nil,
+            musicalKey: nil,
+            trackNumber: nil,
+            totalTracks: nil,
+            discNumber: nil,
+            totalDiscs: nil,
+            year: nil,
+            date: nil,
+            publisherOrLabel: nil,
+            copyright: nil,
+            encodedBy: nil,
+            isrc: nil,
+            duration: track.duration,
+            artworkData: track.artworkData,
+            updatedAt: Date()
+        )
+    }
+}

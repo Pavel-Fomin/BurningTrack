@@ -7,10 +7,11 @@
 //  - наблюдение за прогрессом
 //  - взаимодействие с Control Center и NowPlayingInfo
 //
-//  Работает с абстрактным протоколом TrackDisplayable и тремя контекстами:
+//  Работает с абстрактным протоколом TrackDisplayable и контекстами:
 //  - PlayerTrack (плейлист плеера)
 //  - Track (треклист)
 //  - LibraryTrack (фонотека)
+//  - PurchasedITunesPlayableTrack (купленные iTunes-треки)
 //
 //  Created by Pavel Fomin on 28.04.2025.
 //
@@ -26,11 +27,11 @@ final class PlayerViewModel: ObservableObject {
     
     // MARK: - Публичные состояния
     
-    @Published var currentTrackDisplayable: (any TrackDisplayable)?  /// Текущий воспроизводимый трек (PlayerTrack / Track / LibraryTrack)
+    @Published var currentTrackDisplayable: (any TrackDisplayable)?  /// Текущий воспроизводимый трек
     @Published var isPlaying: Bool = false                           /// Воспроизводится ли сейчас аудио
     @Published var currentTime: TimeInterval = 0.0                   /// Текущее время воспроизведения
     @Published var trackDuration: TimeInterval = 0.0                 /// Длительность текущего трека
-    @Published var currentContext: PlaybackContext?                  /// Контекст воспроизведения (плеер / треклист / фонотека)
+    @Published var currentContext: PlaybackContext?                  /// Контекст воспроизведения
     @Published private(set) var snapshotsByTrackId: [UUID: TrackRuntimeSnapshot] = [:] /// Runtime snapshot треков по id
     
     // MARK: - MiniPlayer State
@@ -74,7 +75,7 @@ final class PlayerViewModel: ObservableObject {
     // MARK: - Now Playing Snapshot
     
     /// Собирает snapshot для Control Center из текущего состояния.
-    /// Источник метаданных — TrackRuntimeSnapshot.
+    /// Источник метаданных — TrackRuntimeSnapshot или runtime-данные iTunes-адаптера.
     /// Artwork используется отдельного размера (~512 px).
     private func makeNowPlayingSnapshot(for track: any TrackDisplayable) -> NowPlayingSnapshot {
         nowPlayingSnapshotBuilder.makeSnapshot(
@@ -197,14 +198,32 @@ final class PlayerViewModel: ObservableObject {
         }
     }
 
+    /// Запрашивает runtime snapshot только для треков, которые живут в bookmark-pipeline приложения.
+    private func requestSnapshotIfNeeded(
+        for track: any TrackDisplayable
+    ) {
+        guard !track.isPurchasedITunesRuntimeTrack else {
+            // iTunes-трек уже содержит assetURL из MediaPlayer; snapshot-builder пошёл бы в BookmarkResolver без нужды.
+            return
+        }
+
+        requestSnapshotIfNeeded(for: track.trackId)
+    }
+
     /// Пересобирает runtime snapshot известных плееру треков после изменения настроек приложения.
     private func reloadSnapshotsAfterSettingsChange() {
         runtimeSnapshotController.clear()
         publishRuntimeSnapshots()
 
-        let trackIds = playbackContextStore.allTrackIds(
-            currentTrack: currentTrackDisplayable
-        )
+        let trackIds: Set<UUID>
+        if currentTrackDisplayable?.isPurchasedITunesRuntimeTrack == true {
+            // Для iTunes-трека нет записи в TrackRegistry, поэтому его не отправляем в BookmarkResolver.
+            trackIds = []
+        } else {
+            trackIds = playbackContextStore.allTrackIds(
+                currentTrack: currentTrackDisplayable
+            )
+        }
 
         for trackId in trackIds {
             requestSnapshotIfNeeded(for: trackId)
@@ -279,7 +298,7 @@ final class PlayerViewModel: ObservableObject {
         currentTrackDisplayable = track
         currentTime = 0
         trackDuration = 0
-        requestSnapshotIfNeeded(for: track.trackId)
+        requestSnapshotIfNeeded(for: track)
         
         updateMiniPlayerStaticState(for: track)
         updateMiniPlayerProgressState()
@@ -293,7 +312,10 @@ final class PlayerViewModel: ObservableObject {
         // Стартуем воспроизведение через PlayerManager
         Task { @MainActor in
             do {
-                try await playerManager.play(track: track)
+                // Для iTunes-источника передаём в PlayerManager адаптер с assetURL,
+                // а currentTrackDisplayable оставляем исходным для подсветки контекста.
+                let playbackTrack = playbackTrack(for: track)
+                try await playerManager.play(track: playbackTrack)
                 isPlaying = true
                 updateMiniPlayerProgressState()
                 // Первичное заполнение Now Playing Info (duration ещё может быть 0)
@@ -325,6 +347,13 @@ final class PlayerViewModel: ObservableObject {
             }
         }
         
+    }
+
+    /// Возвращает трек, который должен попасть непосредственно в PlayerManager.
+    private func playbackTrack(
+        for track: any TrackDisplayable
+    ) -> any TrackDisplayable {
+        track.asPurchasedITunesPlayableTrack() ?? track
     }
     
     // MARK: - Управление воспроизведением

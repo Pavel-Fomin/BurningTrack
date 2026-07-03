@@ -19,6 +19,7 @@ struct PlayerView: View {
     let onShowInLibrary: (UUID) -> Void
     let onMoveToFolder: (UUID) -> Void
     let onAddToTrackList: (UUID) -> Void  /// Добавление элемента очереди в треклист
+    let onCopyTrack: (UUID) -> Void       /// Копирование iTunes-трека из очереди
     let onEditTags: (UUID) -> Void        /// Редактирование тегов элемента очереди
     let onArtworkTap: (UUID) -> Void
     let onRequestSnapshot: (UUID) -> Void
@@ -35,6 +36,7 @@ struct PlayerView: View {
                     onShowInLibrary: onShowInLibrary,
                     onMoveToFolder: onMoveToFolder,
                     onAddToTrackList: onAddToTrackList,
+                    onCopyTrack: onCopyTrack,
                     onEditTags: onEditTags,
                     onArtworkTap: onArtworkTap,
                     onRequestSnapshot: onRequestSnapshot,
@@ -77,6 +79,7 @@ struct PlayerView: View {
         let onShowInLibrary: (UUID) -> Void
         let onMoveToFolder: (UUID) -> Void
         let onAddToTrackList: (UUID) -> Void  /// Добавление элемента очереди в треклист
+        let onCopyTrack: (UUID) -> Void       /// Копирование iTunes-трека из очереди
         let onEditTags: (UUID) -> Void        /// Редактирование тегов элемента очереди
         let onArtworkTap: (UUID) -> Void
         let onRequestSnapshot: (UUID) -> Void
@@ -92,6 +95,7 @@ struct PlayerView: View {
                     onShowInLibrary: onShowInLibrary,
                     onMoveToFolder: onMoveToFolder,
                     onAddToTrackList: onAddToTrackList,
+                    onCopyTrack: onCopyTrack,
                     onEditTags: onEditTags,
                     onArtworkTap: onArtworkTap,
                     onRequestSnapshot: onRequestSnapshot,

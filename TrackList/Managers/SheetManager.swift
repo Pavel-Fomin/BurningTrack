@@ -11,9 +11,27 @@ import Foundation
 
 // MARK: - Данные для MoveToFolderSheet
 
+/// Режим файловой операции после выбора папки назначения.
+enum MoveToFolderOperation: Equatable {
+    /// Обычное перемещение файлового трека фонотеки.
+    case move
+    /// Копирование купленного iTunes-трека через выбранную папку назначения.
+    case copyPurchasedITunes
+}
+
 struct MoveToFolderSheetData: Identifiable, Equatable {
     let id = UUID()
     let track: any TrackDisplayable
+    let operation: MoveToFolderOperation
+
+    /// Создаёт payload выбора папки для файлового действия.
+    init(
+        track: any TrackDisplayable,
+        operation: MoveToFolderOperation = .move
+    ) {
+        self.track = track
+        self.operation = operation
+    }
 
     static func == (lhs: MoveToFolderSheetData, rhs: MoveToFolderSheetData) -> Bool { lhs.id == rhs.id
     }
@@ -335,7 +353,21 @@ final class SheetManager: ObservableObject {
     // MARK: - Хелперы для вызова конкретных шитов
 
     func presentMoveToFolder(for track: any TrackDisplayable) {
-        let data = MoveToFolderSheetData(track: track)
+        let data = MoveToFolderSheetData(
+            track: track,
+            operation: .move
+        )
+        present(.moveToFolder(data))
+    }
+
+    /// Открывает существующий выбор папки для будущего копирования iTunes-трека.
+    func presentCopyPurchasedITunesToFolder(
+        for track: PurchasedITunesPlayableTrack
+    ) {
+        let data = MoveToFolderSheetData(
+            track: track,
+            operation: .copyPurchasedITunes
+        )
         present(.moveToFolder(data))
     }
 

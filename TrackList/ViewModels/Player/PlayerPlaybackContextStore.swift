@@ -11,7 +11,7 @@ import Foundation
 
 /// Хранит текущий контекст воспроизведения.
 /// Отвечает только за:
-/// - сохранение контекста player / tracklist / library;
+/// - сохранение контекста плеера / треклиста / фонотеки / купленных iTunes-треков;
 /// - очистку неактивных контекстов;
 /// - поиск следующего и предыдущего трека.
 @MainActor
@@ -20,6 +20,8 @@ final class PlayerPlaybackContextStore {
     private var playerTracksContext: [PlayerTrack] = []
     private var trackListContext: [Track] = []
     private var libraryTracksContext: [LibraryTrack] = []
+    /// Контекст купленных iTunes-треков хранится отдельно от обычной фонотеки.
+    private var purchasedITunesTracksContext: [PurchasedITunesPlayableTrack] = []
 
     /// Позволяет создавать store как зависимость по умолчанию в init PlayerViewModel.
     nonisolated init() {}
@@ -33,14 +35,23 @@ final class PlayerPlaybackContextStore {
             playerTracksContext = context.compactMap { $0 as? PlayerTrack }
             trackListContext = []
             libraryTracksContext = []
+            purchasedITunesTracksContext = []
         } else if currentTrack is Track {
             trackListContext = context.compactMap { $0 as? Track }
             playerTracksContext = []
             libraryTracksContext = []
+            purchasedITunesTracksContext = []
         } else if currentTrack is LibraryTrack {
             libraryTracksContext = context.compactMap { $0 as? LibraryTrack }
             trackListContext = []
             playerTracksContext = []
+            purchasedITunesTracksContext = []
+        } else if currentTrack is PurchasedITunesPlayableTrack {
+            // Купленные iTunes-треки живут отдельно от фонотеки и не попадают в LibraryTrack.
+            purchasedITunesTracksContext = context.compactMap { $0 as? PurchasedITunesPlayableTrack }
+            playerTracksContext = []
+            trackListContext = []
+            libraryTracksContext = []
         } else {
             clear()
         }
@@ -75,6 +86,16 @@ final class PlayerPlaybackContextStore {
             return (
                 playerTracksContext[index + 1],
                 playerTracksContext.map { $0 as any TrackDisplayable }
+            )
+        }
+
+        if let purchasedTrack = currentTrack as? PurchasedITunesPlayableTrack {
+            guard let index = purchasedITunesTracksContext.firstIndex(where: { $0.trackId == purchasedTrack.trackId }),
+                  index + 1 < purchasedITunesTracksContext.count else { return nil }
+
+            return (
+                purchasedITunesTracksContext[index + 1],
+                purchasedITunesTracksContext.map { $0 as any TrackDisplayable }
             )
         }
 
@@ -113,6 +134,16 @@ final class PlayerPlaybackContextStore {
             )
         }
 
+        if let purchasedTrack = currentTrack as? PurchasedITunesPlayableTrack {
+            guard let index = purchasedITunesTracksContext.firstIndex(where: { $0.trackId == purchasedTrack.trackId }),
+                  index - 1 >= 0 else { return nil }
+
+            return (
+                purchasedITunesTracksContext[index - 1],
+                purchasedITunesTracksContext.map { $0 as any TrackDisplayable }
+            )
+        }
+
         return nil
     }
 
@@ -121,21 +152,25 @@ final class PlayerPlaybackContextStore {
         playerTracksContext = []
         trackListContext = []
         libraryTracksContext = []
+        purchasedITunesTracksContext = []
     }
 
     /// Возвращает все известные trackId из текущих контекстов.
     func allTrackIds(currentTrack: (any TrackDisplayable)?) -> Set<UUID> {
         var ids = Set<UUID>()
 
-        if let currentTrack {
+        if let currentTrack,
+           !currentTrack.isPurchasedITunesRuntimeTrack {
             ids.insert(currentTrack.trackId)
         }
 
         for track in playerTracksContext {
+            guard !track.isPurchasedITunesRuntimeTrack else { continue }
             ids.insert(track.trackId)
         }
 
         for track in trackListContext {
+            guard !track.isPurchasedITunesRuntimeTrack else { continue }
             ids.insert(track.trackId)
         }
 

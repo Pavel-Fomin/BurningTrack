@@ -29,6 +29,9 @@ final class SettingsActionHandler {
 
         case .setFileFormatVisible(let value):
             settingsManager.setFileFormatVisible(value)
+
+        case .setPurchasedITunesSourceVisible(let value):
+            settingsManager.setPurchasedITunesSourceVisible(value)
         }
     }
 }

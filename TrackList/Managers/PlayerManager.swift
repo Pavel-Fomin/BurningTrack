@@ -59,11 +59,9 @@ final class PlayerManager {
     func play(track: any TrackDisplayable) async throws {
         let trackId = track.trackId
 
-        // 1. resolvedURL — через BookmarkResolver
-        guard let resolvedURL = await BookmarkResolver.url(forTrack: trackId) else {
-            PersistentLogger.log("❌ PlayerManager: no URL for trackId=\(trackId)")
-            throw AppError.bookmarkResolveFailed
-        }
+        // 1. Получаем URL воспроизведения из подходящего источника.
+        let playbackResource = try await playbackResource(for: track)
+        let resolvedURL = playbackResource.url
 
         // 2. Активация аудиосессии
         do {
@@ -77,16 +75,20 @@ final class PlayerManager {
         // 3. Закрываем старый доступ
         stopAccessingCurrentTrack()
 
-        // 4. Пытаемся открыть доступ к файлу.
-        // В iOS 26 (File Provider Storage) startAccessing на файл может вернуть false,
-        // при этом доступ может быть получен через root-scope папки.
-        let started = resolvedURL.startAccessingSecurityScopedResource()
-        if started {
-            currentAccessedURL = resolvedURL
+        // 4. Пытаемся открыть security-scoped доступ только для файлов прикреплённых папок.
+        if playbackResource.needsSecurityScopedAccess {
+            // В iOS 26 (File Provider Storage) startAccessing на файл может вернуть false,
+            // при этом доступ может быть получен через root-scope папки.
+            let started = resolvedURL.startAccessingSecurityScopedResource()
+            if started {
+                currentAccessedURL = resolvedURL
+            } else {
+                currentAccessedURL = nil
+                print("⚠️ startAccessing вернул false для файла, пробуем играть через root-scope:", resolvedURL.lastPathComponent)
+                PersistentLogger.log("⚠️ PlayerManager: startAccessing false file=\(resolvedURL.lastPathComponent)")
+            }
         } else {
             currentAccessedURL = nil
-            print("⚠️ startAccessing вернул false для файла, пробуем играть через root-scope:", resolvedURL.lastPathComponent)
-            PersistentLogger.log("⚠️ PlayerManager: startAccessing false file=\(resolvedURL.lastPathComponent)")
         }
 
         // 5. Создаём AVPlayerItem
@@ -116,6 +118,23 @@ final class PlayerManager {
                 userInfo: ["duration": duration]
             )
         }
+    }
+
+    /// Возвращает URL для AVPlayer и признак необходимости security-scoped доступа.
+    private func playbackResource(
+        for track: any TrackDisplayable
+    ) async throws -> (url: URL, needsSecurityScopedAccess: Bool) {
+        if let purchasedTrack = track as? PurchasedITunesPlayableTrack {
+            // Трек iTunes приходит из MediaPlayer с готовым assetURL, поэтому BookmarkResolver здесь не нужен.
+            return (purchasedTrack.assetURL, false)
+        }
+
+        guard let resolvedURL = await BookmarkResolver.url(forTrack: track.trackId) else {
+            PersistentLogger.log("❌ PlayerManager: no URL for trackId=\(track.trackId)")
+            throw AppError.bookmarkResolveFailed
+        }
+
+        return (resolvedURL, true)
     }
 
     // MARK: - Security Access
@@ -231,6 +250,11 @@ final class PlayerManager {
             MPNowPlayingInfoPropertyPlaybackRate: snapshot.isPlaying ? 1.0 : 0.0,
             MPNowPlayingInfoPropertyMediaType: MPNowPlayingInfoMediaType.audio.rawValue
         ]
+
+        if let album = snapshot.album,
+           album.isEmpty == false {
+            info[MPMediaItemPropertyAlbumTitle] = album
+        }
         
         if let artwork = snapshot.artwork {
             info[MPMediaItemPropertyArtwork] =

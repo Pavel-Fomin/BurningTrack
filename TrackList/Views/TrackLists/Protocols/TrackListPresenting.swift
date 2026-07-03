@@ -22,6 +22,9 @@ protocol TrackListPresenting {
     /// Открывает детали трека.
     func presentTrackDetail(_ track: Track)
 
+    /// Открывает копирование купленного iTunes-трека.
+    func presentCopyPurchasedITunesTrack(_ track: PurchasedITunesPlayableTrack)
+
     /// Открывает редактирование тегов трека.
     func presentTrackTagsEditor(_ track: Track)
 

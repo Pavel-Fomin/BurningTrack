@@ -53,6 +53,7 @@ final class PlayerTrackRowStateBuilder {
                 isPlaying: isCurrent && isPlaying,
                 isHighlighted: highlightedRowId == track.id,
                 artwork: makeArtwork(
+                    track: track,
                     trackId: track.trackId,
                     snapshot: snapshot,
                     shouldShowTags: shouldShowTags
@@ -63,6 +64,7 @@ final class PlayerTrackRowStateBuilder {
                     shouldShowTags: shouldShowTags
                 ),
                 artist: makeArtist(
+                    track: track,
                     snapshot: snapshot,
                     shouldShowTags: shouldShowTags
                 ),
@@ -79,10 +81,15 @@ final class PlayerTrackRowStateBuilder {
 
     /// Формирует обложку строки плеера из runtime snapshot.
     private func makeArtwork(
+        track: PlayerTrack,
         trackId: UUID,
         snapshot: TrackRuntimeSnapshot?,
         shouldShowTags: Bool
     ) -> UIImage? {
+        if track.isPurchasedITunesRuntimeTrack {
+            return track.artwork
+        }
+
         guard shouldShowTags else { return nil }
         guard let data = snapshot?.artworkData else { return nil }
 
@@ -99,15 +106,24 @@ final class PlayerTrackRowStateBuilder {
         snapshot: TrackRuntimeSnapshot?,
         shouldShowTags: Bool
     ) -> String {
+        if track.isPurchasedITunesRuntimeTrack {
+            return track.title ?? track.fileName
+        }
+
         guard shouldShowTags else { return track.fileName }
         return snapshot?.title ?? snapshot?.fileName ?? track.fileName
     }
 
     /// Формирует исполнителя строки плеера.
     private func makeArtist(
+        track: PlayerTrack,
         snapshot: TrackRuntimeSnapshot?,
         shouldShowTags: Bool
     ) -> String {
+        if track.isPurchasedITunesRuntimeTrack {
+            return track.artist ?? ""
+        }
+
         guard shouldShowTags else { return "" }
         return snapshot?.artist ?? ""
     }

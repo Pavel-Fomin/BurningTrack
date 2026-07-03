@@ -54,6 +54,24 @@ struct SettingsView: View {
                     )
                 )
             }
+
+            Section("Фонотека") {
+                Toggle(
+                    "Показывать купленное в iTunes",
+                    isOn: Binding(
+                        get: {
+                            state.isPurchasedITunesSourceVisible
+                        },
+                        set: { value in
+                            onAction(.setPurchasedITunesSourceVisible(value))
+                        }
+                    )
+                )
+
+                Text("Отображает раздел с локальными iTunes-треками в фонотеке.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
         }
         .listStyle(.insetGrouped)
     }

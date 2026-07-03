@@ -58,6 +58,13 @@ struct PlayerPlaylistView: View {
                     )
                 )
             },
+            onCopyTrack: { queueItemId in
+                screenViewModel.handle(
+                    .copyTrack(
+                        queueItemId: queueItemId
+                    )
+                )
+            },
             onEditTags: { queueItemId in
                 screenViewModel.handle(
                     .editTags(

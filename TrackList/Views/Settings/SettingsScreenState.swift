@@ -13,4 +13,5 @@ struct SettingsScreenState: Equatable {
     var isTagReadingEnabled: Bool
     var isTrackListMembershipVisible: Bool
     var isFileFormatVisible: Bool
+    var isPurchasedITunesSourceVisible: Bool
 }

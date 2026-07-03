@@ -46,6 +46,9 @@ struct TrackListRowState: Identifiable {
     /// Имя файла.
     let fileName: String
 
+    /// Источник трека для контекстного меню.
+    let source: TrackSource
+
     /// Длительность трека.
     let duration: TimeInterval
 

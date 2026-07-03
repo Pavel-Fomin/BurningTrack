@@ -34,7 +34,8 @@ struct PlayerFlowActionHandlerFactory {
         let presentationActionHandler = PlayerPresentationActionHandler(
             playlistManager: PlaylistManager.shared,
             sheetManager: SheetManager.shared,
-            sheetActionCoordinator: SheetActionCoordinator.shared
+            sheetActionCoordinator: SheetActionCoordinator.shared,
+            toastPresenter: ToastManager.shared
         )
         let viewControllerProvider = ApplicationViewControllerProvider()
         let exportActionHandler = PlayerExportActionHandler(
@@ -48,7 +49,8 @@ struct PlayerFlowActionHandlerFactory {
         let renameActionHandler = PlayerRenameActionHandler(
             playlistManager: PlaylistManager.shared,
             playerViewModel: playerViewModel,
-            trackFileRenameActionHandler: trackFileRenameActionHandler
+            trackFileRenameActionHandler: trackFileRenameActionHandler,
+            toastPresenter: ToastManager.shared
         )
 
         return PlayerFlowActionHandler(

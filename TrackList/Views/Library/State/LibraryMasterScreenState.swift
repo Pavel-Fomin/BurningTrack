@@ -15,6 +15,8 @@ struct LibraryMasterScreenState {
     let accessState: MusicLibraryManager.LibraryAccessState
     /// Строки прикреплённых папок.
     let folders: [LibraryMasterFolderRowState]
+    /// Нужно ли показывать отдельный источник купленных iTunes-треков.
+    let showsPurchasedITunesSource: Bool
     /// Нужно ли показывать пустое состояние.
     let isEmpty: Bool
     /// Состояние предупреждения перед откреплением папки.

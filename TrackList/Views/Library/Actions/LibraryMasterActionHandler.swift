@@ -64,6 +64,9 @@ final class LibraryMasterActionHandler {
         case .openFolder(let folderId):
             openFolder(folderId)
 
+        case .openPurchasedITunes:
+            openPurchasedITunes()
+
         case .requestDetachFolder(let folderId):
             requestDetachFolder(folderId)
 
@@ -81,6 +84,11 @@ final class LibraryMasterActionHandler {
     ) {
         guard manager.isAttachingFolder(folderId) == false else { return }
         navigationCoordinator.openFolder(folderId)
+    }
+
+    /// Открывает виртуальный источник iTunes без обращения к медиатеке устройства.
+    private func openPurchasedITunes() {
+        navigationCoordinator.openPurchasedITunes()
     }
 
     /// Прикрепляет выбранную папку и показывает результат пользователю.

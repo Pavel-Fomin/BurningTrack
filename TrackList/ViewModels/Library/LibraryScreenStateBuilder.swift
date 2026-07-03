@@ -17,7 +17,9 @@ struct LibraryScreenStateBuilder {
         musicLibraryManager: MusicLibraryManager
     ) -> LibraryScreenState {
         var destinations: [NavigationCoordinator.LibraryRoute: LibraryScreenDestinationState] = [
-            .root: .root
+            .root: .root,
+            // Виртуальный источник всегда доступен в корне и не зависит от списка папок.
+            .purchasedITunes: .purchasedITunes
         ]
 
         for folder in musicLibraryManager.attachedFolders {

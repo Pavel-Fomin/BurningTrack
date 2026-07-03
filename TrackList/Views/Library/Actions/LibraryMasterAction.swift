@@ -20,6 +20,8 @@ enum LibraryMasterAction {
     case folderPickFailed
     /// Пользователь открыл прикреплённую папку.
     case openFolder(UUID)
+    /// Пользователь открыл виртуальный источник купленных треков iTunes.
+    case openPurchasedITunes
     /// Пользователь запросил открепление папки.
     case requestDetachFolder(UUID)
     /// Пользователь подтвердил остановку воспроизведения и открепление папки.

@@ -15,6 +15,7 @@ struct LibraryMasterScreenStateBuilder {
     @MainActor
     func build(
         manager: MusicLibraryManager,
+        settings: AppSettings,
         pendingDetachFolder: LibraryFolder?
     ) -> LibraryMasterScreenState {
 
@@ -30,6 +31,7 @@ struct LibraryMasterScreenStateBuilder {
         return LibraryMasterScreenState(
             accessState: manager.accessState,
             folders: folders,
+            showsPurchasedITunesSource: settings.visible.library.isPurchasedITunesSourceVisible,
             isEmpty: folders.isEmpty,
             detachAlert: detachAlert(for: pendingDetachFolder)
         )

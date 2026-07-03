@@ -17,4 +17,5 @@ protocol SettingsManaging: AnyObject {
     func setTagReadingEnabled(_ value: Bool)
     func setTrackListMembershipVisible(_ value: Bool)
     func setFileFormatVisible(_ value: Bool)
+    func setPurchasedITunesSourceVisible(_ value: Bool)
 }

@@ -53,6 +53,13 @@ final class PlayerPlaybackActionHandler {
 
     /// Запрашивает runtime snapshot трека.
     func requestSnapshot(trackId: UUID) {
+        guard !playlistManager.tracks.contains(where: { track in
+            track.trackId == trackId &&
+            track.isPurchasedITunesRuntimeTrack
+        }) else {
+            return
+        }
+
         playerViewModel.requestSnapshotIfNeeded(for: trackId)
     }
 }

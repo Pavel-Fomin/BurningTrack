@@ -19,6 +19,12 @@ enum TrackListAction {
     /// Пользователь запросил удаление строки из треклиста.
     case deleteTrack(rowId: UUID)
 
+    /// Пользователь запросил копирование iTunes-трека.
+    case copyTrack(rowId: UUID)
+
+    /// Пользователь запросил добавление iTunes-трека в плеер.
+    case addToPlayer(rowId: UUID)
+
     /// Пользователь изменил порядок строк.
     case moveTrack(from: IndexSet, to: Int)
 

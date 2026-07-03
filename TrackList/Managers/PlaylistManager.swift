@@ -23,6 +23,112 @@ final class PlaylistManager: ObservableObject {
     private struct PlayerFileItem: Codable {
         let queueItemId: UUID
         let trackId: UUID
+        let title: String?
+        let artist: String?
+        let album: String?
+        let artworkData: Data?
+        let duration: Double?
+        let fileName: String?
+        let isAvailable: Bool?
+        let source: TrackSource
+        let assetURL: URL?
+
+        private enum CodingKeys: String, CodingKey {
+            case queueItemId
+            case trackId
+            case title
+            case artist
+            case album
+            case artworkData
+            case duration
+            case fileName
+            case isAvailable
+            case source
+            case assetURL
+        }
+
+        /// Создаёт файловую запись очереди с сохранением совместимости старого формата.
+        init(
+            queueItemId: UUID,
+            trackId: UUID,
+            title: String? = nil,
+            artist: String? = nil,
+            album: String? = nil,
+            artworkData: Data? = nil,
+            duration: Double? = nil,
+            fileName: String? = nil,
+            isAvailable: Bool? = nil,
+            source: TrackSource = .library,
+            assetURL: URL? = nil
+        ) {
+            self.queueItemId = queueItemId
+            self.trackId = trackId
+            self.title = title
+            self.artist = artist
+            self.album = album
+            self.artworkData = artworkData
+            self.duration = duration
+            self.fileName = fileName
+            self.isAvailable = isAvailable
+            self.source = source
+            self.assetURL = assetURL
+        }
+
+        /// Сохраняет iTunes-метаданные и текущую обложку только для iTunes-источника.
+        init(track: PlayerTrack) {
+            self.init(
+                queueItemId: track.queueItemId,
+                trackId: track.trackId,
+                title: track.title,
+                artist: track.artist,
+                album: track.album,
+                artworkData: track.source == .purchasedITunes ? track.artworkData : nil,
+                duration: track.duration,
+                fileName: track.fileName,
+                isAvailable: track.isAvailable,
+                source: track.source,
+                assetURL: track.assetURL
+            )
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            self.queueItemId = try container.decode(UUID.self, forKey: .queueItemId)
+            self.trackId = try container.decode(UUID.self, forKey: .trackId)
+            self.title = try container.decodeIfPresent(String.self, forKey: .title)
+            self.artist = try container.decodeIfPresent(String.self, forKey: .artist)
+            self.album = try container.decodeIfPresent(String.self, forKey: .album)
+            let decodedSource = try container.decodeIfPresent(TrackSource.self, forKey: .source) ?? .library
+            // Обложку восстанавливаем только для iTunes-очереди, где нет файловой цепочки метаданных.
+            self.artworkData = decodedSource == .purchasedITunes
+                ? try container.decodeIfPresent(Data.self, forKey: .artworkData)
+                : nil
+            self.duration = try container.decodeIfPresent(Double.self, forKey: .duration)
+            self.fileName = try container.decodeIfPresent(String.self, forKey: .fileName)
+            self.isAvailable = try container.decodeIfPresent(Bool.self, forKey: .isAvailable)
+            self.source = decodedSource
+            self.assetURL = try container.decodeIfPresent(URL.self, forKey: .assetURL)
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(queueItemId, forKey: .queueItemId)
+            try container.encode(trackId, forKey: .trackId)
+            try container.encodeIfPresent(title, forKey: .title)
+            try container.encodeIfPresent(artist, forKey: .artist)
+            try container.encodeIfPresent(album, forKey: .album)
+            if source == .purchasedITunes {
+                // Это единственный источник обложки для восстановленной iTunes-очереди плеера.
+                try container.encodeIfPresent(artworkData, forKey: .artworkData)
+            }
+            try container.encodeIfPresent(duration, forKey: .duration)
+            try container.encodeIfPresent(fileName, forKey: .fileName)
+            try container.encodeIfPresent(isAvailable, forKey: .isAvailable)
+            try container.encode(source, forKey: .source)
+            try container.encodeIfPresent(assetURL, forKey: .assetURL)
+        }
     }
     private struct LegacyPlayerFile: Codable {
         let trackIds: [UUID]
@@ -85,6 +191,10 @@ final class PlaylistManager: ObservableObject {
     
     // MARK: - Превращение trackId → PlayerTrack
     private func makePlayerTrack(from item: PlayerFileItem) async -> PlayerTrack {
+        if item.source == .purchasedITunes {
+            return makePurchasedITunesPlayerTrack(from: item)
+        }
+
         // Пытаемся получить URL
         guard let url = await BookmarkResolver.url(forTrack: item.trackId) else {
             return PlayerTrack(
@@ -111,6 +221,39 @@ final class PlaylistManager: ObservableObject {
             duration: duration,
             fileName: fileName,
             isAvailable: isAvailable
+        )
+    }
+
+    /// Восстанавливает элемент очереди iTunes без обращения к BookmarkResolver.
+    private func makePurchasedITunesPlayerTrack(from item: PlayerFileItem) -> PlayerTrack {
+        guard let assetURL = item.assetURL else {
+            return PlayerTrack(
+                queueItemId: item.queueItemId,
+                trackId: item.trackId,
+                title: item.title ?? "Недоступно",
+                artist: item.artist,
+                album: item.album,
+                artworkData: item.artworkData,
+                duration: item.duration ?? 0,
+                fileName: item.fileName ?? "Unknown",
+                isAvailable: false,
+                source: .purchasedITunes,
+                assetURL: nil
+            )
+        }
+
+        return PlayerTrack(
+            queueItemId: item.queueItemId,
+            trackId: item.trackId,
+            title: item.title,
+            artist: item.artist,
+            album: item.album,
+            artworkData: item.artworkData,
+            duration: item.duration ?? 0,
+            fileName: item.fileName ?? item.title ?? assetURL.lastPathComponent,
+            isAvailable: item.isAvailable ?? true,
+            source: .purchasedITunes,
+            assetURL: assetURL
         )
     }
     
@@ -149,9 +292,7 @@ final class PlaylistManager: ObservableObject {
     }
     @discardableResult
     func saveToDisk() -> Bool {
-        let items = tracks.map {
-            PlayerFileItem(queueItemId: $0.queueItemId, trackId: $0.trackId)
-        }
+        let items = tracks.map { PlayerFileItem(track: $0) }
         return saveToDisk(items: items)
     }
     

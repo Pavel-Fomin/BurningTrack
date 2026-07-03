@@ -91,15 +91,22 @@ extension AppSettings {
     struct LibrarySettings: Codable, Equatable {
         var isTrackListMembershipVisible: Bool
         var isFileFormatVisible: Bool
+        var isPurchasedITunesSourceVisible: Bool
 
         enum CodingKeys: String, CodingKey {
             case isTrackListMembershipVisible
             case isFileFormatVisible
+            case isPurchasedITunesSourceVisible
         }
 
-        init(isTrackListMembershipVisible: Bool, isFileFormatVisible: Bool) {
+        init(
+            isTrackListMembershipVisible: Bool,
+            isFileFormatVisible: Bool,
+            isPurchasedITunesSourceVisible: Bool
+        ) {
             self.isTrackListMembershipVisible = isTrackListMembershipVisible
             self.isFileFormatVisible = isFileFormatVisible
+            self.isPurchasedITunesSourceVisible = isPurchasedITunesSourceVisible
         }
 
         init(from decoder: Decoder) throws {
@@ -115,13 +122,19 @@ extension AppSettings {
                 Bool.self,
                 forKey: .isFileFormatVisible
             ) ?? Self.defaultValue.isFileFormatVisible
+
+            isPurchasedITunesSourceVisible = try container.decodeIfPresent(
+                Bool.self,
+                forKey: .isPurchasedITunesSourceVisible
+            ) ?? Self.defaultValue.isPurchasedITunesSourceVisible
         }
 
-        // По умолчанию показываем связь трека с треклистами и формат файла.
+        // По умолчанию показываем связь трека с треклистами, формат файла и источник iTunes.
         static var defaultValue: LibrarySettings {
             LibrarySettings(
                 isTrackListMembershipVisible: true,
-                isFileFormatVisible: true
+                isFileFormatVisible: true,
+                isPurchasedITunesSourceVisible: true
             )
         }
     }

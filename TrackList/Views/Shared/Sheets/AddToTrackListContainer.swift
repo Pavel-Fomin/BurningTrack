@@ -110,6 +110,11 @@ struct AddToTrackListContainer: View {
                     libraryBatchTracks,
                     to: trackListId
                 )
+            } else if let purchasedITunesTracks = purchasedITunesTracks() {
+                try await AppCommandExecutor.shared.addPurchasedITunesTracksToTrackList(
+                    purchasedITunesTracks,
+                    trackListId: trackListId
+                )
             } else if data.trackIds.count == 1, let trackId = data.trackIds.first {
                 try await AppCommandExecutor.shared.addTrackToTrackList(
                     trackId: trackId,
@@ -129,6 +134,21 @@ struct AddToTrackListContainer: View {
             print("❌ Ошибка добавления трека в треклист: \(error)")
             ToastManager.shared.handle(AppError.trackListSaveFailed)
         }
+    }
+
+    /// Возвращает iTunes-треки, если sheet был открыт именно для этого источника.
+    private func purchasedITunesTracks() -> [PurchasedITunesPlayableTrack]? {
+        let tracks = data.tracks.compactMap {
+            $0.asPurchasedITunesPlayableTrack()
+        }
+
+        guard !tracks.isEmpty,
+              tracks.count == data.tracks.count
+        else {
+            return nil
+        }
+
+        return tracks
     }
 
     /// Добавляет batch из фонотеки через существующий manager треклистов.

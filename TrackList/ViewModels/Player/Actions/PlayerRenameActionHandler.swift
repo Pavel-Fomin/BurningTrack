@@ -30,16 +30,21 @@ final class PlayerRenameActionHandler {
     /// Общий обработчик переименования файлов треков.
     private let trackFileRenameActionHandler: TrackFileRenameActionHandler
 
+    /// Презентер пользовательских сообщений.
+    private let toastPresenter: any ToastPresenting
+
     // MARK: - Инициализация
 
     init(
         playlistManager: PlaylistManager,
         playerViewModel: PlayerViewModel,
-        trackFileRenameActionHandler: TrackFileRenameActionHandler
+        trackFileRenameActionHandler: TrackFileRenameActionHandler,
+        toastPresenter: any ToastPresenting
     ) {
         self.playlistManager = playlistManager
         self.playerViewModel = playerViewModel
         self.trackFileRenameActionHandler = trackFileRenameActionHandler
+        self.toastPresenter = toastPresenter
     }
 
     // MARK: - Actions
@@ -54,6 +59,7 @@ final class PlayerRenameActionHandler {
         ) else {
             return
         }
+        guard canRename(track) else { return }
 
         let snapshot = playerViewModel.snapshot(for: track.trackId)
         let request = TrackFileRenameRequest(
@@ -65,5 +71,19 @@ final class PlayerRenameActionHandler {
             strategy: strategy
         )
         trackFileRenameActionHandler.handle(request)
+    }
+
+    /// Проверяет, можно ли запускать файловое переименование для элемента очереди.
+    private func canRename(
+        _ track: PlayerTrack
+    ) -> Bool {
+        guard track.isPurchasedITunesRuntimeTrack else {
+            return true
+        }
+
+        toastPresenter.handle(
+            .operationFailed(message: "Это действие недоступно для iTunes-трека")
+        )
+        return false
     }
 }

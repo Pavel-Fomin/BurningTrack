@@ -16,6 +16,7 @@ enum AppError: Error {
     case fileAlreadyExists
     case fileMoveFailed
     case fileRenameFailed
+    case purchasedITunesCopyFailed
     case bookmarkMissing
     case bookmarkStale
     case bookmarkResolveFailed

@@ -149,6 +149,7 @@ final class TrackListViewModel: ObservableObject {
         guard let track = tracks.first(where: { $0.id == rowId }) else {
             return
         }
+        guard canRename(track) else { return }
 
         let snapshot = snapshotsByTrackId[track.trackId]
         let request = TrackFileRenameRequest(
@@ -160,6 +161,20 @@ final class TrackListViewModel: ObservableObject {
             strategy: strategy
         )
         fileRenamer.handle(request)
+    }
+
+    /// Проверяет, можно ли запускать файловое переименование для строки треклиста.
+    private func canRename(
+        _ track: Track
+    ) -> Bool {
+        guard track.isPurchasedITunesRuntimeTrack else {
+            return true
+        }
+
+        toastPresenter.handle(
+            .operationFailed(message: "Это действие недоступно для iTunes-трека")
+        )
+        return false
     }
 
     // MARK: - Loading
@@ -235,6 +250,12 @@ final class TrackListViewModel: ObservableObject {
     /// Запрашивает runtime snapshot трека, если он ещё не загружен.
     /// - Parameter trackId: Идентификатор трека
     func requestSnapshotIfNeeded(for trackId: UUID) {
+        guard !tracks.contains(where: { track in
+            track.trackId == trackId &&
+            track.isPurchasedITunesRuntimeTrack
+        }) else {
+            return
+        }
 
         if snapshotsByTrackId[trackId] != nil { return }
         

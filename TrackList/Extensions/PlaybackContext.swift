@@ -8,9 +8,15 @@
 import Foundation
 
 enum PlaybackContext {
+    /// Очередь основного плеера.
     case player
+    /// Экран пользовательского треклиста.
     case trackList
+    /// Обычная фонотека приложения.
     case library
+    /// Раздел купленных треков iTunes.
+    case purchasedITunes
+    /// Неизвестный или одиночный контекст.
     case unknown
 }
 
@@ -19,6 +25,7 @@ extension PlaybackContext {
         if context.first is PlayerTrack { return .player }
         if context.first is Track { return .trackList }
         if context.first is LibraryTrack { return .library }
+        if context.first is PurchasedITunesPlayableTrack { return .purchasedITunes }
         return .unknown
     }
 }

@@ -91,6 +91,43 @@ actor AppCommandExecutor {
             ToastManager.shared.handle(event)
         }
     }
+
+    // MARK: - Копировать iTunes-трек
+
+    /// Принимает выбранную папку назначения для копирования iTunes-трека.
+    /// Файловая операция выполняется через отдельный manager, без BookmarkResolver
+    /// и файлового metadata cache для исходного iTunes-трека.
+    func copyPurchasedITunesTrack(
+        _ track: PurchasedITunesPlayableTrack,
+        toFolder folderId: UUID
+    ) async throws {
+        do {
+            let result = try await PurchasedITunesTrackCopyManager.shared.copy(
+                track,
+                toFolder: folderId
+            )
+
+            // После физического копирования используем общий sync-путь фонотеки,
+            // чтобы новый файл попал в TrackRegistry и BookmarksRegistry.
+            try await LibrarySyncModule.shared.syncRootFolder(
+                rootFolderId: result.rootFolderId,
+                rootURL: result.rootFolderURL,
+                mode: .safe
+            )
+
+            let event = trackCopiedFromITunesEvent(
+                for: track,
+                folderName: result.folderName
+            )
+
+            await MainActor.run {
+                ToastManager.shared.handle(event)
+            }
+        } catch {
+            print("❌ copyPurchasedITunesTrack failed:", error)
+            throw AppError.purchasedITunesCopyFailed
+        }
+    }
     
     
     // MARK: -  Переименовать файл
@@ -300,6 +337,40 @@ actor AppCommandExecutor {
             )
         }
     }
+
+    /// Добавляет iTunes-треки в треклист без копирования и без BookmarkResolver.
+    func addPurchasedITunesTracksToTrackList(
+        _ tracks: [PurchasedITunesPlayableTrack],
+        trackListId: UUID
+    ) async throws {
+        guard !tracks.isEmpty else { return }
+
+        let importedTracks = tracks.map {
+            Track(purchasedITunesTrack: $0)
+        }
+
+        let list = try TrackListManager.shared.addTracks(
+            importedTracks,
+            to: trackListId
+        )
+
+        let event: ToastEvent
+        if tracks.count == 1, let track = tracks.first {
+            event = trackAddedToTrackListEvent(
+                for: track,
+                trackListName: list.name
+            )
+        } else {
+            event = .tracksAddedToTrackList(
+                count: tracks.count,
+                name: list.name
+            )
+        }
+
+        await MainActor.run {
+            ToastManager.shared.handle(event)
+        }
+    }
     
     // MARK: - Создать треклист
     
@@ -315,16 +386,7 @@ actor AppCommandExecutor {
         // PlaylistManager — @MainActor → нужен await
         let playerTracks = await PlaylistManager.shared.tracks
         
-        let tracks: [Track] = playerTracks.map {
-            Track(
-                trackId: $0.trackId,
-                title: $0.title,
-                artist: $0.artist,
-                duration: $0.duration,
-                fileName: $0.fileName,
-                isAvailable: $0.isAvailable
-            )
-        }
+        let tracks: [Track] = playerTracks.map { $0.asTrack() }
         
         let created = try TrackListsManager.shared.createTrackList(
             from: tracks,
@@ -379,7 +441,6 @@ actor AppCommandExecutor {
         }
         
         let removedTrack = list.tracks[index]
-        let trackId = removedTrack.trackId
         
         /// 3. Удаляем только одно конкретное вхождение
         list.tracks.remove(at: index)
@@ -389,23 +450,28 @@ actor AppCommandExecutor {
             throw TrackListStorageError.saveFailed(trackListId: list.id)
         }
         
-        /// 5. Получаем snapshot трека
-        let snapshot = await resolveSnapshot(for: trackId)
+        /// 5. ToastEvent для iTunes строится из самой модели, без BookmarkResolver и snapshot-builder.
+        let event: ToastEvent
+        if removedTrack.isPurchasedITunesRuntimeTrack {
+            event = trackRemovedFromTrackListEvent(for: removedTrack)
+        } else {
+            let trackId = removedTrack.trackId
+            let snapshot = await resolveSnapshot(for: trackId)
+
+            event = ToastEvent.trackRemovedFromTrackList(
+                title: snapshot?.title ?? removedTrack.fileName,
+                artist: snapshot?.artist ?? "",
+                artwork: snapshot.flatMap {
+                    ArtworkProvider.shared.image(
+                        trackId: trackId,
+                        artworkData: $0.artworkData,
+                        purpose: .toast
+                    ).map { Image(uiImage: $0) }
+                }
+            )
+        }
         
-        /// 6. ToastEvent строится из snapshot
-        let event = ToastEvent.trackRemovedFromTrackList(
-            title: snapshot?.title ?? removedTrack.fileName,
-            artist: snapshot?.artist ?? "",
-            artwork: snapshot.flatMap {
-                ArtworkProvider.shared.image(
-                    trackId: trackId,
-                    artworkData: $0.artworkData,
-                    purpose: .toast
-                ).map { Image(uiImage: $0) }
-            }
-        )
-        
-        /// 7. Показ тоста
+        /// 6. Показ тоста
         await MainActor.run {
             ToastManager.shared.handle(event)
         }
@@ -428,6 +494,26 @@ actor AppCommandExecutor {
         /// 3. ToastEvent.
         let event = trackAddedToPlayerEvent(for: importItem)
         
+        await MainActor.run {
+            ToastManager.shared.handle(event)
+        }
+    }
+
+    /// Добавляет iTunes-трек в плеер через общий PlaylistManager без копирования файла.
+    func addPurchasedITunesTrackToPlayer(
+        _ track: PurchasedITunesPlayableTrack
+    ) async throws {
+        let playerTrack = PlayerTrack.make(from: track)
+
+        let didSave = await MainActor.run {
+            PlaylistManager.shared.addTracks([playerTrack])
+        }
+        guard didSave else {
+            throw AppError.playlistSaveFailed
+        }
+
+        let event = trackAddedToPlayerEvent(for: track)
+
         await MainActor.run {
             ToastManager.shared.handle(event)
         }
@@ -482,12 +568,7 @@ actor AppCommandExecutor {
             throw AppError.trackNotFound
         }
         
-        let trackId = removedTrack.trackId
-        
-        // 2. Получаем snapshot трека (для тоста)
-        let snapshot = await resolveSnapshot(for: trackId)
-        
-        // 3. Мутация плеера — строго MainActor
+        // 2. Мутация плеера — строго MainActor
         let removeResult = await MainActor.run {
             let previousTracks = PlaylistManager.shared.tracks
             
@@ -514,20 +595,28 @@ actor AppCommandExecutor {
             throw AppError.playlistSaveFailed
         }
         
-        // 4. ToastEvent строится из snapshot
-        let event = ToastEvent.trackRemovedFromPlayer(
-            title: snapshot?.title ?? snapshot?.fileName ?? removedTrack.fileName,
-            artist: snapshot?.artist ?? "",
-            artwork: snapshot.flatMap {
-                ArtworkProvider.shared.image(
-                    trackId: trackId,
-                    artworkData: $0.artworkData,
-                    purpose: .toast
-                ).map { Image(uiImage: $0) }
-            }
-        )
+        // 3. ToastEvent для iTunes строится из самой модели, без BookmarkResolver и snapshot-builder.
+        let event: ToastEvent
+        if removedTrack.isPurchasedITunesRuntimeTrack {
+            event = trackRemovedFromPlayerEvent(for: removedTrack)
+        } else {
+            let trackId = removedTrack.trackId
+            let snapshot = await resolveSnapshot(for: trackId)
+
+            event = ToastEvent.trackRemovedFromPlayer(
+                title: snapshot?.title ?? snapshot?.fileName ?? removedTrack.fileName,
+                artist: snapshot?.artist ?? "",
+                artwork: snapshot.flatMap {
+                    ArtworkProvider.shared.image(
+                        trackId: trackId,
+                        artworkData: $0.artworkData,
+                        purpose: .toast
+                    ).map { Image(uiImage: $0) }
+                }
+            )
+        }
         
-        // 5. Показ тоста
+        // 4. Показ тоста
         await MainActor.run {
             ToastManager.shared.handle(event)
         }
@@ -798,6 +887,76 @@ private func trackAddedToPlayerEvent(for item: PlayerTrackImportItem) -> ToastEv
             ).map { Image(uiImage: $0) }
         }
     )
+}
+
+/// Строит toast добавления iTunes-трека в плеер из runtime-данных MediaPlayer.
+private func trackAddedToPlayerEvent(
+    for track: PurchasedITunesPlayableTrack
+) -> ToastEvent {
+    ToastEvent.trackAddedToPlayer(
+        title: track.title ?? track.fileName,
+        artist: track.artist ?? "",
+        artwork: toastArtwork(for: track)
+    )
+}
+
+/// Строит toast добавления iTunes-трека в треклист из runtime-данных MediaPlayer.
+private func trackAddedToTrackListEvent(
+    for track: PurchasedITunesPlayableTrack,
+    trackListName: String
+) -> ToastEvent {
+    ToastEvent.trackAddedToTrackList(
+        title: track.title ?? track.fileName,
+        artist: track.artist ?? "",
+        artwork: toastArtwork(for: track),
+        trackListName: trackListName
+    )
+}
+
+/// Строит toast успешного копирования iTunes-трека из runtime-данных MediaPlayer.
+private func trackCopiedFromITunesEvent(
+    for track: PurchasedITunesPlayableTrack,
+    folderName: String?
+) -> ToastEvent {
+    ToastEvent.trackCopiedFromITunes(
+        title: track.title ?? track.fileName,
+        artist: track.artist ?? "",
+        artwork: toastArtwork(for: track),
+        folderName: folderName
+    )
+}
+
+/// Строит toast удаления iTunes-трека из плеера из сохранённых runtime-данных модели.
+private func trackRemovedFromPlayerEvent(
+    for track: PlayerTrack
+) -> ToastEvent {
+    ToastEvent.trackRemovedFromPlayer(
+        title: track.title ?? track.fileName,
+        artist: track.artist ?? "",
+        artwork: toastArtwork(for: track)
+    )
+}
+
+/// Строит toast удаления iTunes-трека из треклиста из сохранённых runtime-данных модели.
+private func trackRemovedFromTrackListEvent(
+    for track: Track
+) -> ToastEvent {
+    ToastEvent.trackRemovedFromTrackList(
+        title: track.title ?? track.fileName,
+        artist: track.artist ?? "",
+        artwork: toastArtwork(for: track)
+    )
+}
+
+/// Готовит обложку iTunes-трека для toast без файлового metadata cache.
+private func toastArtwork(
+    for track: any TrackDisplayable & PurchasedITunesTrackRepresentable
+) -> Image? {
+    ArtworkProvider.shared.image(
+        trackId: track.trackId,
+        artworkData: track.artworkData,
+        purpose: .toast
+    ).map { Image(uiImage: $0) }
 }
 
 /// Преобразует файловую ошибку фонотеки в ошибку пользовательского уровня.

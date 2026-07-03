@@ -41,6 +41,12 @@ struct TrackListView: View {
                         onDelete: { rowId in
                             onAction(.deleteTrack(rowId: rowId))
                         },
+                        onCopyTrack: { rowId in
+                            onAction(.copyTrack(rowId: rowId))
+                        },
+                        onAddToPlayer: { rowId in
+                            onAction(.addToPlayer(rowId: rowId))
+                        },
                         onRenameTrack: { rowId, strategy in
                             onAction(
                                 .renameFile(
@@ -108,12 +114,26 @@ struct TrackListView: View {
                 let onRequestSnapshot: (UUID) -> Void
                 let onTap: (UUID) -> Void
                 let onDelete: (UUID) -> Void
+                let onCopyTrack: (UUID) -> Void
+                let onAddToPlayer: (UUID) -> Void
                 let onRenameTrack: (UUID, FileRenameStrategy) -> Void
                 let onEditTags: (UUID) -> Void
                 let onArtworkTap: (UUID) -> Void
                 let onShowInLibrary: (UUID) -> Void
                 let onMoveToFolder: (UUID) -> Void
                 let onMove: (IndexSet, Int) -> Void
+
+                /// Проверяет доступность пункта меню для строки треклиста.
+                private func isMenuActionAvailable(
+                    _ action: TrackMenuAction,
+                    for row: TrackListRowState
+                ) -> Bool {
+                    TrackMenuActionAvailability.isAvailable(
+                        action,
+                        source: row.source,
+                        context: .trackList
+                    )
+                }
 
                 var body: some View {
                     ForEach(rows) { row in
@@ -124,6 +144,12 @@ struct TrackListView: View {
                             },
                             onDelete: {
                                 onDelete(row.id)
+                            },
+                            onCopyTrack: {
+                                onCopyTrack(row.id)
+                            },
+                            onAddToPlayer: {
+                                onAddToPlayer(row.id)
                             },
                             onRenameTrack: { strategy in
                                 onRenameTrack(row.id, strategy)
@@ -149,27 +175,42 @@ struct TrackListView: View {
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
 
                             /// Локальное действие — удалить из треклиста
-                            Button(role: .destructive) {
-                                onDelete(row.id)
-                            } label: {
-                                Label("Удалить", systemImage: "trash")
+                            if isMenuActionAvailable(
+                                .deleteFromTrackList,
+                                for: row
+                            ) {
+                                Button(role: .destructive) {
+                                    onDelete(row.id)
+                                } label: {
+                                    Label("Удалить", systemImage: "trash")
+                                }
                             }
 
                             /// Глобальное действие — показать в фонотеке
-                            Button {
-                                onShowInLibrary(row.id)
-                            } label: {
-                                Label("Показать", systemImage: "scope")
+                            if isMenuActionAvailable(
+                                .showInLibrary,
+                                for: row
+                            ) {
+                                Button {
+                                    onShowInLibrary(row.id)
+                                } label: {
+                                    Label("Показать", systemImage: "scope")
+                                }
+                                .tint(.gray)
                             }
-                            .tint(.gray)
 
                             // Глобальное действие — переместить
-                            Button {
-                                onMoveToFolder(row.id)
-                            } label: {
-                                Label("Переместить", systemImage: "arrow.forward.folder")
+                            if isMenuActionAvailable(
+                                .moveToFolder,
+                                for: row
+                            ) {
+                                Button {
+                                    onMoveToFolder(row.id)
+                                } label: {
+                                    Label("Переместить", systemImage: "arrow.forward.folder")
+                                }
+                                .tint(.blue)
                             }
-                            .tint(.blue)
                         }
                         .id(row.id)
                     }

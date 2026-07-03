@@ -21,11 +21,24 @@ struct TrackListRowView: View {
     let state: TrackListRowState /// Готовое состояние строки треклиста
     let onTap: () -> Void        /// Тап по строке (воспроизведение / пауза)
     let onDelete: () -> Void     /// Удаление строки (локальное действие)
+    let onCopyTrack: () -> Void  /// Копирование iTunes-трека
+    let onAddToPlayer: () -> Void /// Добавление iTunes-трека в плеер
     let onRenameTrack: (FileRenameStrategy) -> Void /// Переименование файла трека
     let onEditTags: () -> Void    /// Редактирование тегов трека
     let onArtworkTap: () -> Void /// Открытие карточки трека из меню
     let onShowInLibrary: () -> Void /// Переход к треку в фонотеке
     let onMoveToFolder: () -> Void  /// Перемещение файла трека в папку
+
+    /// Проверяет доступность пункта меню для строки треклиста.
+    private func isMenuActionAvailable(
+        _ action: TrackMenuAction
+    ) -> Bool {
+        TrackMenuActionAvailability.isAvailable(
+            action,
+            source: state.source,
+            context: .trackList
+        )
+    }
     
     // MARK: - UI
     
@@ -63,59 +76,90 @@ struct TrackListRowView: View {
     /// Меню действий строки треклиста.
     @ViewBuilder
     private var trackListActionMenuContent: some View {
-        Button {
-            onArtworkTap()
-        } label: {
-            Label("О треке", systemImage: "info.circle")
-        }
-
-        Button {
-            onShowInLibrary()
-        } label: {
-            Label("Показать в папке", systemImage: "scope")
-        }
-
-        Button {
-            onMoveToFolder()
-        } label: {
-            Label("Переместить", systemImage: "arrow.forward.folder")
-        }
-
-        Menu {
+        if isMenuActionAvailable(.details) {
             Button {
-                onEditTags()
+                onArtworkTap()
             } label: {
-                Label("Теги", systemImage: "tag")
+                Label("О треке", systemImage: "info.circle")
             }
-
-            // Системная секция делает "Название файла" подписью, а не пунктом меню.
-            Section("Название файла") {
-                Button {
-                    onRenameTrack(.artistTitle)
-                } label: {
-                    Text("Артист - Название")
-                }
-
-                Button {
-                    onRenameTrack(.titleArtist)
-                } label: {
-                    Text("Название - Артист")
-                }
-
-                Button {
-                    onRenameTrack(.manual)
-                } label: {
-                    Text("Вручную")
-                }
-            }
-        } label: {
-            Label("Редактировать", systemImage: "square.and.pencil")
         }
 
-        Button(role: .destructive) {
-            onDelete()
-        } label: {
-            Label("Удалить из треклиста", systemImage: "trash")
+        if isMenuActionAvailable(.copy) {
+            Button {
+                onCopyTrack()
+            } label: {
+                Label("Копировать", systemImage: "doc.on.doc")
+            }
+        }
+
+        if isMenuActionAvailable(.addToPlayer) {
+            Button {
+                onAddToPlayer()
+            } label: {
+                Label("В плеер", systemImage: "waveform")
+            }
+        }
+
+        if isMenuActionAvailable(.showInLibrary) {
+            Button {
+                onShowInLibrary()
+            } label: {
+                Label("Показать в папке", systemImage: "scope")
+            }
+        }
+
+        if isMenuActionAvailable(.moveToFolder) {
+            Button {
+                onMoveToFolder()
+            } label: {
+                Label("Переместить", systemImage: "arrow.forward.folder")
+            }
+        }
+
+        if isMenuActionAvailable(.editTags) ||
+            isMenuActionAvailable(.renameFile) {
+            Menu {
+                if isMenuActionAvailable(.editTags) {
+                    Button {
+                        onEditTags()
+                    } label: {
+                        Label("Теги", systemImage: "tag")
+                    }
+                }
+
+                if isMenuActionAvailable(.renameFile) {
+                    // Системная секция делает "Название файла" подписью, а не пунктом меню.
+                    Section("Название файла") {
+                        Button {
+                            onRenameTrack(.artistTitle)
+                        } label: {
+                            Text("Артист - Название")
+                        }
+
+                        Button {
+                            onRenameTrack(.titleArtist)
+                        } label: {
+                            Text("Название - Артист")
+                        }
+
+                        Button {
+                            onRenameTrack(.manual)
+                        } label: {
+                            Text("Вручную")
+                        }
+                    }
+                }
+            } label: {
+                Label("Редактировать", systemImage: "square.and.pencil")
+            }
+        }
+
+        if isMenuActionAvailable(.deleteFromTrackList) {
+            Button(role: .destructive) {
+                onDelete()
+            } label: {
+                Label("Удалить из треклиста", systemImage: "trash")
+            }
         }
     }
 }

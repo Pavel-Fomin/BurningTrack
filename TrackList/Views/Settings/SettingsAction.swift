@@ -13,4 +13,5 @@ enum SettingsAction: Equatable {
     case setTagReadingEnabled(Bool)
     case setTrackListMembershipVisible(Bool)
     case setFileFormatVisible(Bool)
+    case setPurchasedITunesSourceVisible(Bool)
 }

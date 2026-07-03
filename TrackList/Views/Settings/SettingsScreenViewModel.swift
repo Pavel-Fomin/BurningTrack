@@ -47,7 +47,8 @@ final class SettingsScreenViewModel: ObservableObject {
         SettingsScreenState(
             isTagReadingEnabled: settings.visible.metadata.isTagReadingEnabled,
             isTrackListMembershipVisible: settings.visible.library.isTrackListMembershipVisible,
-            isFileFormatVisible: settings.visible.library.isFileFormatVisible
+            isFileFormatVisible: settings.visible.library.isFileFormatVisible,
+            isPurchasedITunesSourceVisible: settings.visible.library.isPurchasedITunesSourceVisible
         )
     }
 }

@@ -50,6 +50,11 @@ enum PlayerScreenAction {
         queueItemId: UUID
     )
 
+    /// Открывает сценарий копирования iTunes-трека из очереди.
+    case copyTrack(
+        queueItemId: UUID
+    )
+
     /// Открывает редактирование тегов элемента очереди.
     case editTags(
         queueItemId: UUID

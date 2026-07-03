@@ -24,6 +24,8 @@ struct LibraryScreenState {
 
 enum LibraryScreenDestinationState {
     case root
+    /// Экран виртуального источника iTunes, который не является папкой фонотеки.
+    case purchasedITunes
     case folder(LibraryScreenFolderDestinationState)
     case missingFolder
 }

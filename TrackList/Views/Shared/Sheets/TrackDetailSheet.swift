@@ -85,6 +85,11 @@ struct TrackDetailSheet: View {
     /// URL используется только для отображения пути.
     /// Метаданные и artwork берутся из TrackRuntimeSnapshot.
     private func load() async {
+        if let purchasedTrack = track.asPurchasedITunesPlayableTrack() {
+            await loadPurchasedITunesRuntimeData(purchasedTrack)
+            return
+        }
+
         guard let url = await BookmarkResolver.url(forTrack: track.trackId) else {
             print("❌ BookmarkResolver: нет URL для трека \(track.trackId)")
             return
@@ -96,6 +101,23 @@ struct TrackDetailSheet: View {
         guard let snapshot else { return }
 
         await MainActor.run {
+            applySnapshotToSheetState(snapshot)
+        }
+    }
+
+    /// Загружает runtime-данные iTunes-трека без BookmarkResolver и кэша метаданных.
+    /// Sheet получает те же поля через TrackRuntimeSnapshot, что и обычные треки.
+    /// - Parameter track: Runtime-модель купленного iTunes-трека
+    private func loadPurchasedITunesRuntimeData(
+        _ track: PurchasedITunesPlayableTrack
+    ) async {
+        let snapshot = TrackRuntimeSnapshot(
+            purchasedITunesTrack: track
+        )
+
+        await MainActor.run {
+            resolvedURL = nil
+            TrackRuntimeStore.shared.storeSnapshot(snapshot)
             applySnapshotToSheetState(snapshot)
         }
     }

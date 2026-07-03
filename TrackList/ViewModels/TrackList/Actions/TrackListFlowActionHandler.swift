@@ -40,7 +40,8 @@ final class TrackListFlowActionHandler {
     ) {
         self.presentationHandler = TrackListPresentationHandler(
             reader: reader,
-            presenter: presenter
+            presenter: presenter,
+            toastPresenter: toastPresenter
         )
         self.playbackHandler = TrackListPlaybackHandler(
             reader: reader,
@@ -74,6 +75,12 @@ final class TrackListFlowActionHandler {
 
         case .deleteTrack(let rowId):
             mutationHandler.deleteTrack(rowId: rowId)
+
+        case .copyTrack(let rowId):
+            presentationHandler.copyTrack(rowId: rowId)
+
+        case .addToPlayer(let rowId):
+            presentationHandler.addToPlayer(rowId: rowId)
 
         case .moveTrack(let source, let destination):
             mutationHandler.moveTrack(from: source, to: destination)

@@ -167,6 +167,14 @@ struct LibraryScreen: View {
             rootContent
                 .navigationTitle("Фонотека")
 
+        case .purchasedITunes:
+            PurchasedITunesMusicView(
+                playerViewModel: playerViewModel
+            )
+                .onAppear {
+                    selectionActionBarConfig = nil
+                }
+
         case .folder(let destination):
             LibraryFolderContainer(
                 folder: destination.folder,
