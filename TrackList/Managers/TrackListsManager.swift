@@ -3,7 +3,7 @@
 //  TrackList
 //
 //  Менеджер для списка всех треклистов.
-//  Отвечает за работу с файлом tracklists.json (метаинформация о всех треклистах):
+//  Отвечает за работу с SQLite-хранилищем треклистов:
 //  - создание / удаление / переименование треклистов
 //  - сохранение и загрузка списка TrackListMeta
 //
@@ -18,7 +18,15 @@ typealias TrackListsManagerTrackListMeta = TrackListMeta
 final class TrackListsManager {
     
     static let shared = TrackListsManager()
-    private init() {}
+    private let databaseStore: TrackListDatabaseStore
+
+    private init() {
+        do {
+            self.databaseStore = try TrackListDatabaseStore()
+        } catch {
+            preconditionFailure("Не удалось создать TrackListDatabaseStore: \(error)")
+        }
+    }
     
     
     // MARK: - Модель метаинформации
@@ -27,34 +35,16 @@ final class TrackListsManager {
     typealias TrackListMeta = TrackListsManagerTrackListMeta
     
     
-    // MARK: - Пути
+    // MARK: - Метаданные SQLite
     
-    private var documentsDirectory: URL? {
-        FileManager.default.urls(for: .documentDirectory,
-                                 in: .userDomainMask).first
-    }
-    
-    private var metasURL: URL? {
-        documentsDirectory?.appendingPathComponent("tracklists.json")
-    }
-    
-    
-    // MARK: - Метаданные (tracklists.json)
-    
-    /// Загружает список всех треклистов (метаданных) из tracklists.json
+    /// Загружает список всех треклистов из SQLite.
     func loadTrackListMetas() throws -> [TrackListMeta] {
-        guard let url = metasURL else {
-            throw AppError.trackListLoadFailed
-        }
-
-        guard FileManager.default.fileExists(atPath: url.path) else {
-            return []
-        }
-
         do {
-            let data = try Data(contentsOf: url)
-            return try JSONDecoder().decode([TrackListMeta].self, from: data)
+            return try databaseStore.fetchMetas()
+        } catch let appError as AppError {
+            throw appError
         } catch {
+            PersistentLogger.log("❌ TrackListsManager: SQLite load metas failed error=\(error)")
             throw AppError.trackListLoadFailed
         }
     }
@@ -63,11 +53,19 @@ final class TrackListsManager {
         (try? loadTrackListMetas()) ?? []
     }
     
-    /// Сохраняет список всех треклистов (метаинформацию) в tracklists.json
+    /// Сохраняет список всех треклистов в SQLite.
     func saveTrackListMetas(_ metas: [TrackListMeta]) throws {
-        guard persistTrackListMetas(metas) else {
-            throw AppError.trackListSaveFailed
+        let trackLists = try metas.map { meta in
+            let tracks = try TrackListManager.shared.loadTracks(for: meta.id)
+            return TrackList(
+                id: meta.id,
+                name: meta.name,
+                createdAt: meta.createdAt,
+                tracks: tracks
+            )
         }
+
+        try saveTrackLists(trackLists)
     }
 
     private func postTrackListsDidChange() {
@@ -76,38 +74,15 @@ final class TrackListsManager {
             object: nil
         )
     }
-
-    @discardableResult
-    private func persistTrackListMetas(
-        _ metas: [TrackListMeta],
-        postDidChange: Bool = true
-    ) -> Bool {
-        guard let url = metasURL else {
-            PersistentLogger.log("❌ TrackListsManager: metas url nil")
-            return false
-        }
-        
-        let encoder = makePrettyJSONEncoder()
-        guard let data = try? encoder.encode(metas) else {
-            PersistentLogger.log("❌ TrackListsManager: encode metas failed count=\(metas.count)")
-            return false
-        }
-
-        do {
-            try data.write(to: url, options: .atomic)
-            if postDidChange {
-                postTrackListsDidChange()
-            }
-            return true
-        } catch {
-            PersistentLogger.log("❌ TrackListsManager: write metas failed error=\(error)")
-            return false
-        }
-    }
     
-    /// Проверяет, существует ли треклист с указанным ID
+    /// Проверяет, существует ли треклист с указанным ID.
     func trackListExists(id: UUID) -> Bool {
-        loadTrackListMetasOrEmpty().contains { $0.id == id }
+        do {
+            return try databaseStore.exists(id: id)
+        } catch {
+            PersistentLogger.log("⚠️ TrackListsManager: SQLite exists failed id=\(id) error=\(error)")
+            return false
+        }
     }
     
     
@@ -123,23 +98,15 @@ final class TrackListsManager {
 
         let id = UUID()
         let createdAt = Date()
-        var metas = try loadTrackListMetas()
-        
-        // Сохраняем треки
-        guard TrackListManager.shared.saveTracks(
-            tracks,
-            for: id,
-            postTrackListsDidChange: false
-        ) else {
-            throw AppError.trackListSaveFailed
-        }
-        
-        // Сохраняем мета
-        let meta = TrackListMeta(id: id, name: name, createdAt: createdAt)
-        metas.append(meta)
-        try saveTrackListMetas(metas)
+        let trackList = try databaseStore.createTrackList(
+            id: id,
+            name: name,
+            createdAt: createdAt,
+            tracks: tracks
+        )
 
-        return TrackList(id: id, name: name, createdAt: createdAt, tracks: tracks)
+        postTrackListsDidChange()
+        return trackList
     }
 
     // Создаёт новый треклист с авто-именем по дате ("dd.MM.yy, HH:mm")
@@ -180,11 +147,10 @@ final class TrackListsManager {
         return try createTrackList(from: tracks, withName: name)
     }
 
-    // Сохраняет один TrackListMeta в общий список (tracklists.json)
+    // Сохраняет один TrackListMeta в SQLite.
     func saveTrackListMeta(_ meta: TrackListMeta) throws {
-        var current = try loadTrackListMetas()
-        current.append(meta)
-        try saveTrackListMetas(current)
+        try databaseStore.saveMeta(meta)
+        postTrackListsDidChange()
     }
 
     // MARK: - Добавление треков
@@ -196,7 +162,7 @@ final class TrackListsManager {
         guard !libraryTracks.isEmpty else { return true }
 
         // Конвертация остаётся на уровне manager-а списка треклистов,
-        // а сохранение одного файла делегируется TrackListManager.
+        // а сохранение одного треклиста делегируется TrackListManager.
         let newTracks = libraryTracks.map { Track(libraryTrack: $0) }
         try TrackListManager.shared.addTracks(newTracks, to: trackListId)
 
@@ -205,66 +171,38 @@ final class TrackListsManager {
     
     // MARK: - Удаление и переименование
     
-    /// Удаляет плейлист по ID: треки + мета
+    /// Удаляет плейлист по ID: строки треклиста + мета.
     func deleteTrackList(id: UUID) throws {
-        var metas = try loadTrackListMetas()
-        guard metas.contains(where: { $0.id == id }) else {
-            throw AppError.trackListNotFound
-        }
-
-        try TrackListManager.shared.deleteTracksFile(for: id)
-        
-        metas.removeAll { $0.id == id }
-        guard persistTrackListMetas(metas) else {
-            throw AppError.trackListSaveFailed
-        }
-        
+        try databaseStore.deleteTrackList(id: id)
+        postTrackListsDidChange()
         print("🗑️ Треклист \(id) удалён")
     }
     
-    /// Переименовывает треклист по ID
+    /// Переименовывает треклист по ID.
     func renameTrackList(id: UUID, to newName: String) throws {
-        var metas = try loadTrackListMetas()
-        guard let index = metas.firstIndex(where: { $0.id == id }) else {
-            throw AppError.trackListNotFound
+        guard TrackListManager.shared.validateName(newName) else {
+            throw AppError.trackListNameInvalid
         }
-        
-        metas[index].name = newName
-        guard persistTrackListMetas(metas) else {
-            throw AppError.trackListSaveFailed
-        }
+
+        try databaseStore.renameTrackList(id: id, to: newName)
+        postTrackListsDidChange()
     }
     
     
     // MARK: - Сохранение всех треклистов (массово)
     
-    /// Сохраняет все треклисты (отдельно JSON с треками и tracklists.json с мета)
+    /// Сохраняет все треклисты в SQLite.
     func saveTrackLists(_ trackLists: [TrackList]) throws {
-        var didSaveTracks = false
-
-        for list in trackLists {
-            let didSave = TrackListManager.shared.saveTracks(
-                list.tracks,
-                for: list.id,
-                postTrackListsDidChange: false
-            )
-            didSaveTracks = didSaveTracks || didSave
-        }
-        
-        let metas = trackLists.map {
-            TrackListMeta(id: $0.id, name: $0.name, createdAt: $0.createdAt)
-        }
-        
-        let didSaveMetas = persistTrackListMetas(metas, postDidChange: false)
-        guard didSaveMetas else {
+        do {
+            try databaseStore.replaceTrackLists(trackLists)
+            postTrackListsDidChange()
+            print("✅ Все треклисты сохранены в SQLite")
+        } catch let appError as AppError {
+            throw appError
+        } catch {
+            PersistentLogger.log("❌ TrackListsManager: SQLite saveTrackLists failed error=\(error)")
             throw AppError.trackListSaveFailed
         }
-
-        if didSaveTracks || didSaveMetas {
-            postTrackListsDidChange()
-        }
-        
-        print("✅ Все треклисты сохранены (треки + мета)")
     }
     
     
