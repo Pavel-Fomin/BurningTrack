@@ -15,7 +15,8 @@ final class AppDatabase {
     static let shared = AppDatabase(
         location: DatabaseLocation(),
         migrator: DatabaseMigrator(migrations: [
-            .initialSchema
+            .initialSchema,
+            .initialTables
         ])
     )
 
