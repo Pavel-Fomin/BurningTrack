@@ -11,13 +11,27 @@ import Foundation
 
 // Возвращает URL файла базы данных без открытия SQLite и без выполнения SQL.
 struct DatabaseLocation {
+    private let customDatabaseURL: URL?
     private let fileManager: FileManager
 
-    init(fileManager: FileManager = .default) {
+    init(
+        databaseURL: URL? = nil,
+        fileManager: FileManager = .default
+    ) {
+        self.customDatabaseURL = databaseURL
         self.fileManager = fileManager
     }
 
     func databaseURL() throws -> URL {
+        if let customDatabaseURL {
+            // Тестовые и служебные базы могут передать точный путь, не меняя AppDatabase.
+            try fileManager.createDirectory(
+                at: customDatabaseURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            return customDatabaseURL
+        }
+
         // Храним постоянную БД в Library/Application Support, чтобы не смешивать её с пользовательскими документами.
         guard let applicationSupportURL = fileManager.urls(
             for: .applicationSupportDirectory,

@@ -7,12 +7,10 @@
 //  Created by Pavel Fomin on 04.07.2026.
 //
 
-import SQLite3
-
 // Хранит идентификатор миграции и действие, которое изменяет схему базы.
 struct DatabaseMigration {
     let identifier: String
-    let migrate: (OpaquePointer) throws -> Void
+    let migrate: (DatabaseConnection) throws -> Void
 }
 
 extension DatabaseMigration {
@@ -23,7 +21,7 @@ extension DatabaseMigration {
 
     // Вторая миграция создаёт рабочие таблицы без переноса существующих JSON-данных.
     static let initialTables = DatabaseMigration(identifier: "002_initial_tables") { database in
-        try DatabaseMigration.execute(
+        try database.executeScript(
             """
             CREATE TABLE IF NOT EXISTS folders (
                 id TEXT PRIMARY KEY,
@@ -259,20 +257,6 @@ extension DatabaseMigration {
                 updated_at TEXT NOT NULL
             );
             """,
-            database: database
         )
-    }
-
-    private static func execute(_ sql: String, database: OpaquePointer) throws {
-        var errorMessage: UnsafeMutablePointer<CChar>?
-
-        // sqlite3_exec выполняет DDL-скрипт миграции внутри транзакции, открытой DatabaseMigrator.
-        let result = sqlite3_exec(database, sql, nil, nil, &errorMessage)
-
-        guard result == SQLITE_OK else {
-            let message = errorMessage.map { String(cString: $0) } ?? String(cString: sqlite3_errmsg(database))
-            sqlite3_free(errorMessage)
-            throw DatabaseError.sqliteFailed(message: message)
-        }
     }
 }

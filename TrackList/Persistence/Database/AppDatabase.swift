@@ -8,7 +8,6 @@
 //
 
 import Foundation
-import SQLite3
 
 // Открывает SQLite один раз за жизненный цикл приложения и запускает миграции.
 final class AppDatabase {
@@ -23,7 +22,8 @@ final class AppDatabase {
     private let location: DatabaseLocation
     private let migrator: DatabaseMigrator
     private let lock = NSLock()
-    private var connection: OpaquePointer?
+    private var connection: DatabaseConnection?
+    private var activeExecutor: DatabaseExecutor?
 
     private(set) var databaseURL: URL?
 
@@ -43,32 +43,41 @@ final class AppDatabase {
             lock.unlock()
         }
 
+        try openIfNeededLocked()
+    }
+
+    func databaseExecutor() throws -> DatabaseExecutor {
+        lock.lock()
+        defer {
+            lock.unlock()
+        }
+
+        // Executor создаётся лениво после открытия базы и переиспользуется всеми Store.
+        try openIfNeededLocked()
+
+        guard let activeExecutor else {
+            throw DatabaseError.databaseNotOpen
+        }
+
+        return activeExecutor
+    }
+
+    private func openIfNeededLocked() throws {
         // Повторные вызовы старта не создают второе соединение.
         guard connection == nil else { return }
 
         let url = try location.databaseURL()
-        var openedConnection: OpaquePointer?
-        let flags = SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX
-
-        // sqlite3_open_v2 создаёт файл базы при первом запуске и открывает единственное приложениевое соединение.
-        let openResult = sqlite3_open_v2(url.path, &openedConnection, flags, nil)
-
-        guard openResult == SQLITE_OK, let openedConnection else {
-            let message = openedConnection.map { sqliteErrorMessage($0) } ?? "SQLite не вернул соединение."
-            if let openedConnection {
-                sqlite3_close(openedConnection)
-            }
-            throw DatabaseError.openFailed(message: message)
-        }
+        let openedConnection = try DatabaseConnection.open(url: url)
 
         do {
             try configure(openedConnection)
             try migrator.migrate(database: openedConnection)
 
             connection = openedConnection
+            activeExecutor = DatabaseExecutor(connection: openedConnection)
             databaseURL = url
         } catch {
-            sqlite3_close(openedConnection)
+            try? openedConnection.close()
             throw error
         }
     }
@@ -82,47 +91,24 @@ final class AppDatabase {
         guard let connection else { return }
 
         // Закрываем именно сохранённое единственное соединение.
-        let closeResult = sqlite3_close(connection)
-
-        guard closeResult == SQLITE_OK else {
-            throw DatabaseError.closeFailed(message: sqliteErrorMessage(connection))
-        }
+        try connection.close()
 
         self.connection = nil
+        activeExecutor = nil
     }
 
-    private func configure(_ database: OpaquePointer) throws {
+    private func configure(_ database: DatabaseConnection) throws {
         // WAL разрешает чтение во время записи и лучше подходит для будущего постоянного хранилища UI-данных.
-        try execute("PRAGMA journal_mode = WAL;", database: database)
+        try database.executeScript("PRAGMA journal_mode = WAL;")
 
         // foreign_keys включает контроль внешних ключей, потому что SQLite по умолчанию не применяет его автоматически.
-        try execute("PRAGMA foreign_keys = ON;", database: database)
+        try database.executeScript("PRAGMA foreign_keys = ON;")
 
         // synchronous NORMAL снижает стоимость записи в WAL, сохраняя практичный уровень защиты от повреждения БД.
-        try execute("PRAGMA synchronous = NORMAL;", database: database)
+        try database.executeScript("PRAGMA synchronous = NORMAL;")
 
         // busy_timeout даёт SQLite время дождаться освобождения lock вместо мгновенной ошибки SQLITE_BUSY.
         let busyTimeoutMilliseconds: Int32 = 5_000
-        guard sqlite3_busy_timeout(database, busyTimeoutMilliseconds) == SQLITE_OK else {
-            throw DatabaseError.sqliteFailed(message: sqliteErrorMessage(database))
-        }
-    }
-
-    private func execute(_ sql: String, database: OpaquePointer) throws {
-        var errorMessage: UnsafeMutablePointer<CChar>?
-
-        // sqlite3_exec используется только для служебных PRAGMA-команд без результирующей обработки.
-        let result = sqlite3_exec(database, sql, nil, nil, &errorMessage)
-
-        guard result == SQLITE_OK else {
-            let message = errorMessage.map { String(cString: $0) } ?? sqliteErrorMessage(database)
-            sqlite3_free(errorMessage)
-            throw DatabaseError.sqliteFailed(message: message)
-        }
-    }
-
-    private func sqliteErrorMessage(_ database: OpaquePointer) -> String {
-        // Берём сообщение ошибки из текущего соединения SQLite.
-        String(cString: sqlite3_errmsg(database))
+        try database.setBusyTimeout(milliseconds: busyTimeoutMilliseconds)
     }
 }
