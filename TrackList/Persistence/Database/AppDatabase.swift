@@ -15,7 +15,8 @@ final class AppDatabase {
         location: DatabaseLocation(),
         migrator: DatabaseMigrator(migrations: [
             .initialSchema,
-            .initialTables
+            .initialTables,
+            .trackListTracksAllowExternalTrackIds
         ])
     )
 

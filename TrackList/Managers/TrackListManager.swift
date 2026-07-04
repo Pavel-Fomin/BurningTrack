@@ -43,8 +43,8 @@ final class TrackListManager {
     func loadTracks(for id: UUID) throws -> [Track] {
         do {
             return try databaseStore.fetchTracks(for: id)
-        } catch let appError as AppError {
-            throw appError
+        } catch TrackListDatabaseStoreError.trackListNotFound {
+            throw AppError.trackListNotFound
         } catch {
             PersistentLogger.log("❌ TrackListManager: SQLite loadTracks failed id=\(id) error=\(error)")
             throw AppError.trackListLoadFailed
@@ -91,8 +91,8 @@ final class TrackListManager {
     func getTrackListById(_ id: UUID) throws -> TrackList {
         do {
             return try databaseStore.fetchTrackList(id: id)
-        } catch let appError as AppError {
-            throw appError
+        } catch TrackListDatabaseStoreError.trackListNotFound {
+            throw AppError.trackListNotFound
         } catch {
             PersistentLogger.log("❌ TrackListManager: SQLite getTrackListById failed id=\(id) error=\(error)")
             throw AppError.trackListLoadFailed

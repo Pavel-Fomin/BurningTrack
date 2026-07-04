@@ -41,8 +41,6 @@ final class TrackListsManager {
     func loadTrackListMetas() throws -> [TrackListMeta] {
         do {
             return try databaseStore.fetchMetas()
-        } catch let appError as AppError {
-            throw appError
         } catch {
             PersistentLogger.log("❌ TrackListsManager: SQLite load metas failed error=\(error)")
             throw AppError.trackListLoadFailed
@@ -53,19 +51,11 @@ final class TrackListsManager {
         (try? loadTrackListMetas()) ?? []
     }
     
-    /// Сохраняет список всех треклистов в SQLite.
+    /// Сохраняет список всех треклистов в SQLite, сохраняя текущие строки существующих списков.
     func saveTrackListMetas(_ metas: [TrackListMeta]) throws {
-        let trackLists = try metas.map { meta in
-            let tracks = try TrackListManager.shared.loadTracks(for: meta.id)
-            return TrackList(
-                id: meta.id,
-                name: meta.name,
-                createdAt: meta.createdAt,
-                tracks: tracks
-            )
+        guard persistTrackListMetas(metas) else {
+            throw AppError.trackListSaveFailed
         }
-
-        try saveTrackLists(trackLists)
     }
 
     private func postTrackListsDidChange() {
@@ -73,6 +63,39 @@ final class TrackListsManager {
             name: .trackListsDidChange,
             object: nil
         )
+    }
+
+    @discardableResult
+    private func persistTrackListMetas(
+        _ metas: [TrackListMeta],
+        postDidChange: Bool = true
+    ) -> Bool {
+        do {
+            let trackLists = try metas.map { meta in
+                let tracks: [Track]
+                do {
+                    tracks = try TrackListManager.shared.loadTracks(for: meta.id)
+                } catch AppError.trackListNotFound {
+                    // Новая meta без строк соответствует пустому треклисту.
+                    tracks = []
+                }
+
+                return TrackList(
+                    id: meta.id,
+                    name: meta.name,
+                    createdAt: meta.createdAt,
+                    tracks: tracks
+                )
+            }
+            try databaseStore.replaceTrackLists(trackLists)
+            if postDidChange {
+                postTrackListsDidChange()
+            }
+            return true
+        } catch {
+            PersistentLogger.log("❌ TrackListsManager: SQLite metas save failed error=\(error)")
+            return false
+        }
     }
     
     /// Проверяет, существует ли треклист с указанным ID.
@@ -98,15 +121,24 @@ final class TrackListsManager {
 
         let id = UUID()
         let createdAt = Date()
-        let trackList = try databaseStore.createTrackList(
-            id: id,
-            name: name,
-            createdAt: createdAt,
-            tracks: tracks
-        )
 
-        postTrackListsDidChange()
-        return trackList
+        do {
+            // Создаём метаданные и строки треклиста одним вызовом фасада.
+            let created = try databaseStore.createTrackList(
+                id: id,
+                name: name,
+                createdAt: createdAt,
+                tracks: tracks
+            )
+            NotificationCenter.default.post(
+                name: .trackListTracksDidChange,
+                object: id
+            )
+            postTrackListsDidChange()
+            return created
+        } catch {
+            throw AppError.trackListSaveFailed
+        }
     }
 
     // Создаёт новый треклист с авто-именем по дате ("dd.MM.yy, HH:mm")
@@ -149,8 +181,12 @@ final class TrackListsManager {
 
     // Сохраняет один TrackListMeta в SQLite.
     func saveTrackListMeta(_ meta: TrackListMeta) throws {
-        try databaseStore.saveMeta(meta)
-        postTrackListsDidChange()
+        do {
+            try databaseStore.saveMeta(meta)
+            postTrackListsDidChange()
+        } catch {
+            throw AppError.trackListSaveFailed
+        }
     }
 
     // MARK: - Добавление треков
@@ -162,7 +198,7 @@ final class TrackListsManager {
         guard !libraryTracks.isEmpty else { return true }
 
         // Конвертация остаётся на уровне manager-а списка треклистов,
-        // а сохранение одного треклиста делегируется TrackListManager.
+        // а сохранение строк делегируется TrackListManager.
         let newTracks = libraryTracks.map { Track(libraryTrack: $0) }
         try TrackListManager.shared.addTracks(newTracks, to: trackListId)
 
@@ -173,8 +209,15 @@ final class TrackListsManager {
     
     /// Удаляет плейлист по ID: строки треклиста + мета.
     func deleteTrackList(id: UUID) throws {
-        try databaseStore.deleteTrackList(id: id)
-        postTrackListsDidChange()
+        do {
+            try databaseStore.deleteTrackList(id: id)
+            postTrackListsDidChange()
+        } catch TrackListDatabaseStoreError.trackListNotFound {
+            throw AppError.trackListNotFound
+        } catch {
+            throw AppError.trackListSaveFailed
+        }
+
         print("🗑️ Треклист \(id) удалён")
     }
     
@@ -184,8 +227,14 @@ final class TrackListsManager {
             throw AppError.trackListNameInvalid
         }
 
-        try databaseStore.renameTrackList(id: id, to: newName)
-        postTrackListsDidChange()
+        do {
+            try databaseStore.renameTrackList(id: id, to: newName)
+            postTrackListsDidChange()
+        } catch TrackListDatabaseStoreError.trackListNotFound {
+            throw AppError.trackListNotFound
+        } catch {
+            throw AppError.trackListSaveFailed
+        }
     }
     
     
@@ -195,14 +244,19 @@ final class TrackListsManager {
     func saveTrackLists(_ trackLists: [TrackList]) throws {
         do {
             try databaseStore.replaceTrackLists(trackLists)
-            postTrackListsDidChange()
-            print("✅ Все треклисты сохранены в SQLite")
-        } catch let appError as AppError {
-            throw appError
         } catch {
-            PersistentLogger.log("❌ TrackListsManager: SQLite saveTrackLists failed error=\(error)")
             throw AppError.trackListSaveFailed
         }
+
+        for list in trackLists {
+            NotificationCenter.default.post(
+                name: .trackListTracksDidChange,
+                object: list.id
+            )
+        }
+        postTrackListsDidChange()
+
+        print("✅ Все треклисты сохранены в SQLite")
     }
     
     

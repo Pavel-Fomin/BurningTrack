@@ -136,6 +136,47 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
         XCTAssertEqual(queue.first?.position, 0)
     }
 
+    func testTrackListDatabaseStorePersistsBusinessModels() throws {
+        let database = try makeDatabase()
+        let executor = try database.databaseExecutor()
+        let store = TrackListDatabaseStore(executor: executor)
+        let trackId = UUID()
+        let createdAt = Date()
+        let firstEntry = makeTrackListTrack(
+            listItemId: UUID(),
+            trackId: trackId,
+            title: "First"
+        )
+        let secondEntry = makeTrackListTrack(
+            listItemId: UUID(),
+            trackId: trackId,
+            title: "Second"
+        )
+
+        let created = try store.createTrackList(
+            id: UUID(),
+            name: "Duplicates",
+            createdAt: createdAt,
+            tracks: [firstEntry, secondEntry]
+        )
+
+        XCTAssertEqual(try store.fetchMetas().map(\.id), [created.id])
+        XCTAssertEqual(try store.fetchTracks(for: created.id).map(\.id), [firstEntry.id, secondEntry.id])
+        XCTAssertEqual(try store.fetchTracks(for: created.id).map(\.trackId), [trackId, trackId])
+
+        try store.replaceTracks([secondEntry], for: created.id)
+
+        let remainingTracks = try store.fetchTrackList(id: created.id).tracks
+        XCTAssertEqual(remainingTracks.map(\.id), [secondEntry.id])
+        XCTAssertEqual(remainingTracks.first?.trackId, trackId)
+
+        try store.renameTrackList(id: created.id, to: "Renamed")
+        XCTAssertEqual(try store.fetchTrackList(id: created.id).name, "Renamed")
+
+        try store.deleteTrackList(id: created.id)
+        XCTAssertFalse(try store.exists(id: created.id))
+    }
+
     func testLibraryDatabaseStorePersistsLibraryGraph() throws {
         let database = try makeDatabase()
         let store = try LibraryDatabaseStore(database: database)
@@ -291,7 +332,8 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
             location: DatabaseLocation(databaseURL: databaseURL),
             migrator: DatabaseMigrator(migrations: [
                 .initialSchema,
-                .initialTables
+                .initialTables,
+                .trackListTracksAllowExternalTrackIds
             ])
         )
 
@@ -323,6 +365,23 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
             assetURLString: nil,
             isAvailable: true,
             isDeleted: false
+        )
+    }
+
+    private func makeTrackListTrack(
+        listItemId: UUID,
+        trackId: UUID,
+        title: String
+    ) -> Track {
+        // Трек не создаётся в таблице tracks, чтобы проверить независимость снимка треклиста от фонотеки.
+        Track(
+            listItemId: listItemId,
+            trackId: trackId,
+            title: title,
+            artist: "Artist",
+            duration: 10,
+            fileName: "\(title).mp3",
+            isAvailable: true
         )
     }
 

@@ -30,10 +30,10 @@ enum TrackSourceDatabaseMapper {
     }
 }
 
-// Преобразует метаданные треклиста между SQLite и текущей JSON-моделью.
+// Преобразует метаданные треклиста между SQLite и бизнес-моделью.
 enum TrackListMetaDatabaseMapper {
     static func databaseModel(from meta: TrackListMeta, updatedAt: Date) -> TrackListDatabaseModel {
-        // sortOrder и isDeleted отсутствуют в текущей JSON-модели и заполняются значениями SQLite-слоя.
+        // sortOrder и isDeleted отсутствуют в бизнес-модели и заполняются значениями SQLite-слоя.
         TrackListDatabaseModel(
             id: meta.id,
             name: meta.name,

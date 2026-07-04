@@ -19,7 +19,7 @@ extension DatabaseMigration {
         // Бизнес-таблицы треков, плеера и треклистов появятся в следующих фазах.
     }
 
-    // Вторая миграция создаёт рабочие таблицы без переноса существующих JSON-данных.
+    // Вторая миграция создаёт рабочие таблицы SQLite.
     static let initialTables = DatabaseMigration(identifier: "002_initial_tables") { database in
         try database.executeScript(
             """
@@ -161,8 +161,7 @@ extension DatabaseMigration {
                 asset_url_snapshot TEXT,
                 is_available_snapshot INTEGER NOT NULL DEFAULT 1 CHECK (is_available_snapshot IN (0, 1)),
                 created_at TEXT NOT NULL,
-                FOREIGN KEY (tracklist_id) REFERENCES tracklists(id) ON DELETE CASCADE,
-                FOREIGN KEY (track_id) REFERENCES tracks(id)
+                FOREIGN KEY (tracklist_id) REFERENCES tracklists(id) ON DELETE CASCADE
             );
 
             CREATE UNIQUE INDEX IF NOT EXISTS idx_tracklist_tracks_unique_position
@@ -256,6 +255,56 @@ extension DatabaseMigration {
                 export_artwork INTEGER NOT NULL DEFAULT 0 CHECK (export_artwork IN (0, 1)),
                 updated_at TEXT NOT NULL
             );
+            """,
+        )
+    }
+
+    // Третья миграция разрешает треклистам хранить внешние track_id из iTunes.
+    static let trackListTracksAllowExternalTrackIds = DatabaseMigration(identifier: "003_tracklist_tracks_allow_external_track_ids") { database in
+        try database.executeScript(
+            """
+            CREATE TABLE IF NOT EXISTS tracklist_tracks_rebuilt (
+                id TEXT PRIMARY KEY,
+                tracklist_id TEXT NOT NULL,
+                track_id TEXT NOT NULL,
+                position INTEGER NOT NULL,
+                source_snapshot TEXT NOT NULL CHECK (source_snapshot IN ('library', 'purchasedITunes')),
+                title_snapshot TEXT,
+                artist_snapshot TEXT,
+                album_snapshot TEXT,
+                duration_snapshot REAL,
+                file_name_snapshot TEXT,
+                asset_url_snapshot TEXT,
+                is_available_snapshot INTEGER NOT NULL DEFAULT 1 CHECK (is_available_snapshot IN (0, 1)),
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (tracklist_id) REFERENCES tracklists(id) ON DELETE CASCADE
+            );
+
+            INSERT INTO tracklist_tracks_rebuilt (
+                id, tracklist_id, track_id, position, source_snapshot, title_snapshot,
+                artist_snapshot, album_snapshot, duration_snapshot, file_name_snapshot,
+                asset_url_snapshot, is_available_snapshot, created_at
+            )
+            SELECT id, tracklist_id, track_id, position, source_snapshot, title_snapshot,
+                   artist_snapshot, album_snapshot, duration_snapshot, file_name_snapshot,
+                   asset_url_snapshot, is_available_snapshot, created_at
+            FROM tracklist_tracks;
+
+            DROP TABLE tracklist_tracks;
+
+            ALTER TABLE tracklist_tracks_rebuilt RENAME TO tracklist_tracks;
+
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_tracklist_tracks_unique_position
+            ON tracklist_tracks(tracklist_id, position);
+
+            CREATE INDEX IF NOT EXISTS idx_tracklist_tracks_tracklist_id
+            ON tracklist_tracks(tracklist_id);
+
+            CREATE INDEX IF NOT EXISTS idx_tracklist_tracks_track_id
+            ON tracklist_tracks(track_id);
+
+            CREATE INDEX IF NOT EXISTS idx_tracklist_tracks_position
+            ON tracklist_tracks(position);
             """,
         )
     }
