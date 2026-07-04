@@ -44,7 +44,8 @@ actor LibrarySyncModule {
     func syncRootFolder(
         rootFolderId: UUID,
         rootURL: URL,
-        mode: SyncMode
+        mode: SyncMode,
+        logsDatabaseDiagnostics: Bool = true
     ) async throws {
         
         /// Защита от разрушительного sync во время boot процесса.
@@ -187,7 +188,14 @@ actor LibrarySyncModule {
         try await TrackRegistry.shared.persist()
         try await BookmarksRegistry.shared.persist()
         
-        let removedCount = mode == .full ? existing.count - aliveIds.count : 0
-        print("✅ syncRootFolder завершён:", rootURL.lastPathComponent, "режим:", mode, "файлов:", scanned.count, "удалено:", removedCount)
+        // Лог завершения sync не содержит счётчик удалений, потому что фактическое состояние БД логируется отдельно.
+        print("✅ syncRootFolder завершён:", rootURL.lastPathComponent, "режим:", mode, "файлов:", scanned.count)
+
+        #if DEBUG
+        // DEBUG-снимок показывает состояние SQLite после persist, а не статистику текущей операции.
+        if logsDatabaseDiagnostics {
+            DatabaseDiagnosticsLogger.logLibrarySnapshot()
+        }
+        #endif
     }
 }

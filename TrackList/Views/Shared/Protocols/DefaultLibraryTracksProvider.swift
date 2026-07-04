@@ -36,7 +36,8 @@ final class DefaultLibraryTracksProvider: LibraryTracksProvider {
                     title: nil,
                     artist: nil,
                     duration: 0,
-                    addedDate: fileDate
+                    addedDate: fileDate,
+                    isAvailable: FileManager.default.fileExists(atPath: url.path)
                 )
             )
         }

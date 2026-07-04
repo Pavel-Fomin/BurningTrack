@@ -31,7 +31,7 @@ final class FastLibraryTracksProvider: LibraryTracksProvider {
                 artist: nil,
                 duration: 0,
                 addedDate: entry.fileDate,
-                isAvailable: true
+                isAvailable: entry.isAvailable
             )
         }
     }

@@ -34,6 +34,10 @@ enum BookmarkResolver {
 
             // Если файл реально существует — это валидный путь
             if FileManager.default.fileExists(atPath: candidateURL.path) {
+                await TrackRegistry.shared.updateTrackAvailability(
+                    id: id,
+                    isAvailable: true
+                )
                 return candidateURL
             }
 
@@ -46,14 +50,26 @@ enum BookmarkResolver {
         // 2) Fallback: bookmark трека
         guard let base64 = await BookmarksRegistry.shared.trackBookmark(for: id) else {
             print("⚠️ BookmarkResolver: нет пути к треку \(id)")
+            await TrackRegistry.shared.updateTrackAvailability(
+                id: id,
+                isAvailable: false
+            )
             return nil
         }
 
         guard let url = resolveBookmark(base64) else {
             print("⚠️ BookmarkResolver: не удалось резолвить bookmark трека \(id)")
+            await TrackRegistry.shared.updateTrackAvailability(
+                id: id,
+                isAvailable: false
+            )
             return nil
         }
 
+        await TrackRegistry.shared.updateTrackAvailability(
+            id: id,
+            isAvailable: FileManager.default.fileExists(atPath: url.path)
+        )
         return url
     }
 
@@ -62,14 +78,26 @@ enum BookmarkResolver {
     static func url(forFolder id: UUID) async -> URL? {
         guard let base64 = await BookmarksRegistry.shared.folderBookmark(for: id) else {
             print("⚠️ BookmarkResolver: нет bookmark для папки \(id)")
+            await TrackRegistry.shared.updateFolderAvailability(
+                id: id,
+                isAvailable: false
+            )
             return nil
         }
 
         guard let url = resolveBookmark(base64) else {
             print("⚠️ BookmarkResolver: не удалось резолвить bookmark папки \(id)")
+            await TrackRegistry.shared.updateFolderAvailability(
+                id: id,
+                isAvailable: false
+            )
             return nil
         }
 
+        await TrackRegistry.shared.updateFolderAvailability(
+            id: id,
+            isAvailable: FileManager.default.fileExists(atPath: url.path)
+        )
         return url
     }
 

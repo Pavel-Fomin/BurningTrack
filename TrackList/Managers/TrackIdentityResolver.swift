@@ -7,7 +7,7 @@
 //  ВАЖНО:
 //  - trackId создаётся только здесь
 //  - trackId больше не зависит от тегов, размера файла и байтов содержимого
-//  - для фонотеки identity строится из rootFolderId + relativePath
+//  - для фонотеки identity строится из SQLite-записи tracks(root_folder_id, relative_path)
 //  - для одиночных импортов identity строится из нормализованного пути файла
 //
 //  Created by Pavel Fomin on 30.12.2025.
@@ -21,10 +21,13 @@ actor TrackIdentityResolver {
 
     // MARK: - Хранилище соответствий
 
-    /// identityKey -> trackId
-    private var identityMap: [String: UUID] = [:]
+    /// identityKey -> trackId для внефазовых одиночных импортов.
+    private var importedIdentityMap: [String: UUID] = [:]
+    /// Старые library-ключи сохраняются в JSON как backup, но больше не используются как источник фонотеки.
+    private var backupLibraryIdentityMap: [String: UUID] = [:]
 
     private var isLoaded = false
+    private var isDirty = false
 
     // MARK: - Путь к файлу хранения
 
@@ -39,52 +42,44 @@ actor TrackIdentityResolver {
     // MARK: - Публичный API
 
     /// Возвращает постоянный trackId для трека фонотеки.
-    /// Если в реестре уже есть существующий id для этого logical path,
-    /// он будет сохранён и переиспользован.
+    /// SQLite tracks(root_folder_id, relative_path) теперь является источником library identity.
     func trackId(
         forRootFolderId rootFolderId: UUID,
         relativePath: String,
         preferredExistingId: UUID? = nil
     ) async throws -> UUID {
-        await loadIfNeeded()
-
-        let key = libraryKey(
-            rootFolderId: rootFolderId,
+        if let existing = await TrackRegistry.shared.entry(
+            inRootFolder: rootFolderId,
             relativePath: relativePath
-        )
+        ) {
+            return existing.id
+        }
 
-        return try await upsertIdentityKey(
-            key,
-            preferredExistingId: preferredExistingId
-        )
+        if let preferredExistingId {
+            return preferredExistingId
+        }
+
+        return UUID()
     }
 
     /// Возвращает постоянный trackId для одиночного импортированного файла.
-    /// Используется только там, где нет library root и relativePath.
+    /// Используется только там, где нет rootFolderId + relativePath.
     func trackId(forImportedURL url: URL) async throws -> UUID {
-        await loadIfNeeded()
+        loadIfNeeded()
 
         let key = importedFileKey(for: url)
-        return try await upsertIdentityKey(key, preferredExistingId: nil)
+        return try await upsertImportedIdentityKey(key, preferredExistingId: nil)
     }
 
-    /// Привязывает уже известный trackId к библиотечному ключу.
-    /// Нужен после rename / move и при sync, когда id уже известен из реестра.
+    /// Library identity хранится в SQLite, поэтому отдельная JSON-привязка больше не нужна.
     func bindLibraryTrack(
         id trackId: UUID,
         rootFolderId: UUID,
         relativePath: String
     ) async throws {
-        await loadIfNeeded()
-
-        let key = libraryKey(
-            rootFolderId: rootFolderId,
-            relativePath: relativePath
-        )
-
-        if identityMap[key] == trackId { return }
-        identityMap[key] = trackId
-        try await persist()
+        _ = trackId
+        _ = rootFolderId
+        _ = relativePath
     }
 
     /// Привязывает уже известный trackId к импортированному файлу.
@@ -92,79 +87,65 @@ actor TrackIdentityResolver {
         id trackId: UUID,
         url: URL
     ) async throws {
-        await loadIfNeeded()
+        loadIfNeeded()
 
         let key = importedFileKey(for: url)
 
-        if identityMap[key] == trackId { return }
-        identityMap[key] = trackId
+        if importedIdentityMap[key] == trackId { return }
+        importedIdentityMap[key] = trackId
+        isDirty = true
         try await persist()
     }
 
-    /// Удаляет только библиотечный ключ.
-    /// Сам trackId при этом не трогаем.
+    /// Library identity удаляется вместе со строкой tracks, поэтому JSON-ключ не трогаем.
     func unbindLibraryTrack(
         rootFolderId: UUID,
         relativePath: String
     ) async throws {
-        await loadIfNeeded()
-
-        let key = libraryKey(
-            rootFolderId: rootFolderId,
-            relativePath: relativePath
-        )
-
-        if identityMap.removeValue(forKey: key) != nil {
-            try await persist()
-        }
+        _ = rootFolderId
+        _ = relativePath
     }
 
-    /// Полностью забывает все ключи, которые были привязаны к trackId.
-    /// Используется только когда трек реально исчез из библиотеки.
+    /// Полностью забывает импортированные ключи, которые были привязаны к trackId.
     func forgetTrack(id trackId: UUID) async throws {
-        await loadIfNeeded()
+        loadIfNeeded()
 
-        let oldCount = identityMap.count
-        identityMap = identityMap.filter { $0.value != trackId }
+        let oldCount = importedIdentityMap.count
+        importedIdentityMap = importedIdentityMap.filter { $0.value != trackId }
 
-        if identityMap.count != oldCount {
+        if importedIdentityMap.count != oldCount {
+            isDirty = true
             try await persist()
         }
     }
 
     // MARK: - Внутренняя логика
 
-    private func upsertIdentityKey(
+    private func upsertImportedIdentityKey(
         _ key: String,
         preferredExistingId: UUID?
     ) async throws -> UUID {
         if let preferredExistingId {
-            if identityMap[key] != preferredExistingId {
-                identityMap[key] = preferredExistingId
+            if importedIdentityMap[key] != preferredExistingId {
+                importedIdentityMap[key] = preferredExistingId
+                isDirty = true
                 try await persist()
             }
             return preferredExistingId
         }
 
-        if let existing = identityMap[key] {
+        if let existing = importedIdentityMap[key] {
             return existing
         }
 
         let newId = UUID()
-        identityMap[key] = newId
+        importedIdentityMap[key] = newId
+        isDirty = true
         try await persist()
         return newId
     }
 
     // MARK: - Ключи identity
-
-    private func libraryKey(
-        rootFolderId: UUID,
-        relativePath: String
-    ) -> String {
-        let normalizedPath = normalizeRelativePath(relativePath)
-        return "lib:\(rootFolderId.uuidString):\(normalizedPath)"
-    }
 
     private func importedFileKey(for url: URL) -> String {
         let normalizedPath = url
@@ -175,30 +156,30 @@ actor TrackIdentityResolver {
         return "imp:\(normalizedPath)"
     }
 
-    private func normalizeRelativePath(_ relativePath: String) -> String {
-        relativePath
-            .replacingOccurrences(of: "\\", with: "/")
-            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-    }
-
     // MARK: - Загрузка / сохранение
 
-    private func loadIfNeeded() async {
+    private func loadIfNeeded() {
         guard !isLoaded else { return }
         isLoaded = true
 
         do {
             let data = try Data(contentsOf: fileURL)
-            identityMap = try JSONDecoder().decode([String: UUID].self, from: data)
+            let decoded = try JSONDecoder().decode([String: UUID].self, from: data)
+            importedIdentityMap = decoded.filter { $0.key.hasPrefix("imp:") }
+            backupLibraryIdentityMap = decoded.filter { $0.key.hasPrefix("imp:") == false }
         } catch {
-            identityMap = [:]
+            importedIdentityMap = [:]
+            backupLibraryIdentityMap = [:]
         }
     }
 
     private func persist() async throws {
-        // Сохраняем карту соответствия треков на диск и не скрываем ошибку записи.
-        // Вызывающий код должен знать, что identity-map фактически не была сохранена.
-        let data = try JSONEncoder().encode(identityMap)
+        guard isDirty else { return }
+
+        // Сохраняем только legacy imports как активные ключи и оставляем старые library-ключи как backup.
+        let file = backupLibraryIdentityMap.merging(importedIdentityMap) { _, imported in imported }
+        let data = try JSONEncoder().encode(file)
         try data.write(to: fileURL, options: .atomic)
+        isDirty = false
     }
 }

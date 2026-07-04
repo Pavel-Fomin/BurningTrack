@@ -135,3 +135,28 @@ enum PlayerQueueDatabaseMapper {
         )
     }
 }
+
+// Преобразует runtime snapshot в строку SQLite metadata.
+enum TrackMetadataDatabaseMapper {
+    static func databaseModel(from snapshot: TrackRuntimeSnapshot) -> TrackMetadataDatabaseModel {
+        TrackMetadataDatabaseModel(
+            trackId: snapshot.trackId,
+            title: snapshot.title,
+            artist: snapshot.artist,
+            album: snapshot.album,
+            albumArtist: snapshot.albumArtist,
+            genre: snapshot.genre,
+            year: snapshot.year,
+            trackNumber: snapshot.trackNumber,
+            discNumber: snapshot.discNumber,
+            bpm: snapshot.bpm.map(Double.init),
+            keySignature: snapshot.musicalKey,
+            comment: snapshot.comment,
+            duration: snapshot.duration,
+            bitrate: nil,
+            sampleRate: nil,
+            channelCount: nil,
+            metadataUpdatedAt: snapshot.updatedAt
+        )
+    }
+}

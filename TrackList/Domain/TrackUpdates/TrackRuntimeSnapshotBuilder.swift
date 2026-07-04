@@ -66,7 +66,7 @@ final class TrackRuntimeSnapshotBuilder {
         // Runtime-данные читаем через существующий metadata cache manager.
         let cachedMetadata = await TrackMetadataCacheManager.shared.loadMetadata(for: url)
 
-        return TrackRuntimeSnapshot(
+        let snapshot = TrackRuntimeSnapshot(
             trackId: trackId,                         /// Идентификатор трека
             fileName: fileName,                       /// Имя файла
             isAvailable: isAvailable,                 /// Доступность файла
@@ -105,5 +105,21 @@ final class TrackRuntimeSnapshotBuilder {
             artworkData: cachedMetadata?.artworkData, /// Обложка в raw data
             updatedAt: Date()                         /// Время сборки snapshot
         )
+
+        // Сохраняем прочитанные metadata в SQLite, не превращая runtime-кэш в persistence-слой.
+        persistMetadata(snapshot)
+
+        return snapshot
+    }
+
+    /// Сохраняет metadata snapshot в постоянное хранилище фонотеки.
+    private func persistMetadata(_ snapshot: TrackRuntimeSnapshot) {
+        do {
+            let store = try LibraryDatabaseStore()
+            let model = TrackMetadataDatabaseMapper.databaseModel(from: snapshot)
+            try store.upsertTrackMetadata(model)
+        } catch {
+            PersistentLogger.log("❌ TrackRuntimeSnapshotBuilder: metadata persist failed \(error)")
+        }
     }
 }

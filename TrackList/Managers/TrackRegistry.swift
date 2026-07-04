@@ -3,8 +3,7 @@
 //  TrackList
 //
 //  Хранилище метаданных о папках и треках.
-//  Без bookmark'ов, без FileManager, без рекурсий.
-//  Только данные.
+//  Для фонотеки использует SQLite, для внефазовых одиночных импортов сохраняет legacy JSON.
 //
 //  Created by Pavel Fomin on 30.11.2025.
 //
@@ -32,9 +31,11 @@ actor TrackRegistry {
         /// Дата файла для сортировки и группировки фонотеки.
         var fileDate: Date
         var updatedAt: Date
+        /// Сохранённое состояние доступности файла.
+        var isAvailable: Bool
 
         enum CodingKeys: String, CodingKey {
-            case id, fileName, relativePath, folderId, rootFolderId, importedAt, fileDate, updatedAt
+            case id, fileName, relativePath, folderId, rootFolderId, importedAt, fileDate, updatedAt, isAvailable
         }
 
         init(
@@ -45,7 +46,8 @@ actor TrackRegistry {
             rootFolderId: UUID,
             importedAt: Date,
             fileDate: Date,
-            updatedAt: Date
+            updatedAt: Date,
+            isAvailable: Bool = true
         ) {
             self.id = id
             self.fileName = fileName
@@ -55,6 +57,7 @@ actor TrackRegistry {
             self.importedAt = importedAt
             self.fileDate = fileDate
             self.updatedAt = updatedAt
+            self.isAvailable = isAvailable
         }
 
         init(from decoder: Decoder) throws {
@@ -67,6 +70,7 @@ actor TrackRegistry {
             updatedAt = try c.decode(Date.self, forKey: .updatedAt)
             importedAt = (try? c.decode(Date.self, forKey: .importedAt)) ?? updatedAt
             fileDate = (try? c.decode(Date.self, forKey: .fileDate)) ?? importedAt
+            isAvailable = (try? c.decode(Bool.self, forKey: .isAvailable)) ?? true
         }
     }
 
@@ -79,8 +83,13 @@ actor TrackRegistry {
 
     static let shared = TrackRegistry()
 
-    private var folders: [UUID: FolderEntry] = [:]
-    private var tracks: [UUID: TrackEntry] = [:]
+    private var legacyImportedTracks: [UUID: TrackEntry] = [:]
+    private var backupFolders: [FolderEntry] = []
+    private var backupLibraryTracks: [TrackEntry] = []
+    private var isLegacyLoaded = false
+    private var legacyDirty = false
+    private var pendingPersistenceError: Error?
+    private var cachedLibraryStore: LibraryDatabaseStore?
 
     private let fileURL: URL = {
         let appDir = FileManager.default.urls(for: .documentDirectory,
@@ -104,62 +113,84 @@ actor TrackRegistry {
     // MARK: - Загрузка
 
     func load() {
-        do {
-            let data = try Data(contentsOf: fileURL)
-            let decoded = try decoder.decode(RegistryFile.self, from: data)
+        // JSON больше не является источником фонотеки, поэтому из него берём только legacy-импорты.
+        isLegacyLoaded = false
+        loadLegacyIfNeeded()
 
-            folders = Dictionary(
-                uniqueKeysWithValues: decoded.folders.map { ($0.id, $0) }
-            )
-
-            tracks = Dictionary(
-                uniqueKeysWithValues: decoded.tracks.map { ($0.id, $0) }
-            )
-
-            print("📘 TrackRegistry загружен (\(tracks.count) треков, \(folders.count) папок)")
-        } catch {
-            print("ℹ️ TrackRegistry: нет файла, создаём новый.")
-            folders = [:]
-            tracks = [:]
-        }
+        let libraryCounts = (try? libraryStore().fetchRootFolders().count) ?? 0
+        print("📘 TrackRegistry загружен из SQLite (папок: \(libraryCounts), legacy imports: \(legacyImportedTracks.count))")
     }
 
     // MARK: - Сохранение
 
     func persist() throws {
+        if let pendingPersistenceError {
+            self.pendingPersistenceError = nil
+            throw pendingPersistenceError
+        }
+
+        guard legacyDirty else {
+            print(" TrackRegistry: SQLite-изменения уже сохранены")
+            return
+        }
+
         let file = RegistryFile(
-            folders: folders.values.sorted { $0.updatedAt > $1.updatedAt },
-            tracks: tracks.values.sorted { $0.updatedAt > $1.updatedAt }
+            folders: backupFolders,
+            tracks: backupLibraryTracks + legacyImportedTracks.values.sorted { $0.updatedAt > $1.updatedAt }
         )
 
-        // Сохраняем реестр на диск и не скрываем ошибку записи.
-        // Вызывающий код должен знать, что операция фактически не была сохранена.
+        // Legacy JSON пишется только для внефазовых импортов и сохраняет старые backup-записи фонотеки.
         let data = try encoder.encode(file)
         try data.write(to: fileURL, options: .atomic)
-        print(" TrackRegistry сохранён")
+        legacyDirty = false
+        print(" TrackRegistry legacy imports сохранены")
     }
 
     // MARK: - Папки
 
     func upsertFolder(id: UUID, name: String) {
-        let entry = FolderEntry(
-            id: id,
-            name: name,
-            updatedAt: Date()
-        )
-        folders[id] = entry
+        do {
+            try libraryStore().upsertRootFolder(
+                id: id,
+                name: name
+            )
+        } catch {
+            rememberPersistenceError(error)
+        }
     }
 
-    /// Удаляет корневую папку и все связанные с ней треки
+    /// Удаляет корневую папку и все связанные с ней SQLite-записи фонотеки.
     func removeFolder(id rootFolderId: UUID) {
-        folders.removeValue(forKey: rootFolderId)
-
-        // Удаляем все треки, принадлежащие корню
-        tracks = tracks.filter { $0.value.rootFolderId != rootFolderId }
+        do {
+            try libraryStore().deleteRootFolder(id: rootFolderId)
+        } catch {
+            rememberPersistenceError(error)
+        }
     }
 
     func allFolders() -> [FolderEntry] {
-        folders.values.sorted { $0.updatedAt > $1.updatedAt }
+        do {
+            return try libraryStore()
+                .fetchRootFolders()
+                .map(folderEntry(from:))
+        } catch {
+            rememberPersistenceError(error)
+            return []
+        }
+    }
+
+    func updateFolderAvailability(
+        id: UUID,
+        isAvailable: Bool
+    ) {
+        do {
+            try libraryStore().updateFolderAvailability(
+                id: id,
+                isAvailable: isAvailable
+            )
+        } catch {
+            rememberPersistenceError(error)
+        }
     }
 
     // MARK: - Треки
@@ -172,9 +203,26 @@ actor TrackRegistry {
         rootFolderId: UUID,
         fileDate: Date = Date()
     ) {
-        let now = Date()
-        let existing = tracks[id]
+        if isLibraryRelativePath(relativePath) {
+            do {
+                try libraryStore().upsertLibraryTrack(
+                    id: id,
+                    fileName: fileName,
+                    relativePath: relativePath,
+                    folderId: folderId,
+                    rootFolderId: rootFolderId,
+                    fileDate: fileDate
+                )
+            } catch {
+                rememberPersistenceError(error)
+            }
+            return
+        }
 
+        loadLegacyIfNeeded()
+
+        let now = Date()
+        let existing = legacyImportedTracks[id]
         let entry = TrackEntry(
             id: id,
             fileName: fileName,
@@ -183,38 +231,212 @@ actor TrackRegistry {
             rootFolderId: rootFolderId,
             importedAt: existing?.importedAt ?? now,
             fileDate: fileDate,
-            updatedAt: now
+            updatedAt: now,
+            isAvailable: true
         )
-        tracks[id] = entry
+        legacyImportedTracks[id] = entry
+        legacyDirty = true
     }
 
     func removeTrack(id: UUID) {
-        tracks.removeValue(forKey: id)
+        loadLegacyIfNeeded()
+
+        if legacyImportedTracks.removeValue(forKey: id) != nil {
+            legacyDirty = true
+            return
+        }
+
+        do {
+            try libraryStore().removeLibraryTrack(id: id)
+        } catch {
+            rememberPersistenceError(error)
+        }
     }
 
     func tracks(inFolder folderId: UUID) -> [TrackEntry] {
-        tracks.values.filter { $0.folderId == folderId }
+        do {
+            return try libraryStore()
+                .fetchLibraryTracks(inFolder: folderId)
+                .compactMap(trackEntry(from:))
+        } catch {
+            rememberPersistenceError(error)
+            return []
+        }
     }
 
     func tracks(inRootFolder rootFolderId: UUID) -> [TrackEntry] {
-        tracks.values.filter { $0.rootFolderId == rootFolderId }
+        do {
+            return try libraryStore()
+                .fetchLibraryTracks(inRootFolder: rootFolderId)
+                .compactMap(trackEntry(from:))
+        } catch {
+            rememberPersistenceError(error)
+            return []
+        }
     }
 
     func allTracks() -> [TrackEntry] {
-        Array(tracks.values)
+        loadLegacyIfNeeded()
+
+        let libraryTracks: [TrackEntry]
+        do {
+            libraryTracks = try libraryStore()
+                .fetchRootFolders()
+                .flatMap { root in
+                    try libraryStore()
+                        .fetchLibraryTracks(inRootFolder: root.id)
+                        .compactMap(trackEntry(from:))
+                }
+        } catch {
+            rememberPersistenceError(error)
+            libraryTracks = []
+        }
+
+        return libraryTracks + Array(legacyImportedTracks.values)
     }
 
     func entry(for id: UUID) -> TrackEntry? {
-        tracks[id]
+        do {
+            if let model = try libraryStore().fetchLibraryTrack(id: id) {
+                return trackEntry(from: model)
+            }
+        } catch {
+            rememberPersistenceError(error)
+        }
+
+        loadLegacyIfNeeded()
+        return legacyImportedTracks[id]
     }
     
     func entry(
         inRootFolder rootFolderId: UUID,
         relativePath: String
     ) -> TrackEntry? {
-        tracks.values.first {
+        do {
+            if let model = try libraryStore().fetchLibraryTrack(
+                rootFolderId: rootFolderId,
+                relativePath: relativePath
+            ) {
+                return trackEntry(from: model)
+            }
+        } catch {
+            rememberPersistenceError(error)
+        }
+
+        loadLegacyIfNeeded()
+        return legacyImportedTracks.values.first {
             $0.rootFolderId == rootFolderId &&
             $0.relativePath == relativePath
         }
+    }
+
+    func updateTrackAvailability(
+        id: UUID,
+        isAvailable: Bool
+    ) {
+        loadLegacyIfNeeded()
+
+        if var legacyEntry = legacyImportedTracks[id] {
+            legacyEntry.isAvailable = isAvailable
+            legacyEntry.updatedAt = Date()
+            legacyImportedTracks[id] = legacyEntry
+            legacyDirty = true
+            return
+        }
+
+        do {
+            try libraryStore().updateTrackAvailability(
+                id: id,
+                isAvailable: isAvailable
+            )
+        } catch {
+            rememberPersistenceError(error)
+        }
+    }
+
+    func isLibraryTrack(id: UUID) -> Bool {
+        do {
+            return try libraryStore().fetchLibraryTrack(id: id) != nil
+        } catch {
+            rememberPersistenceError(error)
+            return false
+        }
+    }
+
+    func isLegacyImportedTrack(id: UUID) -> Bool {
+        loadLegacyIfNeeded()
+        return legacyImportedTracks[id] != nil
+    }
+
+    // MARK: - Private
+
+    private func libraryStore() throws -> LibraryDatabaseStore {
+        if let cachedLibraryStore {
+            return cachedLibraryStore
+        }
+
+        let store = try LibraryDatabaseStore()
+        cachedLibraryStore = store
+        return store
+    }
+
+    private func loadLegacyIfNeeded() {
+        guard isLegacyLoaded == false else { return }
+        isLegacyLoaded = true
+
+        do {
+            let data = try Data(contentsOf: fileURL)
+            let decoded = try decoder.decode(RegistryFile.self, from: data)
+
+            backupFolders = decoded.folders
+            backupLibraryTracks = decoded.tracks.filter { isLibraryRelativePath($0.relativePath) }
+            legacyImportedTracks = Dictionary(
+                uniqueKeysWithValues: decoded.tracks
+                    .filter { isLibraryRelativePath($0.relativePath) == false }
+                    .map { ($0.id, $0) }
+            )
+        } catch {
+            backupFolders = []
+            backupLibraryTracks = []
+            legacyImportedTracks = [:]
+        }
+    }
+
+    private func folderEntry(from model: FolderDatabaseModel) -> FolderEntry {
+        FolderEntry(
+            id: model.id,
+            name: model.name,
+            updatedAt: model.updatedAt
+        )
+    }
+
+    private func trackEntry(from model: TrackDatabaseModel) -> TrackEntry? {
+        guard let folderId = model.folderId,
+              let rootFolderId = model.rootFolderId,
+              let relativePath = model.relativePath
+        else {
+            return nil
+        }
+
+        return TrackEntry(
+            id: model.id,
+            fileName: model.fileName,
+            relativePath: relativePath,
+            folderId: folderId,
+            rootFolderId: rootFolderId,
+            importedAt: model.importedAt,
+            fileDate: model.fileDate ?? model.importedAt,
+            updatedAt: model.updatedAt,
+            isAvailable: model.isAvailable
+        )
+    }
+
+    private func isLibraryRelativePath(_ relativePath: String) -> Bool {
+        relativePath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+    }
+
+    private func rememberPersistenceError(_ error: Error) {
+        pendingPersistenceError = error
+        PersistentLogger.log("❌ TrackRegistry SQLite error: \(error)")
     }
 }

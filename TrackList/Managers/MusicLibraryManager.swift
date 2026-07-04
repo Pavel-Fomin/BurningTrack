@@ -129,7 +129,8 @@ final class MusicLibraryManager: ObservableObject {
             try await LibrarySyncModule.shared.syncRootFolder(
                 rootFolderId: rootFolderId,
                 rootURL: url,
-                mode: .full
+                mode: .full,
+                logsDatabaseDiagnostics: false
             )
 
             // 5. Заменяем lite-папку на полноценное дерево
@@ -140,6 +141,11 @@ final class MusicLibraryManager: ObservableObject {
             }
 
             attachingFolderIds.remove(rootFolderId)
+
+            #if DEBUG
+            // Диагностика attach показывает итоговое состояние SQLite после регистрации корня и sync.
+            DatabaseDiagnosticsLogger.logLibrarySnapshot()
+            #endif
         } catch {
             attachingFolderIds.remove(rootFolderId)
             attachedFolders.removeAll { $0.id == rootFolderId }
@@ -185,6 +191,11 @@ final class MusicLibraryManager: ObservableObject {
 
         // Обновляем UI-список прикреплённых папок
         attachedFolders.removeAll { $0.url == url }
+
+        #if DEBUG
+        // Диагностика detach показывает фактическое состояние SQLite после удаления корня.
+        DatabaseDiagnosticsLogger.logLibrarySnapshot()
+        #endif
     }
     
     // MARK: - Проверка перед откреплением папки
@@ -275,6 +286,11 @@ final class MusicLibraryManager: ObservableObject {
             isAccessRestored = true
             PersistentLogger.log("✅ restoreAccessAsync: ready (no folders)")
             
+            #if DEBUG
+            // Диагностика запуска полезна даже при пустой фонотеке.
+            DatabaseDiagnosticsLogger.logLibrarySnapshot()
+            #endif
+
             NotificationCenter.default.post(name: .libraryAccessRestored, object: nil)
             return
         }
@@ -310,6 +326,12 @@ final class MusicLibraryManager: ObservableObject {
             
             PersistentLogger.log("❌ restoreAccessAsync: no root access opened")
             print("❌ restoreAccessAsync: не удалось открыть ни одну корневую папку")
+
+            #if DEBUG
+            // Диагностика фиксирует состояние БД после неуспешной попытки восстановления доступа.
+            DatabaseDiagnosticsLogger.logLibrarySnapshot()
+            #endif
+
             return
         }
         
@@ -337,7 +359,8 @@ final class MusicLibraryManager: ObservableObject {
                 try await LibrarySyncModule.shared.syncRootFolder(
                     rootFolderId: root.id,
                     rootURL: root.url,
-                    mode: .safe
+                    mode: .safe,
+                    logsDatabaseDiagnostics: false
                 )
                 print("🔄 Safe sync завершён:", root.name)
             } catch {
@@ -352,7 +375,8 @@ final class MusicLibraryManager: ObservableObject {
                 try await LibrarySyncModule.shared.syncRootFolder(
                     rootFolderId: root.id,
                     rootURL: root.url,
-                    mode: .full
+                    mode: .full,
+                    logsDatabaseDiagnostics: false
                 )
                 print("🔄 Full sync завершён:", root.name)
             } catch {
@@ -366,6 +390,11 @@ final class MusicLibraryManager: ObservableObject {
         print("✅ Восстановление доступа завершено (ready)")
         PersistentLogger.log("✅ Восстановление доступа завершено (ready)")
         PersistentLogger.log("✅ restoreAccessAsync: ready")
+
+        #if DEBUG
+        // Диагностика restore печатается один раз после всех safe/full sync корневых папок.
+        DatabaseDiagnosticsLogger.logLibrarySnapshot()
+        #endif
         
         NotificationCenter.default.post(name: .libraryAccessRestored, object: nil)
     }

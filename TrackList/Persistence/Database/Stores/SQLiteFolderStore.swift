@@ -13,6 +13,9 @@ import Foundation
 protocol FolderDatabaseReading {
     func fetch(id: UUID) throws -> FolderDatabaseModel?
     func fetchAll() throws -> [FolderDatabaseModel]
+    func fetchRootFolders() throws -> [FolderDatabaseModel]
+    func fetchAll(rootFolderId: UUID) throws -> [FolderDatabaseModel]
+    func fetch(rootFolderId: UUID, relativePath: String) throws -> FolderDatabaseModel?
 }
 
 // Записывает строки folders без смешивания с бизнес-логикой фонотеки.
@@ -21,6 +24,8 @@ protocol FolderDatabaseWriting {
     func update(_ model: FolderDatabaseModel) throws
     func upsert(_ model: FolderDatabaseModel) throws
     func delete(id: UUID) throws
+    func updateBookmark(id: UUID, bookmarkBase64: String?, updatedAt: Date) throws
+    func updateAvailability(id: UUID, isAvailable: Bool, updatedAt: Date) throws
 }
 
 // SQLite-реализация доступа только к таблице folders.
@@ -52,6 +57,39 @@ final class SQLiteFolderStore: FolderDatabaseReading, FolderDatabaseWriting {
         try executor.fetchAll(FolderDatabaseQueries.fetchAll, map: Self.map)
     }
 
+    func fetchRootFolders() throws -> [FolderDatabaseModel] {
+        try executor.fetchAll(FolderDatabaseQueries.fetchRootFolders, map: Self.map)
+    }
+
+    func fetchAll(rootFolderId: UUID) throws -> [FolderDatabaseModel] {
+        try executor.read { database in
+            let statement = try database.prepare(FolderDatabaseQueries.fetchAllForRoot)
+            try statement.bind(rootFolderId, at: 1)
+            try statement.bind(rootFolderId, at: 2)
+
+            var result: [FolderDatabaseModel] = []
+            while try statement.step() == .row {
+                result.append(try Self.map(statement.rowReader()))
+            }
+
+            return result
+        }
+    }
+
+    func fetch(rootFolderId: UUID, relativePath: String) throws -> FolderDatabaseModel? {
+        try executor.read { database in
+            let statement = try database.prepare(FolderDatabaseQueries.fetchByRootRelativePath)
+            try statement.bind(rootFolderId, at: 1)
+            try statement.bind(relativePath, at: 2)
+
+            guard try statement.step() == .row else {
+                return nil
+            }
+
+            return try Self.map(statement.rowReader())
+        }
+    }
+
     func insert(_ model: FolderDatabaseModel) throws {
         try executor.write { database in
             let statement = try database.prepare(FolderDatabaseQueries.insert)
@@ -80,6 +118,26 @@ final class SQLiteFolderStore: FolderDatabaseReading, FolderDatabaseWriting {
         try executor.write { database in
             let statement = try database.prepare(FolderDatabaseQueries.delete)
             try statement.bind(id, at: 1)
+            try statement.execute()
+        }
+    }
+
+    func updateBookmark(id: UUID, bookmarkBase64: String?, updatedAt: Date) throws {
+        try executor.write { database in
+            let statement = try database.prepare(FolderDatabaseQueries.updateBookmark)
+            try statement.bind(bookmarkBase64, at: 1)
+            try statement.bind(updatedAt, at: 2)
+            try statement.bind(id, at: 3)
+            try statement.execute()
+        }
+    }
+
+    func updateAvailability(id: UUID, isAvailable: Bool, updatedAt: Date) throws {
+        try executor.write { database in
+            let statement = try database.prepare(FolderDatabaseQueries.updateAvailability)
+            try statement.bind(isAvailable, at: 1)
+            try statement.bind(updatedAt, at: 2)
+            try statement.bind(id, at: 3)
             try statement.execute()
         }
     }

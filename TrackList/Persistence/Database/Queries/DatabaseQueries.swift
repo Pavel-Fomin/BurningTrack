@@ -25,6 +25,30 @@ enum FolderDatabaseQueries {
     ORDER BY updated_at DESC;
     """
 
+    static let fetchRootFolders = """
+    SELECT id, parent_folder_id, root_folder_id, name, relative_path, bookmark_base64,
+           is_root, is_available, created_at, updated_at, last_scanned_at
+    FROM folders
+    WHERE is_root = 1
+    ORDER BY updated_at DESC;
+    """
+
+    static let fetchAllForRoot = """
+    SELECT id, parent_folder_id, root_folder_id, name, relative_path, bookmark_base64,
+           is_root, is_available, created_at, updated_at, last_scanned_at
+    FROM folders
+    WHERE id = ? OR root_folder_id = ?
+    ORDER BY is_root DESC, relative_path ASC;
+    """
+
+    static let fetchByRootRelativePath = """
+    SELECT id, parent_folder_id, root_folder_id, name, relative_path, bookmark_base64,
+           is_root, is_available, created_at, updated_at, last_scanned_at
+    FROM folders
+    WHERE root_folder_id = ? AND relative_path = ?
+    LIMIT 1;
+    """
+
     static let insert = """
     INSERT INTO folders (
         id, parent_folder_id, root_folder_id, name, relative_path, bookmark_base64,
@@ -62,6 +86,18 @@ enum FolderDatabaseQueries {
     DELETE FROM folders
     WHERE id = ?;
     """
+
+    static let updateBookmark = """
+    UPDATE folders
+    SET bookmark_base64 = ?, updated_at = ?
+    WHERE id = ?;
+    """
+
+    static let updateAvailability = """
+    UPDATE folders
+    SET is_available = ?, updated_at = ?
+    WHERE id = ?;
+    """
 }
 
 // SQL для таблицы tracks.
@@ -80,6 +116,41 @@ enum TrackDatabaseQueries {
            bookmark_base64, asset_url, is_available, is_deleted
     FROM tracks
     ORDER BY imported_at DESC;
+    """
+
+    static let fetchLibrary = """
+    SELECT id, source, folder_id, root_folder_id, file_name, relative_path,
+           file_extension, file_size, file_date, imported_at, updated_at,
+           bookmark_base64, asset_url, is_available, is_deleted
+    FROM tracks
+    WHERE id = ? AND source = 'library' AND is_deleted = 0;
+    """
+
+    static let fetchLibraryForFolder = """
+    SELECT id, source, folder_id, root_folder_id, file_name, relative_path,
+           file_extension, file_size, file_date, imported_at, updated_at,
+           bookmark_base64, asset_url, is_available, is_deleted
+    FROM tracks
+    WHERE folder_id = ? AND source = 'library' AND is_deleted = 0
+    ORDER BY file_date DESC, imported_at DESC;
+    """
+
+    static let fetchLibraryForRoot = """
+    SELECT id, source, folder_id, root_folder_id, file_name, relative_path,
+           file_extension, file_size, file_date, imported_at, updated_at,
+           bookmark_base64, asset_url, is_available, is_deleted
+    FROM tracks
+    WHERE root_folder_id = ? AND source = 'library' AND is_deleted = 0
+    ORDER BY file_date DESC, imported_at DESC;
+    """
+
+    static let fetchLibraryByRootRelativePath = """
+    SELECT id, source, folder_id, root_folder_id, file_name, relative_path,
+           file_extension, file_size, file_date, imported_at, updated_at,
+           bookmark_base64, asset_url, is_available, is_deleted
+    FROM tracks
+    WHERE root_folder_id = ? AND relative_path = ? AND source = 'library' AND is_deleted = 0
+    LIMIT 1;
     """
 
     static let insert = """
@@ -129,6 +200,18 @@ enum TrackDatabaseQueries {
     static let markDeleted = """
     UPDATE tracks
     SET is_deleted = 1, updated_at = ?
+    WHERE id = ?;
+    """
+
+    static let updateBookmark = """
+    UPDATE tracks
+    SET bookmark_base64 = ?, updated_at = ?
+    WHERE id = ?;
+    """
+
+    static let updateAvailability = """
+    UPDATE tracks
+    SET is_available = ?, updated_at = ?
     WHERE id = ?;
     """
 }

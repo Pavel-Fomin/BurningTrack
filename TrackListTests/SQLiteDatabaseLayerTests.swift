@@ -136,6 +136,152 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
         XCTAssertEqual(queue.first?.position, 0)
     }
 
+    func testLibraryDatabaseStorePersistsLibraryGraph() throws {
+        let database = try makeDatabase()
+        let store = try LibraryDatabaseStore(database: database)
+        let rootFolderId = UUID()
+        let childFolderId = UUID()
+        let trackId = UUID()
+        let now = Date()
+
+        try store.upsertRootFolder(
+            id: rootFolderId,
+            name: "Music"
+        )
+        try store.upsertRootFolderBookmark(
+            id: rootFolderId,
+            bookmarkBase64: "root-bookmark"
+        )
+        try store.upsertLibraryTrack(
+            id: trackId,
+            fileName: "Track.mp3",
+            relativePath: "Album/Track.mp3",
+            folderId: childFolderId,
+            rootFolderId: rootFolderId,
+            fileDate: now,
+            bookmarkBase64: "track-bookmark"
+        )
+
+        XCTAssertEqual(try store.fetchRootFolders().first?.name, "Music")
+        XCTAssertEqual(try store.folderBookmark(id: rootFolderId), "root-bookmark")
+        XCTAssertEqual(try store.fetchLibraryTracks(inFolder: childFolderId).map(\.id), [trackId])
+        XCTAssertEqual(
+            try store.fetchLibraryTrack(
+                rootFolderId: rootFolderId,
+                relativePath: "Album/Track.mp3"
+            )?.id,
+            trackId
+        )
+        XCTAssertEqual(try store.trackBookmark(id: trackId), "track-bookmark")
+
+        let metadata = TrackMetadataDatabaseModel(
+            trackId: trackId,
+            title: "Title",
+            artist: "Artist",
+            album: "Album",
+            albumArtist: nil,
+            genre: nil,
+            year: 2026,
+            trackNumber: 1,
+            discNumber: nil,
+            bpm: nil,
+            keySignature: nil,
+            comment: nil,
+            duration: 120,
+            bitrate: nil,
+            sampleRate: nil,
+            channelCount: nil,
+            metadataUpdatedAt: now
+        )
+        try store.upsertTrackMetadata(metadata)
+        XCTAssertEqual(try store.fetchTrackMetadata(trackId: trackId)?.title, "Title")
+
+        try store.removeLibraryTrack(id: trackId)
+        XCTAssertNil(try store.fetchLibraryTrack(id: trackId))
+    }
+
+    #if DEBUG
+    func testDatabaseDiagnosticsSnapshotCountsActualLibraryState() throws {
+        let database = try makeDatabase()
+        let store = try LibraryDatabaseStore(database: database)
+        let diagnosticsStore = try DatabaseDiagnosticsStore(database: database)
+        let musicRootId = UUID()
+        let downloadsRootId = UUID()
+        let albumFolderId = UUID()
+        let firstTrackId = UUID()
+        let secondTrackId = UUID()
+        let now = Date()
+
+        try store.upsertRootFolder(
+            id: musicRootId,
+            name: "Music"
+        )
+        try store.upsertRootFolder(
+            id: downloadsRootId,
+            name: "Downloads"
+        )
+
+        try store.upsertLibraryTrack(
+            id: firstTrackId,
+            fileName: "First.mp3",
+            relativePath: "Album/First.mp3",
+            folderId: albumFolderId,
+            rootFolderId: musicRootId,
+            fileDate: now
+        )
+        try store.upsertLibraryTrack(
+            id: secondTrackId,
+            fileName: "Second.mp3",
+            relativePath: "Second.mp3",
+            folderId: musicRootId,
+            rootFolderId: musicRootId,
+            fileDate: now,
+            isAvailable: false
+        )
+
+        // Недоступность выставляется отдельными update-запросами, как это делает runtime-проверка bookmark'ов.
+        try store.updateFolderAvailability(
+            id: albumFolderId,
+            isAvailable: false
+        )
+        try store.upsertTrackMetadata(
+            TrackMetadataDatabaseModel(
+                trackId: firstTrackId,
+                title: "First",
+                artist: nil,
+                album: nil,
+                albumArtist: nil,
+                genre: nil,
+                year: nil,
+                trackNumber: nil,
+                discNumber: nil,
+                bpm: nil,
+                keySignature: nil,
+                comment: nil,
+                duration: nil,
+                bitrate: nil,
+                sampleRate: nil,
+                channelCount: nil,
+                metadataUpdatedAt: now
+            )
+        )
+
+        let snapshot = try diagnosticsStore.librarySnapshot()
+        let rootsByName = Dictionary(uniqueKeysWithValues: snapshot.rootFolders.map { ($0.name, $0) })
+
+        XCTAssertEqual(snapshot.rootFoldersCount, 2)
+        XCTAssertEqual(snapshot.foldersTotalCount, 3)
+        XCTAssertEqual(snapshot.libraryTracksTotalCount, 2)
+        XCTAssertEqual(snapshot.metadataRowsCount, 1)
+        XCTAssertEqual(snapshot.unavailableFoldersCount, 1)
+        XCTAssertEqual(snapshot.unavailableTracksCount, 1)
+        XCTAssertEqual(rootsByName["Music"]?.tracksCount, 2)
+        XCTAssertEqual(rootsByName["Music"]?.foldersCount, 2)
+        XCTAssertEqual(rootsByName["Downloads"]?.tracksCount, 0)
+        XCTAssertEqual(rootsByName["Downloads"]?.foldersCount, 1)
+    }
+    #endif
+
     private func makeDatabase() throws -> AppDatabase {
         let directory = FileManager.default
             .temporaryDirectory

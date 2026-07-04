@@ -13,6 +13,10 @@ import Foundation
 protocol TrackDatabaseReading {
     func fetch(id: UUID) throws -> TrackDatabaseModel?
     func fetchAll() throws -> [TrackDatabaseModel]
+    func fetchLibrary(id: UUID) throws -> TrackDatabaseModel?
+    func fetchLibrary(rootFolderId: UUID, relativePath: String) throws -> TrackDatabaseModel?
+    func fetchLibraryTracks(inFolder folderId: UUID) throws -> [TrackDatabaseModel]
+    func fetchLibraryTracks(inRootFolder rootFolderId: UUID) throws -> [TrackDatabaseModel]
 }
 
 // Записывает строки tracks без обращения к JSON-хранилищам.
@@ -22,6 +26,8 @@ protocol TrackDatabaseWriting {
     func upsert(_ model: TrackDatabaseModel) throws
     func delete(id: UUID) throws
     func markDeleted(id: UUID, updatedAt: Date) throws
+    func updateBookmark(id: UUID, bookmarkBase64: String?, updatedAt: Date) throws
+    func updateAvailability(id: UUID, isAvailable: Bool, updatedAt: Date) throws
 }
 
 // SQLite-реализация доступа только к таблице tracks.
@@ -51,6 +57,61 @@ final class SQLiteTrackStore: TrackDatabaseReading, TrackDatabaseWriting {
 
     func fetchAll() throws -> [TrackDatabaseModel] {
         try executor.fetchAll(TrackDatabaseQueries.fetchAll, map: Self.map)
+    }
+
+    func fetchLibrary(id: UUID) throws -> TrackDatabaseModel? {
+        try executor.read { database in
+            let statement = try database.prepare(TrackDatabaseQueries.fetchLibrary)
+            try statement.bind(id, at: 1)
+
+            guard try statement.step() == .row else {
+                return nil
+            }
+
+            return try Self.map(statement.rowReader())
+        }
+    }
+
+    func fetchLibrary(rootFolderId: UUID, relativePath: String) throws -> TrackDatabaseModel? {
+        try executor.read { database in
+            let statement = try database.prepare(TrackDatabaseQueries.fetchLibraryByRootRelativePath)
+            try statement.bind(rootFolderId, at: 1)
+            try statement.bind(relativePath, at: 2)
+
+            guard try statement.step() == .row else {
+                return nil
+            }
+
+            return try Self.map(statement.rowReader())
+        }
+    }
+
+    func fetchLibraryTracks(inFolder folderId: UUID) throws -> [TrackDatabaseModel] {
+        try executor.read { database in
+            let statement = try database.prepare(TrackDatabaseQueries.fetchLibraryForFolder)
+            try statement.bind(folderId, at: 1)
+
+            var result: [TrackDatabaseModel] = []
+            while try statement.step() == .row {
+                result.append(try Self.map(statement.rowReader()))
+            }
+
+            return result
+        }
+    }
+
+    func fetchLibraryTracks(inRootFolder rootFolderId: UUID) throws -> [TrackDatabaseModel] {
+        try executor.read { database in
+            let statement = try database.prepare(TrackDatabaseQueries.fetchLibraryForRoot)
+            try statement.bind(rootFolderId, at: 1)
+
+            var result: [TrackDatabaseModel] = []
+            while try statement.step() == .row {
+                result.append(try Self.map(statement.rowReader()))
+            }
+
+            return result
+        }
     }
 
     func insert(_ model: TrackDatabaseModel) throws {
@@ -90,6 +151,26 @@ final class SQLiteTrackStore: TrackDatabaseReading, TrackDatabaseWriting {
             let statement = try database.prepare(TrackDatabaseQueries.markDeleted)
             try statement.bind(updatedAt, at: 1)
             try statement.bind(id, at: 2)
+            try statement.execute()
+        }
+    }
+
+    func updateBookmark(id: UUID, bookmarkBase64: String?, updatedAt: Date) throws {
+        try executor.write { database in
+            let statement = try database.prepare(TrackDatabaseQueries.updateBookmark)
+            try statement.bind(bookmarkBase64, at: 1)
+            try statement.bind(updatedAt, at: 2)
+            try statement.bind(id, at: 3)
+            try statement.execute()
+        }
+    }
+
+    func updateAvailability(id: UUID, isAvailable: Bool, updatedAt: Date) throws {
+        try executor.write { database in
+            let statement = try database.prepare(TrackDatabaseQueries.updateAvailability)
+            try statement.bind(isAvailable, at: 1)
+            try statement.bind(updatedAt, at: 2)
+            try statement.bind(id, at: 3)
             try statement.execute()
         }
     }

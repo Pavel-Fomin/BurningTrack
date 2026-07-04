@@ -3,8 +3,7 @@
 //  TrackList
 //
 //  Хранилище bookmark'ов для папок и треков.
-//  TrackRegistry хранит только метаданные.
-//  BookmarksRegistry отвечает исключительно за доступ.
+//  Для фонотеки использует SQLite, для внефазовых одиночных импортов сохраняет legacy JSON.
 //
 //  Created by Pavel Fomin on 30.11.2025.
 //
@@ -36,8 +35,12 @@ actor BookmarksRegistry {
 
     // MARK: - Хранилище
 
-    private var folderBookmarks: [UUID: FolderBookmark] = [:]
-    private var trackBookmarks:  [UUID: TrackBookmark]  = [:]
+    private var backupFolderBookmarks: [FolderBookmark] = []
+    private var legacyTrackBookmarks: [UUID: TrackBookmark] = [:]
+    private var isLegacyLoaded = false
+    private var legacyDirty = false
+    private var pendingPersistenceError: Error?
+    private var cachedLibraryStore: LibraryDatabaseStore?
 
     private let fileURL: URL = {
         let appDir = FileManager.default.urls(for: .documentDirectory,
@@ -61,73 +64,156 @@ actor BookmarksRegistry {
     // MARK: - Загрузка
 
     func load() {
-        do {
-            let data = try Data(contentsOf: fileURL)
-            let decoded = try decoder.decode(BookmarkFile.self, from: data)
+        // JSON больше не является источником bookmark'ов фонотеки.
+        isLegacyLoaded = false
+        loadLegacyIfNeeded()
 
-            folderBookmarks = Dictionary(uniqueKeysWithValues:
-                decoded.folders.map { ($0.id, $0) })
-
-            trackBookmarks = Dictionary(uniqueKeysWithValues:
-                decoded.tracks.map { ($0.id, $0) })
-
-            print("🔑 BookmarksRegistry загружен (\(trackBookmarks.count) треков, \(folderBookmarks.count) папок)")
-
-        } catch {
-            print("ℹ️ BookmarksRegistry: нет файла, создаём новый.")
-            folderBookmarks = [:]
-            trackBookmarks = [:]
-        }
+        print("🔑 BookmarksRegistry загружен из SQLite (legacy bookmarks: \(legacyTrackBookmarks.count))")
     }
 
     // MARK: - Сохранение
 
     func persist() throws {
+        if let pendingPersistenceError {
+            self.pendingPersistenceError = nil
+            throw pendingPersistenceError
+        }
+
+        guard legacyDirty else {
+            print(" BookmarksRegistry: SQLite-изменения уже сохранены")
+            return
+        }
+
         let file = BookmarkFile(
-            folders: folderBookmarks.values.sorted { $0.updatedAt > $1.updatedAt },
-            tracks:  trackBookmarks.values.sorted  { $0.updatedAt > $1.updatedAt }
+            folders: backupFolderBookmarks,
+            tracks: legacyTrackBookmarks.values.sorted { $0.updatedAt > $1.updatedAt }
         )
 
-        // Сохраняем bookmark-реестр на диск и не скрываем ошибку записи.
-        // Вызывающий код должен знать, что операция фактически не была сохранена.
+        // Legacy JSON пишется только для внефазовых импортов и сохраняет старые backup-записи.
         let data = try encoder.encode(file)
         try data.write(to: fileURL, options: .atomic)
-        print(" BookmarksRegistry сохранён")
+        legacyDirty = false
+        print(" BookmarksRegistry legacy imports сохранён")
     }
 
     // MARK: - Папки
 
     func upsertFolderBookmark(id: UUID, base64: String) {
-        folderBookmarks[id] = FolderBookmark(
-            id: id,
-            base64: base64,
-            updatedAt: Date()
-        )
+        do {
+            try libraryStore().upsertRootFolderBookmark(
+                id: id,
+                bookmarkBase64: base64
+            )
+        } catch {
+            rememberPersistenceError(error)
+        }
     }
 
     func removeFolderBookmark(id: UUID) {
-        folderBookmarks.removeValue(forKey: id)
+        do {
+            try libraryStore().removeFolderBookmark(id: id)
+        } catch {
+            rememberPersistenceError(error)
+        }
     }
 
     func folderBookmark(for id: UUID) -> String? {
-        folderBookmarks[id]?.base64
+        do {
+            return try libraryStore().folderBookmark(id: id)
+        } catch {
+            rememberPersistenceError(error)
+            return nil
+        }
     }
 
     // MARK: - Треки
 
-    func upsertTrackBookmark(id: UUID, base64: String) {
-        trackBookmarks[id] = TrackBookmark(
+    func upsertTrackBookmark(id: UUID, base64: String) async {
+        if await TrackRegistry.shared.isLibraryTrack(id: id) {
+            do {
+                try libraryStore().upsertTrackBookmark(
+                    id: id,
+                    bookmarkBase64: base64
+                )
+            } catch {
+                rememberPersistenceError(error)
+            }
+            return
+        }
+
+        loadLegacyIfNeeded()
+        legacyTrackBookmarks[id] = TrackBookmark(
             id: id,
             base64: base64,
             updatedAt: Date()
         )
+        legacyDirty = true
     }
 
-    func removeTrackBookmark(id: UUID) {
-        trackBookmarks.removeValue(forKey: id)
+    func removeTrackBookmark(id: UUID) async {
+        do {
+            try libraryStore().removeTrackBookmark(id: id)
+        } catch {
+            rememberPersistenceError(error)
+        }
+
+        loadLegacyIfNeeded()
+        guard await TrackRegistry.shared.isLegacyImportedTrack(id: id) else { return }
+
+        if legacyTrackBookmarks.removeValue(forKey: id) != nil {
+            legacyDirty = true
+        }
     }
 
-    func trackBookmark(for id: UUID) -> String? {
-        trackBookmarks[id]?.base64
+    func trackBookmark(for id: UUID) async -> String? {
+        do {
+            if let bookmark = try libraryStore().trackBookmark(id: id) {
+                return bookmark
+            }
+        } catch {
+            rememberPersistenceError(error)
+        }
+
+        guard await TrackRegistry.shared.isLegacyImportedTrack(id: id) else {
+            return nil
+        }
+
+        loadLegacyIfNeeded()
+        return legacyTrackBookmarks[id]?.base64
+    }
+
+    // MARK: - Private
+
+    private func libraryStore() throws -> LibraryDatabaseStore {
+        if let cachedLibraryStore {
+            return cachedLibraryStore
+        }
+
+        let store = try LibraryDatabaseStore()
+        cachedLibraryStore = store
+        return store
+    }
+
+    private func loadLegacyIfNeeded() {
+        guard isLegacyLoaded == false else { return }
+        isLegacyLoaded = true
+
+        do {
+            let data = try Data(contentsOf: fileURL)
+            let decoded = try decoder.decode(BookmarkFile.self, from: data)
+
+            backupFolderBookmarks = decoded.folders
+            legacyTrackBookmarks = Dictionary(
+                uniqueKeysWithValues: decoded.tracks.map { ($0.id, $0) }
+            )
+        } catch {
+            backupFolderBookmarks = []
+            legacyTrackBookmarks = [:]
+        }
+    }
+
+    private func rememberPersistenceError(_ error: Error) {
+        pendingPersistenceError = error
+        PersistentLogger.log("❌ BookmarksRegistry SQLite error: \(error)")
     }
 }
