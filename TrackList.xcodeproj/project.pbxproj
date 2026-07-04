@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		A912E3B52DA911BD0046A8B6 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = A912E3B42DA911BD0046A8B6 /* LaunchScreen.storyboard */; };
+		A9C9F1012F19A50100DB0001 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = A9C9F1002F19A50100DB0001 /* libsqlite3.tbd */; };
 		A9BCE0F82F09B99F000DDCD3 /* libz.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = A9BCE0F72F09B99F000DDCD3 /* libz.tbd */; };
 /* End PBXBuildFile section */
 
@@ -47,6 +48,7 @@
 		A90C56042E0DF38300AAA02B /* TrackListUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TrackListUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A912E3B42DA911BD0046A8B6 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		A992A15C2E04ADE800BA637D /* TrackList-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TrackList-Bridging-Header.h"; sourceTree = "<group>"; };
+		A9C9F1002F19A50100DB0001 /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
 		A9BCE0F72F09B99F000DDCD3 /* libz.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libz.tbd; path = usr/lib/libz.tbd; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
@@ -128,6 +130,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A9C9F1012F19A50100DB0001 /* libsqlite3.tbd in Frameworks */,
 				A9BCE0F82F09B99F000DDCD3 /* libz.tbd in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -169,6 +172,7 @@
 		A992A1662E05829B00BA637D /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				A9C9F1002F19A50100DB0001 /* libsqlite3.tbd */,
 				A9BCE0F72F09B99F000DDCD3 /* libz.tbd */,
 			);
 			name = Frameworks;

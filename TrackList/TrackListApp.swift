@@ -17,6 +17,14 @@ struct TrackListApp: App {
     let playerViewModel: PlayerViewModel
     
     init() {
+        do {
+            // Открываем постоянное SQLite-хранилище один раз при старте приложения.
+            try AppDatabase.shared.open()
+        } catch {
+            // Инфраструктура БД критична для следующих фаз, поэтому ошибка должна быть заметна сразу.
+            preconditionFailure("Не удалось подготовить SQLite-хранилище: \(error.localizedDescription)")
+        }
+
         let playerVM = PlayerViewModel() // без аргументов
         self.playerViewModel = playerVM
     }
