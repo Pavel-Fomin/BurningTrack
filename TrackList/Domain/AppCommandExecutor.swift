@@ -519,7 +519,7 @@ actor AppCommandExecutor {
         }
     }
 
-    /// Добавляет несколько треков в плеер одним сохранением player.json.
+    /// Добавляет несколько треков в плеер одним сохранением очереди.
     func addTracksToPlayer(trackIds: [UUID]) async throws {
         guard !trackIds.isEmpty else { return }
 
@@ -578,7 +578,7 @@ actor AppCommandExecutor {
             
             PlaylistManager.shared.tracks.remove(at: index)
             
-            guard PlaylistManager.shared.saveToDisk() else {
+            guard PlaylistManager.shared.saveQueue() else {
                 PlaylistManager.shared.tracks = previousTracks
                 return PlayerTrackRemovalResult.saveFailed
             }
@@ -631,7 +631,7 @@ actor AppCommandExecutor {
         let didClear = await MainActor.run {
             let previousTracks = PlaylistManager.shared.tracks
             PlaylistManager.shared.tracks.removeAll()
-            guard PlaylistManager.shared.saveToDisk() else {
+            guard PlaylistManager.shared.saveQueue() else {
                 PlaylistManager.shared.tracks = previousTracks
                 return false
             }

@@ -44,7 +44,7 @@ final class PlayerQueueActionHandler {
     // MARK: - Actions
 
     /// Перемещает элементы очереди плеера
-    /// с сохранением и rollback при ошибке.
+    /// с сохранением очереди и rollback при ошибке.
     func moveTracks(
         from: IndexSet,
         to: Int
@@ -54,7 +54,7 @@ final class PlayerQueueActionHandler {
             fromOffsets: from,
             toOffset: to
         )
-        guard playlistManager.saveToDisk() else {
+        guard playlistManager.saveQueue() else {
             playlistManager.tracks = previousTracks
             toastManager.handle(.playlistSaveFailed)
             return

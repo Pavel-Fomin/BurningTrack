@@ -6,9 +6,9 @@
 //  Runtime display-модель.
 //  Codable сохранён для совместимости, но источником runtime-метаданных является TrackRuntimeSnapshot.
 //  Runtime-модель строки плеера.
-//  Для library-треков в player.json сохраняются queueItemId и trackId.
+//  Для library-треков сохраняются queueItemId и trackId.
 //  URL library-трека определяется через TrackRegistry по trackId.
-//  Для iTunes-трека дополнительно сохраняются текущие метаданные и artworkData.
+//  Для iTunes-трека дополнительно сохраняются текущие метаданные.
 //
 //  Created by Pavel Fomin on 07.08.2025.
 //
