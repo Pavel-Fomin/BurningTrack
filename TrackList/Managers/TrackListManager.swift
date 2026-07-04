@@ -26,66 +26,40 @@ enum TrackListStorageError: Error, LocalizedError {
 final class TrackListManager {
     
     static let shared = TrackListManager()
-    private init() {}
-    
-    
-    // MARK: - Пути
-    
-    /// Путь к директории /Documents
-    private var documentsDirectory: URL? {
-        FileManager.default.urls(for: .documentDirectory,
-                                 in: .userDomainMask).first
-    }
-    
-    /// Путь к JSON-файлу с треками конкретного треклиста
-    private func urlForTrackList(id: UUID) -> URL? {
-        guard let directory = documentsDirectory else { return nil }
-        let fileName = "tracklist_\(id.uuidString).json"
-        return directory.appendingPathComponent(fileName)
-    }
-    
-    
-    // MARK: - Работа с треками (tracklist_<id>.json)
-    
-    /// Загружает треки по ID треклиста
-    func loadTracks(for id: UUID) throws -> [Track] {
-        guard let url = urlForTrackList(id: id) else {
-            throw AppError.trackListLoadFailed
-        }
+    private let databaseStore: TrackListDatabaseStore
 
-        guard FileManager.default.fileExists(atPath: url.path) else {
-            return []
-        }
-
+    private init() {
         do {
-            let data = try Data(contentsOf: url)
-            return try JSONDecoder().decode([Track].self, from: data)
+            self.databaseStore = try TrackListDatabaseStore()
         } catch {
+            preconditionFailure("Не удалось создать TrackListDatabaseStore: \(error)")
+        }
+    }
+    
+    
+    // MARK: - Работа с треками SQLite
+    
+    /// Загружает треки по ID треклиста из SQLite.
+    func loadTracks(for id: UUID) throws -> [Track] {
+        do {
+            return try databaseStore.fetchTracks(for: id)
+        } catch let appError as AppError {
+            throw appError
+        } catch {
+            PersistentLogger.log("❌ TrackListManager: SQLite loadTracks failed id=\(id) error=\(error)")
             throw AppError.trackListLoadFailed
         }
     }
     
-    /// Сохраняет треки по ID треклиста
+    /// Сохраняет треки по ID треклиста в SQLite.
     @discardableResult
     func saveTracks(
         _ tracks: [Track],
         for id: UUID,
         postTrackListsDidChange: Bool = true
     ) -> Bool {
-        guard let url = urlForTrackList(id: id) else {
-            PersistentLogger.log("❌ TrackListManager: saveTracks url nil id=\(id)")
-            return false
-        }
-
-        let encoder = makePrettyJSONEncoder()
-
-        guard let data = try? encoder.encode(tracks) else {
-            PersistentLogger.log("❌ TrackListManager: encode failed id=\(id) tracks=\(tracks.count)")
-            return false
-        }
-
         do {
-            try data.write(to: url, options: .atomic)
+            try databaseStore.replaceTracks(tracks, for: id)
             NotificationCenter.default.post(
                 name: .trackListTracksDidChange,
                 object: id
@@ -96,57 +70,38 @@ final class TrackListManager {
                     object: nil
                 )
             }
-            PersistentLogger.log("💾 TrackListManager: saved tracks=\(tracks.count) id=\(id)")
+            PersistentLogger.log("💾 TrackListManager: saved SQLite tracks=\(tracks.count) id=\(id)")
             return true
         } catch {
-            PersistentLogger.log("❌ TrackListManager: write failed id=\(id) error=\(error)")
+            PersistentLogger.log("❌ TrackListManager: SQLite saveTracks failed id=\(id) tracks=\(tracks.count) error=\(error)")
             return false
         }
     }
     
-    /// Удаляет файл с треками треклиста (используется при удалении треклиста)
+    /// Совместимый метод для старого сценария удаления файла.
+    /// После переноса треклистов на SQLite физический файл tracklist_<UUID>.json больше не используется.
     func deleteTracksFile(for id: UUID) throws {
-        guard let url = urlForTrackList(id: id) else {
-            PersistentLogger.log("❌ TrackListManager: deleteTracksFile url nil id=\(id)")
-            throw AppError.trackListSaveFailed
-        }
-
-        guard FileManager.default.fileExists(atPath: url.path) else {
-            return
-        }
-
-        do {
-            try FileManager.default.removeItem(at: url)
-            PersistentLogger.log("🗑 TrackListManager: deleted tracklist file id=\(id)")
-        } catch {
-            PersistentLogger.log("❌ TrackListManager: delete failed id=\(id) error=\(error)")
-            throw AppError.trackListSaveFailed
-        }
+        PersistentLogger.log("ℹ️ TrackListManager: deleteTracksFile skipped for SQLite tracklist id=\(id)")
     }
     
     
     // MARK: - Возвращает объект треклиста
     
-    /// Возвращает треклист с треками и метаданными по его ID
+    /// Возвращает треклист с треками и метаданными по его ID из SQLite.
     func getTrackListById(_ id: UUID) throws -> TrackList {
-        // Получаем метаданные через TrackListsManager
-        let metas = try TrackListsManager.shared.loadTrackListMetas()
-        guard let meta = metas.first(where: { $0.id == id }) else {
-            throw AppError.trackListNotFound
+        do {
+            return try databaseStore.fetchTrackList(id: id)
+        } catch let appError as AppError {
+            throw appError
+        } catch {
+            PersistentLogger.log("❌ TrackListManager: SQLite getTrackListById failed id=\(id) error=\(error)")
+            throw AppError.trackListLoadFailed
         }
-        
-        let tracks = try loadTracks(for: id)
-        return TrackList(
-            id: id,
-            name: meta.name,
-            createdAt: meta.createdAt,
-            tracks: tracks
-        )
     }
 
     // MARK: - Добавление треков
 
-    /// Добавляет готовые модели Track в существующий треклист и сохраняет файл треклиста.
+    /// Добавляет готовые модели Track в существующий треклист и сохраняет его в SQLite.
     /// Повторные вхождения одного trackId разрешены, потому что это отдельные элементы треклиста.
     @discardableResult
     func addTracks(
