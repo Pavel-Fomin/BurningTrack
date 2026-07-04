@@ -156,7 +156,15 @@ final class TrackListDatabaseStore {
         )
 
         try trackListsStore.insert(model)
-        try replaceTracksWithoutMigration(tracks, for: id)
+
+        do {
+            try replaceTracksWithoutMigration(tracks, for: id)
+        } catch {
+            // Если строки треклиста не сохранились, мета не должна оставаться сиротой.
+            try? trackListTracksStore.replaceAll([], forTrackListId: id)
+            try? trackListsStore.delete(id: id)
+            throw error
+        }
 
         return TrackList(
             id: id,
