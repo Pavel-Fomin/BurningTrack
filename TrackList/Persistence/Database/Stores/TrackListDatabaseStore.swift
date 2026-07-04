@@ -172,15 +172,25 @@ final class TrackListDatabaseStore {
         try replaceTracksWithoutMigration(tracks, for: id)
     }
 
-    /// Атомарно заменяет все треклисты.
+    /// Заменяет набор треклистов на переданный список бизнес-моделей.
+    /// Треклисты, которых нет в новом списке, удаляются вместе со строками содержимого.
     func replaceTrackLists(_ trackLists: [TrackList]) throws {
+        let incomingIds = Set(trackLists.map(\.id))
+        let existingModels = try trackListsStore.fetchAll()
+
+        for model in existingModels where !incomingIds.contains(model.id) {
+            try trackListTracksStore.replaceAll([], forTrackListId: model.id)
+            try trackListsStore.delete(id: model.id)
+        }
+
         for list in trackLists {
+            let existing = try trackListsStore.fetch(id: list.id)
             let model = TrackListDatabaseModel(
                 id: list.id,
                 name: list.name,
                 createdAt: list.createdAt,
                 updatedAt: Date(),
-                sortOrder: nil,
+                sortOrder: existing?.sortOrder,
                 isDeleted: false
             )
             try trackListsStore.upsert(model)
