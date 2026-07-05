@@ -18,50 +18,12 @@ enum FolderDatabaseQueries {
     WHERE id = ?;
     """
 
-    static let fetchAll = """
-    SELECT id, parent_folder_id, root_folder_id, name, relative_path, bookmark_base64,
-           is_root, is_available, created_at, updated_at, last_scanned_at
-    FROM folders
-    ORDER BY updated_at DESC;
-    """
-
     static let fetchRootFolders = """
     SELECT id, parent_folder_id, root_folder_id, name, relative_path, bookmark_base64,
            is_root, is_available, created_at, updated_at, last_scanned_at
     FROM folders
     WHERE is_root = 1
     ORDER BY updated_at DESC;
-    """
-
-    static let fetchAllForRoot = """
-    SELECT id, parent_folder_id, root_folder_id, name, relative_path, bookmark_base64,
-           is_root, is_available, created_at, updated_at, last_scanned_at
-    FROM folders
-    WHERE id = ? OR root_folder_id = ?
-    ORDER BY is_root DESC, relative_path ASC;
-    """
-
-    static let fetchByRootRelativePath = """
-    SELECT id, parent_folder_id, root_folder_id, name, relative_path, bookmark_base64,
-           is_root, is_available, created_at, updated_at, last_scanned_at
-    FROM folders
-    WHERE root_folder_id = ? AND relative_path = ?
-    LIMIT 1;
-    """
-
-    static let insert = """
-    INSERT INTO folders (
-        id, parent_folder_id, root_folder_id, name, relative_path, bookmark_base64,
-        is_root, is_available, created_at, updated_at, last_scanned_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-    """
-
-    static let update = """
-    UPDATE folders
-    SET parent_folder_id = ?, root_folder_id = ?, name = ?, relative_path = ?,
-        bookmark_base64 = ?, is_root = ?, is_available = ?, created_at = ?,
-        updated_at = ?, last_scanned_at = ?
-    WHERE id = ?;
     """
 
     static let upsert = """
@@ -110,20 +72,37 @@ enum TrackDatabaseQueries {
     WHERE id = ?;
     """
 
-    static let fetchAll = """
-    SELECT id, source, folder_id, root_folder_id, file_name, relative_path,
-           file_extension, file_size, file_date, imported_at, updated_at,
-           bookmark_base64, asset_url, is_available, is_deleted
-    FROM tracks
-    ORDER BY imported_at DESC;
-    """
-
     static let fetchLibrary = """
     SELECT id, source, folder_id, root_folder_id, file_name, relative_path,
            file_extension, file_size, file_date, imported_at, updated_at,
            bookmark_base64, asset_url, is_available, is_deleted
     FROM tracks
     WHERE id = ? AND source = 'library' AND is_deleted = 0;
+    """
+
+    static let fetchImported = """
+    SELECT id, source, folder_id, root_folder_id, file_name, relative_path,
+           file_extension, file_size, file_date, imported_at, updated_at,
+           bookmark_base64, asset_url, is_available, is_deleted
+    FROM tracks
+    WHERE id = ? AND source = 'imported' AND is_deleted = 0;
+    """
+
+    static let fetchActiveLocal = """
+    SELECT id, source, folder_id, root_folder_id, file_name, relative_path,
+           file_extension, file_size, file_date, imported_at, updated_at,
+           bookmark_base64, asset_url, is_available, is_deleted
+    FROM tracks
+    WHERE id = ? AND source IN ('library', 'imported') AND is_deleted = 0;
+    """
+
+    static let fetchAllActiveLocal = """
+    SELECT id, source, folder_id, root_folder_id, file_name, relative_path,
+           file_extension, file_size, file_date, imported_at, updated_at,
+           bookmark_base64, asset_url, is_available, is_deleted
+    FROM tracks
+    WHERE source IN ('library', 'imported') AND is_deleted = 0
+    ORDER BY imported_at DESC;
     """
 
     static let fetchLibraryForFolder = """
@@ -161,14 +140,6 @@ enum TrackDatabaseQueries {
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
     """
 
-    static let update = """
-    UPDATE tracks
-    SET source = ?, folder_id = ?, root_folder_id = ?, file_name = ?, relative_path = ?,
-        file_extension = ?, file_size = ?, file_date = ?, imported_at = ?, updated_at = ?,
-        bookmark_base64 = ?, asset_url = ?, is_available = ?, is_deleted = ?
-    WHERE id = ?;
-    """
-
     static let upsert = """
     INSERT INTO tracks (
         id, source, folder_id, root_folder_id, file_name, relative_path,
@@ -190,11 +161,6 @@ enum TrackDatabaseQueries {
         asset_url = excluded.asset_url,
         is_available = excluded.is_available,
         is_deleted = excluded.is_deleted;
-    """
-
-    static let delete = """
-    DELETE FROM tracks
-    WHERE id = ?;
     """
 
     static let markDeleted = """
@@ -226,31 +192,6 @@ enum TrackMetadataDatabaseQueries {
     WHERE track_id = ?;
     """
 
-    static let fetchAll = """
-    SELECT track_id, title, artist, album, album_artist, genre, year, track_number,
-           disc_number, bpm, key_signature, comment, duration, bitrate, sample_rate,
-           channel_count, metadata_updated_at
-    FROM track_metadata
-    ORDER BY metadata_updated_at DESC;
-    """
-
-    static let insert = """
-    INSERT INTO track_metadata (
-        track_id, title, artist, album, album_artist, genre, year, track_number,
-        disc_number, bpm, key_signature, comment, duration, bitrate, sample_rate,
-        channel_count, metadata_updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-    """
-
-    static let update = """
-    UPDATE track_metadata
-    SET title = ?, artist = ?, album = ?, album_artist = ?, genre = ?, year = ?,
-        track_number = ?, disc_number = ?, bpm = ?, key_signature = ?, comment = ?,
-        duration = ?, bitrate = ?, sample_rate = ?, channel_count = ?,
-        metadata_updated_at = ?
-    WHERE track_id = ?;
-    """
-
     static let upsert = """
     INSERT INTO track_metadata (
         track_id, title, artist, album, album_artist, genre, year, track_number,
@@ -278,6 +219,30 @@ enum TrackMetadataDatabaseQueries {
 
     static let delete = """
     DELETE FROM track_metadata
+    WHERE track_id = ?;
+    """
+}
+
+// SQL для таблицы track_identity_keys.
+enum TrackIdentityKeyDatabaseQueries {
+    static let fetch = """
+    SELECT identity_key, track_id, source, created_at, updated_at
+    FROM track_identity_keys
+    WHERE identity_key = ?;
+    """
+
+    static let upsert = """
+    INSERT INTO track_identity_keys (
+        identity_key, track_id, source, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(identity_key) DO UPDATE SET
+        track_id = excluded.track_id,
+        source = excluded.source,
+        updated_at = excluded.updated_at;
+    """
+
+    static let deleteAllForTrack = """
+    DELETE FROM track_identity_keys
     WHERE track_id = ?;
     """
 }
@@ -651,50 +616,6 @@ enum PlayerSettingsDatabaseQueries {
 
     static let delete = """
     DELETE FROM player_settings
-    WHERE id = 1;
-    """
-}
-
-// SQL для таблицы export_settings.
-enum ExportSettingsDatabaseQueries {
-    static let fetch = """
-    SELECT id, filename_template, include_tracklist_prefix, prefix_format,
-           duplicate_handling, create_m3u, export_artwork, updated_at
-    FROM export_settings
-    WHERE id = 1;
-    """
-
-    static let insert = """
-    INSERT INTO export_settings (
-        id, filename_template, include_tracklist_prefix, prefix_format,
-        duplicate_handling, create_m3u, export_artwork, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
-    """
-
-    static let update = """
-    UPDATE export_settings
-    SET filename_template = ?, include_tracklist_prefix = ?, prefix_format = ?,
-        duplicate_handling = ?, create_m3u = ?, export_artwork = ?, updated_at = ?
-    WHERE id = ?;
-    """
-
-    static let upsert = """
-    INSERT INTO export_settings (
-        id, filename_template, include_tracklist_prefix, prefix_format,
-        duplicate_handling, create_m3u, export_artwork, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(id) DO UPDATE SET
-        filename_template = excluded.filename_template,
-        include_tracklist_prefix = excluded.include_tracklist_prefix,
-        prefix_format = excluded.prefix_format,
-        duplicate_handling = excluded.duplicate_handling,
-        create_m3u = excluded.create_m3u,
-        export_artwork = excluded.export_artwork,
-        updated_at = excluded.updated_at;
-    """
-
-    static let delete = """
-    DELETE FROM export_settings
     WHERE id = 1;
     """
 }

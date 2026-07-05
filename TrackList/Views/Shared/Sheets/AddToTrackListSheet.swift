@@ -25,7 +25,7 @@ struct AddToTrackListSheet: View {
     
     // MARK: - Input
     
-    let trackLists: [TrackListsManager.TrackListMeta]  /// Список доступных треклистов (read-only).
+    let trackLists: [TrackListMeta]                    /// Список доступных треклистов (read-only).
     let currentTrackListId: UUID?                      /// Текущий  треклист. Используется для бейджа «Текущий»
     
     @Binding var selectedTrackListId: UUID?            /// Выбранный треклист назначения.Источник истины находится в контейнере

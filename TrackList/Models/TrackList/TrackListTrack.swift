@@ -9,7 +9,7 @@
 import Foundation
 import UIKit
 // MARK: - Основная модель трека
-struct Track: Identifiable, TrackDisplayable, Codable {
+struct Track: Identifiable, TrackDisplayable {
     
     // MARK: - Identity
     let listItemId: UUID
@@ -67,64 +67,6 @@ struct Track: Identifiable, TrackDisplayable, Codable {
         self.source = source
         self.assetURL = assetURL
         self.isAvailable = isAvailable
-    }
-}
-// MARK: - Codable
-extension Track {
-    private enum CodingKeys: String, CodingKey {
-        case listItemId
-        case trackId
-        case id
-        case title
-        case artist
-        case album
-        case artworkData
-        case duration
-        case fileName
-        case source
-        case assetURL
-        case isAvailable
-    }
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        let decodedTrackId = try container.decodeIfPresent(UUID.self, forKey: .trackId)
-            ?? container.decode(UUID.self, forKey: .id)
-        let decodedSource = try container.decodeIfPresent(TrackSource.self, forKey: .source) ?? .library
-        let decodedAssetURL = try container.decodeIfPresent(URL.self, forKey: .assetURL)
-        self.listItemId = try container.decodeIfPresent(UUID.self, forKey: .listItemId) ?? UUID()
-        self.trackId = decodedTrackId
-        self.title = try container.decodeIfPresent(String.self, forKey: .title)
-        self.artist = try container.decodeIfPresent(String.self, forKey: .artist)
-        self.album = try container.decodeIfPresent(String.self, forKey: .album)
-        // Обложку сохраняем только для iTunes-треков, потому что для них нет файловой цепочки метаданных приложения.
-        self.artworkData = decodedSource == .purchasedITunes
-            ? try container.decodeIfPresent(Data.self, forKey: .artworkData)
-            : nil
-        self.duration = try container.decodeIfPresent(Double.self, forKey: .duration) ?? 0
-        self.fileName = try container.decode(String.self, forKey: .fileName)
-        self.source = decodedSource
-        self.assetURL = decodedAssetURL
-        let decodedIsAvailable = try container.decodeIfPresent(Bool.self, forKey: .isAvailable) ?? true
-        self.isAvailable = decodedSource == .purchasedITunes
-            ? decodedAssetURL != nil && decodedIsAvailable
-            : decodedIsAvailable
-    }
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(listItemId, forKey: .listItemId)
-        try container.encode(trackId, forKey: .trackId)
-        try container.encodeIfPresent(title, forKey: .title)
-        try container.encodeIfPresent(artist, forKey: .artist)
-        try container.encodeIfPresent(album, forKey: .album)
-        if source == .purchasedITunes {
-            // Для iTunes-трека это единственный источник обложки для mini player, Now Playing и sheet "О треке".
-            try container.encodeIfPresent(artworkData, forKey: .artworkData)
-        }
-        try container.encode(duration, forKey: .duration)
-        try container.encode(fileName, forKey: .fileName)
-        try container.encode(source, forKey: .source)
-        try container.encodeIfPresent(assetURL, forKey: .assetURL)
-        try container.encode(isAvailable, forKey: .isAvailable)
     }
 }
 // MARK: - Equatable

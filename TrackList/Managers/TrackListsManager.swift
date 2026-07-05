@@ -12,9 +12,6 @@
 
 import Foundation
 
-// Алиас фиксирует внешнюю модель метаинформации до объявления вложенного alias manager-а.
-typealias TrackListsManagerTrackListMeta = TrackListMeta
-
 final class TrackListsManager {
     
     static let shared = TrackListsManager()
@@ -29,12 +26,6 @@ final class TrackListsManager {
     }
     
     
-    // MARK: - Модель метаинформации
-    
-    /// Совместимость для старых обращений TrackListsManager.TrackListMeta.
-    typealias TrackListMeta = TrackListsManagerTrackListMeta
-    
-    
     // MARK: - Метаданные SQLite
     
     /// Загружает список всех треклистов из SQLite.
@@ -47,55 +38,11 @@ final class TrackListsManager {
         }
     }
 
-    private func loadTrackListMetasOrEmpty() -> [TrackListMeta] {
-        (try? loadTrackListMetas()) ?? []
-    }
-    
-    /// Сохраняет список всех треклистов в SQLite, сохраняя текущие строки существующих списков.
-    func saveTrackListMetas(_ metas: [TrackListMeta]) throws {
-        guard persistTrackListMetas(metas) else {
-            throw AppError.trackListSaveFailed
-        }
-    }
-
     private func postTrackListsDidChange() {
         NotificationCenter.default.post(
             name: .trackListsDidChange,
             object: nil
         )
-    }
-
-    @discardableResult
-    private func persistTrackListMetas(
-        _ metas: [TrackListMeta],
-        postDidChange: Bool = true
-    ) -> Bool {
-        do {
-            let trackLists = try metas.map { meta in
-                let tracks: [Track]
-                do {
-                    tracks = try TrackListManager.shared.loadTracks(for: meta.id)
-                } catch AppError.trackListNotFound {
-                    // Новая meta без строк соответствует пустому треклисту.
-                    tracks = []
-                }
-
-                return TrackList(
-                    id: meta.id,
-                    name: meta.name,
-                    createdAt: meta.createdAt,
-                    tracks: tracks
-                )
-            }
-            try databaseStore.replaceTrackLists(trackLists)
-            if postDidChange {
-                postTrackListsDidChange()
-            }
-            return true
-        } catch {
-            PersistentLogger.log("❌ TrackListsManager: SQLite metas save failed error=\(error)")
-            return false
-        }
     }
     
     /// Проверяет, существует ли треклист с указанным ID.
@@ -179,16 +126,6 @@ final class TrackListsManager {
         return try createTrackList(from: tracks, withName: name)
     }
 
-    // Сохраняет один TrackListMeta в SQLite.
-    func saveTrackListMeta(_ meta: TrackListMeta) throws {
-        do {
-            try databaseStore.saveMeta(meta)
-            postTrackListsDidChange()
-        } catch {
-            throw AppError.trackListSaveFailed
-        }
-    }
-
     // MARK: - Добавление треков
 
     /// Добавляет треки из фонотеки в существующий треклист.
@@ -234,45 +171,6 @@ final class TrackListsManager {
             throw AppError.trackListNotFound
         } catch {
             throw AppError.trackListSaveFailed
-        }
-    }
-    
-    
-    // MARK: - Сохранение всех треклистов (массово)
-    
-    /// Сохраняет все треклисты в SQLite.
-    func saveTrackLists(_ trackLists: [TrackList]) throws {
-        do {
-            try databaseStore.replaceTrackLists(trackLists)
-        } catch {
-            throw AppError.trackListSaveFailed
-        }
-
-        for list in trackLists {
-            NotificationCenter.default.post(
-                name: .trackListTracksDidChange,
-                object: list.id
-            )
-        }
-        postTrackListsDidChange()
-
-        print("✅ Все треклисты сохранены в SQLite")
-    }
-    
-    
-    // MARK: - Отладка
-    
-    /// Выводит все треклисты и их содержимое в консоль
-    func printTrackLists() {
-        let metas = loadTrackListMetasOrEmpty()
-        print("\n===== СОДЕРЖИМОЕ ВСЕХ ТРЕКЛИСТОВ =====")
-        
-        for meta in metas {
-            let tracks = (try? TrackListManager.shared.loadTracks(for: meta.id)) ?? []
-            print("Плейлист: \(meta.name), ID: \(meta.id)")
-            for track in tracks {
-                print("— \(track.fileName) (\(track.artist ?? "неизвестный артист") — \(track.title ?? "неизвестный трек")), duration: \(track.duration)")
-            }
         }
     }
 }

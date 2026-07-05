@@ -9,22 +9,8 @@
 
 import Foundation
 
-// Читает сохранённые метаданные треков из SQLite.
-protocol TrackMetadataDatabaseReading {
-    func fetch(trackId: UUID) throws -> TrackMetadataDatabaseModel?
-    func fetchAll() throws -> [TrackMetadataDatabaseModel]
-}
-
-// Записывает сохранённые метаданные треков в SQLite.
-protocol TrackMetadataDatabaseWriting {
-    func insert(_ model: TrackMetadataDatabaseModel) throws
-    func update(_ model: TrackMetadataDatabaseModel) throws
-    func upsert(_ model: TrackMetadataDatabaseModel) throws
-    func delete(trackId: UUID) throws
-}
-
 // SQLite-реализация доступа только к таблице track_metadata.
-final class SQLiteTrackMetadataStore: TrackMetadataDatabaseReading, TrackMetadataDatabaseWriting {
+final class SQLiteTrackMetadataStore {
     private let executor: DatabaseExecutor
 
     init(executor: DatabaseExecutor) {
@@ -45,26 +31,6 @@ final class SQLiteTrackMetadataStore: TrackMetadataDatabaseReading, TrackMetadat
             }
 
             return try Self.map(statement.rowReader())
-        }
-    }
-
-    func fetchAll() throws -> [TrackMetadataDatabaseModel] {
-        try executor.fetchAll(TrackMetadataDatabaseQueries.fetchAll, map: Self.map)
-    }
-
-    func insert(_ model: TrackMetadataDatabaseModel) throws {
-        try executor.write { database in
-            let statement = try database.prepare(TrackMetadataDatabaseQueries.insert)
-            try Self.bindInsert(model, statement: statement)
-            try statement.execute()
-        }
-    }
-
-    func update(_ model: TrackMetadataDatabaseModel) throws {
-        try executor.write { database in
-            let statement = try database.prepare(TrackMetadataDatabaseQueries.update)
-            try Self.bindUpdate(model, statement: statement)
-            try statement.execute()
         }
     }
 
@@ -130,27 +96,4 @@ final class SQLiteTrackMetadataStore: TrackMetadataDatabaseReading, TrackMetadat
         try statement.bind(model.metadataUpdatedAt, at: 17)
     }
 
-    private static func bindUpdate(
-        _ model: TrackMetadataDatabaseModel,
-        statement: DatabaseStatement
-    ) throws {
-        // UPDATE держит track_id последним, потому что это ключ строки.
-        try statement.bind(model.title, at: 1)
-        try statement.bind(model.artist, at: 2)
-        try statement.bind(model.album, at: 3)
-        try statement.bind(model.albumArtist, at: 4)
-        try statement.bind(model.genre, at: 5)
-        try statement.bind(model.year, at: 6)
-        try statement.bind(model.trackNumber, at: 7)
-        try statement.bind(model.discNumber, at: 8)
-        try statement.bind(model.bpm, at: 9)
-        try statement.bind(model.keySignature, at: 10)
-        try statement.bind(model.comment, at: 11)
-        try statement.bind(model.duration, at: 12)
-        try statement.bind(model.bitrate, at: 13)
-        try statement.bind(model.sampleRate, at: 14)
-        try statement.bind(model.channelCount, at: 15)
-        try statement.bind(model.metadataUpdatedAt, at: 16)
-        try statement.bind(model.trackId, at: 17)
-    }
 }

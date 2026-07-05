@@ -58,7 +58,10 @@ final class LibraryScreenActionHandler {
                 return
             }
 
-            let folderId = entry.folderId
+            guard let folderId = entry.folderId else {
+                toastPresenter.handle(.showInLibraryTargetMissing)
+                return
+            }
 
             guard musicLibraryManager.folder(for: folderId) != nil else {
                 toastPresenter.handle(.folderNotFound)

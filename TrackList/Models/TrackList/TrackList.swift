@@ -13,7 +13,7 @@
 
 import Foundation
 
-struct TrackList: Identifiable, Codable, Equatable {
+struct TrackList: Identifiable, Equatable {
     let id: UUID
     var name: String
     let createdAt: Date

@@ -133,6 +133,16 @@ final class LibraryDatabaseStore {
         try trackStore.fetchLibrary(id: id)
     }
 
+    /// Возвращает один активный локальный трек приложения: library или imported.
+    func fetchTrack(id: UUID) throws -> TrackDatabaseModel? {
+        try trackStore.fetchActiveLocal(id: id)
+    }
+
+    /// Возвращает один активный одиночный imported-трек.
+    func fetchImportedTrack(id: UUID) throws -> TrackDatabaseModel? {
+        try trackStore.fetchImported(id: id)
+    }
+
     /// Возвращает активный трек фонотеки по логическому пути внутри root-папки.
     func fetchLibraryTrack(
         rootFolderId: UUID,
@@ -152,6 +162,11 @@ final class LibraryDatabaseStore {
     /// Возвращает активные треки внутри всего прикреплённого корня.
     func fetchLibraryTracks(inRootFolder rootFolderId: UUID) throws -> [TrackDatabaseModel] {
         try trackStore.fetchLibraryTracks(inRootFolder: rootFolderId)
+    }
+
+    /// Возвращает все активные локальные треки приложения.
+    func fetchAllTracks() throws -> [TrackDatabaseModel] {
+        try trackStore.fetchAllActiveLocal()
     }
 
     /// Создаёт или обновляет трек фонотеки и служебную строку его папки.
@@ -195,7 +210,40 @@ final class LibraryDatabaseStore {
         try trackStore.upsert(model)
     }
 
-    /// Обновляет bookmark трека фонотеки.
+    /// Создаёт или обновляет одиночный imported-трек без фиктивных folder/root-ссылок.
+    func upsertImportedTrack(
+        id: UUID,
+        fileName: String,
+        fileURL: URL? = nil,
+        fileDate: Date = Date(),
+        bookmarkBase64: String? = nil,
+        isAvailable: Bool = true
+    ) throws {
+        let now = Date()
+        let existing = try trackStore.fetch(id: id)
+        let resolvedFileURL = fileURL?.standardizedFileURL
+        let model = TrackDatabaseModel(
+            id: id,
+            source: .imported,
+            folderId: nil,
+            rootFolderId: nil,
+            fileName: fileName,
+            relativePath: nil,
+            fileExtension: (fileName as NSString).pathExtension.lowercased(),
+            fileSize: existing?.fileSize,
+            fileDate: fileDate,
+            importedAt: existing?.importedAt ?? now,
+            updatedAt: now,
+            bookmarkBase64: bookmarkBase64 ?? existing?.bookmarkBase64,
+            assetURLString: resolvedFileURL?.absoluteString ?? existing?.assetURLString,
+            isAvailable: isAvailable,
+            isDeleted: false
+        )
+
+        try trackStore.upsert(model)
+    }
+
+    /// Обновляет bookmark локального трека приложения.
     func upsertTrackBookmark(
         id: UUID,
         bookmarkBase64: String
@@ -207,9 +255,9 @@ final class LibraryDatabaseStore {
         )
     }
 
-    /// Возвращает bookmark трека фонотеки.
+    /// Возвращает bookmark локального трека приложения.
     func trackBookmark(id: UUID) throws -> String? {
-        try trackStore.fetchLibrary(id: id)?.bookmarkBase64
+        try trackStore.fetchActiveLocal(id: id)?.bookmarkBase64
     }
 
     /// Убирает bookmark трека, не удаляя саму строку индекса.
@@ -221,8 +269,8 @@ final class LibraryDatabaseStore {
         )
     }
 
-    /// Скрывает трек из активного индекса фонотеки и удаляет его сохранённые metadata.
-    func removeLibraryTrack(id: UUID) throws {
+    /// Скрывает локальный трек приложения из активного индекса и удаляет его сохранённые metadata.
+    func removeTrack(id: UUID) throws {
         try metadataStore.delete(trackId: id)
         try trackStore.markDeleted(id: id, updatedAt: Date())
     }

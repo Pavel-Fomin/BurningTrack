@@ -9,29 +9,8 @@
 
 import Foundation
 
-// Читает строки tracks как persistence-модели.
-protocol TrackDatabaseReading {
-    func fetch(id: UUID) throws -> TrackDatabaseModel?
-    func fetchAll() throws -> [TrackDatabaseModel]
-    func fetchLibrary(id: UUID) throws -> TrackDatabaseModel?
-    func fetchLibrary(rootFolderId: UUID, relativePath: String) throws -> TrackDatabaseModel?
-    func fetchLibraryTracks(inFolder folderId: UUID) throws -> [TrackDatabaseModel]
-    func fetchLibraryTracks(inRootFolder rootFolderId: UUID) throws -> [TrackDatabaseModel]
-}
-
-// Записывает строки tracks без обращения к JSON-хранилищам.
-protocol TrackDatabaseWriting {
-    func insert(_ model: TrackDatabaseModel) throws
-    func update(_ model: TrackDatabaseModel) throws
-    func upsert(_ model: TrackDatabaseModel) throws
-    func delete(id: UUID) throws
-    func markDeleted(id: UUID, updatedAt: Date) throws
-    func updateBookmark(id: UUID, bookmarkBase64: String?, updatedAt: Date) throws
-    func updateAvailability(id: UUID, isAvailable: Bool, updatedAt: Date) throws
-}
-
 // SQLite-реализация доступа только к таблице tracks.
-final class SQLiteTrackStore: TrackDatabaseReading, TrackDatabaseWriting {
+final class SQLiteTrackStore {
     private let executor: DatabaseExecutor
 
     init(executor: DatabaseExecutor) {
@@ -55,10 +34,6 @@ final class SQLiteTrackStore: TrackDatabaseReading, TrackDatabaseWriting {
         }
     }
 
-    func fetchAll() throws -> [TrackDatabaseModel] {
-        try executor.fetchAll(TrackDatabaseQueries.fetchAll, map: Self.map)
-    }
-
     func fetchLibrary(id: UUID) throws -> TrackDatabaseModel? {
         try executor.read { database in
             let statement = try database.prepare(TrackDatabaseQueries.fetchLibrary)
@@ -70,6 +45,36 @@ final class SQLiteTrackStore: TrackDatabaseReading, TrackDatabaseWriting {
 
             return try Self.map(statement.rowReader())
         }
+    }
+
+    func fetchImported(id: UUID) throws -> TrackDatabaseModel? {
+        try executor.read { database in
+            let statement = try database.prepare(TrackDatabaseQueries.fetchImported)
+            try statement.bind(id, at: 1)
+
+            guard try statement.step() == .row else {
+                return nil
+            }
+
+            return try Self.map(statement.rowReader())
+        }
+    }
+
+    func fetchActiveLocal(id: UUID) throws -> TrackDatabaseModel? {
+        try executor.read { database in
+            let statement = try database.prepare(TrackDatabaseQueries.fetchActiveLocal)
+            try statement.bind(id, at: 1)
+
+            guard try statement.step() == .row else {
+                return nil
+            }
+
+            return try Self.map(statement.rowReader())
+        }
+    }
+
+    func fetchAllActiveLocal() throws -> [TrackDatabaseModel] {
+        try executor.fetchAll(TrackDatabaseQueries.fetchAllActiveLocal, map: Self.map)
     }
 
     func fetchLibrary(rootFolderId: UUID, relativePath: String) throws -> TrackDatabaseModel? {
@@ -122,26 +127,10 @@ final class SQLiteTrackStore: TrackDatabaseReading, TrackDatabaseWriting {
         }
     }
 
-    func update(_ model: TrackDatabaseModel) throws {
-        try executor.write { database in
-            let statement = try database.prepare(TrackDatabaseQueries.update)
-            try Self.bindUpdate(model, statement: statement)
-            try statement.execute()
-        }
-    }
-
     func upsert(_ model: TrackDatabaseModel) throws {
         try executor.write { database in
             let statement = try database.prepare(TrackDatabaseQueries.upsert)
             try Self.bindInsert(model, statement: statement)
-            try statement.execute()
-        }
-    }
-
-    func delete(id: UUID) throws {
-        try executor.write { database in
-            let statement = try database.prepare(TrackDatabaseQueries.delete)
-            try statement.bind(id, at: 1)
             try statement.execute()
         }
     }
@@ -222,25 +211,4 @@ final class SQLiteTrackStore: TrackDatabaseReading, TrackDatabaseWriting {
         try statement.bind(model.isDeleted, at: 15)
     }
 
-    private static func bindUpdate(
-        _ model: TrackDatabaseModel,
-        statement: DatabaseStatement
-    ) throws {
-        // UPDATE держит id последним, чтобы изменяемые значения шли в порядке колонок.
-        try statement.bind(model.source.rawValue, at: 1)
-        try statement.bind(model.folderId, at: 2)
-        try statement.bind(model.rootFolderId, at: 3)
-        try statement.bind(model.fileName, at: 4)
-        try statement.bind(model.relativePath, at: 5)
-        try statement.bind(model.fileExtension, at: 6)
-        try statement.bind(model.fileSize, at: 7)
-        try statement.bind(model.fileDate, at: 8)
-        try statement.bind(model.importedAt, at: 9)
-        try statement.bind(model.updatedAt, at: 10)
-        try statement.bind(model.bookmarkBase64, at: 11)
-        try statement.bind(model.assetURLString, at: 12)
-        try statement.bind(model.isAvailable, at: 13)
-        try statement.bind(model.isDeleted, at: 14)
-        try statement.bind(model.id, at: 15)
-    }
 }

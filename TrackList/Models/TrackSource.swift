@@ -10,9 +10,11 @@
 import Foundation
 
 /// Показывает, откуда пришёл трек, не смешивая модели фонотеки и iTunes.
-enum TrackSource: String, Codable {
+enum TrackSource: String {
     /// Обычный файловый трек из прикреплённой фонотеки.
     case library
+    /// Одиночный файловый трек, импортированный напрямую в пользовательский список или плеер.
+    case imported
     /// Купленный iTunes-трек из системной медиатеки.
     case purchasedITunes
 }

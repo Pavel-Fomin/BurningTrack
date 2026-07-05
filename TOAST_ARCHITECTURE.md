@@ -248,8 +248,7 @@ catch let appError as AppError {
 `try?` допустим там, где данные являются вспомогательными и отсутствие результата не является пользовательской ошибкой текущего действия:
 
 - best-effort чтение badge-данных в `DefaultTrackListBadgeProvider`;
-- internal fallback `loadTrackListMetasOrEmpty()`;
-- debug/diagnostic вывод в `printTrackLists()`;
+- best-effort технические чтения в индексах и runtime-снимках;
 - технические операции очистки или задержки, где ошибка не влияет на user-facing flow.
 
 `try?` запрещен в пользовательском действии, если операция является самим действием пользователя и при ошибке нужен Toast. В таких местах должен быть `do/catch` с `AppError` branch и generic fallback.
@@ -306,20 +305,14 @@ dismissTask?.cancel()
 
 - `TrackListManager.getTrackListById(_:) throws -> TrackList`
 - `TrackListManager.loadTracks(for:) throws -> [Track]`
-- `TrackListManager.deleteTracksFile(for:) throws`
 - `TrackListsManager.loadTrackListMetas() throws -> [TrackListMeta]`
 - `TrackListsManager.deleteTrackList(id:) throws`
 - `TrackListsManager.renameTrackList(id:to:) throws`
-- `TrackListsManager.saveTrackListMetas(_:) throws`
-- `TrackListsManager.saveTrackListMeta(_:) throws`
-- `TrackListsManager.saveTrackLists(_:) throws`
 
 Эти методы переведены на `throws`, потому что их ошибки являются user-facing для треклистов:
 
-- невозможность получить documents/metas URL;
-- ошибка чтения или декодирования JSON;
-- ошибка записи `tracklists.json`;
-- ошибка удаления `tracklist_<id>.json`;
+- ошибка чтения или записи SQLite;
+- ошибка удаления строк треклиста;
 - отсутствие треклиста по id;
 - невалидное имя треклиста;
 - невозможность сохранить tracks/metas после мутации.
@@ -339,9 +332,3 @@ Throwing contract нужен, чтобы manager-слой не делал silent
 - Чтение файлов или runtime metadata внутри `ToastEvent`.
 - Показ Toast из `AppError` или `AppError+ToastEvent`.
 - Бизнес-логика внутри `ToastManager`, `ToastView` или `ToastHostModifier`.
-
-## 10. Остаточные технические долги
-
-- Orphan tracklist file при create: `createTrackListInternal` сначала сохраняет `tracklist_<id>.json`, затем пишет meta в `tracklists.json`; если meta save падает, файл треков уже создан.
-- Meta/file atomicity: операции с файлом треков и `tracklists.json` не являются единой атомарной транзакцией.
-- `saveTrackLists` bulk-save behavior: `saveTrackLists` остаётся техническим долгом: ошибка сохранения отдельного tracks-файла учитывается через `didSaveTracks`, но контракт bulk-save требует отдельного аудита перед активным использованием.

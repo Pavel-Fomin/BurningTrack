@@ -96,6 +96,7 @@ final class PlaylistManager: ObservableObject {
         let album = metadata?.album
         let duration = metadata?.duration ?? 0
         let isAvailable = true
+        let source = await TrackRegistry.shared.entry(for: trackId)?.source ?? .library
         return PlayerTrack(
             queueItemId: queueItemId,
             trackId: trackId,
@@ -104,7 +105,8 @@ final class PlaylistManager: ObservableObject {
             album: album,
             duration: duration,
             fileName: fileName,
-            isAvailable: isAvailable
+            isAvailable: isAvailable,
+            source: source
         )
     }
     

@@ -24,6 +24,9 @@ struct TrackMenuActionAvailability {
         case .library:
             return localActions(context: context)
 
+        case .imported:
+            return importedActions(context: context)
+
         case .purchasedITunes:
             return purchasedITunesActions(context: context)
         }
@@ -73,6 +76,37 @@ struct TrackMenuActionAvailability {
                 .details,
                 .showInLibrary,
                 .moveToFolder,
+                .editTags,
+                .renameFile,
+                .deleteFromTrackList
+            ]
+
+        case .purchasedITunes:
+            return []
+        }
+    }
+
+    /// Наборы меню для одиночных импортов без привязки к папкам фонотеки.
+    private static func importedActions(
+        context: TrackMenuContext
+    ) -> Set<TrackMenuAction> {
+        switch context {
+        case .library:
+            return []
+
+        case .player:
+            return [
+                .details,
+                .addToTrackList,
+                .editTags,
+                .renameFile,
+                .deleteFromPlayer
+            ]
+
+        case .trackList:
+            return [
+                .details,
+                .addToPlayer,
                 .editTags,
                 .renameFile,
                 .deleteFromTrackList

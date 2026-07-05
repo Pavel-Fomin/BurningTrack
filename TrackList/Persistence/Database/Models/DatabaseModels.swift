@@ -64,6 +64,16 @@ struct TrackMetadataDatabaseModel: Equatable {
     var metadataUpdatedAt: Date
 }
 
+// Строка таблицы track_identity_keys.
+struct TrackIdentityKeyDatabaseModel: Equatable, Identifiable {
+    var id: String { identityKey }
+    let identityKey: String
+    var trackId: UUID
+    var source: DatabaseTrackSource
+    var createdAt: Date
+    var updatedAt: Date
+}
+
 // Строка таблицы tracklists.
 struct TrackListDatabaseModel: Equatable, Identifiable {
     let id: UUID
@@ -152,17 +162,5 @@ struct PlayerSettingsDatabaseModel: Equatable, Identifiable {
     var restoreLastPosition: Bool
     var showMiniPlayer: Bool
     var backgroundPlaybackEnabled: Bool
-    var updatedAt: Date
-}
-
-// Единственная строка таблицы export_settings.
-struct ExportSettingsDatabaseModel: Equatable, Identifiable {
-    let id: Int
-    var filenameTemplate: String
-    var includeTrackListPrefix: Bool
-    var prefixFormat: String
-    var duplicateHandling: DatabaseExportDuplicateHandling
-    var createM3U: Bool
-    var exportArtwork: Bool
     var updatedAt: Date
 }

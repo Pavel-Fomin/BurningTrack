@@ -250,13 +250,15 @@ actor AppCommandExecutor {
         }
         
         /// 2. Формируем модель Track для треклиста
+        let source = await TrackRegistry.shared.entry(for: trackId)?.source ?? .library
         let imported = Track(
             trackId: trackId,
             title: nil,
             artist: nil,
             duration: 0,
             fileName: url.lastPathComponent,
-            isAvailable: true
+            isAvailable: true,
+            source: source
         )
         
         /// 3. Загружаем треклист и добавляем трек
@@ -309,13 +311,15 @@ actor AppCommandExecutor {
 
             /// 2. Используем runtime snapshot, чтобы сохранить актуальные display-данные.
             let snapshot = await resolveSnapshot(for: trackId)
+            let source = await TrackRegistry.shared.entry(for: trackId)?.source ?? .library
             let imported = Track(
                 trackId: trackId,
                 title: snapshot?.title,
                 artist: snapshot?.artist,
                 duration: snapshot?.duration ?? 0,
                 fileName: snapshot?.fileName ?? url.lastPathComponent,
-                isAvailable: true
+                isAvailable: true,
+                source: source
             )
             importedTracks.append(imported)
         }
@@ -857,13 +861,15 @@ private func makePlayerTrackImportItem(trackId: UUID) async throws -> PlayerTrac
     }
 
     let snapshot = await resolveSnapshot(for: trackId)
+    let source = await TrackRegistry.shared.entry(for: trackId)?.source ?? .library
     let track = PlayerTrack(
         trackId: trackId,
         title: snapshot?.title,
         artist: snapshot?.artist,
         duration: snapshot?.duration ?? 0,
         fileName: snapshot?.fileName ?? url.lastPathComponent,
-        isAvailable: true
+        isAvailable: true,
+        source: source
     )
 
     return PlayerTrackImportItem(

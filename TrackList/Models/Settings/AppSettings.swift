@@ -10,22 +10,15 @@
 import Foundation
 
 
-struct AppSettings: Codable, Equatable {
+struct AppSettings: Equatable {
 
     let schemaVersion: Int
     var visible: VisibleSettings
     var internalSettings: InternalSettings
 
-    // Сохраняет ключ internal в JSON, не используя зарезервированное имя в Swift-модели.
-    enum CodingKeys: String, CodingKey {
-        case schemaVersion
-        case visible
-        case internalSettings = "internal"
-    }
-
     static let currentSchemaVersion = 1
 
-    // Базовое состояние настроек для первого запуска или восстановления отсутствующего файла.
+    // Базовое состояние настроек для первого запуска или восстановления отсутствующих строк SQLite.
     static var defaultValue: AppSettings {
         AppSettings(
             schemaVersion: currentSchemaVersion,
@@ -38,14 +31,9 @@ struct AppSettings: Codable, Equatable {
 extension AppSettings {
 
     // Настройки, которые могут быть доступны пользователю через интерфейс приложения.
-    struct VisibleSettings: Codable, Equatable {
+    struct VisibleSettings: Equatable {
         var metadata: MetadataSettings
         var library: LibrarySettings
-
-        enum CodingKeys: String, CodingKey {
-            case metadata
-            case library
-        }
 
         // Значения пользовательских настроек по умолчанию.
         static var defaultValue: VisibleSettings {
@@ -59,24 +47,10 @@ extension AppSettings {
             self.metadata = metadata
             self.library = library
         }
-
-        init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-
-            metadata = try container.decodeIfPresent(
-                MetadataSettings.self,
-                forKey: .metadata
-            ) ?? MetadataSettings.defaultValue
-
-            library = try container.decodeIfPresent(
-                LibrarySettings.self,
-                forKey: .library
-            ) ?? LibrarySettings.defaultValue
-        }
     }
 
     // Настройки обработки метаданных треков.
-    struct MetadataSettings: Codable, Equatable {
+    struct MetadataSettings: Equatable {
         var isTagReadingEnabled: Bool
 
         // По умолчанию чтение тегов включено, чтобы метаданные подхватывались автоматически.
@@ -88,16 +62,10 @@ extension AppSettings {
     }
 
     // Настройки отображения фонотеки.
-    struct LibrarySettings: Codable, Equatable {
+    struct LibrarySettings: Equatable {
         var isTrackListMembershipVisible: Bool
         var isFileFormatVisible: Bool
         var isPurchasedITunesSourceVisible: Bool
-
-        enum CodingKeys: String, CodingKey {
-            case isTrackListMembershipVisible
-            case isFileFormatVisible
-            case isPurchasedITunesSourceVisible
-        }
 
         init(
             isTrackListMembershipVisible: Bool,
@@ -107,26 +75,6 @@ extension AppSettings {
             self.isTrackListMembershipVisible = isTrackListMembershipVisible
             self.isFileFormatVisible = isFileFormatVisible
             self.isPurchasedITunesSourceVisible = isPurchasedITunesSourceVisible
-        }
-
-        init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-
-            // Старые settings.json не содержат новых ключей, поэтому недостающие значения берём из defaultValue.
-            isTrackListMembershipVisible = try container.decodeIfPresent(
-                Bool.self,
-                forKey: .isTrackListMembershipVisible
-            ) ?? Self.defaultValue.isTrackListMembershipVisible
-
-            isFileFormatVisible = try container.decodeIfPresent(
-                Bool.self,
-                forKey: .isFileFormatVisible
-            ) ?? Self.defaultValue.isFileFormatVisible
-
-            isPurchasedITunesSourceVisible = try container.decodeIfPresent(
-                Bool.self,
-                forKey: .isPurchasedITunesSourceVisible
-            ) ?? Self.defaultValue.isPurchasedITunesSourceVisible
         }
 
         // По умолчанию показываем связь трека с треклистами, формат файла и источник iTunes.
@@ -140,7 +88,7 @@ extension AppSettings {
     }
 
     // Внутренние настройки приложения, не предназначенные для пользовательского редактирования.
-    struct InternalSettings: Codable, Equatable {
+    struct InternalSettings: Equatable {
         // Пока внутренних параметров нет, поэтому используется пустая структура.
         static var defaultValue: InternalSettings {
             InternalSettings()

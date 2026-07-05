@@ -21,21 +21,9 @@ final class AppSettingsManager: ObservableObject, SettingsManaging {
         $settings
     }
 
-    private let legacyFileURL: URL
-    private let decoder: JSONDecoder
     private let settingsStore: SettingsDatabaseStore
 
     private init() {
-        // Старый файл нужен только для одноразового импорта настроек пользователей прошлых версий.
-        let appDirectory = FileManager.default.urls(
-            for: .documentDirectory,
-            in: .userDomainMask
-        ).first!
-
-        legacyFileURL = appDirectory.appendingPathComponent("settings.json")
-
-        decoder = JSONDecoder()
-
         let resolvedSettingsStore: SettingsDatabaseStore
         do {
             resolvedSettingsStore = try SettingsDatabaseStore()
@@ -50,14 +38,9 @@ final class AppSettingsManager: ObservableObject, SettingsManaging {
 
     func load() {
         do {
-            settings = try settingsStore.fetchSettings { [legacyFileURL, decoder] in
-                Self.loadLegacySettings(
-                    fileURL: legacyFileURL,
-                    decoder: decoder
-                )
-            }
+            settings = try settingsStore.fetchSettings { nil }
         } catch {
-            // При ошибке SQLite восстанавливаем дефолты в основной БД, не используя JSON как резервный источник.
+            // При ошибке SQLite восстанавливаем дефолты через основной Store без резервного файлового источника.
             settings = AppSettings.defaultValue
             save()
         }
@@ -107,18 +90,5 @@ final class AppSettingsManager: ObservableObject, SettingsManaging {
         save()
 
         NotificationCenter.default.post(name: .appSettingsDidChange, object: nil)
-    }
-
-    private static func loadLegacySettings(
-        fileURL: URL,
-        decoder: JSONDecoder
-    ) -> AppSettings? {
-        do {
-            let data = try Data(contentsOf: fileURL)
-            return try decoder.decode(AppSettings.self, from: data)
-        } catch {
-            // Отсутствующий или повреждённый старый JSON не должен заменять SQLite-источник настроек.
-            return nil
-        }
     }
 }

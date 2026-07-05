@@ -157,14 +157,14 @@ final class SettingsDatabaseStore {
 
     /// Загружает рабочие настройки из SQLite и создаёт строки по умолчанию при первом запуске.
     func fetchSettings(
-        legacySettingsProvider: () -> AppSettings?
+        initialSettingsProvider: () -> AppSettings?
     ) throws -> AppSettings {
         let appModel = try appSettingsStore.fetch()
         let libraryModel = try libraryViewSettingsStore.fetch()
         let playerModel = try playerSettingsStore.fetch()
-        let shouldImportLegacySettings = appModel == nil && libraryModel == nil
-        let sourceSettings = shouldImportLegacySettings
-            ? (legacySettingsProvider() ?? .defaultValue)
+        let shouldUseInitialSettings = appModel == nil && libraryModel == nil
+        let sourceSettings = shouldUseInitialSettings
+            ? (initialSettingsProvider() ?? .defaultValue)
             : .defaultValue
         let now = Date()
 

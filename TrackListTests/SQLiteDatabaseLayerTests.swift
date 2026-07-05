@@ -237,33 +237,178 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
         try store.upsertTrackMetadata(metadata)
         XCTAssertEqual(try store.fetchTrackMetadata(trackId: trackId)?.title, "Title")
 
-        try store.removeLibraryTrack(id: trackId)
+        try store.removeTrack(id: trackId)
         XCTAssertNil(try store.fetchLibraryTrack(id: trackId))
     }
 
-    func testSettingsDatabaseStoreImportsLegacySettingsOnlyOnce() throws {
+    func testImportedTrackPersistsInSQLiteTracks() throws {
+        let database = try makeDatabase()
+        let store = try LibraryDatabaseStore(database: database)
+        let trackId = UUID()
+        let fileURL = try makeTemporaryAudioFile(name: "Imported.mp3")
+        let now = Date()
+
+        try store.upsertImportedTrack(
+            id: trackId,
+            fileName: fileURL.lastPathComponent,
+            fileURL: fileURL,
+            fileDate: now
+        )
+
+        let stored = try XCTUnwrap(store.fetchTrack(id: trackId))
+        XCTAssertEqual(stored.source, .imported)
+        XCTAssertNil(stored.folderId)
+        XCTAssertNil(stored.rootFolderId)
+        XCTAssertNil(stored.relativePath)
+        XCTAssertEqual(stored.fileName, "Imported.mp3")
+        XCTAssertEqual(stored.assetURLString, fileURL.standardizedFileURL.absoluteString)
+    }
+
+    func testImportedBookmarkPersistsInSQLiteTrackRow() throws {
+        let database = try makeDatabase()
+        let store = try LibraryDatabaseStore(database: database)
+        let trackId = UUID()
+        let fileURL = try makeTemporaryAudioFile(name: "Bookmark.mp3")
+
+        try store.upsertImportedTrack(
+            id: trackId,
+            fileName: fileURL.lastPathComponent,
+            fileURL: fileURL
+        )
+        try store.upsertTrackBookmark(
+            id: trackId,
+            bookmarkBase64: "imported-bookmark"
+        )
+
+        XCTAssertEqual(try store.trackBookmark(id: trackId), "imported-bookmark")
+    }
+
+    func testImportedTrackIdentityReturnsStableUUID() async throws {
+        let database = try makeDatabase()
+        let resolver = TrackIdentityResolver(database: database)
+        let fileURL = try makeTemporaryAudioFile(name: "Stable.mp3")
+
+        let firstId = try await resolver.trackId(forImportedURL: fileURL)
+        let secondId = try await resolver.trackId(forImportedURL: fileURL)
+
+        XCTAssertEqual(firstId, secondId)
+        let stored = try XCTUnwrap(try LibraryDatabaseStore(database: database).fetchImportedTrack(id: firstId))
+        XCTAssertEqual(stored.source, .imported)
+    }
+
+    func testImportedTrackIdentityForgetRemovesKeys() async throws {
+        let database = try makeDatabase()
+        let resolver = TrackIdentityResolver(database: database)
+        let identityStore = try TrackIdentityDatabaseStore(database: database)
+        let fileURL = try makeTemporaryAudioFile(name: "Forget.mp3")
+        let identityKey = importedIdentityKey(for: fileURL)
+
+        let trackId = try await resolver.trackId(forImportedURL: fileURL)
+        XCTAssertNotNil(try identityStore.identity(identityKey: identityKey))
+
+        try await resolver.forgetTrack(id: trackId)
+
+        XCTAssertNil(try identityStore.identity(identityKey: identityKey))
+    }
+
+    func testImportedTrackIdentityReplaceRemovesOldPathKey() async throws {
+        let database = try makeDatabase()
+        let resolver = TrackIdentityResolver(database: database)
+        let identityStore = try TrackIdentityDatabaseStore(database: database)
+        let oldURL = try makeTemporaryAudioFile(name: "OldName.mp3")
+        let newURL = try makeTemporaryAudioFile(name: "NewName.mp3")
+        let oldIdentityKey = importedIdentityKey(for: oldURL)
+        let newIdentityKey = importedIdentityKey(for: newURL)
+
+        let trackId = try await resolver.trackId(forImportedURL: oldURL)
+        try await resolver.replaceImportedTrackIdentity(id: trackId, url: newURL)
+
+        XCTAssertNil(try identityStore.identity(identityKey: oldIdentityKey))
+        XCTAssertEqual(try identityStore.identity(identityKey: newIdentityKey)?.trackId, trackId)
+
+        let stored = try XCTUnwrap(try LibraryDatabaseStore(database: database).fetchImportedTrack(id: trackId))
+        XCTAssertEqual(stored.fileName, "NewName.mp3")
+        XCTAssertEqual(stored.assetURLString, newURL.standardizedFileURL.absoluteString)
+    }
+
+    func testBookmarkResolverResolvesImportedTrackFromSQLite() async throws {
+        let database = try makeDatabase()
+        let resolver = TrackIdentityResolver(database: database)
+        let registry = TrackRegistry(database: database)
+        let bookmarks = BookmarksRegistry(database: database)
+        let fileURL = try makeTemporaryAudioFile(name: "Resolve.mp3")
+        let trackId = try await resolver.trackId(forImportedURL: fileURL)
+        let bookmark = try XCTUnwrap(BookmarkResolver.makeBookmarkBase64(for: fileURL))
+
+        await bookmarks.upsertTrackBookmark(id: trackId, base64: bookmark)
+
+        let resolvedURL = await BookmarkResolver.url(
+            forTrack: trackId,
+            trackRegistry: registry,
+            bookmarksRegistry: bookmarks
+        )
+
+        XCTAssertEqual(resolvedURL?.standardizedFileURL.path, fileURL.standardizedFileURL.path)
+    }
+
+    func testTrackRegistryEntryReturnsImportedTrack() async throws {
+        let database = try makeDatabase()
+        let registry = TrackRegistry(database: database)
+        let trackId = UUID()
+        let fileURL = try makeTemporaryAudioFile(name: "Registry.mp3")
+
+        await registry.upsertImportedTrack(
+            id: trackId,
+            fileName: fileURL.lastPathComponent,
+            fileURL: fileURL
+        )
+
+        let entry = await registry.entry(for: trackId)
+        XCTAssertEqual(entry?.source, .imported)
+        XCTAssertEqual(entry?.fileName, "Registry.mp3")
+        XCTAssertNil(entry?.folderId)
+        XCTAssertNil(entry?.rootFolderId)
+        XCTAssertNil(entry?.relativePath)
+    }
+
+    func testRegistriesDoNotCreateJSONFiles() async throws {
+        let database = try makeDatabase()
+        let registry = TrackRegistry(database: database)
+        let identityResolver = TrackIdentityResolver(database: database)
+        let bookmarks = BookmarksRegistry(database: database)
+        let fileURL = try makeTemporaryAudioFile(name: "NoJSON.mp3")
+        let trackId = try await identityResolver.trackId(forImportedURL: fileURL)
+
+        await registry.upsertImportedTrack(
+            id: trackId,
+            fileName: fileURL.lastPathComponent,
+            fileURL: fileURL
+        )
+        await bookmarks.upsertTrackBookmark(id: trackId, base64: "bookmark")
+        try await registry.throwPendingPersistenceError()
+        try await bookmarks.throwPendingPersistenceError()
+
+        let directory = try XCTUnwrap(databaseDirectory)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: directory.appendingPathComponent("TrackRegistry.json").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: directory.appendingPathComponent("TrackIdentityRegistry.json").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: directory.appendingPathComponent("BookmarksRegistry.json").path))
+    }
+
+    func testSettingsDatabaseStoreCreatesDefaultSettingsOnlyOnce() throws {
         let database = try makeDatabase()
         let store = try SettingsDatabaseStore(database: database)
-        var legacySettings = AppSettings.defaultValue
-        legacySettings.visible.metadata.isTagReadingEnabled = false
-        legacySettings.visible.library.isTrackListMembershipVisible = false
-        legacySettings.visible.library.isFileFormatVisible = false
-        legacySettings.visible.library.isPurchasedITunesSourceVisible = false
 
-        let importedSettings = try store.fetchSettings {
-            legacySettings
+        let initialSettings = try store.fetchSettings {
+            nil
         }
 
-        XCTAssertFalse(importedSettings.visible.metadata.isTagReadingEnabled)
-        XCTAssertFalse(importedSettings.visible.library.isTrackListMembershipVisible)
-        XCTAssertFalse(importedSettings.visible.library.isFileFormatVisible)
-        XCTAssertFalse(importedSettings.visible.library.isPurchasedITunesSourceVisible)
+        XCTAssertEqual(initialSettings, AppSettings.defaultValue)
 
         let reloadedSettings = try store.fetchSettings {
-            AppSettings.defaultValue
+            nil
         }
 
-        XCTAssertEqual(reloadedSettings, importedSettings)
+        XCTAssertEqual(reloadedSettings, initialSettings)
     }
 
     func testSettingsDatabaseStoreSavesWorkingSettingsToSQLite() throws {
@@ -383,7 +528,8 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
                 .initialSchema,
                 .initialTables,
                 .trackListTracksAllowExternalTrackIds,
-                .settingsPhase7
+                .settingsPhase7,
+                .importedTracksPhase8
             ])
         )
 
@@ -433,6 +579,28 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
             fileName: "\(title).mp3",
             isAvailable: true
         )
+    }
+
+    private func makeTemporaryAudioFile(name: String) throws -> URL {
+        let directory = try XCTUnwrap(databaseDirectory)
+        let fileURL = directory.appendingPathComponent(name)
+
+        // Пустого файла достаточно для проверки bookmark и SQLite metadata.
+        _ = FileManager.default.createFile(
+            atPath: fileURL.path,
+            contents: Data()
+        )
+
+        return fileURL
+    }
+
+    private func importedIdentityKey(for url: URL) -> String {
+        let normalizedPath = url
+            .resolvingSymlinksInPath()
+            .standardizedFileURL
+            .path
+
+        return "imp:\(normalizedPath)"
     }
 
     private enum ExpectedRollbackError: Error {

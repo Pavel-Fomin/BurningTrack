@@ -69,6 +69,16 @@ enum DatabaseSchema {
         static let metadataUpdatedAt = "metadata_updated_at"
     }
 
+    enum TrackIdentityKeys {
+        static let table = "track_identity_keys"
+
+        static let identityKey = "identity_key"
+        static let trackId = "track_id"
+        static let source = "source"
+        static let createdAt = "created_at"
+        static let updatedAt = "updated_at"
+    }
+
     enum TrackLists {
         static let table = "tracklists"
 
@@ -167,16 +177,4 @@ enum DatabaseSchema {
         static let updatedAt = "updated_at"
     }
 
-    enum ExportSettings {
-        static let table = "export_settings"
-
-        static let id = "id"
-        static let filenameTemplate = "filename_template"
-        static let includeTrackListPrefix = "include_tracklist_prefix"
-        static let prefixFormat = "prefix_format"
-        static let duplicateHandling = "duplicate_handling"
-        static let createM3U = "create_m3u"
-        static let exportArtwork = "export_artwork"
-        static let updatedAt = "updated_at"
-    }
 }

@@ -15,6 +15,8 @@ enum TrackSourceDatabaseMapper {
         switch source {
         case .library:
             return .library
+        case .imported:
+            return .imported
         case .purchasedITunes:
             return .purchasedITunes
         }
@@ -24,6 +26,8 @@ enum TrackSourceDatabaseMapper {
         switch source {
         case .library:
             return .library
+        case .imported:
+            return .imported
         case .purchasedITunes:
             return .purchasedITunes
         }

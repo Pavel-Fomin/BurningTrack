@@ -21,8 +21,10 @@ final class FastLibraryTracksProvider: LibraryTracksProvider {
     func tracks(inFolder folderId: UUID) async -> [LibraryTrack] {
         let entries = await TrackRegistry.shared.tracks(inFolder: folderId)
 
-        return entries.map { entry in
-            let fileURL = URL(fileURLWithPath: entry.relativePath)
+        return entries.compactMap { entry in
+            guard let relativePath = entry.relativePath else { return nil }
+
+            let fileURL = URL(fileURLWithPath: relativePath)
 
             return LibraryTrack(
                 id: entry.id,

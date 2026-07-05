@@ -94,7 +94,8 @@ actor LibrarySyncModule {
 
         var existingByRelativePath: [String: TrackRegistry.TrackEntry] = [:]
         for entry in existing {
-            existingByRelativePath[entry.relativePath] = entry
+            guard let relativePath = entry.relativePath else { continue }
+            existingByRelativePath[relativePath] = entry
         }
 
         // 4) Применяем найденные файлы: upsert + bookmark
@@ -168,31 +169,33 @@ actor LibrarySyncModule {
 
                 // Трек реально исчез из библиотеки.
                 // Значит его library identity тоже нужно забыть.
-                try await TrackIdentityResolver.shared.unbindLibraryTrack(
-                    rootFolderId: entry.rootFolderId,
-                    relativePath: entry.relativePath
-                )
+                if let rootFolderId = entry.rootFolderId,
+                   let relativePath = entry.relativePath {
+                    try await TrackIdentityResolver.shared.unbindLibraryTrack(
+                        rootFolderId: rootFolderId,
+                        relativePath: relativePath
+                    )
+                }
 
                 // И дополнительно очищаем все привязки к этому trackId,
                 // чтобы потом другой файл по старому пути не воскресил старый id.
                 try await TrackIdentityResolver.shared.forgetTrack(id: entry.id)
             }
         }
-        // 6) Persist выполняется только после валидной синхронизации.
+        // 6) Финальная проверка ошибок выполняется только после валидной синхронизации.
         // До этого места код доходит только если:
         // - библиотека находится в состоянии ready
         // - доступ к rootURL успешно открыт
         // - scanner вернул надёжный непустой результат
-        // Сохраняем результат синхронизации после обновления памяти.
-        // Если запись реестров не прошла, sync не должен считаться успешным.
-        try await TrackRegistry.shared.persist()
-        try await BookmarksRegistry.shared.persist()
+        // Если запись в SQLite не прошла, sync не должен считаться успешным.
+        try await TrackRegistry.shared.throwPendingPersistenceError()
+        try await BookmarksRegistry.shared.throwPendingPersistenceError()
         
         // Лог завершения sync не содержит счётчик удалений, потому что фактическое состояние БД логируется отдельно.
         print("✅ syncRootFolder завершён:", rootURL.lastPathComponent, "режим:", mode, "файлов:", scanned.count)
 
         #if DEBUG
-        // DEBUG-снимок показывает состояние SQLite после persist, а не статистику текущей операции.
+        // DEBUG-снимок показывает состояние SQLite после финальной проверки, а не статистику текущей операции.
         if logsDatabaseDiagnostics {
             DatabaseDiagnosticsLogger.logLibrarySnapshot()
         }

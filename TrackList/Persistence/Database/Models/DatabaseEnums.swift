@@ -12,6 +12,7 @@ import Foundation
 // Источник трека в таблицах базы, отделённый от runtime-моделей приложения.
 enum DatabaseTrackSource: String, Equatable {
     case library
+    case imported
     case purchasedITunes
 }
 
@@ -27,11 +28,4 @@ enum DatabasePreferredColorScheme: String, Equatable {
     case system
     case light
     case dark
-}
-
-// Способ обработки дубликатов при экспорте.
-enum DatabaseExportDuplicateHandling: String, Equatable {
-    case keepBoth
-    case skip
-    case replace
 }

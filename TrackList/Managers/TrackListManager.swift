@@ -78,13 +78,6 @@ final class TrackListManager {
         }
     }
     
-    /// Совместимый метод для старого сценария удаления файла.
-    /// После переноса треклистов на SQLite физический файл tracklist_<UUID>.json больше не используется.
-    func deleteTracksFile(for id: UUID) throws {
-        PersistentLogger.log("ℹ️ TrackListManager: deleteTracksFile skipped for SQLite tracklist id=\(id)")
-    }
-    
-    
     // MARK: - Возвращает объект треклиста
     
     /// Возвращает треклист с треками и метаданными по его ID из SQLite.

@@ -18,23 +18,29 @@ enum BookmarkResolver {
 
     // MARK: - URL для трека
 
-    static func url(forTrack id: UUID) async -> URL? {
+    static func url(
+        forTrack id: UUID,
+        trackRegistry: TrackRegistry = .shared,
+        bookmarksRegistry: BookmarksRegistry = .shared
+    ) async -> URL? {
 
         // 1) Основной путь: rootFolder + relativePath (фонотека)
-        if let entry = await TrackRegistry.shared.entry(for: id),
-           entry.relativePath.isEmpty == false {
+        if let entry = await trackRegistry.entry(for: id),
+           let relativePath = entry.relativePath,
+           relativePath.isEmpty == false,
+           let rootFolderId = entry.rootFolderId {
 
-            guard let rootURL = await url(forFolder: entry.rootFolderId) else {
+            guard let rootURL = await url(forFolder: rootFolderId) else {
                 print("⚠️ BookmarkResolver: не удалось восстановить rootURL для трека \(id)")
                 return nil
             }
 
             // Собираем путь из root + relativePath
-            let candidateURL = rootURL.appendingPathComponent(entry.relativePath)
+            let candidateURL = rootURL.appendingPathComponent(relativePath)
 
             // Если файл реально существует — это валидный путь
             if FileManager.default.fileExists(atPath: candidateURL.path) {
-                await TrackRegistry.shared.updateTrackAvailability(
+                await trackRegistry.updateTrackAvailability(
                     id: id,
                     isAvailable: true
                 )
@@ -48,9 +54,9 @@ enum BookmarkResolver {
         }
 
         // 2) Fallback: bookmark трека
-        guard let base64 = await BookmarksRegistry.shared.trackBookmark(for: id) else {
+        guard let base64 = await bookmarksRegistry.trackBookmark(for: id) else {
             print("⚠️ BookmarkResolver: нет пути к треку \(id)")
-            await TrackRegistry.shared.updateTrackAvailability(
+            await trackRegistry.updateTrackAvailability(
                 id: id,
                 isAvailable: false
             )
@@ -59,14 +65,14 @@ enum BookmarkResolver {
 
         guard let url = resolveBookmark(base64) else {
             print("⚠️ BookmarkResolver: не удалось резолвить bookmark трека \(id)")
-            await TrackRegistry.shared.updateTrackAvailability(
+            await trackRegistry.updateTrackAvailability(
                 id: id,
                 isAvailable: false
             )
             return nil
         }
 
-        await TrackRegistry.shared.updateTrackAvailability(
+        await trackRegistry.updateTrackAvailability(
             id: id,
             isAvailable: FileManager.default.fileExists(atPath: url.path)
         )

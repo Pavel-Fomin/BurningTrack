@@ -40,7 +40,7 @@ struct AddToTrackListContainer: View {
     // MARK: - Data source
 
     /// Список всех треклистов в фиксированном порядке
-    private let trackLists: [TrackListsManager.TrackListMeta]
+    private let trackLists: [TrackListMeta]
 
     init(data: AddToTrackListSheetData) {
         self.data = data

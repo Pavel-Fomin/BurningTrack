@@ -17,6 +17,9 @@ final class ImportManager {
 
     func importTracks(from urls: [URL], to folderId: UUID) async throws -> [UUID] {
 
+        // Параметр оставлен для старого контракта вызова; imported-треки больше не получают fake folderId.
+        _ = folderId
+
         var result: [UUID] = []
 
         for url in urls {
@@ -39,24 +42,20 @@ final class ImportManager {
                 print("❌ Не удалось создать bookmark для файла: \(url.lastPathComponent)")
             }
 
-            // 4. TrackRegistry — только метаданные
-            await TrackRegistry.shared.upsertTrack(
+            // 4. TrackRegistry сохраняет imported-трек в SQLite без фиктивной папки фонотеки.
+            await TrackRegistry.shared.upsertImportedTrack(
                 id: trackId,
                 fileName: url.lastPathComponent,
-                relativePath: "",
-                folderId: folderId,
-                rootFolderId: folderId
+                fileURL: url
             )
 
             print("📥 Импортирован: \(metadata?.title ?? url.lastPathComponent)")
             result.append(trackId)
         }
 
-        // Persist — один раз
-        // Сохраняем реестр после обновления импортированных треков.
-        try await TrackRegistry.shared.persist()
-        // Сохраняем bookmark-реестр после обновления импортированных треков.
-        try await BookmarksRegistry.shared.persist()
+        // Финально пробрасываем возможные ошибки SQLite, накопленные во время non-throwing upsert-вызовов.
+        try await TrackRegistry.shared.throwPendingPersistenceError()
+        try await BookmarksRegistry.shared.throwPendingPersistenceError()
 
         return result
     }

@@ -183,11 +183,11 @@ final class MusicLibraryManager: ObservableObject {
         // Удаляем папку и связанные с ней треки из TrackRegistry
         await TrackRegistry.shared.removeFolder(id: rootFolderId)
 
-        // Сохраняем оба реестра только после обновления памяти.
-        // Если запись на диск не прошла, ошибка должна дойти до UI,
+        // Финально проверяем записи в SQLite после обновления реестров.
+        // Если запись не прошла, ошибка должна дойти до UI,
         // чтобы success-toast не был показан ложно.
-        try await BookmarksRegistry.shared.persist()
-        try await TrackRegistry.shared.persist()
+        try await BookmarksRegistry.shared.throwPendingPersistenceError()
+        try await TrackRegistry.shared.throwPendingPersistenceError()
 
         // Обновляем UI-список прикреплённых папок
         attachedFolders.removeAll { $0.url == url }

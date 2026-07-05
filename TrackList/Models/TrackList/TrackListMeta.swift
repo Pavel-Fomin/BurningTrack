@@ -19,7 +19,7 @@ import Foundation
 
 // Метаданные одного плейлиста (без треков)
 // Используются для отображения списка и управления
-struct TrackListMeta: Codable, Identifiable {
+struct TrackListMeta: Identifiable {
     let id: UUID               // Уникальный идентификатор плейлиста
     var name: String           // Название, заданное пользователем
     let createdAt: Date        // Дата создания плейлиста

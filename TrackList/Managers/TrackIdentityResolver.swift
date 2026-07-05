@@ -21,23 +21,12 @@ actor TrackIdentityResolver {
 
     // MARK: - Хранилище соответствий
 
-    /// identityKey -> trackId для внефазовых одиночных импортов.
-    private var importedIdentityMap: [String: UUID] = [:]
-    /// Старые library-ключи сохраняются в JSON как backup, но больше не используются как источник фонотеки.
-    private var backupLibraryIdentityMap: [String: UUID] = [:]
+    private var cachedIdentityStore: TrackIdentityDatabaseStore?
+    private let database: AppDatabase
 
-    private var isLoaded = false
-    private var isDirty = false
-
-    // MARK: - Путь к файлу хранения
-
-    private let fileURL: URL = {
-        let dir = FileManager.default.urls(
-            for: .documentDirectory,
-            in: .userDomainMask
-        ).first!
-        return dir.appendingPathComponent("TrackIdentityRegistry.json")
-    }()
+    init(database: AppDatabase = .shared) {
+        self.database = database
+    }
 
     // MARK: - Публичный API
 
@@ -65,13 +54,14 @@ actor TrackIdentityResolver {
     /// Возвращает постоянный trackId для одиночного импортированного файла.
     /// Используется только там, где нет rootFolderId + relativePath.
     func trackId(forImportedURL url: URL) async throws -> UUID {
-        loadIfNeeded()
-
         let key = importedFileKey(for: url)
-        return try await upsertImportedIdentityKey(key, preferredExistingId: nil)
+        return try identityStore().trackIdForImportedIdentity(
+            identityKey: key,
+            fileURL: url
+        )
     }
 
-    /// Library identity хранится в SQLite, поэтому отдельная JSON-привязка больше не нужна.
+    /// Library identity хранится в tracks(root_folder_id, relative_path), поэтому отдельная привязка не нужна.
     func bindLibraryTrack(
         id trackId: UUID,
         rootFolderId: UUID,
@@ -87,17 +77,28 @@ actor TrackIdentityResolver {
         id trackId: UUID,
         url: URL
     ) async throws {
-        loadIfNeeded()
-
         let key = importedFileKey(for: url)
-
-        if importedIdentityMap[key] == trackId { return }
-        importedIdentityMap[key] = trackId
-        isDirty = true
-        try await persist()
+        try identityStore().bindImportedTrack(
+            id: trackId,
+            identityKey: key,
+            fileURL: url
+        )
     }
 
-    /// Library identity удаляется вместе со строкой tracks, поэтому JSON-ключ не трогаем.
+    /// Заменяет path-identity imported-трека после физического rename/move.
+    func replaceImportedTrackIdentity(
+        id trackId: UUID,
+        url: URL
+    ) async throws {
+        let key = importedFileKey(for: url)
+        try identityStore().replaceImportedTrackIdentity(
+            id: trackId,
+            identityKey: key,
+            fileURL: url
+        )
+    }
+
+    /// Library identity удаляется вместе со строкой tracks.
     func unbindLibraryTrack(
         rootFolderId: UUID,
         relativePath: String
@@ -108,41 +109,19 @@ actor TrackIdentityResolver {
 
     /// Полностью забывает импортированные ключи, которые были привязаны к trackId.
     func forgetTrack(id trackId: UUID) async throws {
-        loadIfNeeded()
-
-        let oldCount = importedIdentityMap.count
-        importedIdentityMap = importedIdentityMap.filter { $0.value != trackId }
-
-        if importedIdentityMap.count != oldCount {
-            isDirty = true
-            try await persist()
-        }
+        try identityStore().forgetTrack(id: trackId)
     }
 
     // MARK: - Внутренняя логика
 
-    private func upsertImportedIdentityKey(
-        _ key: String,
-        preferredExistingId: UUID?
-    ) async throws -> UUID {
-        if let preferredExistingId {
-            if importedIdentityMap[key] != preferredExistingId {
-                importedIdentityMap[key] = preferredExistingId
-                isDirty = true
-                try await persist()
-            }
-            return preferredExistingId
+    private func identityStore() throws -> TrackIdentityDatabaseStore {
+        if let cachedIdentityStore {
+            return cachedIdentityStore
         }
 
-        if let existing = importedIdentityMap[key] {
-            return existing
-        }
-
-        let newId = UUID()
-        importedIdentityMap[key] = newId
-        isDirty = true
-        try await persist()
-        return newId
+        let store = try TrackIdentityDatabaseStore(database: database)
+        cachedIdentityStore = store
+        return store
     }
 
     // MARK: - Ключи identity
@@ -154,32 +133,5 @@ actor TrackIdentityResolver {
             .path
 
         return "imp:\(normalizedPath)"
-    }
-
-    // MARK: - Загрузка / сохранение
-
-    private func loadIfNeeded() {
-        guard !isLoaded else { return }
-        isLoaded = true
-
-        do {
-            let data = try Data(contentsOf: fileURL)
-            let decoded = try JSONDecoder().decode([String: UUID].self, from: data)
-            importedIdentityMap = decoded.filter { $0.key.hasPrefix("imp:") }
-            backupLibraryIdentityMap = decoded.filter { $0.key.hasPrefix("imp:") == false }
-        } catch {
-            importedIdentityMap = [:]
-            backupLibraryIdentityMap = [:]
-        }
-    }
-
-    private func persist() async throws {
-        guard isDirty else { return }
-
-        // Сохраняем только legacy imports как активные ключи и оставляем старые library-ключи как backup.
-        let file = backupLibraryIdentityMap.merging(importedIdentityMap) { _, imported in imported }
-        let data = try JSONEncoder().encode(file)
-        try data.write(to: fileURL, options: .atomic)
-        isDirty = false
     }
 }

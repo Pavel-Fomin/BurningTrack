@@ -17,7 +17,8 @@ final class AppDatabase {
             .initialSchema,
             .initialTables,
             .trackListTracksAllowExternalTrackIds,
-            .settingsPhase7
+            .settingsPhase7,
+            .importedTracksPhase8
         ])
     )
 
