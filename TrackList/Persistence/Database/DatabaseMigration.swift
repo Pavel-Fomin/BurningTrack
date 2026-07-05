@@ -221,6 +221,7 @@ extension DatabaseMigration {
                 preferred_color_scheme TEXT NOT NULL DEFAULT 'system' CHECK (preferred_color_scheme IN ('system', 'light', 'dark')),
                 accent_color_name TEXT,
                 last_opened_tab TEXT,
+                is_tag_reading_enabled INTEGER NOT NULL DEFAULT 1 CHECK (is_tag_reading_enabled IN (0, 1)),
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );
@@ -231,6 +232,8 @@ extension DatabaseMigration {
                 group_mode TEXT NOT NULL DEFAULT 'date',
                 show_tracklist_badges INTEGER NOT NULL DEFAULT 1 CHECK (show_tracklist_badges IN (0, 1)),
                 show_unavailable_tracks INTEGER NOT NULL DEFAULT 1 CHECK (show_unavailable_tracks IN (0, 1)),
+                show_file_format INTEGER NOT NULL DEFAULT 1 CHECK (show_file_format IN (0, 1)),
+                show_purchased_itunes_source INTEGER NOT NULL DEFAULT 1 CHECK (show_purchased_itunes_source IN (0, 1)),
                 last_opened_folder_id TEXT,
                 updated_at TEXT NOT NULL,
                 FOREIGN KEY (last_opened_folder_id) REFERENCES folders(id) ON DELETE SET NULL
@@ -307,5 +310,56 @@ extension DatabaseMigration {
             ON tracklist_tracks(position);
             """,
         )
+    }
+
+    // Четвёртая миграция добавляет рабочие пользовательские настройки из старого settings.json.
+    static let settingsPhase7 = DatabaseMigration(identifier: "004_settings_phase_7") { database in
+        try ensureColumn(
+            "is_tag_reading_enabled",
+            in: "app_settings",
+            definition: "INTEGER NOT NULL DEFAULT 1 CHECK (is_tag_reading_enabled IN (0, 1))",
+            database: database
+        )
+        try ensureColumn(
+            "show_file_format",
+            in: "library_view_settings",
+            definition: "INTEGER NOT NULL DEFAULT 1 CHECK (show_file_format IN (0, 1))",
+            database: database
+        )
+        try ensureColumn(
+            "show_purchased_itunes_source",
+            in: "library_view_settings",
+            definition: "INTEGER NOT NULL DEFAULT 1 CHECK (show_purchased_itunes_source IN (0, 1))",
+            database: database
+        )
+    }
+
+    private static func ensureColumn(
+        _ column: String,
+        in table: String,
+        definition: String,
+        database: DatabaseConnection
+    ) throws {
+        let existingColumns = try columnNames(in: table, database: database)
+        guard existingColumns.contains(column) == false else { return }
+
+        // Имена таблиц и колонок приходят только из кода миграции, поэтому DDL не принимает пользовательский ввод.
+        try database.executeScript(
+            "ALTER TABLE \(table) ADD COLUMN \(column) \(definition);"
+        )
+    }
+
+    private static func columnNames(
+        in table: String,
+        database: DatabaseConnection
+    ) throws -> Set<String> {
+        let statement = try database.prepare("PRAGMA table_info(\(table));")
+        var names = Set<String>()
+
+        while try statement.step() == .row {
+            names.insert(try statement.rowReader().requiredString(at: 1))
+        }
+
+        return names
     }
 }

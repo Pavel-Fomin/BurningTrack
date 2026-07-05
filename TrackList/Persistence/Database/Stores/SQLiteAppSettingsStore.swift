@@ -89,8 +89,9 @@ final class SQLiteAppSettingsStore: AppSettingsDatabaseReading, AppSettingsDatab
             preferredColorScheme: preferredColorScheme,
             accentColorName: row.string(at: 3),
             lastOpenedTab: row.string(at: 4),
-            createdAt: try row.requiredDate(at: 5),
-            updatedAt: try row.requiredDate(at: 6)
+            isTagReadingEnabled: try row.requiredBool(at: 5),
+            createdAt: try row.requiredDate(at: 6),
+            updatedAt: try row.requiredDate(at: 7)
         )
     }
 
@@ -104,8 +105,9 @@ final class SQLiteAppSettingsStore: AppSettingsDatabaseReading, AppSettingsDatab
         try statement.bind(model.preferredColorScheme.rawValue, at: 3)
         try statement.bind(model.accentColorName, at: 4)
         try statement.bind(model.lastOpenedTab, at: 5)
-        try statement.bind(model.createdAt, at: 6)
-        try statement.bind(model.updatedAt, at: 7)
+        try statement.bind(model.isTagReadingEnabled, at: 6)
+        try statement.bind(model.createdAt, at: 7)
+        try statement.bind(model.updatedAt, at: 8)
     }
 
     private static func bindUpdate(
@@ -117,8 +119,173 @@ final class SQLiteAppSettingsStore: AppSettingsDatabaseReading, AppSettingsDatab
         try statement.bind(model.preferredColorScheme.rawValue, at: 2)
         try statement.bind(model.accentColorName, at: 3)
         try statement.bind(model.lastOpenedTab, at: 4)
-        try statement.bind(model.createdAt, at: 5)
-        try statement.bind(model.updatedAt, at: 6)
-        try statement.bind(model.id, at: 7)
+        try statement.bind(model.isTagReadingEnabled, at: 5)
+        try statement.bind(model.createdAt, at: 6)
+        try statement.bind(model.updatedAt, at: 7)
+        try statement.bind(model.id, at: 8)
+    }
+}
+
+// Фасад рабочих настроек скрывает SQLite-модели от слоя менеджеров.
+final class SettingsDatabaseStore {
+    private let executor: DatabaseExecutor
+    private let appSettingsStore: any AppSettingsDatabaseReading & AppSettingsDatabaseWriting
+    private let libraryViewSettingsStore: any LibraryViewSettingsDatabaseReading & LibraryViewSettingsDatabaseWriting
+    private let playerSettingsStore: any PlayerSettingsDatabaseReading & PlayerSettingsDatabaseWriting
+
+    init(
+        executor: DatabaseExecutor,
+        appSettingsStore: any AppSettingsDatabaseReading & AppSettingsDatabaseWriting,
+        libraryViewSettingsStore: any LibraryViewSettingsDatabaseReading & LibraryViewSettingsDatabaseWriting,
+        playerSettingsStore: any PlayerSettingsDatabaseReading & PlayerSettingsDatabaseWriting
+    ) {
+        self.executor = executor
+        self.appSettingsStore = appSettingsStore
+        self.libraryViewSettingsStore = libraryViewSettingsStore
+        self.playerSettingsStore = playerSettingsStore
+    }
+
+    convenience init(database: AppDatabase = .shared) throws {
+        let executor = try database.databaseExecutor()
+        self.init(
+            executor: executor,
+            appSettingsStore: SQLiteAppSettingsStore(executor: executor),
+            libraryViewSettingsStore: SQLiteLibraryViewSettingsStore(executor: executor),
+            playerSettingsStore: SQLitePlayerSettingsStore(executor: executor)
+        )
+    }
+
+    /// Загружает рабочие настройки из SQLite и создаёт строки по умолчанию при первом запуске.
+    func fetchSettings(
+        legacySettingsProvider: () -> AppSettings?
+    ) throws -> AppSettings {
+        let appModel = try appSettingsStore.fetch()
+        let libraryModel = try libraryViewSettingsStore.fetch()
+        let playerModel = try playerSettingsStore.fetch()
+        let shouldImportLegacySettings = appModel == nil && libraryModel == nil
+        let sourceSettings = shouldImportLegacySettings
+            ? (legacySettingsProvider() ?? .defaultValue)
+            : .defaultValue
+        let now = Date()
+
+        let resolvedAppModel = appModel ?? Self.makeAppSettingsModel(
+            from: sourceSettings,
+            createdAt: now,
+            updatedAt: now
+        )
+        let resolvedLibraryModel = libraryModel ?? Self.makeLibraryViewSettingsModel(
+            from: sourceSettings,
+            updatedAt: now
+        )
+        let resolvedPlayerModel = playerModel ?? Self.makePlayerSettingsModel(updatedAt: now)
+
+        if appModel == nil || libraryModel == nil || playerModel == nil {
+            try executor.transaction { _ in
+                try appSettingsStore.upsert(resolvedAppModel)
+                try libraryViewSettingsStore.upsert(resolvedLibraryModel)
+                try playerSettingsStore.upsert(resolvedPlayerModel)
+            }
+        }
+
+        return Self.makeAppSettings(
+            appModel: resolvedAppModel,
+            libraryModel: resolvedLibraryModel
+        )
+    }
+
+    /// Сохраняет рабочие настройки приложения, не раскрывая модели базы выше Store.
+    func saveSettings(_ settings: AppSettings) throws {
+        let now = Date()
+        var appModel = try appSettingsStore.fetch() ?? Self.makeAppSettingsModel(
+            from: settings,
+            createdAt: now,
+            updatedAt: now
+        )
+        var libraryModel = try libraryViewSettingsStore.fetch() ?? Self.makeLibraryViewSettingsModel(
+            from: settings,
+            updatedAt: now
+        )
+        let playerModel = try playerSettingsStore.fetch() ?? Self.makePlayerSettingsModel(updatedAt: now)
+
+        // Обновляем только рабочие поля текущей бизнес-модели AppSettings.
+        appModel.schemaVersion = settings.schemaVersion
+        appModel.isTagReadingEnabled = settings.visible.metadata.isTagReadingEnabled
+        appModel.updatedAt = now
+
+        libraryModel.showTrackListBadges = settings.visible.library.isTrackListMembershipVisible
+        libraryModel.showFileFormat = settings.visible.library.isFileFormatVisible
+        libraryModel.showPurchasedITunesSource = settings.visible.library.isPurchasedITunesSourceVisible
+        libraryModel.updatedAt = now
+
+        try executor.transaction { _ in
+            try appSettingsStore.upsert(appModel)
+            try libraryViewSettingsStore.upsert(libraryModel)
+            try playerSettingsStore.upsert(playerModel)
+        }
+    }
+
+    private static func makeAppSettings(
+        appModel: AppSettingsDatabaseModel,
+        libraryModel: LibraryViewSettingsDatabaseModel
+    ) -> AppSettings {
+        AppSettings(
+            schemaVersion: appModel.schemaVersion,
+            visible: AppSettings.VisibleSettings(
+                metadata: AppSettings.MetadataSettings(
+                    isTagReadingEnabled: appModel.isTagReadingEnabled
+                ),
+                library: AppSettings.LibrarySettings(
+                    isTrackListMembershipVisible: libraryModel.showTrackListBadges,
+                    isFileFormatVisible: libraryModel.showFileFormat,
+                    isPurchasedITunesSourceVisible: libraryModel.showPurchasedITunesSource
+                )
+            ),
+            internalSettings: .defaultValue
+        )
+    }
+
+    private static func makeAppSettingsModel(
+        from settings: AppSettings,
+        createdAt: Date,
+        updatedAt: Date
+    ) -> AppSettingsDatabaseModel {
+        AppSettingsDatabaseModel(
+            id: 1,
+            schemaVersion: settings.schemaVersion,
+            preferredColorScheme: .system,
+            accentColorName: nil,
+            lastOpenedTab: nil,
+            isTagReadingEnabled: settings.visible.metadata.isTagReadingEnabled,
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
+    }
+
+    private static func makeLibraryViewSettingsModel(
+        from settings: AppSettings,
+        updatedAt: Date
+    ) -> LibraryViewSettingsDatabaseModel {
+        LibraryViewSettingsDatabaseModel(
+            id: 1,
+            sortMode: "fileDateDesc",
+            groupMode: "date",
+            showTrackListBadges: settings.visible.library.isTrackListMembershipVisible,
+            showUnavailableTracks: true,
+            showFileFormat: settings.visible.library.isFileFormatVisible,
+            showPurchasedITunesSource: settings.visible.library.isPurchasedITunesSourceVisible,
+            lastOpenedFolderId: nil,
+            updatedAt: updatedAt
+        )
+    }
+
+    private static func makePlayerSettingsModel(updatedAt: Date) -> PlayerSettingsDatabaseModel {
+        PlayerSettingsDatabaseModel(
+            id: 1,
+            autoPlayNext: true,
+            restoreLastPosition: true,
+            showMiniPlayer: true,
+            backgroundPlaybackEnabled: true,
+            updatedAt: updatedAt
+        )
     }
 }

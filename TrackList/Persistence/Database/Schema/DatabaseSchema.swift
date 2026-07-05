@@ -137,6 +137,7 @@ enum DatabaseSchema {
         static let preferredColorScheme = "preferred_color_scheme"
         static let accentColorName = "accent_color_name"
         static let lastOpenedTab = "last_opened_tab"
+        static let isTagReadingEnabled = "is_tag_reading_enabled"
         static let createdAt = "created_at"
         static let updatedAt = "updated_at"
     }
@@ -149,6 +150,8 @@ enum DatabaseSchema {
         static let groupMode = "group_mode"
         static let showTrackListBadges = "show_tracklist_badges"
         static let showUnavailableTracks = "show_unavailable_tracks"
+        static let showFileFormat = "show_file_format"
+        static let showPurchasedITunesSource = "show_purchased_itunes_source"
         static let lastOpenedFolderId = "last_opened_folder_id"
         static let updatedAt = "updated_at"
     }

@@ -127,6 +127,7 @@ struct AppSettingsDatabaseModel: Equatable, Identifiable {
     var preferredColorScheme: DatabasePreferredColorScheme
     var accentColorName: String?
     var lastOpenedTab: String?
+    var isTagReadingEnabled: Bool
     var createdAt: Date
     var updatedAt: Date
 }
@@ -138,6 +139,8 @@ struct LibraryViewSettingsDatabaseModel: Equatable, Identifiable {
     var groupMode: String
     var showTrackListBadges: Bool
     var showUnavailableTracks: Bool
+    var showFileFormat: Bool
+    var showPurchasedITunesSource: Bool
     var lastOpenedFolderId: UUID?
     var updatedAt: Date
 }

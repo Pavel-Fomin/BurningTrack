@@ -84,8 +84,10 @@ final class SQLiteLibraryViewSettingsStore: LibraryViewSettingsDatabaseReading, 
             groupMode: try row.requiredString(at: 2),
             showTrackListBadges: try row.requiredBool(at: 3),
             showUnavailableTracks: try row.requiredBool(at: 4),
-            lastOpenedFolderId: try row.uuid(at: 5),
-            updatedAt: try row.requiredDate(at: 6)
+            showFileFormat: try row.requiredBool(at: 5),
+            showPurchasedITunesSource: try row.requiredBool(at: 6),
+            lastOpenedFolderId: try row.uuid(at: 7),
+            updatedAt: try row.requiredDate(at: 8)
         )
     }
 
@@ -99,8 +101,10 @@ final class SQLiteLibraryViewSettingsStore: LibraryViewSettingsDatabaseReading, 
         try statement.bind(model.groupMode, at: 3)
         try statement.bind(model.showTrackListBadges, at: 4)
         try statement.bind(model.showUnavailableTracks, at: 5)
-        try statement.bind(model.lastOpenedFolderId, at: 6)
-        try statement.bind(model.updatedAt, at: 7)
+        try statement.bind(model.showFileFormat, at: 6)
+        try statement.bind(model.showPurchasedITunesSource, at: 7)
+        try statement.bind(model.lastOpenedFolderId, at: 8)
+        try statement.bind(model.updatedAt, at: 9)
     }
 
     private static func bindUpdate(
@@ -112,8 +116,10 @@ final class SQLiteLibraryViewSettingsStore: LibraryViewSettingsDatabaseReading, 
         try statement.bind(model.groupMode, at: 2)
         try statement.bind(model.showTrackListBadges, at: 3)
         try statement.bind(model.showUnavailableTracks, at: 4)
-        try statement.bind(model.lastOpenedFolderId, at: 5)
-        try statement.bind(model.updatedAt, at: 6)
-        try statement.bind(model.id, at: 7)
+        try statement.bind(model.showFileFormat, at: 5)
+        try statement.bind(model.showPurchasedITunesSource, at: 6)
+        try statement.bind(model.lastOpenedFolderId, at: 7)
+        try statement.bind(model.updatedAt, at: 8)
+        try statement.bind(model.id, at: 9)
     }
 }

@@ -527,7 +527,7 @@ enum PlayerStateDatabaseQueries {
 enum AppSettingsDatabaseQueries {
     static let fetch = """
     SELECT id, schema_version, preferred_color_scheme, accent_color_name,
-           last_opened_tab, created_at, updated_at
+           last_opened_tab, is_tag_reading_enabled, created_at, updated_at
     FROM app_settings
     WHERE id = 1;
     """
@@ -535,27 +535,28 @@ enum AppSettingsDatabaseQueries {
     static let insert = """
     INSERT INTO app_settings (
         id, schema_version, preferred_color_scheme, accent_color_name,
-        last_opened_tab, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?);
+        last_opened_tab, is_tag_reading_enabled, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
     """
 
     static let update = """
     UPDATE app_settings
     SET schema_version = ?, preferred_color_scheme = ?, accent_color_name = ?,
-        last_opened_tab = ?, created_at = ?, updated_at = ?
+        last_opened_tab = ?, is_tag_reading_enabled = ?, created_at = ?, updated_at = ?
     WHERE id = ?;
     """
 
     static let upsert = """
     INSERT INTO app_settings (
         id, schema_version, preferred_color_scheme, accent_color_name,
-        last_opened_tab, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        last_opened_tab, is_tag_reading_enabled, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
         schema_version = excluded.schema_version,
         preferred_color_scheme = excluded.preferred_color_scheme,
         accent_color_name = excluded.accent_color_name,
         last_opened_tab = excluded.last_opened_tab,
+        is_tag_reading_enabled = excluded.is_tag_reading_enabled,
         created_at = excluded.created_at,
         updated_at = excluded.updated_at;
     """
@@ -570,7 +571,7 @@ enum AppSettingsDatabaseQueries {
 enum LibraryViewSettingsDatabaseQueries {
     static let fetch = """
     SELECT id, sort_mode, group_mode, show_tracklist_badges, show_unavailable_tracks,
-           last_opened_folder_id, updated_at
+           show_file_format, show_purchased_itunes_source, last_opened_folder_id, updated_at
     FROM library_view_settings
     WHERE id = 1;
     """
@@ -578,27 +579,30 @@ enum LibraryViewSettingsDatabaseQueries {
     static let insert = """
     INSERT INTO library_view_settings (
         id, sort_mode, group_mode, show_tracklist_badges, show_unavailable_tracks,
-        last_opened_folder_id, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?);
+        show_file_format, show_purchased_itunes_source, last_opened_folder_id, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
     """
 
     static let update = """
     UPDATE library_view_settings
     SET sort_mode = ?, group_mode = ?, show_tracklist_badges = ?,
-        show_unavailable_tracks = ?, last_opened_folder_id = ?, updated_at = ?
+        show_unavailable_tracks = ?, show_file_format = ?, show_purchased_itunes_source = ?,
+        last_opened_folder_id = ?, updated_at = ?
     WHERE id = ?;
     """
 
     static let upsert = """
     INSERT INTO library_view_settings (
         id, sort_mode, group_mode, show_tracklist_badges, show_unavailable_tracks,
-        last_opened_folder_id, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        show_file_format, show_purchased_itunes_source, last_opened_folder_id, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
         sort_mode = excluded.sort_mode,
         group_mode = excluded.group_mode,
         show_tracklist_badges = excluded.show_tracklist_badges,
         show_unavailable_tracks = excluded.show_unavailable_tracks,
+        show_file_format = excluded.show_file_format,
+        show_purchased_itunes_source = excluded.show_purchased_itunes_source,
         last_opened_folder_id = excluded.last_opened_folder_id,
         updated_at = excluded.updated_at;
     """

@@ -2,14 +2,14 @@
 //  AppSettingsManager.swift
 //  TrackList
 //
-//  Управляет загрузкой и сохранением настроек приложения в Documents/settings.json.
+//  Управляет загрузкой и сохранением рабочих настроек приложения через SQLite.
 //
 //  Created by Pavel Fomin on 12.05.2026.
 //
 
 import Foundation
 
-// Управляет загрузкой и сохранением настроек приложения в Documents/settings.json.
+// Управляет загрузкой и сохранением рабочих настроек приложения через SettingsDatabaseStore.
 @MainActor
 final class AppSettingsManager: ObservableObject, SettingsManaging {
     static let shared = AppSettingsManager()
@@ -21,23 +21,28 @@ final class AppSettingsManager: ObservableObject, SettingsManaging {
         $settings
     }
 
-    private let fileURL: URL
-    private let encoder: JSONEncoder
+    private let legacyFileURL: URL
     private let decoder: JSONDecoder
+    private let settingsStore: SettingsDatabaseStore
 
     private init() {
-        // Используем ту же директорию Documents, что и остальные JSON-реестры приложения.
+        // Старый файл нужен только для одноразового импорта настроек пользователей прошлых версий.
         let appDirectory = FileManager.default.urls(
             for: .documentDirectory,
             in: .userDomainMask
         ).first!
 
-        fileURL = appDirectory.appendingPathComponent("settings.json")
+        legacyFileURL = appDirectory.appendingPathComponent("settings.json")
 
-        let jsonEncoder = JSONEncoder()
-        jsonEncoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        encoder = jsonEncoder
         decoder = JSONDecoder()
+
+        let resolvedSettingsStore: SettingsDatabaseStore
+        do {
+            resolvedSettingsStore = try SettingsDatabaseStore()
+        } catch {
+            preconditionFailure("Не удалось подготовить SQLite-хранилище настроек: \(error.localizedDescription)")
+        }
+        settingsStore = resolvedSettingsStore
 
         settings = AppSettings.defaultValue
         load()
@@ -45,11 +50,14 @@ final class AppSettingsManager: ObservableObject, SettingsManaging {
 
     func load() {
         do {
-            let data = try Data(contentsOf: fileURL)
-            let decoded = try decoder.decode(AppSettings.self, from: data)
-            settings = decoded
+            settings = try settingsStore.fetchSettings { [legacyFileURL, decoder] in
+                Self.loadLegacySettings(
+                    fileURL: legacyFileURL,
+                    decoder: decoder
+                )
+            }
         } catch {
-            // При первом запуске или поврежденном файле восстанавливаем настройки по умолчанию.
+            // При ошибке SQLite восстанавливаем дефолты в основной БД, не используя JSON как резервный источник.
             settings = AppSettings.defaultValue
             save()
         }
@@ -57,8 +65,7 @@ final class AppSettingsManager: ObservableObject, SettingsManaging {
 
     func save() {
         do {
-            let data = try encoder.encode(settings)
-            try data.write(to: fileURL, options: .atomic)
+            try settingsStore.saveSettings(settings)
         } catch {
             print("Не удалось сохранить настройки приложения: \(error.localizedDescription)")
         }
@@ -100,5 +107,18 @@ final class AppSettingsManager: ObservableObject, SettingsManaging {
         save()
 
         NotificationCenter.default.post(name: .appSettingsDidChange, object: nil)
+    }
+
+    private static func loadLegacySettings(
+        fileURL: URL,
+        decoder: JSONDecoder
+    ) -> AppSettings? {
+        do {
+            let data = try Data(contentsOf: fileURL)
+            return try decoder.decode(AppSettings.self, from: data)
+        } catch {
+            // Отсутствующий или повреждённый старый JSON не должен заменять SQLite-источник настроек.
+            return nil
+        }
     }
 }

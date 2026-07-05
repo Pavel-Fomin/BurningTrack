@@ -16,7 +16,8 @@ final class AppDatabase {
         migrator: DatabaseMigrator(migrations: [
             .initialSchema,
             .initialTables,
-            .trackListTracksAllowExternalTrackIds
+            .trackListTracksAllowExternalTrackIds,
+            .settingsPhase7
         ])
     )
 

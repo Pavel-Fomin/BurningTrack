@@ -241,6 +241,55 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
         XCTAssertNil(try store.fetchLibraryTrack(id: trackId))
     }
 
+    func testSettingsDatabaseStoreImportsLegacySettingsOnlyOnce() throws {
+        let database = try makeDatabase()
+        let store = try SettingsDatabaseStore(database: database)
+        var legacySettings = AppSettings.defaultValue
+        legacySettings.visible.metadata.isTagReadingEnabled = false
+        legacySettings.visible.library.isTrackListMembershipVisible = false
+        legacySettings.visible.library.isFileFormatVisible = false
+        legacySettings.visible.library.isPurchasedITunesSourceVisible = false
+
+        let importedSettings = try store.fetchSettings {
+            legacySettings
+        }
+
+        XCTAssertFalse(importedSettings.visible.metadata.isTagReadingEnabled)
+        XCTAssertFalse(importedSettings.visible.library.isTrackListMembershipVisible)
+        XCTAssertFalse(importedSettings.visible.library.isFileFormatVisible)
+        XCTAssertFalse(importedSettings.visible.library.isPurchasedITunesSourceVisible)
+
+        let reloadedSettings = try store.fetchSettings {
+            AppSettings.defaultValue
+        }
+
+        XCTAssertEqual(reloadedSettings, importedSettings)
+    }
+
+    func testSettingsDatabaseStoreSavesWorkingSettingsToSQLite() throws {
+        let database = try makeDatabase()
+        let store = try SettingsDatabaseStore(database: database)
+        var settings = try store.fetchSettings {
+            nil
+        }
+
+        settings.visible.metadata.isTagReadingEnabled = false
+        settings.visible.library.isTrackListMembershipVisible = false
+        settings.visible.library.isFileFormatVisible = false
+        settings.visible.library.isPurchasedITunesSourceVisible = false
+
+        try store.saveSettings(settings)
+
+        let reloadedSettings = try store.fetchSettings {
+            AppSettings.defaultValue
+        }
+
+        XCTAssertFalse(reloadedSettings.visible.metadata.isTagReadingEnabled)
+        XCTAssertFalse(reloadedSettings.visible.library.isTrackListMembershipVisible)
+        XCTAssertFalse(reloadedSettings.visible.library.isFileFormatVisible)
+        XCTAssertFalse(reloadedSettings.visible.library.isPurchasedITunesSourceVisible)
+    }
+
     #if DEBUG
     func testDatabaseDiagnosticsSnapshotCountsActualLibraryState() throws {
         let database = try makeDatabase()
@@ -333,7 +382,8 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
             migrator: DatabaseMigrator(migrations: [
                 .initialSchema,
                 .initialTables,
-                .trackListTracksAllowExternalTrackIds
+                .trackListTracksAllowExternalTrackIds,
+                .settingsPhase7
             ])
         )
 
