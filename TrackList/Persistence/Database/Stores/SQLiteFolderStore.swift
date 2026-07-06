@@ -74,6 +74,17 @@ final class SQLiteFolderStore {
         }
     }
 
+    /// Обновляет ручной порядок только для корневой папки фонотеки.
+    func updateSortOrder(id: UUID, sortOrder: Int, updatedAt: Date) throws {
+        try executor.write { database in
+            let statement = try database.prepare(FolderDatabaseQueries.updateSortOrder)
+            try statement.bind(sortOrder, at: 1)
+            try statement.bind(updatedAt, at: 2)
+            try statement.bind(id, at: 3)
+            try statement.execute()
+        }
+    }
+
     private static func map(_ row: DatabaseRowReader) throws -> FolderDatabaseModel {
         FolderDatabaseModel(
             id: try row.requiredUUID(at: 0),
@@ -86,7 +97,8 @@ final class SQLiteFolderStore {
             isAvailable: try row.requiredBool(at: 7),
             createdAt: try row.requiredDate(at: 8),
             updatedAt: try row.requiredDate(at: 9),
-            lastScannedAt: try row.date(at: 10)
+            sortOrder: row.int(at: 10),
+            lastScannedAt: try row.date(at: 11)
         )
     }
 
@@ -105,7 +117,8 @@ final class SQLiteFolderStore {
         try statement.bind(model.isAvailable, at: 8)
         try statement.bind(model.createdAt, at: 9)
         try statement.bind(model.updatedAt, at: 10)
-        try statement.bind(model.lastScannedAt, at: 11)
+        try statement.bind(model.sortOrder, at: 11)
+        try statement.bind(model.lastScannedAt, at: 12)
     }
 
 }

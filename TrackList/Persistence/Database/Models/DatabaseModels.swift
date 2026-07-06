@@ -21,6 +21,7 @@ struct FolderDatabaseModel: Equatable, Identifiable {
     var isAvailable: Bool
     var createdAt: Date
     var updatedAt: Date
+    var sortOrder: Int?
     var lastScannedAt: Date?
 }
 
@@ -147,6 +148,7 @@ struct LibraryViewSettingsDatabaseModel: Equatable, Identifiable {
     let id: Int
     var sortMode: String
     var trackListsSortMode: String?
+    var libraryFoldersSortMode: String?
     var groupMode: String
     var showTrackListBadges: Bool
     var showUnavailableTracks: Bool

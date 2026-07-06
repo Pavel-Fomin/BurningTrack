@@ -22,4 +22,10 @@ protocol LibraryMasterActionOutput: AnyObject {
 
     /// Скрывает предупреждение перед откреплением папки.
     func clearPendingDetachFolder()
+
+    /// Применяет выбранную сортировку прикреплённых папок.
+    func setSortMode(_ mode: LibraryFoldersSortMode)
+
+    /// Сохраняет ручное перемещение прикреплённой папки.
+    func moveFolder(from source: IndexSet, to destination: Int)
 }

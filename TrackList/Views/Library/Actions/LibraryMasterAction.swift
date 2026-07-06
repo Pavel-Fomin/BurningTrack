@@ -14,6 +14,10 @@ enum LibraryMasterAction {
     case onAppear
     /// Пользователь запросил выбор новой папки.
     case addFolderTapped
+    /// Пользователь выбрал сортировку прикреплённых папок.
+    case setSortMode(LibraryFoldersSortMode)
+    /// Пользователь изменил ручной порядок прикреплённых папок.
+    case moveFolder(IndexSet, Int)
     /// Пользователь выбрал папку в системном picker'е.
     case folderPicked(URL)
     /// Системный picker не вернул папку.

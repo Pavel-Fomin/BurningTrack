@@ -21,7 +21,8 @@ extension DatabaseMigration {
         .trackListTracksAllowExternalTrackIds,
         .settingsPhase7,
         .importedTracksPhase8,
-        .trackListsSortModeSetting
+        .trackListsSortModeSetting,
+        .libraryFoldersSorting
     ]
 
     // Первая миграция фиксирует стартовую версию схемы без создания бизнес-таблиц.
@@ -44,6 +45,7 @@ extension DatabaseMigration {
                 is_available INTEGER NOT NULL DEFAULT 1 CHECK (is_available IN (0, 1)),
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
+                sort_order INTEGER,
                 last_scanned_at TEXT,
                 FOREIGN KEY (parent_folder_id) REFERENCES folders(id) ON DELETE CASCADE,
                 FOREIGN KEY (root_folder_id) REFERENCES folders(id) ON DELETE CASCADE
@@ -60,6 +62,9 @@ extension DatabaseMigration {
 
             CREATE INDEX IF NOT EXISTS idx_folders_relative_path
             ON folders(relative_path);
+
+            CREATE INDEX IF NOT EXISTS idx_folders_sort_order
+            ON folders(sort_order);
 
             CREATE TABLE IF NOT EXISTS tracks (
                 id TEXT PRIMARY KEY,
@@ -252,6 +257,7 @@ extension DatabaseMigration {
                 id INTEGER PRIMARY KEY CHECK (id = 1),
                 sort_mode TEXT NOT NULL DEFAULT 'fileDateDesc',
                 tracklists_sort_mode TEXT CHECK (tracklists_sort_mode IN ('createdAt', 'name')),
+                library_folders_sort_mode TEXT CHECK (library_folders_sort_mode IN ('createdAt', 'name')),
                 group_mode TEXT NOT NULL DEFAULT 'date',
                 show_tracklist_badges INTEGER NOT NULL DEFAULT 1 CHECK (show_tracklist_badges IN (0, 1)),
                 show_unavailable_tracks INTEGER NOT NULL DEFAULT 1 CHECK (show_unavailable_tracks IN (0, 1)),
@@ -589,6 +595,30 @@ extension DatabaseMigration {
             in: "library_view_settings",
             definition: "TEXT CHECK (tracklists_sort_mode IN ('createdAt', 'name'))",
             database: database
+        )
+    }
+
+    // Седьмая миграция добавляет ручной порядок и выбранный режим сортировки прикреплённых папок.
+    static let libraryFoldersSorting = DatabaseMigration(identifier: "007_library_folders_sorting") { database in
+        try ensureColumn(
+            "sort_order",
+            in: "folders",
+            definition: "INTEGER",
+            database: database
+        )
+        try ensureColumn(
+            "library_folders_sort_mode",
+            in: "library_view_settings",
+            definition: "TEXT CHECK (library_folders_sort_mode IN ('createdAt', 'name'))",
+            database: database
+        )
+
+        // Индекс ускоряет чтение корневых папок в сохранённом ручном порядке.
+        try database.executeScript(
+            """
+            CREATE INDEX IF NOT EXISTS idx_folders_sort_order
+            ON folders(sort_order);
+            """,
         )
     }
 

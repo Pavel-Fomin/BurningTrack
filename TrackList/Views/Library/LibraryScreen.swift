@@ -14,6 +14,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct SelectionActionBarConfig {
     /// Заголовок нижней панели.
@@ -102,6 +103,16 @@ struct LibraryScreen: View {
                     destination(
                         for: viewModel.screenState.destination(for: route)
                     )
+                }
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        LibraryToolbarMenuButton(
+                            state: masterViewModel.screenState,
+                            onAction: { action in
+                                actionHandler.handle(action)
+                            }
+                        )
+                    }
                 }
         }
         .bottomPanelsHost(
@@ -193,6 +204,76 @@ struct LibraryScreen: View {
                 .onAppear {
                     viewModel.handle(.folderMissingAppeared)
                 }
+        }
+    }
+}
+
+/// Нативная кнопка toolbar-меню с поддержкой subtitle у вложенного пункта UIMenu.
+private struct LibraryToolbarMenuButton: UIViewRepresentable {
+    /// Готовое состояние корневого экрана фонотеки.
+    let state: LibraryMasterScreenState
+    /// Передаёт пользовательские действия обработчику экрана.
+    let onAction: (LibraryMasterAction) -> Void
+
+    func makeUIView(context: Context) -> UIButton {
+        let button = UIButton(type: .system)
+        button.setImage(UIImage(systemName: "ellipsis"), for: .normal)
+        button.showsMenuAsPrimaryAction = true
+        button.changesSelectionAsPrimaryAction = false
+        button.accessibilityLabel = "Действия фонотеки"
+        button.setContentHuggingPriority(.required, for: .horizontal)
+        button.setContentCompressionResistancePriority(.required, for: .horizontal)
+        button.menu = makeMenu()
+        return button
+    }
+
+    func updateUIView(_ button: UIButton, context: Context) {
+        button.menu = makeMenu()
+    }
+
+    /// Собирает системное меню, где subtitle и checkmark рисуются UIKit.
+    private func makeMenu() -> UIMenu {
+        let menu = UIMenu(
+            children: [
+                makeAddFolderAction(),
+                makeSortMenu()
+            ]
+        )
+
+        // Разрешает системе показать title и subtitle для пункта "Сортировка".
+        let displayPreferences = UIMenuDisplayPreferences()
+        displayPreferences.maximumNumberOfTitleLines = 2
+        menu.displayPreferences = displayPreferences
+
+        return menu
+    }
+
+    /// Собирает вложенное меню сортировки с системной подписью выбранного режима.
+    private func makeSortMenu() -> UIMenu {
+        let menu = UIMenu(
+            title: "Сортировка",
+            image: UIImage(systemName: "arrow.up.arrow.down"),
+            options: .singleSelection,
+            children: LibraryFoldersSortMode.allCases.map { mode in
+                UIAction(
+                    title: mode.title,
+                    state: state.selectedSortMode == mode ? .on : .off
+                ) { _ in
+                    onAction(.setSortMode(mode))
+                }
+            }
+        )
+        menu.subtitle = state.sortModeCaption
+        return menu
+    }
+
+    /// Собирает пункт добавления новой папки.
+    private func makeAddFolderAction() -> UIAction {
+        UIAction(
+            title: "Добавить папку",
+            image: UIImage(systemName: "folder.fill.badge.plus")
+        ) { _ in
+            onAction(.addFolderTapped)
         }
     }
 }

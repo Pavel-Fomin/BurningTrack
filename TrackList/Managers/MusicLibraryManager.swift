@@ -70,6 +70,56 @@ final class MusicLibraryManager: ObservableObject {
         attachingFolderIds.contains(folderId)
     }
 
+    /// Возвращает прикреплённые папки в порядке выбранной сортировки без изменения опубликованного массива.
+    func sortedAttachedFolders(
+        by mode: LibraryFoldersSortMode
+    ) async -> [LibraryFolder] {
+        let foldersMeta = await TrackRegistry.shared.allFolders()
+        let createdAtByFolderId = Dictionary(
+            uniqueKeysWithValues: foldersMeta.map { ($0.id, $0.createdAt) }
+        )
+
+        switch mode {
+        case .createdAt:
+            return attachedFolders.sorted {
+                let lhsDate = createdAtByFolderId[$0.id] ?? .distantPast
+                let rhsDate = createdAtByFolderId[$1.id] ?? .distantPast
+
+                if lhsDate == rhsDate {
+                    return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+                }
+
+                // Дата сортировки берётся из createdAt root-папки, потому что updatedAt меняется при синхронизациях.
+                return lhsDate > rhsDate
+            }
+
+        case .name:
+            return attachedFolders.sorted {
+                let comparison = $0.name.localizedCaseInsensitiveCompare($1.name)
+
+                if comparison == .orderedSame {
+                    return $0.id.uuidString < $1.id.uuidString
+                }
+
+                return comparison == .orderedAscending
+            }
+        }
+    }
+
+    /// Сохраняет фактический порядок прикреплённых root-папок в SQLite.
+    func saveAttachedFoldersOrder(
+        _ orderedIds: [UUID]
+    ) async throws {
+        try await TrackRegistry.shared.updateRootFoldersOrder(orderedIds)
+    }
+
+    /// Заменяет опубликованный порядок прикреплённых папок после успешного сохранения.
+    func replaceAttachedFolders(
+        with folders: [LibraryFolder]
+    ) {
+        attachedFolders = folders
+    }
+
     /// Проверяет, удерживается ли root-доступ к папке на весь runtime.
     func hasActiveRootAccess(rootFolderId: UUID, url: URL) -> Bool {
         guard let activeURL = activeRootFolderAccess[rootFolderId] else { return false }

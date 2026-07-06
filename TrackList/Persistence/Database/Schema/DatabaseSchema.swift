@@ -24,6 +24,7 @@ enum DatabaseSchema {
         static let isAvailable = "is_available"
         static let createdAt = "created_at"
         static let updatedAt = "updated_at"
+        static let sortOrder = "sort_order"
         static let lastScannedAt = "last_scanned_at"
     }
 
@@ -158,6 +159,7 @@ enum DatabaseSchema {
         static let id = "id"
         static let sortMode = "sort_mode"
         static let trackListsSortMode = "tracklists_sort_mode"
+        static let libraryFoldersSortMode = "library_folders_sort_mode"
         static let groupMode = "group_mode"
         static let showTrackListBadges = "show_tracklist_badges"
         static let showUnavailableTracks = "show_unavailable_tracks"

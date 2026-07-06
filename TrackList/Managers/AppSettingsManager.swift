@@ -107,4 +107,21 @@ final class AppSettingsManager: ObservableObject, SettingsManaging {
 
         NotificationCenter.default.post(name: .appSettingsDidChange, object: nil)
     }
+
+    /// Сохраняет выбранную сортировку прикреплённых папок фонотеки.
+    func setLibraryFoldersSortMode(_ mode: LibraryFoldersSortMode?) throws {
+        guard settings.internalSettings.libraryFoldersSortMode != mode else { return }
+
+        let previousMode = settings.internalSettings.libraryFoldersSortMode
+        settings.internalSettings.libraryFoldersSortMode = mode
+
+        do {
+            try settingsStore.saveSettings(settings)
+        } catch {
+            settings.internalSettings.libraryFoldersSortMode = previousMode
+            throw error
+        }
+
+        NotificationCenter.default.post(name: .appSettingsDidChange, object: nil)
+    }
 }

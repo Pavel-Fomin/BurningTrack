@@ -13,24 +13,28 @@ import Foundation
 enum FolderDatabaseQueries {
     static let fetch = """
     SELECT id, parent_folder_id, root_folder_id, name, relative_path, bookmark_base64,
-           is_root, is_available, created_at, updated_at, last_scanned_at
+           is_root, is_available, created_at, updated_at, sort_order, last_scanned_at
     FROM folders
     WHERE id = ?;
     """
 
     static let fetchRootFolders = """
     SELECT id, parent_folder_id, root_folder_id, name, relative_path, bookmark_base64,
-           is_root, is_available, created_at, updated_at, last_scanned_at
+           is_root, is_available, created_at, updated_at, sort_order, last_scanned_at
     FROM folders
     WHERE is_root = 1
-    ORDER BY updated_at DESC;
+    ORDER BY
+        CASE WHEN sort_order IS NULL THEN 1 ELSE 0 END ASC,
+        sort_order ASC,
+        created_at DESC,
+        name COLLATE NOCASE ASC;
     """
 
     static let upsert = """
     INSERT INTO folders (
         id, parent_folder_id, root_folder_id, name, relative_path, bookmark_base64,
-        is_root, is_available, created_at, updated_at, last_scanned_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        is_root, is_available, created_at, updated_at, sort_order, last_scanned_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
         parent_folder_id = excluded.parent_folder_id,
         root_folder_id = excluded.root_folder_id,
@@ -41,6 +45,7 @@ enum FolderDatabaseQueries {
         is_available = excluded.is_available,
         created_at = excluded.created_at,
         updated_at = excluded.updated_at,
+        sort_order = excluded.sort_order,
         last_scanned_at = excluded.last_scanned_at;
     """
 
@@ -59,6 +64,12 @@ enum FolderDatabaseQueries {
     UPDATE folders
     SET is_available = ?, updated_at = ?
     WHERE id = ?;
+    """
+
+    static let updateSortOrder = """
+    UPDATE folders
+    SET sort_order = ?, updated_at = ?
+    WHERE id = ? AND is_root = 1;
     """
 }
 
@@ -535,38 +546,40 @@ enum AppSettingsDatabaseQueries {
 // SQL для таблицы library_view_settings.
 enum LibraryViewSettingsDatabaseQueries {
     static let fetch = """
-    SELECT id, sort_mode, tracklists_sort_mode, group_mode, show_tracklist_badges,
-           show_unavailable_tracks, show_file_format, show_purchased_itunes_source,
-           last_opened_folder_id, updated_at
+    SELECT id, sort_mode, tracklists_sort_mode, library_folders_sort_mode, group_mode,
+           show_tracklist_badges, show_unavailable_tracks, show_file_format,
+           show_purchased_itunes_source, last_opened_folder_id, updated_at
     FROM library_view_settings
     WHERE id = 1;
     """
 
     static let insert = """
     INSERT INTO library_view_settings (
-        id, sort_mode, tracklists_sort_mode, group_mode, show_tracklist_badges,
-        show_unavailable_tracks, show_file_format, show_purchased_itunes_source,
-        last_opened_folder_id, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        id, sort_mode, tracklists_sort_mode, library_folders_sort_mode, group_mode,
+        show_tracklist_badges, show_unavailable_tracks, show_file_format,
+        show_purchased_itunes_source, last_opened_folder_id, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
     """
 
     static let update = """
     UPDATE library_view_settings
-    SET sort_mode = ?, tracklists_sort_mode = ?, group_mode = ?,
-        show_tracklist_badges = ?, show_unavailable_tracks = ?, show_file_format = ?,
-        show_purchased_itunes_source = ?, last_opened_folder_id = ?, updated_at = ?
+    SET sort_mode = ?, tracklists_sort_mode = ?, library_folders_sort_mode = ?,
+        group_mode = ?, show_tracklist_badges = ?, show_unavailable_tracks = ?,
+        show_file_format = ?, show_purchased_itunes_source = ?,
+        last_opened_folder_id = ?, updated_at = ?
     WHERE id = ?;
     """
 
     static let upsert = """
     INSERT INTO library_view_settings (
-        id, sort_mode, tracklists_sort_mode, group_mode, show_tracklist_badges,
-        show_unavailable_tracks, show_file_format, show_purchased_itunes_source,
-        last_opened_folder_id, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        id, sort_mode, tracklists_sort_mode, library_folders_sort_mode, group_mode,
+        show_tracklist_badges, show_unavailable_tracks, show_file_format,
+        show_purchased_itunes_source, last_opened_folder_id, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
         sort_mode = excluded.sort_mode,
         tracklists_sort_mode = excluded.tracklists_sort_mode,
+        library_folders_sort_mode = excluded.library_folders_sort_mode,
         group_mode = excluded.group_mode,
         show_tracklist_badges = excluded.show_tracklist_badges,
         show_unavailable_tracks = excluded.show_unavailable_tracks,

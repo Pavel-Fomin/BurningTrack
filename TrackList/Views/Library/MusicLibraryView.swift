@@ -91,6 +91,10 @@ struct MusicLibraryView: View {
                     ForEach(state.folders) { folder in
                         folderRow(folder)
                     }
+                    // Ручное перемещение разрешено только для реальных прикреплённых папок.
+                    .onMove { source, destination in
+                        onAction(.moveFolder(source, destination))
+                    }
                 }
 
                 addFolderRow

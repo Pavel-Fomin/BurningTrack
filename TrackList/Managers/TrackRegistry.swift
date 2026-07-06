@@ -17,7 +17,11 @@ actor TrackRegistry {
     struct FolderEntry: Identifiable {
         var id: UUID
         var name: String
+        /// Дата первого добавления корневой папки в SQLite.
+        var createdAt: Date
         var updatedAt: Date
+        /// Сохранённый ручной порядок корневой папки.
+        var sortOrder: Int?
     }
 
     struct TrackEntry: Identifiable {
@@ -134,6 +138,11 @@ actor TrackRegistry {
         } catch {
             rememberPersistenceError(error)
         }
+    }
+
+    /// Сохраняет фактический порядок корневых папок без изменения треков и bookmark'ов.
+    func updateRootFoldersOrder(_ orderedIds: [UUID]) throws {
+        try libraryStore().updateRootFoldersOrder(orderedIds)
     }
 
     // MARK: - Треки
@@ -286,7 +295,9 @@ actor TrackRegistry {
         FolderEntry(
             id: model.id,
             name: model.name,
-            updatedAt: model.updatedAt
+            createdAt: model.createdAt,
+            updatedAt: model.updatedAt,
+            sortOrder: model.sortOrder
         )
     }
 

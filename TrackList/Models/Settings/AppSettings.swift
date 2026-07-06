@@ -90,15 +90,21 @@ extension AppSettings {
     // Внутренние настройки приложения, не предназначенные для пользовательского редактирования.
     struct InternalSettings: Equatable {
         var trackListsSortMode: TrackListsSortMode?
+        var libraryFoldersSortMode: LibraryFoldersSortMode?
 
-        init(trackListsSortMode: TrackListsSortMode?) {
+        init(
+            trackListsSortMode: TrackListsSortMode?,
+            libraryFoldersSortMode: LibraryFoldersSortMode?
+        ) {
             self.trackListsSortMode = trackListsSortMode
+            self.libraryFoldersSortMode = libraryFoldersSortMode
         }
 
-        // По умолчанию список треклистов использует сохранённый фактический порядок без выбранной сортировки.
+        // По умолчанию треклисты и папки фонотеки используют сохранённый фактический порядок без выбранной сортировки.
         static var defaultValue: InternalSettings {
             InternalSettings(
-                trackListsSortMode: nil
+                trackListsSortMode: nil,
+                libraryFoldersSortMode: nil
             )
         }
     }

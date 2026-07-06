@@ -53,6 +53,12 @@ final class LibraryMasterActionHandler {
         case .addFolderTapped:
             requestFolderPicker()
 
+        case .setSortMode(let mode):
+            output.setSortMode(mode)
+
+        case .moveFolder(let source, let destination):
+            output.moveFolder(from: source, to: destination)
+
         case .folderPicked(let url):
             attachFolder(url)
 

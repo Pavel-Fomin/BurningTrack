@@ -9,13 +9,20 @@
 
 import Foundation
 
+// Ошибки фасада фонотеки, которые не раскрывают детали SQLite верхним слоям.
+enum LibraryDatabaseStoreError: Error {
+    case rootFolderNotFound(UUID)
+}
+
 // Единый фасад фонотеки поверх типобезопасных SQLite Store.
 final class LibraryDatabaseStore {
+    private let executor: DatabaseExecutor
     private let folderStore: SQLiteFolderStore
     private let trackStore: SQLiteTrackStore
     private let metadataStore: SQLiteTrackMetadataStore
 
     init(executor: DatabaseExecutor) {
+        self.executor = executor
         self.folderStore = SQLiteFolderStore(executor: executor)
         self.trackStore = SQLiteTrackStore(executor: executor)
         self.metadataStore = SQLiteTrackMetadataStore(executor: executor)
@@ -45,22 +52,31 @@ final class LibraryDatabaseStore {
         isAvailable: Bool = true
     ) throws {
         let now = Date()
-        let existing = try folderStore.fetch(id: id)
-        let model = FolderDatabaseModel(
-            id: id,
-            parentFolderId: nil,
-            rootFolderId: nil,
-            name: name,
-            relativePath: "",
-            bookmarkBase64: bookmarkBase64 ?? existing?.bookmarkBase64,
-            isRoot: true,
-            isAvailable: isAvailable,
-            createdAt: existing?.createdAt ?? now,
-            updatedAt: now,
-            lastScannedAt: existing?.lastScannedAt
-        )
 
-        try folderStore.upsert(model)
+        try executor.transaction { _ in
+            let existing = try folderStore.fetch(id: id)
+
+            if existing == nil {
+                try shiftRootFoldersDown(updatedAt: now)
+            }
+
+            let model = FolderDatabaseModel(
+                id: id,
+                parentFolderId: nil,
+                rootFolderId: nil,
+                name: name,
+                relativePath: "",
+                bookmarkBase64: bookmarkBase64 ?? existing?.bookmarkBase64,
+                isRoot: true,
+                isAvailable: isAvailable,
+                createdAt: existing?.createdAt ?? now,
+                updatedAt: now,
+                sortOrder: existing == nil ? 0 : existing?.sortOrder,
+                lastScannedAt: existing?.lastScannedAt
+            )
+
+            try folderStore.upsert(model)
+        }
     }
 
     /// Обновляет bookmark корневой папки, создавая строку-заготовку при bootstrap.
@@ -70,29 +86,34 @@ final class LibraryDatabaseStore {
     ) throws {
         let now = Date()
 
-        if let existing = try folderStore.fetch(id: id) {
-            var updated = existing
-            updated.bookmarkBase64 = bookmarkBase64
-            updated.updatedAt = now
-            try folderStore.upsert(updated)
-            return
+        try executor.transaction { _ in
+            if let existing = try folderStore.fetch(id: id) {
+                var updated = existing
+                updated.bookmarkBase64 = bookmarkBase64
+                updated.updatedAt = now
+                try folderStore.upsert(updated)
+                return
+            }
+
+            try shiftRootFoldersDown(updatedAt: now)
+
+            let model = FolderDatabaseModel(
+                id: id,
+                parentFolderId: nil,
+                rootFolderId: nil,
+                name: "",
+                relativePath: "",
+                bookmarkBase64: bookmarkBase64,
+                isRoot: true,
+                isAvailable: true,
+                createdAt: now,
+                updatedAt: now,
+                sortOrder: 0,
+                lastScannedAt: nil
+            )
+
+            try folderStore.upsert(model)
         }
-
-        let model = FolderDatabaseModel(
-            id: id,
-            parentFolderId: nil,
-            rootFolderId: nil,
-            name: "",
-            relativePath: "",
-            bookmarkBase64: bookmarkBase64,
-            isRoot: true,
-            isAvailable: true,
-            createdAt: now,
-            updatedAt: now,
-            lastScannedAt: nil
-        )
-
-        try folderStore.upsert(model)
     }
 
     /// Возвращает bookmark корневой папки.
@@ -124,6 +145,42 @@ final class LibraryDatabaseStore {
             isAvailable: isAvailable,
             updatedAt: Date()
         )
+    }
+
+    /// Сохраняет фактический порядок корневых папок фонотеки в sort_order.
+    func updateRootFoldersOrder(_ orderedIds: [UUID]) throws {
+        let updatedAt = Date()
+
+        try executor.transaction { _ in
+            var seenIds = Set<UUID>()
+            let uniqueOrderedIds = orderedIds.filter { id in
+                seenIds.insert(id).inserted
+            }
+            let rootFolders = try folderStore.fetchRootFolders()
+            let rootFoldersById = Dictionary(
+                uniqueKeysWithValues: rootFolders.map { ($0.id, $0) }
+            )
+
+            for id in uniqueOrderedIds {
+                guard rootFoldersById[id]?.isRoot == true else {
+                    throw LibraryDatabaseStoreError.rootFolderNotFound(id)
+                }
+            }
+
+            // Root-папки, которых нет в текущем UI-порядке, сохраняются в конце без потери прежней очередности.
+            let trailingIds = rootFolders
+                .filter { seenIds.contains($0.id) == false }
+                .map(\.id)
+            let normalizedIds = uniqueOrderedIds + trailingIds
+
+            for (index, id) in normalizedIds.enumerated() {
+                try folderStore.updateSortOrder(
+                    id: id,
+                    sortOrder: index,
+                    updatedAt: updatedAt
+                )
+            }
+        }
     }
 
     // MARK: - Tracks
@@ -317,9 +374,11 @@ final class LibraryDatabaseStore {
             isAvailable: true,
             createdAt: now,
             updatedAt: now,
+            sortOrder: 0,
             lastScannedAt: nil
         )
 
+        try shiftRootFoldersDown(updatedAt: now)
         try folderStore.upsert(model)
     }
 
@@ -346,6 +405,7 @@ final class LibraryDatabaseStore {
             isAvailable: true,
             createdAt: now,
             updatedAt: now,
+            sortOrder: nil,
             lastScannedAt: nil
         )
 
@@ -361,5 +421,17 @@ final class LibraryDatabaseStore {
         }
 
         return folderPath
+    }
+
+    /// Сдвигает текущие корневые папки вниз перед вставкой нового root наверх.
+    private func shiftRootFoldersDown(updatedAt: Date) throws {
+        let rootFolders = try folderStore.fetchRootFolders()
+
+        for (index, var model) in rootFolders.enumerated() {
+            // Текущий fetchRootFolders-порядок становится базовым порядком для старых записей без sort_order.
+            model.sortOrder = index + 1
+            model.updatedAt = updatedAt
+            try folderStore.upsert(model)
+        }
     }
 }

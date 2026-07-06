@@ -9,8 +9,8 @@
 | Table | Columns | Foreign Keys | Indexes |
 | --- | ---: | ---: | ---: |
 | app_settings | 8 | 0 | 0 |
-| folders | 11 | 2 | 5 |
-| library_view_settings | 9 | 1 | 0 |
+| folders | 12 | 2 | 6 |
+| library_view_settings | 11 | 1 | 0 |
 | player_queue | 12 | 1 | 4 |
 | player_settings | 6 | 0 | 0 |
 | player_state | 9 | 2 | 0 |
@@ -60,6 +60,7 @@ No indexes.
 | is_available | INTEGER | yes | 1 | 0 | 0 |
 | created_at | TEXT | yes | - | 0 | 0 |
 | updated_at | TEXT | yes | - | 0 | 0 |
+| sort_order | INTEGER | no | - | 0 | 0 |
 | last_scanned_at | TEXT | no | - | 0 | 0 |
 
 ### Foreign Keys
@@ -76,6 +77,7 @@ No indexes.
 | idx_folders_parent_folder_id | no | c | no | parent_folder_id |
 | idx_folders_relative_path | no | c | no | relative_path |
 | idx_folders_root_folder_id | no | c | no | root_folder_id |
+| idx_folders_sort_order | no | c | no | sort_order |
 | idx_folders_unique_root_path | yes | c | no | root_folder_id, relative_path |
 | sqlite_autoindex_folders_1 | yes | pk | no | id |
 
@@ -87,6 +89,8 @@ No indexes.
 | --- | --- | --- | --- | --- | --- |
 | id | INTEGER | no | - | 1 | 0 |
 | sort_mode | TEXT | yes | 'fileDateDesc' | 0 | 0 |
+| tracklists_sort_mode | TEXT | no | - | 0 | 0 |
+| library_folders_sort_mode | TEXT | no | - | 0 | 0 |
 | group_mode | TEXT | yes | 'date' | 0 | 0 |
 | show_tracklist_badges | INTEGER | yes | 1 | 0 | 0 |
 | show_unavailable_tracks | INTEGER | yes | 1 | 0 | 0 |

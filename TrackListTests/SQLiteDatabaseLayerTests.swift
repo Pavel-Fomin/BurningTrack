@@ -340,6 +340,83 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
         XCTAssertNil(try store.fetchLibraryTrack(id: trackId))
     }
 
+    func testLibraryDatabaseStorePersistsManualRootFolderOrder() throws {
+        let database = try makeDatabase()
+        let executor = try database.databaseExecutor()
+        let store = LibraryDatabaseStore(executor: executor)
+        let folderStore = SQLiteFolderStore(executor: executor)
+        let firstId = UUID()
+        let secondId = UUID()
+        let thirdId = UUID()
+
+        try store.upsertRootFolder(
+            id: firstId,
+            name: "First"
+        )
+        try store.upsertRootFolder(
+            id: secondId,
+            name: "Second"
+        )
+        try store.upsertRootFolder(
+            id: thirdId,
+            name: "Third"
+        )
+
+        XCTAssertEqual(try store.fetchRootFolders().map(\.id), [thirdId, secondId, firstId])
+
+        try store.updateRootFoldersOrder([firstId, thirdId, secondId])
+
+        XCTAssertEqual(try store.fetchRootFolders().map(\.id), [firstId, thirdId, secondId])
+        XCTAssertEqual(try folderStore.fetch(id: firstId)?.sortOrder, 0)
+        XCTAssertEqual(try folderStore.fetch(id: thirdId)?.sortOrder, 1)
+        XCTAssertEqual(try folderStore.fetch(id: secondId)?.sortOrder, 2)
+    }
+
+    func testFetchRootFoldersFallsBackToCreatedAtWhenSortOrderIsNil() throws {
+        let database = try makeDatabase()
+        let folderStore = try SQLiteFolderStore(database: database)
+        let olderId = UUID()
+        let newerId = UUID()
+        let olderDate = Date(timeIntervalSince1970: 100)
+        let newerDate = Date(timeIntervalSince1970: 200)
+
+        // Старые записи могут не иметь sort_order, поэтому fetchRootFolders использует дату добавления.
+        try folderStore.upsert(
+            FolderDatabaseModel(
+                id: olderId,
+                parentFolderId: nil,
+                rootFolderId: nil,
+                name: "Older",
+                relativePath: "",
+                bookmarkBase64: nil,
+                isRoot: true,
+                isAvailable: true,
+                createdAt: olderDate,
+                updatedAt: olderDate,
+                sortOrder: nil,
+                lastScannedAt: nil
+            )
+        )
+        try folderStore.upsert(
+            FolderDatabaseModel(
+                id: newerId,
+                parentFolderId: nil,
+                rootFolderId: nil,
+                name: "Newer",
+                relativePath: "",
+                bookmarkBase64: nil,
+                isRoot: true,
+                isAvailable: true,
+                createdAt: newerDate,
+                updatedAt: newerDate,
+                sortOrder: nil,
+                lastScannedAt: nil
+            )
+        )
+
+        XCTAssertEqual(try folderStore.fetchRootFolders().map(\.id), [newerId, olderId])
+    }
+
     func testImportedTrackPersistsInSQLiteTracks() throws {
         let database = try makeDatabase()
         let store = try LibraryDatabaseStore(database: database)
@@ -522,6 +599,7 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
         settings.visible.library.isFileFormatVisible = false
         settings.visible.library.isPurchasedITunesSourceVisible = false
         settings.internalSettings.trackListsSortMode = .name
+        settings.internalSettings.libraryFoldersSortMode = .createdAt
 
         try store.saveSettings(settings)
 
@@ -534,6 +612,7 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
         XCTAssertFalse(reloadedSettings.visible.library.isFileFormatVisible)
         XCTAssertFalse(reloadedSettings.visible.library.isPurchasedITunesSourceVisible)
         XCTAssertEqual(reloadedSettings.internalSettings.trackListsSortMode, .name)
+        XCTAssertEqual(reloadedSettings.internalSettings.libraryFoldersSortMode, .createdAt)
     }
 
     #if DEBUG
@@ -631,7 +710,8 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
                 .trackListTracksAllowExternalTrackIds,
                 .settingsPhase7,
                 .importedTracksPhase8,
-                .trackListsSortModeSetting
+                .trackListsSortModeSetting,
+                .libraryFoldersSorting
             ])
         )
 

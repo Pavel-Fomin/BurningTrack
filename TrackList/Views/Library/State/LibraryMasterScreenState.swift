@@ -21,4 +21,8 @@ struct LibraryMasterScreenState {
     let isEmpty: Bool
     /// Состояние предупреждения перед откреплением папки.
     let detachAlert: LibraryMasterDetachAlertState?
+    /// Сортировка, выбранная через меню; nil означает ручной порядок без галочки.
+    let selectedSortMode: LibraryFoldersSortMode?
+    /// Подпись сортировки для меню; nil означает, что caption не показывается.
+    let sortModeCaption: String?
 }
