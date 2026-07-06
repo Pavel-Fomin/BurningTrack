@@ -89,9 +89,17 @@ extension AppSettings {
 
     // Внутренние настройки приложения, не предназначенные для пользовательского редактирования.
     struct InternalSettings: Equatable {
-        // Пока внутренних параметров нет, поэтому используется пустая структура.
+        var trackListsSortMode: TrackListsSortMode?
+
+        init(trackListsSortMode: TrackListsSortMode?) {
+            self.trackListsSortMode = trackListsSortMode
+        }
+
+        // По умолчанию список треклистов использует сохранённый фактический порядок без выбранной сортировки.
         static var defaultValue: InternalSettings {
-            InternalSettings()
+            InternalSettings(
+                trackListsSortMode: nil
+            )
         }
     }
 }

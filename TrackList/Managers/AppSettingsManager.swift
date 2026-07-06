@@ -91,4 +91,20 @@ final class AppSettingsManager: ObservableObject, SettingsManaging {
 
         NotificationCenter.default.post(name: .appSettingsDidChange, object: nil)
     }
+
+    func setTrackListsSortMode(_ mode: TrackListsSortMode?) throws {
+        guard settings.internalSettings.trackListsSortMode != mode else { return }
+
+        let previousMode = settings.internalSettings.trackListsSortMode
+        settings.internalSettings.trackListsSortMode = mode
+
+        do {
+            try settingsStore.saveSettings(settings)
+        } catch {
+            settings.internalSettings.trackListsSortMode = previousMode
+            throw error
+        }
+
+        NotificationCenter.default.post(name: .appSettingsDidChange, object: nil)
+    }
 }

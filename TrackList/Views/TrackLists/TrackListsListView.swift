@@ -10,20 +10,20 @@
 import Foundation
 import SwiftUI
 
-struct TrackListsListView<Destination: View>: View {
+struct TrackListsListView: View {
     /// Готовое состояние экрана списка треклистов.
     let state: TrackListsScreenState
     /// Передаёт пользовательские действия обработчику экрана.
     let onAction: (TrackListsAction) -> Void
-    /// Собирает экран выбранного треклиста.
-    let destination: (TrackListsRowState) -> Destination
-    
     
     var body: some View {
         ZStack {
             List {
                 ForEach(state.rows) { row in
                     trackListRow(for: row)
+                }
+                .onMove { source, destination in
+                    onAction(.moveTrackList(source, destination))
                 }
             }
             .onAppear {
@@ -57,23 +57,32 @@ struct TrackListsListView<Destination: View>: View {
     
     @ViewBuilder
     private func trackListRow(for row: TrackListsRowState) -> some View {
-        NavigationLink {
-            destination(row)
+        Button {
+            onAction(.openTrackList(row.id))
         } label: {
-            HStack {
+            HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(row.title)
                         .font(.body)
                         .fontWeight(.regular)
-                    Text(row.tracksCountText)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    Text(row.createdAtText)
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
                 
                 Spacer()
+
+                Text(row.tracksCountText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
             .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             Button(role: .destructive) {
                 onAction(.requestDeleteTrackList(row.id))

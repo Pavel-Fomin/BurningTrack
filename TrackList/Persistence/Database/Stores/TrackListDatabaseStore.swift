@@ -87,9 +87,16 @@ final class TrackListDatabaseStore {
         )
 
         try executor.transaction { _ in
-            try saveMetaDirect(
-                TrackListMeta(id: id, name: name, createdAt: createdAt),
-                updatedAt: createdAt
+            try shiftActiveTrackListsDown(updatedAt: createdAt)
+            try trackListStore.upsert(
+                TrackListDatabaseModel(
+                    id: id,
+                    name: name,
+                    createdAt: createdAt,
+                    updatedAt: createdAt,
+                    sortOrder: 0,
+                    isDeleted: false
+                )
             )
             try replaceTracksDirect(tracks, for: id, updatedAt: createdAt)
         }
@@ -141,6 +148,23 @@ final class TrackListDatabaseStore {
         try trackListStore.delete(id: id)
     }
 
+    /// Сохраняет порядок активных треклистов в sort_order.
+    func updateTrackListsOrder(_ orderedIds: [UUID]) throws {
+        let updatedAt = Date()
+
+        try executor.transaction { _ in
+            for (index, id) in orderedIds.enumerated() {
+                guard var model = try activeMetaModel(id: id) else {
+                    throw TrackListDatabaseStoreError.trackListNotFound(id)
+                }
+
+                model.sortOrder = index
+                model.updatedAt = updatedAt
+                try trackListStore.upsert(model)
+            }
+        }
+    }
+
     // MARK: - Internal Mapping
 
     /// Возвращает активные SQLite-модели метаданных.
@@ -180,6 +204,18 @@ final class TrackListDatabaseStore {
         )
 
         try trackListStore.upsert(model)
+    }
+
+    /// Сдвигает активные треклисты вниз перед вставкой нового элемента наверх.
+    private func shiftActiveTrackListsDown(updatedAt: Date) throws {
+        let activeModels = try fetchActiveMetaModels()
+
+        for (index, var model) in activeModels.enumerated() {
+            // Текущий fetchAll-порядок становится базовым порядком для старых записей без sort_order.
+            model.sortOrder = index + 1
+            model.updatedAt = updatedAt
+            try trackListStore.upsert(model)
+        }
     }
 
     /// Заменяет строки одного треклиста в SQLite.

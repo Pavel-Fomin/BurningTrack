@@ -173,6 +173,18 @@ final class TrackListsManager {
             throw AppError.trackListSaveFailed
         }
     }
+
+    /// Сохраняет пользовательский порядок треклистов и сообщает экранам об изменении.
+    func updateTrackListsOrder(_ orderedIds: [UUID]) throws {
+        do {
+            try databaseStore.updateTrackListsOrder(orderedIds)
+            postTrackListsDidChange()
+        } catch TrackListDatabaseStoreError.trackListNotFound {
+            throw AppError.trackListNotFound
+        } catch {
+            throw AppError.trackListSaveFailed
+        }
+    }
 }
 
 // MARK: - TrackListsManaging

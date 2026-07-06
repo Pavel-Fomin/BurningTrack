@@ -20,7 +20,8 @@ extension DatabaseMigration {
         .initialTables,
         .trackListTracksAllowExternalTrackIds,
         .settingsPhase7,
-        .importedTracksPhase8
+        .importedTracksPhase8,
+        .trackListsSortModeSetting
     ]
 
     // Первая миграция фиксирует стартовую версию схемы без создания бизнес-таблиц.
@@ -250,6 +251,7 @@ extension DatabaseMigration {
             CREATE TABLE IF NOT EXISTS library_view_settings (
                 id INTEGER PRIMARY KEY CHECK (id = 1),
                 sort_mode TEXT NOT NULL DEFAULT 'fileDateDesc',
+                tracklists_sort_mode TEXT CHECK (tracklists_sort_mode IN ('createdAt', 'name')),
                 group_mode TEXT NOT NULL DEFAULT 'date',
                 show_tracklist_badges INTEGER NOT NULL DEFAULT 1 CHECK (show_tracklist_badges IN (0, 1)),
                 show_unavailable_tracks INTEGER NOT NULL DEFAULT 1 CHECK (show_unavailable_tracks IN (0, 1)),
@@ -577,6 +579,16 @@ extension DatabaseMigration {
             CREATE INDEX IF NOT EXISTS idx_track_identity_keys_track_id
             ON track_identity_keys(track_id);
             """,
+        )
+    }
+
+    // Шестая миграция сохраняет последний выбранный режим сортировки списка треклистов.
+    static let trackListsSortModeSetting = DatabaseMigration(identifier: "006_tracklists_sort_mode_setting") { database in
+        try ensureColumn(
+            "tracklists_sort_mode",
+            in: "library_view_settings",
+            definition: "TEXT CHECK (tracklists_sort_mode IN ('createdAt', 'name'))",
+            database: database
         )
     }
 

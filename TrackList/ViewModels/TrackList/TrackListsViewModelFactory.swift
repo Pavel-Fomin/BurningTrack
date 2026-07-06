@@ -17,6 +17,7 @@ struct TrackListsViewModelFactory {
             trackListsManager: TrackListsManager.shared,
             trackListManager: TrackListManager.shared,
             toastPresenter: ToastManager.shared,
+            settingsManager: AppSettingsManager.shared,
             eventProvider: NotificationTrackListsEventProvider()
         )
     }

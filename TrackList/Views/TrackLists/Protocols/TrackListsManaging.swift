@@ -20,4 +20,7 @@ protocol TrackListsManaging {
 
     /// Переименовывает треклист.
     func renameTrackList(id: UUID, to newName: String) throws
+
+    /// Сохраняет пользовательский порядок активных треклистов.
+    func updateTrackListsOrder(_ orderedIds: [UUID]) throws
 }

@@ -27,7 +27,7 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
         try super.tearDownWithError()
     }
 
-    func testTrackInsertFetchUpsertDelete() throws {
+    func testTrackInsertFetchUpsertMarkDeleted() throws {
         let database = try makeDatabase()
         let store = try SQLiteTrackStore(database: database)
         let trackId = UUID()
@@ -61,8 +61,9 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
 
         XCTAssertEqual(try store.fetch(id: trackId)?.fileName, "updated.mp3")
 
-        try store.delete(id: trackId)
-        XCTAssertNil(try store.fetch(id: trackId))
+        try store.markDeleted(id: trackId, updatedAt: now.addingTimeInterval(2))
+        XCTAssertNil(try store.fetchActiveLocal(id: trackId))
+        XCTAssertEqual(try store.fetch(id: trackId)?.isDeleted, true)
     }
 
     func testTransactionRollsBackInsertedTrack() throws {
@@ -175,6 +176,104 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
 
         try store.deleteTrackList(id: created.id)
         XCTAssertFalse(try store.exists(id: created.id))
+    }
+
+    func testTrackListDatabaseStorePersistsManualTrackListOrder() throws {
+        let database = try makeDatabase()
+        let executor = try database.databaseExecutor()
+        let store = TrackListDatabaseStore(executor: executor)
+        let trackListStore = SQLiteTrackListStore(executor: executor)
+        let firstDate = Date(timeIntervalSince1970: 100)
+        let secondDate = Date(timeIntervalSince1970: 200)
+        let thirdDate = Date(timeIntervalSince1970: 300)
+        let fourthDate = Date(timeIntervalSince1970: 400)
+
+        let first = try store.createTrackList(
+            id: UUID(),
+            name: "First",
+            createdAt: firstDate,
+            tracks: []
+        )
+        let second = try store.createTrackList(
+            id: UUID(),
+            name: "Second",
+            createdAt: secondDate,
+            tracks: []
+        )
+        let third = try store.createTrackList(
+            id: UUID(),
+            name: "Third",
+            createdAt: thirdDate,
+            tracks: []
+        )
+
+        XCTAssertEqual(try store.fetchMetas().map(\.id), [third.id, second.id, first.id])
+
+        try store.updateTrackListsOrder([first.id, third.id, second.id])
+
+        XCTAssertEqual(try store.fetchMetas().map(\.id), [first.id, third.id, second.id])
+        XCTAssertEqual(try trackListStore.fetch(id: first.id)?.sortOrder, 0)
+        XCTAssertEqual(try trackListStore.fetch(id: third.id)?.sortOrder, 1)
+        XCTAssertEqual(try trackListStore.fetch(id: second.id)?.sortOrder, 2)
+
+        let fourth = try store.createTrackList(
+            id: UUID(),
+            name: "Fourth",
+            createdAt: fourthDate,
+            tracks: []
+        )
+
+        XCTAssertEqual(try store.fetchMetas().map(\.id), [fourth.id, first.id, third.id, second.id])
+        XCTAssertEqual(try trackListStore.fetch(id: fourth.id)?.sortOrder, 0)
+        XCTAssertEqual(try trackListStore.fetch(id: first.id)?.sortOrder, 1)
+        XCTAssertEqual(try trackListStore.fetch(id: third.id)?.sortOrder, 2)
+        XCTAssertEqual(try trackListStore.fetch(id: second.id)?.sortOrder, 3)
+    }
+
+    func testCreateTrackListNormalizesNilSortOrder() throws {
+        let database = try makeDatabase()
+        let executor = try database.databaseExecutor()
+        let store = TrackListDatabaseStore(executor: executor)
+        let trackListStore = SQLiteTrackListStore(executor: executor)
+        let olderId = UUID()
+        let newerId = UUID()
+        let olderDate = Date(timeIntervalSince1970: 100)
+        let newerDate = Date(timeIntervalSince1970: 200)
+        let createdDate = Date(timeIntervalSince1970: 300)
+
+        // Старые записи могут не иметь sort_order, поэтому новый треклист нормализует их текущий fetchAll-порядок.
+        try trackListStore.upsert(
+            TrackListDatabaseModel(
+                id: olderId,
+                name: "Older",
+                createdAt: olderDate,
+                updatedAt: olderDate,
+                sortOrder: nil,
+                isDeleted: false
+            )
+        )
+        try trackListStore.upsert(
+            TrackListDatabaseModel(
+                id: newerId,
+                name: "Newer",
+                createdAt: newerDate,
+                updatedAt: newerDate,
+                sortOrder: nil,
+                isDeleted: false
+            )
+        )
+
+        let created = try store.createTrackList(
+            id: UUID(),
+            name: "Created",
+            createdAt: createdDate,
+            tracks: []
+        )
+
+        XCTAssertEqual(try store.fetchMetas().map(\.id), [created.id, newerId, olderId])
+        XCTAssertEqual(try trackListStore.fetch(id: created.id)?.sortOrder, 0)
+        XCTAssertEqual(try trackListStore.fetch(id: newerId)?.sortOrder, 1)
+        XCTAssertEqual(try trackListStore.fetch(id: olderId)?.sortOrder, 2)
     }
 
     func testLibraryDatabaseStorePersistsLibraryGraph() throws {
@@ -422,6 +521,7 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
         settings.visible.library.isTrackListMembershipVisible = false
         settings.visible.library.isFileFormatVisible = false
         settings.visible.library.isPurchasedITunesSourceVisible = false
+        settings.internalSettings.trackListsSortMode = .name
 
         try store.saveSettings(settings)
 
@@ -433,6 +533,7 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
         XCTAssertFalse(reloadedSettings.visible.library.isTrackListMembershipVisible)
         XCTAssertFalse(reloadedSettings.visible.library.isFileFormatVisible)
         XCTAssertFalse(reloadedSettings.visible.library.isPurchasedITunesSourceVisible)
+        XCTAssertEqual(reloadedSettings.internalSettings.trackListsSortMode, .name)
     }
 
     #if DEBUG
@@ -529,7 +630,8 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
                 .initialTables,
                 .trackListTracksAllowExternalTrackIds,
                 .settingsPhase7,
-                .importedTracksPhase8
+                .importedTracksPhase8,
+                .trackListsSortModeSetting
             ])
         )
 

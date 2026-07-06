@@ -35,8 +35,14 @@ final class TrackListsActionHandler {
         case .onAppear:
             viewModel.refresh()
 
+        case .openTrackList(let id):
+            viewModel.openTrackList(id: id)
+
         case .createTrackList:
             presenter.presentCreateTrackList()
+
+        case .setSortMode(let mode):
+            viewModel.setSortMode(mode)
 
         case .requestDeleteTrackList(let id):
             viewModel.requestDeleteTrackList(id: id)
@@ -46,6 +52,9 @@ final class TrackListsActionHandler {
 
         case .cancelDeleteTrackList:
             viewModel.cancelDeleteTrackList()
+
+        case .moveTrackList(let source, let destination):
+            viewModel.moveTrackList(from: source, to: destination)
         }
     }
 }

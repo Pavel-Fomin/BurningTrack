@@ -146,6 +146,7 @@ struct AppSettingsDatabaseModel: Equatable, Identifiable {
 struct LibraryViewSettingsDatabaseModel: Equatable, Identifiable {
     let id: Int
     var sortMode: String
+    var trackListsSortMode: String?
     var groupMode: String
     var showTrackListBadges: Bool
     var showUnavailableTracks: Bool

@@ -2,7 +2,7 @@
 //  SettingsManaging.swift
 //  TrackList
 //
-//  Контракт чтения и изменения настроек для Settings-flow.
+//  Контракт чтения и изменения рабочих настроек приложения.
 //
 //  Created by Pavel Fomin on 15.06.2026.
 //
@@ -18,4 +18,5 @@ protocol SettingsManaging: AnyObject {
     func setTrackListMembershipVisible(_ value: Bool)
     func setFileFormatVisible(_ value: Bool)
     func setPurchasedITunesSourceVisible(_ value: Bool)
+    func setTrackListsSortMode(_ mode: TrackListsSortMode?) throws
 }
