@@ -149,6 +149,7 @@ enum TrackMetadataDatabaseMapper {
             artist: snapshot.artist,
             album: snapshot.album,
             albumArtist: snapshot.albumArtist,
+            label: snapshot.publisherOrLabel,
             genre: snapshot.genre,
             year: snapshot.year,
             trackNumber: snapshot.trackNumber,

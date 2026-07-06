@@ -39,7 +39,8 @@ struct NewTrackListSelectionFolderView: View {
         _tracksViewModel = StateObject(
             wrappedValue: LibraryTracksViewModel(
                 folderURL: folder.url,
-                renameActionHandler: renameActionHandler
+                renameActionHandler: renameActionHandler,
+                usesLibrarySortSettings: false
             )
         )
     }

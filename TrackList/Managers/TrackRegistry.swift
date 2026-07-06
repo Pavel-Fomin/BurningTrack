@@ -145,6 +145,31 @@ actor TrackRegistry {
         try libraryStore().updateRootFoldersOrder(orderedIds)
     }
 
+    /// Возвращает сохранённый режим сортировки треков для конкретной папки фонотеки.
+    func libraryTrackSortMode(forFolderId folderId: UUID) -> LibraryTrackSortMode {
+        do {
+            return try libraryStore().libraryTrackSortMode(forFolderId: folderId)
+        } catch {
+            rememberPersistenceError(error)
+            return .fileDateDesc
+        }
+    }
+
+    /// Сохраняет режим сортировки треков только для указанной папки фонотеки.
+    func setLibraryTrackSortMode(
+        _ mode: LibraryTrackSortMode,
+        forFolderId folderId: UUID
+    ) {
+        do {
+            try libraryStore().updateLibraryTrackSortMode(
+                mode,
+                forFolderId: folderId
+            )
+        } catch {
+            rememberPersistenceError(error)
+        }
+    }
+
     // MARK: - Треки
 
     func upsertTrack(
@@ -262,6 +287,19 @@ actor TrackRegistry {
         } catch {
             rememberPersistenceError(error)
             return nil
+        }
+    }
+
+    /// Возвращает сохранённые SQLite metadata для сортировки без чтения файлов и runtime cache.
+    func cachedMetadata(forTrackIds trackIds: [UUID]) -> [UUID: TrackCachedMetadata] {
+        do {
+            let metadata = try libraryStore().fetchCachedMetadata(trackIds: trackIds)
+            return Dictionary(
+                uniqueKeysWithValues: metadata.map { ($0.trackId, $0) }
+            )
+        } catch {
+            rememberPersistenceError(error)
+            return [:]
         }
     }
 

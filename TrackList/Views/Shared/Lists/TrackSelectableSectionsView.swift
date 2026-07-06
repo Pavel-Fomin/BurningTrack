@@ -46,7 +46,7 @@ struct TrackSelectableSectionsView: View {
             } header: {
 
                 // Заголовок секции (если есть)
-                if !section.title.isEmpty {
+                if section.showsHeader {
                     Text(section.title)
                 }
             }

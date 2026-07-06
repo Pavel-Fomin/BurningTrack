@@ -215,6 +215,7 @@ final class SettingsDatabaseStore {
         libraryModel.showTrackListBadges = settings.visible.library.isTrackListMembershipVisible
         libraryModel.showFileFormat = settings.visible.library.isFileFormatVisible
         libraryModel.showPurchasedITunesSource = settings.visible.library.isPurchasedITunesSourceVisible
+        libraryModel.sortMode = settings.internalSettings.libraryTrackSortMode.rawValue
         libraryModel.trackListsSortMode = settings.internalSettings.trackListsSortMode?.rawValue
         libraryModel.libraryFoldersSortMode = settings.internalSettings.libraryFoldersSortMode?.rawValue
         libraryModel.updatedAt = now
@@ -243,6 +244,7 @@ final class SettingsDatabaseStore {
                 )
             ),
             internalSettings: AppSettings.InternalSettings(
+                libraryTrackSortMode: LibraryTrackSortMode(rawValue: libraryModel.sortMode) ?? .fileDateDesc,
                 trackListsSortMode: libraryModel.trackListsSortMode.flatMap(TrackListsSortMode.init(rawValue:)),
                 libraryFoldersSortMode: libraryModel.libraryFoldersSortMode.flatMap(LibraryFoldersSortMode.init(rawValue:))
             )
@@ -272,7 +274,7 @@ final class SettingsDatabaseStore {
     ) -> LibraryViewSettingsDatabaseModel {
         LibraryViewSettingsDatabaseModel(
             id: 1,
-            sortMode: "fileDateDesc",
+            sortMode: settings.internalSettings.libraryTrackSortMode.rawValue,
             trackListsSortMode: settings.internalSettings.trackListsSortMode?.rawValue,
             libraryFoldersSortMode: settings.internalSettings.libraryFoldersSortMode?.rawValue,
             groupMode: "date",

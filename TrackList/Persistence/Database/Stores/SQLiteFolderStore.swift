@@ -85,6 +85,21 @@ final class SQLiteFolderStore {
         }
     }
 
+    /// Сохраняет выбранный режим сортировки треков для конкретной папки фонотеки.
+    func updateTrackSortMode(
+        id: UUID,
+        trackSortMode: String,
+        updatedAt: Date
+    ) throws {
+        try executor.write { database in
+            let statement = try database.prepare(FolderDatabaseQueries.updateTrackSortMode)
+            try statement.bind(trackSortMode, at: 1)
+            try statement.bind(updatedAt, at: 2)
+            try statement.bind(id, at: 3)
+            try statement.execute()
+        }
+    }
+
     private static func map(_ row: DatabaseRowReader) throws -> FolderDatabaseModel {
         FolderDatabaseModel(
             id: try row.requiredUUID(at: 0),
@@ -98,7 +113,8 @@ final class SQLiteFolderStore {
             createdAt: try row.requiredDate(at: 8),
             updatedAt: try row.requiredDate(at: 9),
             sortOrder: row.int(at: 10),
-            lastScannedAt: try row.date(at: 11)
+            lastScannedAt: try row.date(at: 11),
+            trackSortMode: row.string(at: 12)
         )
     }
 
@@ -119,6 +135,7 @@ final class SQLiteFolderStore {
         try statement.bind(model.updatedAt, at: 10)
         try statement.bind(model.sortOrder, at: 11)
         try statement.bind(model.lastScannedAt, at: 12)
+        try statement.bind(model.trackSortMode, at: 13)
     }
 
 }

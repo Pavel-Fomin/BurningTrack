@@ -22,7 +22,9 @@ extension DatabaseMigration {
         .settingsPhase7,
         .importedTracksPhase8,
         .trackListsSortModeSetting,
-        .libraryFoldersSorting
+        .libraryFoldersSorting,
+        .trackMetadataLabel,
+        .folderTrackSortMode
     ]
 
     // Первая миграция фиксирует стартовую версию схемы без создания бизнес-таблиц.
@@ -47,6 +49,7 @@ extension DatabaseMigration {
                 updated_at TEXT NOT NULL,
                 sort_order INTEGER,
                 last_scanned_at TEXT,
+                track_sort_mode TEXT,
                 FOREIGN KEY (parent_folder_id) REFERENCES folders(id) ON DELETE CASCADE,
                 FOREIGN KEY (root_folder_id) REFERENCES folders(id) ON DELETE CASCADE
             );
@@ -117,6 +120,7 @@ extension DatabaseMigration {
                 artist TEXT,
                 album TEXT,
                 album_artist TEXT,
+                label TEXT,
                 genre TEXT,
                 year INTEGER,
                 track_number INTEGER,
@@ -619,6 +623,26 @@ extension DatabaseMigration {
             CREATE INDEX IF NOT EXISTS idx_folders_sort_order
             ON folders(sort_order);
             """,
+        )
+    }
+
+    // Восьмая миграция добавляет сохранённый лейбл для сортировки фонотеки.
+    static let trackMetadataLabel = DatabaseMigration(identifier: "008_track_metadata_label") { database in
+        try ensureColumn(
+            "label",
+            in: "track_metadata",
+            definition: "TEXT",
+            database: database
+        )
+    }
+
+    // Девятая миграция сохраняет режим сортировки треков отдельно для каждой папки фонотеки.
+    static let folderTrackSortMode = DatabaseMigration(identifier: "009_folder_track_sort_mode") { database in
+        try ensureColumn(
+            "track_sort_mode",
+            in: "folders",
+            definition: "TEXT",
+            database: database
         )
     }
 

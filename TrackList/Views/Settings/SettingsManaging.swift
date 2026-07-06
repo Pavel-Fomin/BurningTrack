@@ -18,6 +18,7 @@ protocol SettingsManaging: AnyObject {
     func setTrackListMembershipVisible(_ value: Bool)
     func setFileFormatVisible(_ value: Bool)
     func setPurchasedITunesSourceVisible(_ value: Bool)
+    func setLibraryTrackSortMode(_ mode: LibraryTrackSortMode) throws
     func setTrackListsSortMode(_ mode: TrackListsSortMode?) throws
     func setLibraryFoldersSortMode(_ mode: LibraryFoldersSortMode?) throws
 }

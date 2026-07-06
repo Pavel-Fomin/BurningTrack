@@ -13,7 +13,9 @@ import SwiftUI
 
 struct LibraryTrackSectionView: View {
 
+    let id: String
     let title: String
+    let showsHeader: Bool
     
     let tracks: [LibraryTrack]
     let allTracks: [LibraryTrack]
@@ -32,19 +34,31 @@ struct LibraryTrackSectionView: View {
     @Binding var selection: OrderedSelection<UUID>
 
     var body: some View {
-        Section(header: sectionHeader) {
-            ForEach(tracks, id: \.id) { track in
-                row(for: track)
+        if showsHeader {
+            Section(header: sectionHeader) {
+                sectionRows
             }
+            .id(id)
+        } else {
+            Section {
+                sectionRows
+            }
+            .id(id)
         }
-        .id(title)
     }
 
     /// Заголовок секции вынесен из body, чтобы уменьшить сложность SwiftUI-выражения.
     private var sectionHeader: some View {
         Text(title)
             .font(.headline)
-            .id(title)
+            .id(id)
+    }
+
+    /// Строки секции используются в ветках с заголовком и без него.
+    private var sectionRows: some View {
+        ForEach(tracks, id: \.id) { track in
+            row(for: track)
+        }
     }
 
     /// Собирает строку трека с явными локальными значениями для ускорения type-check.

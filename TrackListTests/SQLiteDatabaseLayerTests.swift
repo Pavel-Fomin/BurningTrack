@@ -320,6 +320,7 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
             artist: "Artist",
             album: "Album",
             albumArtist: nil,
+            label: nil,
             genre: nil,
             year: 2026,
             trackNumber: 1,
@@ -394,7 +395,8 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
                 createdAt: olderDate,
                 updatedAt: olderDate,
                 sortOrder: nil,
-                lastScannedAt: nil
+                lastScannedAt: nil,
+                trackSortMode: nil
             )
         )
         try folderStore.upsert(
@@ -410,7 +412,8 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
                 createdAt: newerDate,
                 updatedAt: newerDate,
                 sortOrder: nil,
-                lastScannedAt: nil
+                lastScannedAt: nil,
+                trackSortMode: nil
             )
         )
 
@@ -666,6 +669,7 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
                 artist: nil,
                 album: nil,
                 albumArtist: nil,
+                label: nil,
                 genre: nil,
                 year: nil,
                 trackNumber: nil,
@@ -711,7 +715,9 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
                 .settingsPhase7,
                 .importedTracksPhase8,
                 .trackListsSortModeSetting,
-                .libraryFoldersSorting
+                .libraryFoldersSorting,
+                .trackMetadataLabel,
+                .folderTrackSortMode
             ])
         )
 

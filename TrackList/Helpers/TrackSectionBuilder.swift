@@ -14,6 +14,7 @@ import Foundation
 
 enum TrackGroupingMode {
     case date
+    case flat
     case artist
     case title
 }
@@ -30,6 +31,8 @@ struct TrackSectionBuilder {
         switch mode {
         case .date:
             return groupByDate(tracks)
+        case .flat:
+            return makeFlatSection(tracks)
         case .artist:
             return groupByArtist(tracks)
         case .title:
@@ -47,34 +50,61 @@ private extension TrackSectionBuilder {
     ) -> [TrackSection] {
 
         let calendar = Calendar.current
-
-        let grouped = Dictionary(grouping: tracks) {
-            calendar.startOfDay(for: $0.addedDate)
-        }
-
-        let sortedDays = grouped.keys.sorted(by: >)
-
         let dateFormatter = DateFormatter()
         dateFormatter.dateStyle = .medium
         dateFormatter.timeStyle = .none
+        var sections: [(day: Date, tracks: [LibraryTrack])] = []
+        var sectionIndexByDay: [Date: Int] = [:]
 
-        return sortedDays.map { day in
-            let title: String = {
-                if calendar.isDateInToday(day) { return "Сегодня" }
-                if calendar.isDateInYesterday(day) { return "Вчера" }
-                return dateFormatter.string(from: day)
-            }()
+        for track in tracks {
+            let day = calendar.startOfDay(for: track.addedDate)
 
-            let items = (grouped[day] ?? []).sorted {
-                ($0.addedDate, $0.fileName) > ($1.addedDate, $1.fileName)
+            if let sectionIndex = sectionIndexByDay[day] {
+                sections[sectionIndex].tracks.append(track)
+            } else {
+                sectionIndexByDay[day] = sections.count
+                sections.append((day: day, tracks: [track]))
             }
+        }
 
-            return TrackSection(
-                id: day.iso8601String,
-                title: title,
-                tracks: items
+        return sections.map { section in
+            TrackSection(
+                id: section.day.iso8601String,
+                title: title(
+                    for: section.day,
+                    calendar: calendar,
+                    dateFormatter: dateFormatter
+                ),
+                tracks: section.tracks
             )
         }
+    }
+
+    /// Создаёт одну секцию без заголовка для глобальной сортировки по metadata-полям.
+    static func makeFlatSection(
+        _ tracks: [LibraryTrack]
+    ) -> [TrackSection] {
+        guard tracks.isEmpty == false else { return [] }
+
+        return [
+            TrackSection(
+                id: "library-tracks-flat-section",
+                title: "",
+                tracks: tracks,
+                showsHeader: false
+            )
+        ]
+    }
+
+    /// Возвращает человекочитаемый заголовок date-секции.
+    static func title(
+        for day: Date,
+        calendar: Calendar,
+        dateFormatter: DateFormatter
+    ) -> String {
+        if calendar.isDateInToday(day) { return "Сегодня" }
+        if calendar.isDateInYesterday(day) { return "Вчера" }
+        return dateFormatter.string(from: day)
     }
 }
 

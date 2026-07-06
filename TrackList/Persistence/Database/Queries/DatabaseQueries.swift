@@ -13,14 +13,16 @@ import Foundation
 enum FolderDatabaseQueries {
     static let fetch = """
     SELECT id, parent_folder_id, root_folder_id, name, relative_path, bookmark_base64,
-           is_root, is_available, created_at, updated_at, sort_order, last_scanned_at
+           is_root, is_available, created_at, updated_at, sort_order, last_scanned_at,
+           track_sort_mode
     FROM folders
     WHERE id = ?;
     """
 
     static let fetchRootFolders = """
     SELECT id, parent_folder_id, root_folder_id, name, relative_path, bookmark_base64,
-           is_root, is_available, created_at, updated_at, sort_order, last_scanned_at
+           is_root, is_available, created_at, updated_at, sort_order, last_scanned_at,
+           track_sort_mode
     FROM folders
     WHERE is_root = 1
     ORDER BY
@@ -33,8 +35,9 @@ enum FolderDatabaseQueries {
     static let upsert = """
     INSERT INTO folders (
         id, parent_folder_id, root_folder_id, name, relative_path, bookmark_base64,
-        is_root, is_available, created_at, updated_at, sort_order, last_scanned_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        is_root, is_available, created_at, updated_at, sort_order, last_scanned_at,
+        track_sort_mode
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
         parent_folder_id = excluded.parent_folder_id,
         root_folder_id = excluded.root_folder_id,
@@ -46,7 +49,8 @@ enum FolderDatabaseQueries {
         created_at = excluded.created_at,
         updated_at = excluded.updated_at,
         sort_order = excluded.sort_order,
-        last_scanned_at = excluded.last_scanned_at;
+        last_scanned_at = excluded.last_scanned_at,
+        track_sort_mode = excluded.track_sort_mode;
     """
 
     static let delete = """
@@ -70,6 +74,12 @@ enum FolderDatabaseQueries {
     UPDATE folders
     SET sort_order = ?, updated_at = ?
     WHERE id = ? AND is_root = 1;
+    """
+
+    static let updateTrackSortMode = """
+    UPDATE folders
+    SET track_sort_mode = ?, updated_at = ?
+    WHERE id = ?;
     """
 }
 
@@ -122,7 +132,7 @@ enum TrackDatabaseQueries {
            bookmark_base64, asset_url, is_available, is_deleted
     FROM tracks
     WHERE folder_id = ? AND source = 'library' AND is_deleted = 0
-    ORDER BY file_date DESC, imported_at DESC;
+    ORDER BY file_date DESC, file_name COLLATE NOCASE DESC, imported_at DESC, id ASC;
     """
 
     static let fetchLibraryForRoot = """
@@ -131,7 +141,7 @@ enum TrackDatabaseQueries {
            bookmark_base64, asset_url, is_available, is_deleted
     FROM tracks
     WHERE root_folder_id = ? AND source = 'library' AND is_deleted = 0
-    ORDER BY file_date DESC, imported_at DESC;
+    ORDER BY file_date DESC, file_name COLLATE NOCASE DESC, imported_at DESC, id ASC;
     """
 
     static let fetchLibraryByRootRelativePath = """
@@ -196,24 +206,38 @@ enum TrackDatabaseQueries {
 // SQL для таблицы track_metadata.
 enum TrackMetadataDatabaseQueries {
     static let fetch = """
-    SELECT track_id, title, artist, album, album_artist, genre, year, track_number,
-           disc_number, bpm, key_signature, comment, duration, bitrate, sample_rate,
-           channel_count, metadata_updated_at
+    SELECT track_id, title, artist, album, album_artist, label, genre, year,
+           track_number, disc_number, bpm, key_signature, comment, duration,
+           bitrate, sample_rate, channel_count, metadata_updated_at
     FROM track_metadata
     WHERE track_id = ?;
     """
 
+    /// Собирает запрос для пакетного чтения metadata по списку trackId.
+    static func fetchAll(trackIdsCount: Int) -> String {
+        let placeholders = Array(repeating: "?", count: trackIdsCount).joined(separator: ", ")
+
+        return """
+        SELECT track_id, title, artist, album, album_artist, label, genre, year,
+               track_number, disc_number, bpm, key_signature, comment, duration,
+               bitrate, sample_rate, channel_count, metadata_updated_at
+        FROM track_metadata
+        WHERE track_id IN (\(placeholders));
+        """
+    }
+
     static let upsert = """
     INSERT INTO track_metadata (
-        track_id, title, artist, album, album_artist, genre, year, track_number,
-        disc_number, bpm, key_signature, comment, duration, bitrate, sample_rate,
-        channel_count, metadata_updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        track_id, title, artist, album, album_artist, label, genre, year,
+        track_number, disc_number, bpm, key_signature, comment, duration,
+        bitrate, sample_rate, channel_count, metadata_updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(track_id) DO UPDATE SET
         title = excluded.title,
         artist = excluded.artist,
         album = excluded.album,
         album_artist = excluded.album_artist,
+        label = excluded.label,
         genre = excluded.genre,
         year = excluded.year,
         track_number = excluded.track_number,

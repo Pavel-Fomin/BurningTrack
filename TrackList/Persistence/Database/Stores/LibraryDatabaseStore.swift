@@ -72,7 +72,8 @@ final class LibraryDatabaseStore {
                 createdAt: existing?.createdAt ?? now,
                 updatedAt: now,
                 sortOrder: existing == nil ? 0 : existing?.sortOrder,
-                lastScannedAt: existing?.lastScannedAt
+                lastScannedAt: existing?.lastScannedAt,
+                trackSortMode: existing?.trackSortMode
             )
 
             try folderStore.upsert(model)
@@ -109,7 +110,8 @@ final class LibraryDatabaseStore {
                 createdAt: now,
                 updatedAt: now,
                 sortOrder: 0,
-                lastScannedAt: nil
+                lastScannedAt: nil,
+                trackSortMode: nil
             )
 
             try folderStore.upsert(model)
@@ -143,6 +145,27 @@ final class LibraryDatabaseStore {
         try folderStore.updateAvailability(
             id: id,
             isAvailable: isAvailable,
+            updatedAt: Date()
+        )
+    }
+
+    /// Возвращает сохранённый режим сортировки треков конкретной папки.
+    func libraryTrackSortMode(forFolderId folderId: UUID) throws -> LibraryTrackSortMode {
+        guard let rawValue = try folderStore.fetch(id: folderId)?.trackSortMode else {
+            return .fileDateDesc
+        }
+
+        return LibraryTrackSortMode(rawValue: rawValue) ?? .fileDateDesc
+    }
+
+    /// Сохраняет режим сортировки треков только для указанной папки фонотеки.
+    func updateLibraryTrackSortMode(
+        _ mode: LibraryTrackSortMode,
+        forFolderId folderId: UUID
+    ) throws {
+        try folderStore.updateTrackSortMode(
+            id: folderId,
+            trackSortMode: mode.rawValue,
             updatedAt: Date()
         )
     }
@@ -351,6 +374,22 @@ final class LibraryDatabaseStore {
         try metadataStore.fetch(trackId: trackId)
     }
 
+    /// Возвращает краткие сохранённые metadata для списка треков фонотеки.
+    func fetchCachedMetadata(trackIds: [UUID]) throws -> [TrackCachedMetadata] {
+        try metadataStore.fetchAll(trackIds: trackIds).map { model in
+            TrackCachedMetadata(
+                trackId: model.trackId,
+                title: model.title,
+                artist: model.artist,
+                album: model.album,
+                year: model.year,
+                label: model.label,
+                genre: model.genre,
+                comment: model.comment
+            )
+        }
+    }
+
     /// Создаёт или обновляет сохранённые metadata трека.
     func upsertTrackMetadata(_ model: TrackMetadataDatabaseModel) throws {
         try metadataStore.upsert(model)
@@ -375,7 +414,8 @@ final class LibraryDatabaseStore {
             createdAt: now,
             updatedAt: now,
             sortOrder: 0,
-            lastScannedAt: nil
+            lastScannedAt: nil,
+            trackSortMode: nil
         )
 
         try shiftRootFoldersDown(updatedAt: now)
@@ -406,7 +446,8 @@ final class LibraryDatabaseStore {
             createdAt: now,
             updatedAt: now,
             sortOrder: nil,
-            lastScannedAt: nil
+            lastScannedAt: nil,
+            trackSortMode: nil
         )
 
         try folderStore.upsert(model)

@@ -10,6 +10,7 @@
 
 import Foundation
 import Combine
+import UIKit
 
 @MainActor
 final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
@@ -24,6 +25,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
     @Published private(set) var trackListNamesById: [UUID: [String]] = [:]
     @Published private(set) var isLoading = false
     @Published private(set) var didLoad = false
+    @Published private(set) var sortMode: LibraryTrackSortMode
 
     // MARK: - Состояние выбора
 
@@ -37,6 +39,16 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
     private let eventProvider: LibraryTrackEventProvider
     /// Управляет runtime snapshot pipeline фонотеки.
     private let runtimeController: LibraryTrackRuntimeController
+    /// Даёт текущие настройки отображения, которые влияют на runtime metadata строк.
+    private let settingsManager: any SettingsManaging
+    /// Ограничивает новую сортировку только обычным экраном папки фонотеки.
+    private let usesLibrarySortSettings: Bool
+    /// SQLite metadata, используемые только как сохранённые ключи сортировки.
+    private var cachedMetadataByTrackId: [UUID: TrackCachedMetadata] = [:]
+    /// Флаг не даёт повторно перечитывать режим сортировки папки при обычной перезагрузке строк.
+    private var didLoadFolderSortMode = false
+    /// Последнее значение настройки чтения тегов, чтобы не реагировать runtime-ом на сортировку.
+    private var lastTagReadingEnabled: Bool
     /// Собирает UI-состояние выбора строк фонотеки.
     private let selectionStateBuilder = LibrarySelectionStateBuilder()
     /// Обрабатывает подготовку и применение массового переименования файлов.
@@ -77,6 +89,17 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         }
     )
 
+    /// Поля tag-событий, после которых SQLite-ключи сортировки нужно перечитать.
+    private static let cachedMetadataSortFields: Set<TrackChangedField> = [
+        .title,
+        .artist,
+        .album,
+        .year,
+        .publisherOrLabel,
+        .genre,
+        .comment
+    ]
+
     /// Общий обработчик переименования файлов треков.
     private let renameActionHandler: TrackFileRenameActionHandler
 
@@ -105,15 +128,22 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         tracksProvider: LibraryTracksProvider = FastLibraryTracksProvider(),
         badgeProvider: TrackListBadgeProvider = DefaultTrackListBadgeProvider(),
         eventProvider: LibraryTrackEventProvider = NotificationLibraryTrackEventProvider(),
-        runtimeController: LibraryTrackRuntimeController = LibraryTrackRuntimeController()
+        runtimeController: LibraryTrackRuntimeController = LibraryTrackRuntimeController(),
+        settingsManager: (any SettingsManaging)? = nil,
+        usesLibrarySortSettings: Bool = true
     ) {
         self.folderId = folderURL.libraryFolderId
+        let resolvedSettingsManager = settingsManager ?? AppSettingsManager.shared
 
         self.renameActionHandler = renameActionHandler
         self.tracksProvider = tracksProvider
         self.badgeProvider = badgeProvider
         self.eventProvider = eventProvider
         self.runtimeController = runtimeController
+        self.settingsManager = resolvedSettingsManager
+        self.usesLibrarySortSettings = usesLibrarySortSettings
+        self.sortMode = .fileDateDesc
+        self.lastTagReadingEnabled = resolvedSettingsManager.settings.visible.metadata.isTagReadingEnabled
 
         bindRuntimeController()
         bindBatchRenameHandler()
@@ -178,12 +208,83 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
     
     /// Быстро загружает первичный список треков без синхронизации и дополнительных деталей.
     private func loadInitialTracks() async {
-        let tracks = await tracksProvider.tracks(inFolder: folderId)
+        await loadFolderSortModeIfNeeded()
 
-        trackSections = TrackSectionBuilder.build(
-            from: tracks,
-            mode: .date
+        let tracks = await tracksProvider.tracks(inFolder: folderId)
+        await reloadCachedMetadataIfNeeded(for: tracks)
+
+        trackSections = makeTrackSections(from: tracks)
+    }
+
+    // MARK: - Сортировка
+
+    /// Сохраняет и применяет выбранный режим сортировки треков фонотеки.
+    func setSortMode(_ mode: LibraryTrackSortMode) async {
+        guard usesLibrarySortSettings else { return }
+        guard sortMode != mode else { return }
+
+        sortMode = mode
+        await TrackRegistry.shared.setLibraryTrackSortMode(mode, forFolderId: folderId)
+        await reloadCachedMetadataIfNeeded(for: visibleTracks())
+        rebuildTrackSectionsFromVisibleTracks()
+    }
+
+    /// Пересобирает секции из текущих строк без повторного чтения файлов.
+    private func rebuildTrackSectionsFromVisibleTracks() {
+        trackSections = makeTrackSections(from: visibleTracks())
+    }
+
+    /// Собирает секции с учётом текущего режима сортировки.
+    private func makeTrackSections(from tracks: [LibraryTrack]) -> [TrackSection] {
+        let sortedTracks = sortTracks(tracks)
+
+        return TrackSectionBuilder.build(
+            from: sortedTracks,
+            mode: sortMode.usesDateSections ? .date : .flat
         )
+    }
+
+    /// Применяет общий TrackSorter через адаптер с SQLite metadata.
+    private func sortTracks(_ tracks: [LibraryTrack]) -> [LibraryTrack] {
+        let adapters = tracks.map { track in
+            LibraryTrackSortAdapter(
+                track: track,
+                cachedMetadata: cachedMetadataByTrackId[track.trackId]
+            )
+        }
+
+        return TrackSorter
+            .sort(adapters, using: sortMode.descriptor)
+            .map(\.track)
+    }
+
+    /// Догружает SQLite metadata только для режимов, которым нужны сохранённые metadata-ключи.
+    private func reloadCachedMetadataIfNeeded(for tracks: [LibraryTrack]) async {
+        guard usesLibrarySortSettings else { return }
+        guard sortMode.requiresCachedMetadata else { return }
+
+        cachedMetadataByTrackId = await TrackRegistry.shared.cachedMetadata(
+            forTrackIds: tracks.map(\.trackId)
+        )
+    }
+
+    /// Обновляет SQLite metadata для конкретных треков после tag-событий.
+    private func reloadCachedMetadata(for trackIds: [UUID]) async {
+        guard usesLibrarySortSettings else { return }
+        guard sortMode.requiresCachedMetadata else { return }
+
+        let metadataByTrackId = await TrackRegistry.shared.cachedMetadata(
+            forTrackIds: trackIds
+        )
+
+        for trackId in trackIds {
+            cachedMetadataByTrackId[trackId] = metadataByTrackId[trackId]
+        }
+    }
+
+    /// Возвращает все строки текущего списка в отображаемом порядке.
+    private func visibleTracks() -> [LibraryTrack] {
+        trackSections.flatMap(\.tracks)
     }
 
     /// Догружает тяжёлые детали после появления первичного списка.
@@ -344,7 +445,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         eventProvider.appSettingsDidChange
             .sink { [weak self] in
                 Task { @MainActor in
-                    self?.reloadSnapshotsAfterSettingsChange()
+                    self?.handleAppSettingsDidChange()
                 }
             }
             .store(in: &cancellables)
@@ -359,6 +460,24 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
                 }
             }
             .store(in: &cancellables)
+    }
+
+    /// Реагирует только на настройки, влияющие на runtime metadata строк.
+    private func handleAppSettingsDidChange() {
+        let isTagReadingEnabled = settingsManager.settings.visible.metadata.isTagReadingEnabled
+        guard lastTagReadingEnabled != isTagReadingEnabled else { return }
+
+        lastTagReadingEnabled = isTagReadingEnabled
+        reloadSnapshotsAfterSettingsChange()
+    }
+
+    /// Загружает режим сортировки, сохранённый для текущей папки фонотеки.
+    private func loadFolderSortModeIfNeeded() async {
+        guard usesLibrarySortSettings else { return }
+        guard didLoadFolderSortMode == false else { return }
+
+        didLoadFolderSortMode = true
+        sortMode = await TrackRegistry.shared.libraryTrackSortMode(forFolderId: folderId)
     }
 
     /// Применяет массовое переименование файлов через batch rename handler.
@@ -420,7 +539,11 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
             return
         }
 
-        trackSections = trackSections.map { section in
+        await reloadCachedMetadata(
+            for: eventsRequiringCachedMetadataReload(events)
+        )
+
+        let updatedSections = trackSections.map { section in
             let updatedTracks = section.tracks.map { track in
                 guard let updateEvent = eventsByTrackId[track.trackId] else { return track }
                 return updatedLibraryTrack(from: track, using: updateEvent)
@@ -432,6 +555,10 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
                 tracks: updatedTracks
             )
         }
+
+        trackSections = makeTrackSections(
+            from: updatedSections.flatMap(\.tracks)
+        )
     }
 
     /// Перечитывает состав текущей папки после перемещения трека.
@@ -439,6 +566,17 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
     private func reloadTracksAfterFileMove() async {
         await loadInitialTracks()
         reloadTrackListBadges()
+    }
+
+    /// Возвращает события, после которых сортировочные metadata-ключи нужно перечитать из SQLite.
+    private func eventsRequiringCachedMetadataReload(_ events: [TrackUpdateEvent]) -> [UUID] {
+        events.compactMap { event in
+            guard event.changedFields.isDisjoint(with: Self.cachedMetadataSortFields) == false else {
+                return nil
+            }
+
+            return event.trackId
+        }
     }
 
     /// Собирает обновлённую модель строки фонотеки из runtime snapshot.
@@ -499,5 +637,81 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         return currentURL
             .deletingLastPathComponent()
             .appendingPathComponent(snapshot.fileName)
+    }
+}
+
+/// Адаптер даёт TrackSorter сортировочные значения фонотеки без записи metadata обратно в LibraryTrack.
+private struct LibraryTrackSortAdapter: TrackDisplayable, TrackSortDateProviding, TrackSortMetadataProviding {
+    let track: LibraryTrack
+    let cachedMetadata: TrackCachedMetadata?
+
+    var id: UUID {
+        track.id
+    }
+
+    var trackId: UUID {
+        track.trackId
+    }
+
+    var fileName: String {
+        track.fileName
+    }
+
+    /// Для сортировки title SQLite-значение заменяется на fileName, если metadata нет или она пустая.
+    var title: String? {
+        Self.nonEmptyString(cachedMetadata?.title) ?? track.fileName
+    }
+
+    /// Для сортировки artist SQLite-значение заменяется на fileName, если metadata нет или она пустая.
+    var artist: String? {
+        Self.nonEmptyString(cachedMetadata?.artist) ?? track.fileName
+    }
+
+    /// Для сортировки album SQLite-значение заменяется на fileName, если metadata нет или она пустая.
+    var trackSortAlbum: String? {
+        Self.nonEmptyString(cachedMetadata?.album) ?? track.fileName
+    }
+
+    /// Для сортировки year fallback на fileName не применяется.
+    var trackSortYear: Int? {
+        cachedMetadata?.year
+    }
+
+    /// Для сортировки label SQLite-значение заменяется на fileName, если metadata нет или она пустая.
+    var trackSortLabel: String? {
+        Self.nonEmptyString(cachedMetadata?.label) ?? track.fileName
+    }
+
+    /// Для сортировки genre SQLite-значение заменяется на fileName, если metadata нет или она пустая.
+    var trackSortGenre: String? {
+        Self.nonEmptyString(cachedMetadata?.genre) ?? track.fileName
+    }
+
+    /// Для сортировки comment SQLite-значение заменяется на fileName, если metadata нет или она пустая.
+    var trackSortComment: String? {
+        Self.nonEmptyString(cachedMetadata?.comment) ?? track.fileName
+    }
+
+    var duration: Double {
+        track.duration
+    }
+
+    var artwork: UIImage? {
+        track.artwork
+    }
+
+    var isAvailable: Bool {
+        track.isAvailable
+    }
+
+    /// Дата сортировки остаётся датой фонотеки из исходного LibraryTrack.
+    var trackSortDate: Date? {
+        track.trackSortDate
+    }
+
+    /// Пустые строки из SQLite не участвуют в сортировке как самостоятельное значение.
+    private static func nonEmptyString(_ value: String?) -> String? {
+        let trimmedValue = value?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmedValue?.isEmpty == false ? trimmedValue : nil
     }
 }

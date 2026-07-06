@@ -9,6 +9,7 @@
 
 
 import SwiftUI
+import UIKit
 
 struct LibraryTracksView: View {
 
@@ -171,17 +172,12 @@ struct LibraryTracksView: View {
 
             /// Меню обычного режима.
             ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button(action: handleTapSelect) {
-                        Label("Выбрать", systemImage: "checkmark.circle")
-                    }
-
-                    Divider()
-
-                    batchActionMenuItems
-                } label: {
-                    Image(systemName: "ellipsis")
-                }
+                LibraryTracksToolbarMenuButton(
+                    selectedSortMode: tracksViewModel.sortMode,
+                    onSelect: handleTapSelect,
+                    onSortModeSelection: handleSortModeSelection,
+                    onBatchActionSelection: handleBatchActionSelection
+                )
             }
         }
     }
@@ -350,6 +346,13 @@ struct LibraryTracksView: View {
         updateSelectionActionBarConfig()
     }
 
+    /// Обрабатывает выбор режима сортировки из toolbar menu.
+    private func handleSortModeSelection(_ mode: LibraryTrackSortMode) {
+        Task {
+            await tracksViewModel.setSortMode(mode)
+        }
+    }
+
     /// Обрабатывает отмену режима выбора.
     private func handleTapCancel() {
         // Отмена полностью сбрасывает режим и текущий выбор.
@@ -477,6 +480,200 @@ struct LibraryTracksView: View {
                 try? await Task.sleep(nanoseconds: 1_200_000_000)
                 revealCoordinator.clearRevealHighlightIfCurrent(revealRequest)
             }
+        }
+    }
+}
+
+/// Нативная кнопка toolbar-меню с subtitle выбранной сортировки, как в треклистах и папках.
+private struct LibraryTracksToolbarMenuButton: UIViewRepresentable {
+    /// Текущий режим сортировки треков в открытой папке.
+    let selectedSortMode: LibraryTrackSortMode
+    /// Запускает режим выбора.
+    let onSelect: () -> Void
+    /// Передаёт выбранный режим сортировки во View.
+    let onSortModeSelection: (LibraryTrackSortMode) -> Void
+    /// Передаёт выбранное batch-действие во View.
+    let onBatchActionSelection: (BulkTrackAction) -> Void
+
+    func makeUIView(context: Context) -> UIButton {
+        let button = UIButton(type: .system)
+        button.setImage(UIImage(systemName: "ellipsis"), for: .normal)
+        button.showsMenuAsPrimaryAction = true
+        button.changesSelectionAsPrimaryAction = false
+        button.accessibilityLabel = "Действия папки фонотеки"
+        button.setContentHuggingPriority(.required, for: .horizontal)
+        button.setContentCompressionResistancePriority(.required, for: .horizontal)
+        button.menu = makeMenu()
+        return button
+    }
+
+    func updateUIView(_ button: UIButton, context: Context) {
+        button.menu = makeMenu()
+    }
+
+    /// Собирает системное меню, где subtitle и checkmark рисуются UIKit.
+    private func makeMenu() -> UIMenu {
+        let menu = UIMenu(
+            children: [
+                makeSelectAction(),
+                makeSortMenu(),
+                makeAddMenu(),
+                makeEditMenu()
+            ]
+        )
+
+        // Разрешает системе показать title и subtitle для пункта "Сортировка".
+        let displayPreferences = UIMenuDisplayPreferences()
+        displayPreferences.maximumNumberOfTitleLines = 2
+        menu.displayPreferences = displayPreferences
+
+        return menu
+    }
+
+    /// Собирает вложенное меню сортировки с системной подписью выбранного режима.
+    private func makeSortMenu() -> UIMenu {
+        let menu = UIMenu(
+            title: "Сортировка",
+            image: UIImage(systemName: "arrow.up.arrow.down"),
+            children: [
+                makeDirectionalSortMenu(
+                    title: "Артист",
+                    firstTitle: "От А до Я",
+                    firstMode: .artistAsc,
+                    secondTitle: "От Я до А",
+                    secondMode: .artistDesc
+                ),
+                makeDirectionalSortMenu(
+                    title: "Название",
+                    firstTitle: "От А до Я",
+                    firstMode: .titleAsc,
+                    secondTitle: "От Я до А",
+                    secondMode: .titleDesc
+                ),
+                makeDirectionalSortMenu(
+                    title: "Альбом",
+                    firstTitle: "От А до Я",
+                    firstMode: .albumAsc,
+                    secondTitle: "От Я до А",
+                    secondMode: .albumDesc
+                ),
+                makeDirectionalSortMenu(
+                    title: "Год",
+                    firstTitle: "Сначала новые",
+                    firstMode: .yearDesc,
+                    secondTitle: "Сначала старые",
+                    secondMode: .yearAsc
+                ),
+                makeDirectionalSortMenu(
+                    title: "Лейбл",
+                    firstTitle: "От А до Я",
+                    firstMode: .labelAsc,
+                    secondTitle: "От Я до А",
+                    secondMode: .labelDesc
+                ),
+                makeDirectionalSortMenu(
+                    title: "Жанр",
+                    firstTitle: "От А до Я",
+                    firstMode: .genreAsc,
+                    secondTitle: "От Я до А",
+                    secondMode: .genreDesc
+                ),
+                makeSortAction(title: "Комментарий", mode: .commentAsc),
+                makeDirectionalSortMenu(
+                    title: "Название файла",
+                    firstTitle: "От А до Я",
+                    firstMode: .fileNameAsc,
+                    secondTitle: "От Я до А",
+                    secondMode: .fileNameDesc
+                ),
+                makeDirectionalSortMenu(
+                    title: "Дата",
+                    firstTitle: "Сначала новые",
+                    firstMode: .fileDateDesc,
+                    secondTitle: "Сначала старые",
+                    secondMode: .fileDateAsc
+                )
+            ]
+        )
+        menu.subtitle = selectedSortMode.title
+        return menu
+    }
+
+    /// Собирает подменю сортировки с двумя направлениями.
+    private func makeDirectionalSortMenu(
+        title: String,
+        firstTitle: String,
+        firstMode: LibraryTrackSortMode,
+        secondTitle: String,
+        secondMode: LibraryTrackSortMode
+    ) -> UIMenu {
+        UIMenu(
+            title: title,
+            options: .singleSelection,
+            children: [
+                makeSortAction(title: firstTitle, mode: firstMode),
+                makeSortAction(title: secondTitle, mode: secondMode)
+            ]
+        )
+    }
+
+    /// Собирает пункт сортировки с checkmark для текущего режима.
+    private func makeSortAction(
+        title: String,
+        mode: LibraryTrackSortMode
+    ) -> UIAction {
+        UIAction(
+            title: title,
+            state: selectedSortMode == mode ? .on : .off
+        ) { _ in
+            onSortModeSelection(mode)
+        }
+    }
+
+    /// Собирает пункт входа в режим выбора.
+    private func makeSelectAction() -> UIAction {
+        UIAction(
+            title: "Выбрать",
+            image: UIImage(systemName: "checkmark.circle")
+        ) { _ in
+            onSelect()
+        }
+    }
+
+    /// Собирает inline-группу добавления выбранных треков.
+    private func makeAddMenu() -> UIMenu {
+        UIMenu(
+            title: "Добавить",
+            options: .displayInline,
+            children: [
+                makeBatchAction(.addToPlayer, imageName: "waveform"),
+                makeBatchAction(.addToTrackList, imageName: "list.star")
+            ]
+        )
+    }
+
+    /// Собирает inline-группу изменения выбранных треков.
+    private func makeEditMenu() -> UIMenu {
+        UIMenu(
+            title: "Изменить",
+            options: .displayInline,
+            children: [
+                makeBatchAction(.renameFiles, imageName: "pencil"),
+                makeBatchAction(.editTags, imageName: "tag")
+            ]
+        )
+    }
+
+    /// Собирает пункт batch-действия, оставляя выполнение во ViewModel.
+    private func makeBatchAction(
+        _ action: BulkTrackAction,
+        imageName: String
+    ) -> UIAction {
+        UIAction(
+            title: action.title,
+            image: UIImage(systemName: imageName)
+        ) { _ in
+            onBatchActionSelection(action)
         }
     }
 }

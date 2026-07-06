@@ -23,6 +23,7 @@ struct FolderDatabaseModel: Equatable, Identifiable {
     var updatedAt: Date
     var sortOrder: Int?
     var lastScannedAt: Date?
+    var trackSortMode: String?
 }
 
 // Строка таблицы tracks.
@@ -51,6 +52,7 @@ struct TrackMetadataDatabaseModel: Equatable {
     var artist: String?
     var album: String?
     var albumArtist: String?
+    var label: String?
     var genre: String?
     var year: Int?
     var trackNumber: Int?

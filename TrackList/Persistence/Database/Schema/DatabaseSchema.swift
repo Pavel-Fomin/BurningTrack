@@ -26,6 +26,7 @@ enum DatabaseSchema {
         static let updatedAt = "updated_at"
         static let sortOrder = "sort_order"
         static let lastScannedAt = "last_scanned_at"
+        static let trackSortMode = "track_sort_mode"
     }
 
     enum Tracks {
@@ -56,6 +57,7 @@ enum DatabaseSchema {
         static let artist = "artist"
         static let album = "album"
         static let albumArtist = "album_artist"
+        static let label = "label"
         static let genre = "genre"
         static let year = "year"
         static let trackNumber = "track_number"

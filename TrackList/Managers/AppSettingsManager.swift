@@ -92,6 +92,23 @@ final class AppSettingsManager: ObservableObject, SettingsManaging {
         NotificationCenter.default.post(name: .appSettingsDidChange, object: nil)
     }
 
+    /// Сохраняет выбранную сортировку треков внутри папки фонотеки.
+    func setLibraryTrackSortMode(_ mode: LibraryTrackSortMode) throws {
+        guard settings.internalSettings.libraryTrackSortMode != mode else { return }
+
+        let previousMode = settings.internalSettings.libraryTrackSortMode
+        settings.internalSettings.libraryTrackSortMode = mode
+
+        do {
+            try settingsStore.saveSettings(settings)
+        } catch {
+            settings.internalSettings.libraryTrackSortMode = previousMode
+            throw error
+        }
+
+        NotificationCenter.default.post(name: .appSettingsDidChange, object: nil)
+    }
+
     func setTrackListsSortMode(_ mode: TrackListsSortMode?) throws {
         guard settings.internalSettings.trackListsSortMode != mode else { return }
 

@@ -33,7 +33,9 @@ struct LibraryTrackSectionsListView: View {
     var body: some View {
         ForEach(sections, id: \.id) { section in
             LibraryTrackSectionView(
+                id: section.id,
                 title: section.title,
+                showsHeader: section.showsHeader,
                 tracks: section.tracks,
                 allTracks: allTracks,
                 trackListNamesById: trackListNamesById,
