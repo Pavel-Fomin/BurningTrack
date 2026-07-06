@@ -14,6 +14,15 @@ struct DatabaseMigration {
 }
 
 extension DatabaseMigration {
+    // Единый порядок миграций используется приложением, тестами и генератором документации схемы.
+    static let all: [DatabaseMigration] = [
+        .initialSchema,
+        .initialTables,
+        .trackListTracksAllowExternalTrackIds,
+        .settingsPhase7,
+        .importedTracksPhase8
+    ]
+
     // Первая миграция фиксирует стартовую версию схемы без создания бизнес-таблиц.
     static let initialSchema = DatabaseMigration(identifier: "001_initial_schema") { _ in
         // Бизнес-таблицы треков, плеера и треклистов появятся в следующих фазах.

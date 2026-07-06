@@ -88,6 +88,12 @@ Track Identity отвечает за устойчивую идентичност
 
 Каноничный документ: [Track Identity](Track%20Identity.md).
 
+## SQLite / Data Model
+
+SQLite и Data Model отвечают за постоянное внутреннее состояние приложения и логические правила владения данными. Их ключевая ответственность — отделить архитектурные сущности от физической схемы хранения.
+
+Каноничные документы: [SQLite](SQLite.md), [Data Model](Data%20Model.md), [SQLite Schema](SQLite%20Schema.generated.md).
+
 ## Batch Operations
 
 Batch Operations отвечают за действия над несколькими выбранными треками. Их ключевая ответственность — отделить массовый пользовательский сценарий от одиночных операций.
@@ -173,6 +179,8 @@ Overview является верхним уровнем архитектурно
 - Navigation — правила маршрутизации и переходов.
 - Runtime Metadata — контракт runtime snapshot и обновления данных трека.
 - Track Identity — контракт file identity и row identity.
+- SQLite — архитектура постоянного внутреннего состояния приложения.
+- Data Model — логические сущности и правила владения данными.
 - Library — архитектура фонотеки и загрузки треков.
 - Player — архитектура playback-сценариев.
 - Tracklists — архитектура пользовательских треклистов.
@@ -189,6 +197,9 @@ Overview является верхним уровнем архитектурно
 - Navigation
 - [Runtime Metadata](Runtime%20Metadata.md)
 - [Track Identity](Track%20Identity.md)
+- [SQLite](SQLite.md)
+- [Data Model](Data%20Model.md)
+- [SQLite Schema](SQLite%20Schema.generated.md)
 - Library
 - [Library loading architecture](../Legacy/Library%20loading%20architecture.md)
 - Player

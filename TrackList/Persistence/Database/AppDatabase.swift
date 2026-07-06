@@ -13,13 +13,7 @@ import Foundation
 final class AppDatabase {
     static let shared = AppDatabase(
         location: DatabaseLocation(),
-        migrator: DatabaseMigrator(migrations: [
-            .initialSchema,
-            .initialTables,
-            .trackListTracksAllowExternalTrackIds,
-            .settingsPhase7,
-            .importedTracksPhase8
-        ])
+        migrator: DatabaseMigrator(migrations: DatabaseMigration.all)
     )
 
     private let location: DatabaseLocation
