@@ -38,6 +38,11 @@ final class SQLiteFolderStore {
         try executor.fetchAll(FolderDatabaseQueries.fetchRootFolders, map: Self.map)
     }
 
+    /// Возвращает все папки фонотеки, включая корни и подпапки.
+    func fetchAll() throws -> [FolderDatabaseModel] {
+        try executor.fetchAll(FolderDatabaseQueries.fetchAll, map: Self.map)
+    }
+
     func upsert(_ model: FolderDatabaseModel) throws {
         try executor.write { database in
             let statement = try database.prepare(FolderDatabaseQueries.upsert)

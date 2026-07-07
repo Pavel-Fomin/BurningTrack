@@ -38,6 +38,9 @@ final class TrackListsActionHandler {
         case .openTrackList(let id):
             viewModel.openTrackList(id: id)
 
+        case .openTrackListFromApp(let id):
+            viewModel.openTrackListFromApp(id: id)
+
         case .createTrackList:
             presenter.presentCreateTrackList()
 

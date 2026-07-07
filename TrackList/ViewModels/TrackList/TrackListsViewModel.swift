@@ -151,6 +151,20 @@ final class TrackListsViewModel: ObservableObject {
         navigationPath.append(id)
     }
 
+    /// Открывает треклист по внешнему app-level запросу, заменяя текущий detail route.
+    func openTrackListFromApp(id: UUID) {
+        if trackLists.contains(where: { $0.id == id }) == false {
+            refresh()
+        }
+
+        guard trackLists.contains(where: { $0.id == id }) else {
+            toastPresenter.handle(AppError.trackListNotFound)
+            return
+        }
+
+        navigationPath = [id]
+    }
+
     /// Возвращает треклист для построения detail-экрана по route id.
     func trackList(for id: UUID) -> TrackList? {
         trackLists.first { $0.id == id }

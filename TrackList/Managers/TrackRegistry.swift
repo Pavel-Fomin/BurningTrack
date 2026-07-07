@@ -16,8 +16,12 @@ actor TrackRegistry {
 
     struct FolderEntry: Identifiable {
         var id: UUID
+        var parentFolderId: UUID?
+        var rootFolderId: UUID?
         var name: String
-        /// Дата первого добавления корневой папки в SQLite.
+        var relativePath: String
+        var isRoot: Bool
+        /// Дата первого добавления папки в SQLite.
         var createdAt: Date
         var updatedAt: Date
         /// Сохранённый ручной порядок корневой папки.
@@ -124,6 +128,35 @@ actor TrackRegistry {
             rememberPersistenceError(error)
             return []
         }
+    }
+
+    /// Возвращает все сохранённые папки фонотеки: корневые папки и подпапки.
+    func allFolderEntries() -> [FolderEntry] {
+        do {
+            return try libraryStore()
+                .fetchAllFolders()
+                .map(folderEntry(from:))
+        } catch {
+            rememberPersistenceError(error)
+            return []
+        }
+    }
+
+    /// Возвращает папки фонотеки по id, включая подпапки.
+    func folders(ids: Set<UUID>) -> [UUID: FolderEntry] {
+        var result: [UUID: FolderEntry] = [:]
+
+        for id in ids {
+            do {
+                if let folder = try libraryStore().fetchFolder(id: id) {
+                    result[id] = folderEntry(from: folder)
+                }
+            } catch {
+                rememberPersistenceError(error)
+            }
+        }
+
+        return result
     }
 
     func updateFolderAvailability(
@@ -332,7 +365,11 @@ actor TrackRegistry {
     private func folderEntry(from model: FolderDatabaseModel) -> FolderEntry {
         FolderEntry(
             id: model.id,
+            parentFolderId: model.parentFolderId,
+            rootFolderId: model.rootFolderId,
             name: model.name,
+            relativePath: model.relativePath,
+            isRoot: model.isRoot,
             createdAt: model.createdAt,
             updatedAt: model.updatedAt,
             sortOrder: model.sortOrder

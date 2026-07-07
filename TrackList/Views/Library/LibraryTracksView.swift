@@ -283,23 +283,10 @@ struct LibraryTracksView: View {
         if subfolders.isEmpty == false {
             Section {
                 ForEach(subfolders) { subfolder in
-                    HStack(spacing: 12) {
-                        Image(systemName: "folder.fill")
-                            .foregroundColor(.blue)
-                            .frame(width: 24)
-
-                        Text(subfolder.name)
-                            .lineLimit(1)
-
-                        Spacer()
-
-                        Image(systemName: "chevron.right")
-                            .font(.footnote)
-                            .foregroundStyle(.tertiary)
-                    }
-                    .padding(.vertical, 4)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
+                    LibraryFolderRowView(
+                        name: subfolder.name,
+                        showsDisclosureIndicator: true
+                    ) {
                         onSubfolderTap(subfolder)
                     }
                 }

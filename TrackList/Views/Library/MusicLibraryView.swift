@@ -146,29 +146,12 @@ struct MusicLibraryView: View {
     private func folderRow(
         _ folder: LibraryMasterFolderRowState
     ) -> some View {
-        Button {
-            if folder.isAttaching { return }
+        LibraryFolderRowView(
+            name: folder.name,
+            isAttaching: folder.isAttaching
+        ) {
             onAction(.openFolder(folder.id))
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "folder.fill")
-                    .foregroundColor(.blue)
-                    .frame(width: 24)
-
-                Text(folder.name)
-                    .lineLimit(1)
-
-                Spacer()
-
-                if folder.isAttaching {
-                    ProgressView()
-                        .controlSize(.small)
-                }
-            }
-            .padding(.vertical, 4)
         }
-        .buttonStyle(.plain)
-        .disabled(folder.isAttaching)
         .swipeActions(edge: .trailing) {
             if folder.isAttaching == false {
                 Button(role: .destructive) {

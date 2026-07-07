@@ -14,6 +14,8 @@ enum TrackListsAction {
     case onAppear
     /// Пользователь открыл треклист.
     case openTrackList(UUID)
+    /// Приложение запросило открытие треклиста из другого раздела.
+    case openTrackListFromApp(UUID)
     /// Пользователь запросил создание нового треклиста.
     case createTrackList
     /// Пользователь выбрал сортировку треклистов.

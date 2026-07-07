@@ -20,6 +20,7 @@ struct MiniPlayerHostModifier: ViewModifier {
     // MARK: - Input
 
     @ObservedObject var playerViewModel: PlayerViewModel
+    let isVisible: Bool
 
     // MARK: - Body
 
@@ -27,7 +28,8 @@ struct MiniPlayerHostModifier: ViewModifier {
         content
             .bottomPanelsHost(
                 playerViewModel: playerViewModel,
-                showsTopPanel: false
+                showsTopPanel: false,
+                showsBottomPanel: isVisible
             ) {
                 EmptyView()
             }
@@ -42,11 +44,13 @@ extension View {
     ///
     /// Используется на уровне screen, а не в ContentView поверх TabView.
     func miniPlayerHost(
-        playerViewModel: PlayerViewModel
+        playerViewModel: PlayerViewModel,
+        isVisible: Bool = true
     ) -> some View {
         modifier(
             MiniPlayerHostModifier(
-                playerViewModel: playerViewModel
+                playerViewModel: playerViewModel,
+                isVisible: isVisible
             )
         )
     }

@@ -32,6 +32,20 @@ enum FolderDatabaseQueries {
         name COLLATE NOCASE ASC;
     """
 
+    static let fetchAll = """
+    SELECT id, parent_folder_id, root_folder_id, name, relative_path, bookmark_base64,
+           is_root, is_available, created_at, updated_at, sort_order, last_scanned_at,
+           track_sort_mode
+    FROM folders
+    ORDER BY
+        CASE WHEN is_root = 1 THEN 0 ELSE 1 END ASC,
+        CASE WHEN sort_order IS NULL THEN 1 ELSE 0 END ASC,
+        sort_order ASC,
+        root_folder_id COLLATE NOCASE ASC,
+        relative_path COLLATE NOCASE ASC,
+        name COLLATE NOCASE ASC;
+    """
+
     static let upsert = """
     INSERT INTO folders (
         id, parent_folder_id, root_folder_id, name, relative_path, bookmark_base64,

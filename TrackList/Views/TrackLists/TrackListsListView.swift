@@ -57,32 +57,9 @@ struct TrackListsListView: View {
     
     @ViewBuilder
     private func trackListRow(for row: TrackListsRowState) -> some View {
-        Button {
+        TrackListsRowView(row: row) {
             onAction(.openTrackList(row.id))
-        } label: {
-            HStack(alignment: .center, spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(row.title)
-                        .font(.body)
-                        .fontWeight(.regular)
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                    Text(row.createdAtText)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-                
-                Spacer()
-
-                Text(row.tracksCountText)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             Button(role: .destructive) {
                 onAction(.requestDeleteTrackList(row.id))

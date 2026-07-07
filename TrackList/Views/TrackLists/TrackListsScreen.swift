@@ -16,6 +16,7 @@ struct TrackListsScreen: View {
 
     @ObservedObject var trackListsViewModel: TrackListsViewModel
     @ObservedObject var playerViewModel: PlayerViewModel
+    @ObservedObject private var navigationCoordinator = NavigationCoordinator.shared
 
     /// Фабрика production action handler для master-flow списка треклистов.
     private let actionHandlerFactory = TrackListsActionHandlerFactory()
@@ -57,8 +58,26 @@ struct TrackListsScreen: View {
                 }
             }
         }
+        .onAppear {
+            handlePendingTrackListOpenRequest()
+        }
+        .onChange(of: navigationCoordinator.pendingTrackListOpenRequest) { _, _ in
+            handlePendingTrackListOpenRequest()
+        }
         .miniPlayerHost(
             playerViewModel: playerViewModel
+        )
+    }
+
+    /// Потребляет внешний запрос навигации и открывает треклист штатным master-detail flow.
+    private func handlePendingTrackListOpenRequest() {
+        guard let request = navigationCoordinator.pendingTrackListOpenRequest else {
+            return
+        }
+
+        actionHandler.handle(.openTrackListFromApp(request.trackListId))
+        navigationCoordinator.clearTrackListOpenRequest(
+            requestId: request.requestId
         )
     }
 }

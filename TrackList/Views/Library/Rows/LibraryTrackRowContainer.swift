@@ -188,89 +188,40 @@ struct LibraryTrackRowContainer: View {
     /// Меню действий строки фонотеки.
     @ViewBuilder
     private var libraryActionMenuContent: some View {
-        if isMenuActionAvailable(.details) {
-            Button {
+        LibraryTrackActionMenuContent(
+            onDetails: {
                 commandHandler.handle(
                     .tapArtwork(track: track)
                 )
-            } label: {
-                Label("О треке", systemImage: "info.circle")
-            }
-        }
-
-        if isMenuActionAvailable(.moveToFolder) {
-            Button {
+            },
+            onMoveToFolder: {
                 commandHandler.handle(
                     .moveToFolder(track: track)
                 )
-            } label: {
-                Label("Переместить", systemImage: "arrow.forward.folder")
-            }
-        }
-
-        if isMenuActionAvailable(.addToTrackList) {
-            Button {
+            },
+            onAddToPlayer: {
+                commandHandler.handle(
+                    .addToPlayer(trackId: track.trackId)
+                )
+            },
+            onAddToTrackList: {
                 commandHandler.handle(
                     .addToTrackList(track: track)
                 )
-            } label: {
-                Label("В треклист", systemImage: "list.star")
+            },
+            onEditTags: {
+                commandHandler.handle(
+                    .editTags(track: track)
+                )
+            },
+            onRenameFile: { strategy in
+                commandHandler.handle(
+                    .rename(
+                        trackId: track.trackId,
+                        strategy: strategy
+                    )
+                )
             }
-        }
-
-        if isMenuActionAvailable(.editTags) ||
-            isMenuActionAvailable(.renameFile) {
-            Menu {
-                if isMenuActionAvailable(.editTags) {
-                    Button {
-                        commandHandler.handle(
-                            .editTags(track: track)
-                        )
-                    } label: {
-                        Label("Теги", systemImage: "tag")
-                    }
-                }
-
-                if isMenuActionAvailable(.renameFile) {
-                    // Системная секция делает "Название файла" подписью, а не пунктом меню.
-                    Section("Название файла") {
-                        Button {
-                            commandHandler.handle(
-                                .rename(
-                                    trackId: track.trackId,
-                                    strategy: .artistTitle
-                                )
-                            )
-                        } label: {
-                            Text("Артист - Название")
-                        }
-
-                        Button {
-                            commandHandler.handle(
-                                .rename(
-                                    trackId: track.trackId,
-                                    strategy: .titleArtist
-                                )
-                            )
-                        } label: {
-                            Text("Название - Артист")
-                        }
-
-                        Button {
-                            commandHandler.handle(
-                                .rename(
-                                    trackId: track.trackId,
-                                    strategy: .manual
-                                )
-                            )
-                        } label: {
-                            Text("Вручную")
-                        }
-                    }
-                }
-            } label: {
-                Label("Редактировать", systemImage: "square.and.pencil")
-            }
-        }
+        )
     }
 }

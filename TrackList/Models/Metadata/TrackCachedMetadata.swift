@@ -15,6 +15,7 @@ struct TrackCachedMetadata: Equatable, Identifiable {
     let title: String?
     let artist: String?
     let album: String?
+    let duration: Double?
     let year: Int?
     let label: String?
     let genre: String?

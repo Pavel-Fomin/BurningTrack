@@ -37,36 +37,65 @@ struct MainTabView: View {
 
 // MARK: - Плеер
             
-            PlayerScreen(
-                playerViewModel: playerViewModel
-            )
-                .tabItem { Label("Плеер", systemImage: "waveform") }
-                .tag(ScenePhaseHandler.Tab.player)
+            Tab(
+                "Плеер",
+                systemImage: "waveform",
+                value: ScenePhaseHandler.Tab.player
+            ) {
+                PlayerScreen(
+                    playerViewModel: playerViewModel
+                )
+            }
 
 // MARK: - Фонотека
             
-            LibraryScreen(
-                playerViewModel: playerViewModel
-            )
-                .tabItem { Label("Фонотека", systemImage: "play.square.stack") }
-                .tag(ScenePhaseHandler.Tab.library)
+            Tab(
+                "Фонотека",
+                systemImage: "play.square.stack",
+                value: ScenePhaseHandler.Tab.library
+            ) {
+                LibraryScreen(
+                    playerViewModel: playerViewModel
+                )
+            }
 
 // MARK: - Треклисты
             
-            TrackListsScreen(
-                trackListsViewModel: trackListsVM,
-                playerViewModel: playerViewModel
-            )
-                .tabItem { Label("Треклисты", systemImage: "list.star") }
-                .tag(ScenePhaseHandler.Tab.tracklists)
+            Tab(
+                "Треклисты",
+                systemImage: "list.star",
+                value: ScenePhaseHandler.Tab.tracklists
+            ) {
+                TrackListsScreen(
+                    trackListsViewModel: trackListsVM,
+                    playerViewModel: playerViewModel
+                )
+            }
 
 // MARK: - Настройки
             
-            SettingsScreen(
-                playerViewModel: playerViewModel
-            )
-                .tabItem { Label("Настройки", systemImage: "gear") }
-                .tag(ScenePhaseHandler.Tab.settings)
+            Tab(
+                "Настройки",
+                systemImage: "gear",
+                value: ScenePhaseHandler.Tab.settings
+            ) {
+                SettingsScreen(
+                    playerViewModel: playerViewModel
+                )
+            }
+
+// MARK: - Поиск
+
+            Tab(
+                "Поиск",
+                systemImage: "magnifyingglass",
+                value: ScenePhaseHandler.Tab.search,
+                role: .search
+            ) {
+                SearchScreen(
+                    playerViewModel: playerViewModel
+                )
+            }
         }
     }
 }

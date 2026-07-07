@@ -22,6 +22,11 @@ struct LibraryRevealRequest: Equatable {
     let requestId: UUID
 }
 
+struct TrackListOpenRequest: Equatable {
+    let trackListId: UUID
+    let requestId: UUID
+}
+
 @MainActor
 final class NavigationCoordinator: ObservableObject {
 
@@ -40,6 +45,8 @@ final class NavigationCoordinator: ObservableObject {
 
     /// Одноразовый intent подсветки трека внутри открытой папки.
     @Published private(set) var pendingRevealRequest: LibraryRevealRequest?
+    /// Одноразовый intent открытия треклиста из другого раздела приложения.
+    @Published private(set) var pendingTrackListOpenRequest: TrackListOpenRequest?
 
     private init() {}
 
@@ -59,6 +66,21 @@ final class NavigationCoordinator: ObservableObject {
 
     func setTab(_ tab: ScenePhaseHandler.Tab) {
         ScenePhaseHandler.shared.activeTab = tab
+    }
+
+    /// Открывает папку фонотеки из внешнего раздела и переключает вкладку.
+    func openLibraryFolderFromApp(_ folderId: UUID) {
+        openFolder(folderId)
+        setTab(.library)
+    }
+
+    /// Запрашивает открытие треклиста во вкладке треклистов.
+    func openTrackListFromApp(_ trackListId: UUID) {
+        pendingTrackListOpenRequest = TrackListOpenRequest(
+            trackListId: trackListId,
+            requestId: UUID()
+        )
+        setTab(.tracklists)
     }
 
     // MARK: - Навигация внутри фонотеки
@@ -112,6 +134,11 @@ final class NavigationCoordinator: ObservableObject {
     func clearRevealRequest(requestId: UUID) {
         guard pendingRevealRequest?.requestId == requestId else { return }
         pendingRevealRequest = nil
+    }
+
+    func clearTrackListOpenRequest(requestId: UUID) {
+        guard pendingTrackListOpenRequest?.requestId == requestId else { return }
+        pendingTrackListOpenRequest = nil
     }
 
     // MARK: - Маршруты

@@ -21,6 +21,7 @@ struct BottomPanelsHostModifier<TopPanel: View>: ViewModifier {
 
     @ObservedObject var playerViewModel: PlayerViewModel
     let showsTopPanel: Bool
+    let showsBottomPanel: Bool
     let topPanel: () -> TopPanel
 
     // MARK: - Body
@@ -34,7 +35,8 @@ struct BottomPanelsHostModifier<TopPanel: View>: ViewModifier {
                     topPanel()
                         .padding(.horizontal, 8)
                 } bottomPanel: {
-                    if playerViewModel.currentTrackDisplayable != nil {
+                    if showsBottomPanel,
+                       playerViewModel.currentTrackDisplayable != nil {
                         MiniPlayerView(
                             playerViewModel: playerViewModel
                         )
@@ -61,12 +63,14 @@ extension View {
     func bottomPanelsHost<TopPanel: View>(
         playerViewModel: PlayerViewModel,
         showsTopPanel: Bool = true,
+        showsBottomPanel: Bool = true,
         @ViewBuilder topPanel: @escaping () -> TopPanel
     ) -> some View {
         modifier(
             BottomPanelsHostModifier(
                 playerViewModel: playerViewModel,
                 showsTopPanel: showsTopPanel,
+                showsBottomPanel: showsBottomPanel,
                 topPanel: topPanel
             )
         )
