@@ -28,10 +28,14 @@ final class SearchViewModel: ObservableObject {
     private let toastPresenter: any ToastPresenting
     /// Собирает отображаемое состояние из результатов поиска.
     private let presenter: SearchPresenter
+    /// Проверяет актуальность выбранного чипа после нового результата поиска.
+    private let trackSearchFilterBuilder = TrackSearchFilterBuilder()
     /// Текущая задача поиска, которую можно отменить при новом вводе.
     private var searchTask: Task<Void, Never>?
     /// Последний результат доменного поиска нужен для пересборки строк после загрузки snapshot.
     private var currentResults: SearchResults = .empty
+    /// Выбранное поле фильтра треков; nil означает чип "Все".
+    private var selectedTrackFilterField: TrackSearchMatchField?
 
     // MARK: - Init
 
@@ -60,15 +64,17 @@ final class SearchViewModel: ObservableObject {
     func refreshIfNeeded() {
         guard state.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else {
             state = presenter.empty(query: state.query)
+            currentResults = .empty
+            selectedTrackFilterField = nil
             return
         }
 
-        search(query: state.query)
+        search(query: state.query, resetsSelectedFilter: false)
     }
 
     /// Обновляет запрос и запускает поиск только для непустой строки.
     func updateQuery(_ query: String) {
-        search(query: query)
+        search(query: query, resetsSelectedFilter: true)
     }
 
     /// Очищает строку поиска и результат.
@@ -76,6 +82,16 @@ final class SearchViewModel: ObservableObject {
         searchTask?.cancel()
         state = presenter.empty()
         currentResults = .empty
+        selectedTrackFilterField = nil
+    }
+
+    /// Выбирает чип фильтра и пересобирает текущую выдачу без нового запроса в домен.
+    func selectTrackFilter(field: TrackSearchMatchField?) {
+        selectedTrackFilterField = field
+        state = makeResultsState(
+            query: state.query,
+            results: currentResults
+        )
     }
 
     /// Запрашивает runtime snapshot для видимой строки поиска через общий pipeline фонотеки.
@@ -97,15 +113,20 @@ final class SearchViewModel: ObservableObject {
     // MARK: - Search
 
     /// Выполняет поиск и защищает UI от результатов отменённых задач.
-    private func search(query: String) {
+    private func search(query: String, resetsSelectedFilter: Bool) {
         searchTask?.cancel()
 
         let visibleQuery = query
         let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
 
+        if resetsSelectedFilter {
+            selectedTrackFilterField = nil
+        }
+
         guard normalizedQuery.isEmpty == false else {
             state = presenter.empty(query: visibleQuery)
             currentResults = .empty
+            selectedTrackFilterField = nil
             return
         }
 
@@ -120,6 +141,10 @@ final class SearchViewModel: ObservableObject {
                 guard Task.isCancelled == false else { return }
 
                 currentResults = results
+                clearUnavailableSelectedFilterIfNeeded(
+                    query: visibleQuery,
+                    results: results
+                )
                 state = makeResultsState(
                     query: visibleQuery,
                     results: results
@@ -128,6 +153,7 @@ final class SearchViewModel: ObservableObject {
                 guard Task.isCancelled == false else { return }
 
                 currentResults = .empty
+                selectedTrackFilterField = nil
                 state = makeResultsState(
                     query: visibleQuery,
                     results: .empty
@@ -161,6 +187,24 @@ final class SearchViewModel: ObservableObject {
         )
     }
 
+    /// Сбрасывает выбранный чип, если новое состояние поиска больше его не содержит.
+    private func clearUnavailableSelectedFilterIfNeeded(
+        query: String,
+        results: SearchResults
+    ) {
+        guard selectedTrackFilterField != nil else { return }
+
+        let containsSelectedChip = trackSearchFilterBuilder.containsChip(
+            field: selectedTrackFilterField,
+            results: results.tracks,
+            query: query
+        )
+
+        if containsSelectedChip == false {
+            selectedTrackFilterField = nil
+        }
+    }
+
     /// Собирает состояние с текущими runtime snapshot и настройками отображения фонотеки.
     private func makeResultsState(
         query: String,
@@ -176,6 +220,7 @@ final class SearchViewModel: ObservableObject {
         return presenter.results(
             query: query,
             results: results,
+            selectedTrackFilterField: selectedTrackFilterField,
             snapshotsByTrackId: runtimeController.snapshotsByTrackId,
             displaySettings: displaySettings
         )

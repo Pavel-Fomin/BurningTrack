@@ -32,6 +32,22 @@ struct SearchView: View {
 
         case .results:
             List {
+                if state.trackFilterChips.isEmpty == false {
+                    FilterChipsView(
+                        items: state.trackFilterChips,
+                        selectedItem: selectedTrackFilterChip,
+                        title: { $0.title },
+                        detail: { "\($0.count)" },
+                        onSelect: { chip in
+                            onAction(.selectTrackFilter(chip.field))
+                        }
+                    )
+                    // Чипы остаются отдельной строкой списка и не вмешиваются в TrackRowView.
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+                }
+
                 if state.folders.isEmpty == false {
                     Section(header: sectionHeader("Папки")) {
                         ForEach(state.folders) { folder in
@@ -82,6 +98,13 @@ struct SearchView: View {
     private func sectionHeader(_ title: String) -> some View {
         Text(title)
             .font(.headline)
+    }
+
+    /// Находит выбранный чип по готовому состоянию, не вычисляя фильтрацию во View.
+    private var selectedTrackFilterChip: TrackSearchFilterChip? {
+        state.trackFilterChips.first { chip in
+            chip.field == state.selectedTrackFilterField
+        }
     }
 }
 

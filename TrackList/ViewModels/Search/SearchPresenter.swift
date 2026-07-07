@@ -19,6 +19,8 @@ struct SearchTrackDisplaySettings {
 // Собирает UI-состояние из запроса и результатов доменного сервиса.
 struct SearchPresenter {
     private let trackListsStateBuilder = TrackListsScreenStateBuilder()
+    /// Считает совпавшие поля и чипы фильтрации для треков.
+    private let trackSearchFilterBuilder = TrackSearchFilterBuilder()
 
     /// Состояние до ввода запроса.
     func empty(query: String = "") -> SearchScreenState {
@@ -27,6 +29,8 @@ struct SearchPresenter {
             folders: [],
             trackLists: [],
             tracks: [],
+            trackFilterChips: [],
+            selectedTrackFilterField: nil,
             contentState: .emptyQuery
         )
     }
@@ -38,6 +42,8 @@ struct SearchPresenter {
             folders: [],
             trackLists: [],
             tracks: [],
+            trackFilterChips: [],
+            selectedTrackFilterField: nil,
             contentState: .loading
         )
     }
@@ -46,22 +52,41 @@ struct SearchPresenter {
     func results(
         query: String,
         results: SearchResults,
+        selectedTrackFilterField: TrackSearchMatchField?,
         snapshotsByTrackId: [UUID: TrackRuntimeSnapshot],
         displaySettings: SearchTrackDisplaySettings
     ) -> SearchScreenState {
         let trackListRows = makeTrackListRows(from: results.trackLists)
+        let filteredTrackResults = trackSearchFilterBuilder.filteredResults(
+            results.tracks,
+            query: query,
+            selectedField: selectedTrackFilterField
+        )
         let trackRows = makeTrackRows(
-            from: results.tracks,
+            from: filteredTrackResults,
             snapshotsByTrackId: snapshotsByTrackId,
             displaySettings: displaySettings
         )
+        let visibleFolders = selectedTrackFilterField == nil ? results.folders : []
+        let visibleTrackLists = selectedTrackFilterField == nil ? trackListRows : []
+        let chips = trackSearchFilterBuilder.chips(
+            for: results.tracks,
+            query: query
+        )
+        let contentState: SearchContentState = visibleFolders.isEmpty
+            && visibleTrackLists.isEmpty
+            && filteredTrackResults.isEmpty
+            ? .noResults
+            : .results
 
         return SearchScreenState(
             query: query,
-            folders: results.folders,
-            trackLists: trackListRows,
+            folders: visibleFolders,
+            trackLists: visibleTrackLists,
             tracks: trackRows,
-            contentState: results.isEmpty ? .noResults : .results
+            trackFilterChips: chips,
+            selectedTrackFilterField: selectedTrackFilterField,
+            contentState: contentState
         )
     }
 

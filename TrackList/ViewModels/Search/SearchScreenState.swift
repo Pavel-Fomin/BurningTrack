@@ -52,5 +52,9 @@ struct SearchScreenState {
     let folders: [SearchFolderResult]
     let trackLists: [SearchTrackListRowState]
     let tracks: [SearchTrackRowState]
+    /// Готовые чипы фильтрации треков по полям совпадений.
+    let trackFilterChips: [TrackSearchFilterChip]
+    /// Выбранное поле фильтра или nil для режима "Все".
+    let selectedTrackFilterField: TrackSearchMatchField?
     let contentState: SearchContentState
 }

@@ -12,6 +12,7 @@ enum SearchAction: Equatable {
     case appeared
     case queryChanged(String)
     case clearQuery
+    case selectTrackFilter(TrackSearchMatchField?)
     case requestTrackSnapshot(UUID)
     case playTrack(SearchTrackResult)
     case openFolder(SearchFolderResult)

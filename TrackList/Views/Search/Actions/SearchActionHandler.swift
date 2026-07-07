@@ -45,6 +45,9 @@ final class SearchActionHandler {
         case .clearQuery:
             viewModel.clearQuery()
 
+        case .selectTrackFilter(let field):
+            viewModel.selectTrackFilter(field: field)
+
         case .requestTrackSnapshot(let trackId):
             viewModel.requestSnapshotIfNeeded(for: trackId)
 
