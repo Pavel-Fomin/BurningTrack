@@ -23,27 +23,43 @@ struct SearchPresenter {
     private let trackSearchFilterBuilder = TrackSearchFilterBuilder()
 
     /// Состояние до ввода запроса.
-    func empty(query: String = "") -> SearchScreenState {
-        SearchScreenState(
+    func empty(
+        query: String = "",
+        selectedSortMode: SearchSortMode = .titleAsc
+    ) -> SearchScreenState {
+        let availableSortModeGroups = SearchSortMode.availableModeGroups(for: nil)
+
+        return SearchScreenState(
             query: query,
             folders: [],
             trackLists: [],
             tracks: [],
             trackFilterChips: [],
             selectedTrackFilterField: nil,
+            selectedSortMode: selectedSortMode,
+            availableSortModes: availableSortModeGroups.flatMap(\.modes),
+            availableSortModeGroups: availableSortModeGroups,
             contentState: .emptyQuery
         )
     }
 
     /// Состояние активного поиска по непустому запросу.
-    func loading(query: String) -> SearchScreenState {
-        SearchScreenState(
+    func loading(
+        query: String,
+        selectedSortMode: SearchSortMode
+    ) -> SearchScreenState {
+        let availableSortModeGroups = SearchSortMode.availableModeGroups(for: nil)
+
+        return SearchScreenState(
             query: query,
             folders: [],
             trackLists: [],
             tracks: [],
             trackFilterChips: [],
             selectedTrackFilterField: nil,
+            selectedSortMode: selectedSortMode,
+            availableSortModes: availableSortModeGroups.flatMap(\.modes),
+            availableSortModeGroups: availableSortModeGroups,
             contentState: .loading
         )
     }
@@ -53,6 +69,7 @@ struct SearchPresenter {
         query: String,
         results: SearchResults,
         selectedTrackFilterField: TrackSearchMatchField?,
+        selectedSortMode: SearchSortMode,
         snapshotsByTrackId: [UUID: TrackRuntimeSnapshot],
         displaySettings: SearchTrackDisplaySettings
     ) -> SearchScreenState {
@@ -62,8 +79,12 @@ struct SearchPresenter {
             query: query,
             selectedField: selectedTrackFilterField
         )
+        let sortedTrackResults = SearchResultsSorter.sort(
+            filteredTrackResults,
+            using: selectedSortMode
+        )
         let trackRows = makeTrackRows(
-            from: filteredTrackResults,
+            from: sortedTrackResults,
             snapshotsByTrackId: snapshotsByTrackId,
             displaySettings: displaySettings
         )
@@ -73,9 +94,13 @@ struct SearchPresenter {
             for: results.tracks,
             query: query
         )
+        let availableSortModeGroups = SearchSortMode.availableModeGroups(
+            for: selectedTrackFilterField
+        )
+        let availableSortModes = availableSortModeGroups.flatMap(\.modes)
         let contentState: SearchContentState = visibleFolders.isEmpty
             && visibleTrackLists.isEmpty
-            && filteredTrackResults.isEmpty
+            && sortedTrackResults.isEmpty
             ? .noResults
             : .results
 
@@ -86,6 +111,9 @@ struct SearchPresenter {
             tracks: trackRows,
             trackFilterChips: chips,
             selectedTrackFilterField: selectedTrackFilterField,
+            selectedSortMode: selectedSortMode,
+            availableSortModes: availableSortModes,
+            availableSortModeGroups: availableSortModeGroups,
             contentState: contentState
         )
     }

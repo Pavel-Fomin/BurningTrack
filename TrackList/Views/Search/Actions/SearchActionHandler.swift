@@ -48,6 +48,9 @@ final class SearchActionHandler {
         case .selectTrackFilter(let field):
             viewModel.selectTrackFilter(field: field)
 
+        case .selectSortMode(let mode):
+            viewModel.selectSortMode(mode)
+
         case .requestTrackSnapshot(let trackId):
             viewModel.requestSnapshotIfNeeded(for: trackId)
 

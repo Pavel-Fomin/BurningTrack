@@ -32,6 +32,7 @@ struct SearchResults: Equatable {
 struct SearchTrackResult: Identifiable, Equatable, TrackDisplayable {
     let id: UUID
     let fileName: String
+    let fileDate: Date?
     let relativePath: String
     let folderId: UUID?
     let rootFolderId: UUID?

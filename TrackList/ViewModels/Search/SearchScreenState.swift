@@ -56,5 +56,11 @@ struct SearchScreenState {
     let trackFilterChips: [TrackSearchFilterChip]
     /// Выбранное поле фильтра или nil для режима "Все".
     let selectedTrackFilterField: TrackSearchMatchField?
+    /// Выбранный режим сортировки поиска, который пока влияет только на UI.
+    let selectedSortMode: SearchSortMode
+    /// Режимы сортировки, доступные для текущего выбранного чипа.
+    let availableSortModes: [SearchSortMode]
+    /// Группы сортировки для построения простого или вложенного меню.
+    let availableSortModeGroups: [SearchSortModeGroup]
     let contentState: SearchContentState
 }

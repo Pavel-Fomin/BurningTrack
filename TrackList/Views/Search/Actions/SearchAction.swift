@@ -13,6 +13,7 @@ enum SearchAction: Equatable {
     case queryChanged(String)
     case clearQuery
     case selectTrackFilter(TrackSearchMatchField?)
+    case selectSortMode(SearchSortMode)
     case requestTrackSnapshot(UUID)
     case playTrack(SearchTrackResult)
     case openFolder(SearchFolderResult)

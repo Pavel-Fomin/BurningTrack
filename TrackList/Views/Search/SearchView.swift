@@ -11,17 +11,102 @@ import SwiftUI
 struct SearchView: View {
     let state: SearchScreenState
     @ObservedObject var playerViewModel: PlayerViewModel
+    let onSearchActivityChanged: (Bool) -> Void
     let onAction: (SearchAction) -> Void
 
     var body: some View {
         content
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(
+                SearchActivityObserver(
+                    onSearchActivityChanged: onSearchActivityChanged
+                )
+            )
     }
 
     // MARK: - Content
 
     @ViewBuilder
     private var content: some View {
+        if state.contentState == .results {
+            searchList
+        } else {
+            ZStack {
+                searchList
+                stateOverlay
+            }
+        }
+    }
+
+    /// В results List остаётся основным scroll-контейнером для нативного схлопывания large title.
+    private var searchList: some View {
+        List {
+            if state.contentState == .results {
+                resultRows
+            }
+        }
+        .listStyle(.plain)
+        .scrollDismissesKeyboard(.interactively)
+    }
+
+    @ViewBuilder
+    private var resultRows: some View {
+        if state.trackFilterChips.isEmpty == false {
+            FilterChipsView(
+                items: state.trackFilterChips,
+                selectedItem: selectedTrackFilterChip,
+                title: { $0.title },
+                detail: { "\($0.count)" },
+                onSelect: { chip in
+                    onAction(.selectTrackFilter(chip.field))
+                }
+            )
+            // Чипы остаются отдельной строкой списка и не вмешиваются в TrackRowView.
+            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+            .listRowSeparator(.hidden)
+            .listRowBackground(Color.clear)
+        }
+
+        if state.folders.isEmpty == false {
+            Section(header: sectionHeader("Папки")) {
+                ForEach(state.folders) { folder in
+                    SearchFolderRowView(
+                        result: folder,
+                        onAction: onAction
+                    )
+                    // Сбрасываем стандартный фон ячейки List, чтобы строка совпадала с TrackRowView.
+                    .listRowBackground(Color.clear)
+                }
+            }
+        }
+
+        if state.trackLists.isEmpty == false {
+            Section(header: sectionHeader("Треклисты")) {
+                ForEach(state.trackLists) { row in
+                    SearchTrackListRowView(
+                        row: row,
+                        onAction: onAction
+                    )
+                    // Сбрасываем стандартный фон ячейки List, чтобы строка совпадала с TrackRowView.
+                    .listRowBackground(Color.clear)
+                }
+            }
+        }
+
+        if state.tracks.isEmpty == false {
+            Section(header: sectionHeader("Треки")) {
+                ForEach(state.tracks) { row in
+                    SearchTrackRowView(
+                        row: row,
+                        playerViewModel: playerViewModel,
+                        onAction: onAction
+                    )
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var stateOverlay: some View {
         switch state.contentState {
         case .emptyQuery:
             SearchMessageView(text: "Введите запрос")
@@ -31,63 +116,7 @@ struct SearchView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
         case .results:
-            List {
-                if state.trackFilterChips.isEmpty == false {
-                    FilterChipsView(
-                        items: state.trackFilterChips,
-                        selectedItem: selectedTrackFilterChip,
-                        title: { $0.title },
-                        detail: { "\($0.count)" },
-                        onSelect: { chip in
-                            onAction(.selectTrackFilter(chip.field))
-                        }
-                    )
-                    // Чипы остаются отдельной строкой списка и не вмешиваются в TrackRowView.
-                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color.clear)
-                }
-
-                if state.folders.isEmpty == false {
-                    Section(header: sectionHeader("Папки")) {
-                        ForEach(state.folders) { folder in
-                            SearchFolderRowView(
-                                result: folder,
-                                onAction: onAction
-                            )
-                            // Сбрасываем стандартный фон ячейки List, чтобы строка совпадала с TrackRowView.
-                            .listRowBackground(Color.clear)
-                        }
-                    }
-                }
-
-                if state.trackLists.isEmpty == false {
-                    Section(header: sectionHeader("Треклисты")) {
-                        ForEach(state.trackLists) { row in
-                            SearchTrackListRowView(
-                                row: row,
-                                onAction: onAction
-                            )
-                            // Сбрасываем стандартный фон ячейки List, чтобы строка совпадала с TrackRowView.
-                            .listRowBackground(Color.clear)
-                        }
-                    }
-                }
-
-                if state.tracks.isEmpty == false {
-                    Section(header: sectionHeader("Треки")) {
-                        ForEach(state.tracks) { row in
-                            SearchTrackRowView(
-                                row: row,
-                                playerViewModel: playerViewModel,
-                                onAction: onAction
-                            )
-                        }
-                    }
-                }
-            }
-            .listStyle(.plain)
-            .scrollDismissesKeyboard(.interactively)
+            EmptyView()
 
         case .noResults:
             SearchMessageView(text: "Ничего не найдено")
@@ -124,6 +153,25 @@ private struct SearchMessageView: View {
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+// MARK: - Search Activity
+
+private struct SearchActivityObserver: View {
+    @Environment(\.isSearching) private var isSearching
+
+    let onSearchActivityChanged: (Bool) -> Void
+
+    var body: some View {
+        Color.clear
+            // Передаём системную активность поиска наверх без управления самой search presentation.
+            .onAppear {
+                onSearchActivityChanged(isSearching)
+            }
+            .onChange(of: isSearching) { _, isSearching in
+                onSearchActivityChanged(isSearching)
+            }
     }
 }
 

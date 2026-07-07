@@ -36,6 +36,8 @@ final class SearchViewModel: ObservableObject {
     private var currentResults: SearchResults = .empty
     /// Выбранное поле фильтра треков; nil означает чип "Все".
     private var selectedTrackFilterField: TrackSearchMatchField?
+    /// Выбранная сортировка поиска применяется только к отображаемой выдаче.
+    private var selectedSortMode: SearchSortMode = .titleAsc
 
     // MARK: - Init
 
@@ -63,9 +65,13 @@ final class SearchViewModel: ObservableObject {
     /// Повторно выполняет непустой запрос при возвращении на экран.
     func refreshIfNeeded() {
         guard state.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else {
-            state = presenter.empty(query: state.query)
             currentResults = .empty
             selectedTrackFilterField = nil
+            ensureSelectedSortModeIsAvailable()
+            state = presenter.empty(
+                query: state.query,
+                selectedSortMode: selectedSortMode
+            )
             return
         }
 
@@ -80,18 +86,33 @@ final class SearchViewModel: ObservableObject {
     /// Очищает строку поиска и результат.
     func clearQuery() {
         searchTask?.cancel()
-        state = presenter.empty()
         currentResults = .empty
         selectedTrackFilterField = nil
+        ensureSelectedSortModeIsAvailable()
+        state = presenter.empty(selectedSortMode: selectedSortMode)
     }
 
     /// Выбирает чип фильтра и пересобирает текущую выдачу без нового запроса в домен.
     func selectTrackFilter(field: TrackSearchMatchField?) {
         selectedTrackFilterField = field
+        ensureSelectedSortModeIsAvailable()
         state = makeResultsState(
             query: state.query,
             results: currentResults
         )
+    }
+
+    /// Выбирает режим сортировки и пересобирает текущую выдачу без нового поиска.
+    func selectSortMode(_ mode: SearchSortMode) {
+        let availableModes = SearchSortMode.availableModes(
+            for: selectedTrackFilterField
+        )
+
+        selectedSortMode = availableModes.contains(mode)
+            ? mode
+            : (availableModes.first ?? .titleAsc)
+
+        refreshStateAfterSortModeChange()
     }
 
     /// Запрашивает runtime snapshot для видимой строки поиска через общий pipeline фонотеки.
@@ -121,16 +142,24 @@ final class SearchViewModel: ObservableObject {
 
         if resetsSelectedFilter {
             selectedTrackFilterField = nil
+            ensureSelectedSortModeIsAvailable()
         }
 
         guard normalizedQuery.isEmpty == false else {
-            state = presenter.empty(query: visibleQuery)
             currentResults = .empty
             selectedTrackFilterField = nil
+            ensureSelectedSortModeIsAvailable()
+            state = presenter.empty(
+                query: visibleQuery,
+                selectedSortMode: selectedSortMode
+            )
             return
         }
 
-        state = presenter.loading(query: visibleQuery)
+        state = presenter.loading(
+            query: visibleQuery,
+            selectedSortMode: selectedSortMode
+        )
         currentResults = .empty
 
         searchTask = Task { [weak self] in
@@ -154,6 +183,7 @@ final class SearchViewModel: ObservableObject {
 
                 currentResults = .empty
                 selectedTrackFilterField = nil
+                ensureSelectedSortModeIsAvailable()
                 state = makeResultsState(
                     query: visibleQuery,
                     results: .empty
@@ -202,6 +232,44 @@ final class SearchViewModel: ObservableObject {
 
         if containsSelectedChip == false {
             selectedTrackFilterField = nil
+            ensureSelectedSortModeIsAvailable()
+        }
+    }
+
+    /// Возвращает сортировку к первому доступному режиму при смене чипа.
+    private func ensureSelectedSortModeIsAvailable() {
+        let availableModes = SearchSortMode.availableModes(
+            for: selectedTrackFilterField
+        )
+
+        guard availableModes.contains(selectedSortMode) == false else {
+            return
+        }
+
+        selectedSortMode = availableModes.first ?? .titleAsc
+    }
+
+    /// Обновляет состояние после выбора сортировки, не запуская новый поиск.
+    private func refreshStateAfterSortModeChange() {
+        switch state.contentState {
+        case .emptyQuery:
+            state = presenter.empty(
+                query: state.query,
+                selectedSortMode: selectedSortMode
+            )
+
+        case .loading:
+            state = presenter.loading(
+                query: state.query,
+                selectedSortMode: selectedSortMode
+            )
+
+        case .results,
+             .noResults:
+            state = makeResultsState(
+                query: state.query,
+                results: currentResults
+            )
         }
     }
 
@@ -221,6 +289,7 @@ final class SearchViewModel: ObservableObject {
             query: query,
             results: results,
             selectedTrackFilterField: selectedTrackFilterField,
+            selectedSortMode: selectedSortMode,
             snapshotsByTrackId: runtimeController.snapshotsByTrackId,
             displaySettings: displaySettings
         )

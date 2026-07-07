@@ -98,6 +98,7 @@ final class SearchService: SearchServicing {
             return SearchTrackResult(
                 id: track.id,
                 fileName: track.fileName,
+                fileDate: track.fileDate,
                 relativePath: relativePath,
                 folderId: track.folderId,
                 rootFolderId: track.rootFolderId,
