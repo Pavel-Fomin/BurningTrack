@@ -94,53 +94,25 @@ private extension TrackSorter {
 
         switch field {
         case .artist:
-            return .string(stringMetadataValue(track.artist, fallbackFileName: track.fileName))
+            return .string(nonEmptyString(track.artist))
         case .title:
-            return .string(stringMetadataValue(track.title, fallbackFileName: track.fileName))
+            return .string(nonEmptyString(track.title))
         case .album:
-            return .string(
-                stringMetadataValue(
-                    metadataProvider?.trackSortAlbum,
-                    fallbackFileName: track.fileName
-                )
-            )
+            return .string(nonEmptyString(metadataProvider?.trackSortAlbum))
         case .year:
             return .number(metadataProvider?.trackSortYear)
         case .label:
-            return .string(
-                stringMetadataValue(
-                    metadataProvider?.trackSortLabel,
-                    fallbackFileName: track.fileName
-                )
-            )
+            return .string(nonEmptyString(metadataProvider?.trackSortLabel))
         case .genre:
-            return .string(
-                stringMetadataValue(
-                    metadataProvider?.trackSortGenre,
-                    fallbackFileName: track.fileName
-                )
-            )
+            return .string(nonEmptyString(metadataProvider?.trackSortGenre))
         case .comment:
-            return .string(
-                stringMetadataValue(
-                    metadataProvider?.trackSortComment,
-                    fallbackFileName: track.fileName
-                )
-            )
+            return .string(nonEmptyString(metadataProvider?.trackSortComment))
         case .fileName:
             return .string(nonEmptyString(track.fileName))
         case .date:
             let dateProvider = track as? any TrackSortDateProviding
             return .date(dateProvider?.trackSortDate)
         }
-    }
-
-    /// Возвращает строковую metadata или имя файла, если metadata отсутствует.
-    static func stringMetadataValue(
-        _ value: String?,
-        fallbackFileName: String
-    ) -> String? {
-        nonEmptyString(value) ?? nonEmptyString(fallbackFileName)
     }
 
     /// Убирает пробельные символы и превращает пустую строку в отсутствие значения.

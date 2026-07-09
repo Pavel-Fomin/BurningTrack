@@ -657,19 +657,19 @@ private struct LibraryTrackSortAdapter: TrackDisplayable, TrackSortDateProviding
         track.fileName
     }
 
-    /// Для сортировки title SQLite-значение заменяется на fileName, если metadata нет или она пустая.
+    /// Для сортировки title используются только сохранённые metadata без fallback на имя файла.
     var title: String? {
-        Self.nonEmptyString(cachedMetadata?.title) ?? track.fileName
+        Self.nonEmptyString(cachedMetadata?.title)
     }
 
-    /// Для сортировки artist SQLite-значение заменяется на fileName, если metadata нет или она пустая.
+    /// Для сортировки artist используются только сохранённые metadata без fallback на имя файла.
     var artist: String? {
-        Self.nonEmptyString(cachedMetadata?.artist) ?? track.fileName
+        Self.nonEmptyString(cachedMetadata?.artist)
     }
 
-    /// Для сортировки album SQLite-значение заменяется на fileName, если metadata нет или она пустая.
+    /// Для сортировки album используются только сохранённые metadata без fallback на имя файла.
     var trackSortAlbum: String? {
-        Self.nonEmptyString(cachedMetadata?.album) ?? track.fileName
+        Self.nonEmptyString(cachedMetadata?.album)
     }
 
     /// Для сортировки year fallback на fileName не применяется.
@@ -677,19 +677,19 @@ private struct LibraryTrackSortAdapter: TrackDisplayable, TrackSortDateProviding
         cachedMetadata?.year
     }
 
-    /// Для сортировки label SQLite-значение заменяется на fileName, если metadata нет или она пустая.
+    /// Для сортировки label используются только сохранённые metadata без fallback на имя файла.
     var trackSortLabel: String? {
-        Self.nonEmptyString(cachedMetadata?.label) ?? track.fileName
+        Self.nonEmptyString(cachedMetadata?.label)
     }
 
-    /// Для сортировки genre SQLite-значение заменяется на fileName, если metadata нет или она пустая.
+    /// Для сортировки genre используются только сохранённые metadata без fallback на имя файла.
     var trackSortGenre: String? {
-        Self.nonEmptyString(cachedMetadata?.genre) ?? track.fileName
+        Self.nonEmptyString(cachedMetadata?.genre)
     }
 
-    /// Для сортировки comment SQLite-значение заменяется на fileName, если metadata нет или она пустая.
+    /// Для сортировки comment используются только сохранённые metadata без fallback на имя файла.
     var trackSortComment: String? {
-        Self.nonEmptyString(cachedMetadata?.comment) ?? track.fileName
+        Self.nonEmptyString(cachedMetadata?.comment)
     }
 
     var duration: Double {

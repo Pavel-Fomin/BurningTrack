@@ -64,16 +64,6 @@ struct SearchTrackResult: Identifiable, Equatable, TrackDisplayable {
         Self.nonEmpty(title) ?? fileName
     }
 
-    /// Отображаемый артист сохраняет пустое значение явным прочерком.
-    var displayArtist: String {
-        Self.nonEmpty(artist) ?? "—"
-    }
-
-    /// Отображаемый альбом сохраняет пустое значение явным прочерком.
-    var displayAlbum: String {
-        Self.nonEmpty(album) ?? "—"
-    }
-
     /// Поля трека для обычного текстового поиска без контекста папки.
     var searchableValues: [String] {
         [

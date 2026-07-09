@@ -15,24 +15,33 @@ struct SearchResultsSorter {
         _ tracks: [SearchTrackResult],
         using mode: SearchSortMode
     ) -> [SearchTrackResult] {
-        tracks.sorted { lhs, rhs in
-            let primaryComparison = compare(
-                key(for: lhs, mode: mode),
-                key(for: rhs, mode: mode),
-                direction: direction(for: mode)
-            )
+        tracks
+            .enumerated()
+            .sorted { lhs, rhs in
+                let leftKey = key(for: lhs.element, mode: mode)
+                let rightKey = key(for: rhs.element, mode: mode)
+                let primaryComparison = compare(
+                    leftKey,
+                    rightKey,
+                    direction: direction(for: mode)
+                )
 
-            if primaryComparison != .orderedSame {
-                return primaryComparison == .orderedAscending
+                if primaryComparison != .orderedSame {
+                    return primaryComparison == .orderedAscending
+                }
+
+                if mode.isTagSortMode {
+                    return lhs.offset < rhs.offset
+                }
+
+                let fallbackComparison = compareFallback(lhs.element, rhs.element)
+                if fallbackComparison != .orderedSame {
+                    return fallbackComparison == .orderedAscending
+                }
+
+                return lhs.offset < rhs.offset
             }
-
-            let fallbackComparison = compareFallback(lhs, rhs)
-            if fallbackComparison != .orderedSame {
-                return fallbackComparison == .orderedAscending
-            }
-
-            return lhs.id.uuidString < rhs.id.uuidString
-        }
+            .map { $0.element }
     }
 }
 
@@ -106,7 +115,7 @@ private extension SearchResultsSorter {
         }
     }
 
-    /// Стабильный fallback не даёт строкам менять порядок при равных основных значениях.
+    /// Вторичный fallback сохраняет прежнее детерминированное упорядочивание.
     static func compareFallback(
         _ lhs: SearchTrackResult,
         _ rhs: SearchTrackResult
@@ -239,6 +248,34 @@ private enum SearchSortKey {
     case string(String?)
     case number(Int?)
     case date(Date?)
+}
+
+private extension SearchSortMode {
+    /// Признак теговой сортировки нужен, чтобы при равных тегах сохранять исходный порядок.
+    var isTagSortMode: Bool {
+        switch self {
+        case .artistAsc,
+             .artistDesc,
+             .titleAsc,
+             .titleDesc,
+             .albumAsc,
+             .albumDesc,
+             .yearNewest,
+             .yearOldest,
+             .labelAsc,
+             .labelDesc,
+             .genreAsc,
+             .genreDesc,
+             .commentAsc:
+            return true
+
+        case .filenameAsc,
+             .filenameDesc,
+             .dateNewest,
+             .dateOldest:
+            return false
+        }
+    }
 }
 
 // Направление сортировки поиска.
