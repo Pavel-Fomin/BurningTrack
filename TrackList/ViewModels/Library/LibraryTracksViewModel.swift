@@ -2,8 +2,8 @@
 //  LibraryTracksViewModel.swift
 //  TrackList
 //
-//  ViewModel для треков внутри папки
-//  Отвечает за список, выбор и координацию runtime-снимков фонотеки
+//  ViewModel для списка треков фонотеки.
+//  Отвечает за список, выбор и координацию runtime-снимков фонотеки.
 //
 //  Created by Pavel Fomin on 12.12.2025.
 //
@@ -17,7 +17,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
 
     // MARK: - Входные данные
 
-    private let folderId: UUID
+    private let source: LibraryTrackListSource
 
     // MARK: - Состояние списка
 
@@ -41,7 +41,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
     private let runtimeController: LibraryTrackRuntimeController
     /// Даёт текущие настройки отображения, которые влияют на runtime metadata строк.
     private let settingsManager: any SettingsManaging
-    /// Ограничивает новую сортировку только обычным экраном папки фонотеки.
+    /// Разрешает читать и сохранять сортировку в настройках папки.
     private let usesLibrarySortSettings: Bool
     /// SQLite metadata, используемые только как сохранённые ключи сортировки.
     private var cachedMetadataByTrackId: [UUID: TrackCachedMetadata] = [:]
@@ -122,7 +122,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
 
     // MARK: - Инициализация
 
-    init(
+    convenience init(
         folderURL: URL,
         renameActionHandler: TrackFileRenameActionHandler,
         tracksProvider: LibraryTracksProvider = FastLibraryTracksProvider(),
@@ -132,16 +132,38 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         settingsManager: (any SettingsManaging)? = nil,
         usesLibrarySortSettings: Bool = true
     ) {
-        self.folderId = folderURL.libraryFolderId
+        self.init(
+            source: .folder(folderId: folderURL.libraryFolderId),
+            renameActionHandler: renameActionHandler,
+            tracksProvider: tracksProvider,
+            badgeProvider: badgeProvider,
+            eventProvider: eventProvider,
+            runtimeController: runtimeController,
+            settingsManager: settingsManager,
+            usesLibrarySortSettings: usesLibrarySortSettings
+        )
+    }
+
+    init(
+        source: LibraryTrackListSource,
+        renameActionHandler: TrackFileRenameActionHandler,
+        tracksProvider: LibraryTracksProvider = FastLibraryTracksProvider(),
+        badgeProvider: TrackListBadgeProvider = DefaultTrackListBadgeProvider(),
+        eventProvider: LibraryTrackEventProvider = NotificationLibraryTrackEventProvider(),
+        runtimeController: LibraryTrackRuntimeController = LibraryTrackRuntimeController(),
+        settingsManager: (any SettingsManaging)? = nil,
+        usesLibrarySortSettings: Bool = true
+    ) {
         let resolvedSettingsManager = settingsManager ?? AppSettingsManager.shared
 
+        self.source = source
         self.renameActionHandler = renameActionHandler
         self.tracksProvider = tracksProvider
         self.badgeProvider = badgeProvider
         self.eventProvider = eventProvider
         self.runtimeController = runtimeController
         self.settingsManager = resolvedSettingsManager
-        self.usesLibrarySortSettings = usesLibrarySortSettings
+        self.usesLibrarySortSettings = usesLibrarySortSettings && source.canPersistFolderSortMode
         self.sortMode = .fileDateDesc
         self.lastTagReadingEnabled = resolvedSettingsManager.settings.visible.metadata.isTagReadingEnabled
 
@@ -210,7 +232,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
     private func loadInitialTracks() async {
         await loadFolderSortModeIfNeeded()
 
-        let tracks = await tracksProvider.tracks(inFolder: folderId)
+        let tracks = await tracksProvider.tracks(for: source)
         await reloadCachedMetadataIfNeeded(for: tracks)
 
         trackSections = makeTrackSections(from: tracks)
@@ -218,13 +240,16 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
 
     // MARK: - Сортировка
 
-    /// Сохраняет и применяет выбранный режим сортировки треков фонотеки.
+    /// Применяет выбранный режим сортировки и сохраняет его только для папочного источника.
     func setSortMode(_ mode: LibraryTrackSortMode) async {
-        guard usesLibrarySortSettings else { return }
         guard sortMode != mode else { return }
 
         sortMode = mode
-        await TrackRegistry.shared.setLibraryTrackSortMode(mode, forFolderId: folderId)
+        if usesLibrarySortSettings,
+           let folderId = source.folderId {
+            await TrackRegistry.shared.setLibraryTrackSortMode(mode, forFolderId: folderId)
+        }
+
         await reloadCachedMetadataIfNeeded(for: visibleTracks())
         rebuildTrackSectionsFromVisibleTracks()
     }
@@ -260,7 +285,6 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
 
     /// Догружает SQLite metadata только для режимов, которым нужны сохранённые metadata-ключи.
     private func reloadCachedMetadataIfNeeded(for tracks: [LibraryTrack]) async {
-        guard usesLibrarySortSettings else { return }
         guard sortMode.requiresCachedMetadata else { return }
 
         cachedMetadataByTrackId = await TrackRegistry.shared.cachedMetadata(
@@ -270,7 +294,6 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
 
     /// Обновляет SQLite metadata для конкретных треков после tag-событий.
     private func reloadCachedMetadata(for trackIds: [UUID]) async {
-        guard usesLibrarySortSettings else { return }
         guard sortMode.requiresCachedMetadata else { return }
 
         let metadataByTrackId = await TrackRegistry.shared.cachedMetadata(
@@ -291,8 +314,9 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
     private func loadDetailsInBackground() async {
         reloadTrackListBadges()
 
-        await MusicLibraryManager.shared.syncFolderIfNeeded(folderId: folderId)
+        guard let folderId = source.folderId else { return }
 
+        await MusicLibraryManager.shared.syncFolderIfNeeded(folderId: folderId)
         await updateAvailabilityInBackground()
     }
 
@@ -474,6 +498,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
     /// Загружает режим сортировки, сохранённый для текущей папки фонотеки.
     private func loadFolderSortModeIfNeeded() async {
         guard usesLibrarySortSettings else { return }
+        guard let folderId = source.folderId else { return }
         guard didLoadFolderSortMode == false else { return }
 
         didLoadFolderSortMode = true
@@ -532,10 +557,9 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
 
         runtimeController.applyTrackUpdateEvents(events)
 
-        // При перемещении меняется folderId, поэтому точечного обновления строки недостаточно.
-        // Текущая папка должна заново взять состав треков из TrackRegistry.
-        if events.contains(where: { $0.reason == .fileMoved }) {
-            await reloadTracksAfterFileMove()
+        // Перемещение или изменение metadata может поменять состав текущего источника.
+        if eventsAffectCurrentSourceMembership(events) {
+            await reloadTracksAfterSourceMembershipChange()
             return
         }
 
@@ -561,11 +585,25 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         )
     }
 
-    /// Перечитывает состав текущей папки после перемещения трека.
-    /// Это удаляет трек из старой папки и добавляет его в новую, если её ViewModel уже активна.
-    private func reloadTracksAfterFileMove() async {
+    /// Перечитывает состав текущего источника после изменения принадлежности строки.
+    private func reloadTracksAfterSourceMembershipChange() async {
         await loadInitialTracks()
         reloadTrackListBadges()
+    }
+
+    /// Проверяет, нужно ли перечитать весь список из-за изменения принадлежности к источнику.
+    private func eventsAffectCurrentSourceMembership(_ events: [TrackUpdateEvent]) -> Bool {
+        if events.contains(where: { $0.reason == .fileMoved }) {
+            return true
+        }
+
+        guard case .collectionValue(let category, _, _) = source else {
+            return false
+        }
+
+        return events.contains { event in
+            event.changedFields.isDisjoint(with: category.changedFields) == false
+        }
     }
 
     /// Возвращает события, после которых сортировочные metadata-ключи нужно перечитать из SQLite.

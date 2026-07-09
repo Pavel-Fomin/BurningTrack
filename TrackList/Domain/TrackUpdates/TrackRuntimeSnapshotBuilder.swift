@@ -116,7 +116,13 @@ final class TrackRuntimeSnapshotBuilder {
     private func persistMetadata(_ snapshot: TrackRuntimeSnapshot) {
         do {
             let store = try LibraryDatabaseStore()
-            let model = TrackMetadataDatabaseMapper.databaseModel(from: snapshot)
+            var model = TrackMetadataDatabaseMapper.databaseModel(from: snapshot)
+
+            // Runtime reader пока не умеет читать исполнителя альбома, поэтому nil не должен затирать сохранённое SQLite-значение.
+            if model.albumArtist == nil {
+                model.albumArtist = try store.fetchTrackMetadata(trackId: snapshot.trackId)?.albumArtist
+            }
+
             try store.upsertTrackMetadata(model)
         } catch {
             PersistentLogger.log("❌ TrackRuntimeSnapshotBuilder: metadata persist failed \(error)")

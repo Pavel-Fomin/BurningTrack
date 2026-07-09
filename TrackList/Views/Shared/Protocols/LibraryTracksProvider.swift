@@ -9,5 +9,6 @@ import Foundation
 
 
 protocol LibraryTracksProvider {
-    func tracks(inFolder folderId: UUID) async -> [LibraryTrack]
+    /// Возвращает треки для папки, значения раздела коллекции или общего списка фонотеки.
+    func tracks(for source: LibraryTrackListSource) async -> [LibraryTrack]
 }

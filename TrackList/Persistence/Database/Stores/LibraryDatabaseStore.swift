@@ -387,6 +387,7 @@ final class LibraryDatabaseStore {
                 title: model.title,
                 artist: model.artist,
                 album: model.album,
+                albumArtist: model.albumArtist,
                 duration: model.duration,
                 year: model.year,
                 label: model.label,

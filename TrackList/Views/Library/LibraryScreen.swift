@@ -4,7 +4,7 @@
 //
 //  Вкладка “Фонотека”.
 //  Управляет только отображением содержимого фонотеки:
-//  — корневой список папок,
+//  — корневые режимы папок и разделов коллекции,
 //  — содержимое конкретной папки.
 //
 //  Навигация между вкладками → ScenePhaseHandler.
@@ -55,6 +55,8 @@ struct LibraryScreen: View {
     // MARK: - State
 
     @State private var isShowingFolderPicker = false
+    /// Текущий режим корня фонотеки, переключаемый кнопкой в leading toolbar.
+    @State private var rootDisplayMode: LibraryRootDisplayMode = .folders
     /// Конфигурация верхней нижней панели для текущего экрана фонотеки.
     @State private var selectionActionBarConfig: SelectionActionBarConfig?
 
@@ -105,9 +107,19 @@ struct LibraryScreen: View {
                     )
                 }
                 .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button {
+                            rootDisplayMode = rootDisplayMode.toggled
+                        } label: {
+                            Image(systemName: rootDisplayMode.systemImage)
+                        }
+                        .accessibilityLabel(rootDisplayMode.title)
+                    }
+
                     ToolbarItem(placement: .topBarTrailing) {
                         LibraryToolbarMenuButton(
                             state: masterViewModel.screenState,
+                            displayMode: rootDisplayMode,
                             onAction: { action in
                                 actionHandler.handle(action)
                             }
@@ -157,10 +169,17 @@ struct LibraryScreen: View {
 
     @ViewBuilder
     private var rootContent: some View {
-        MusicLibraryView(
-            state: masterViewModel.screenState,
-            onAction: { action in
+        LibraryRootView(
+            folderState: masterViewModel.screenState,
+            displayMode: rootDisplayMode,
+            collectionCategories: LibraryCollectionCategory.allCases,
+            playerViewModel: playerViewModel,
+            selectionActionBarConfig: $selectionActionBarConfig,
+            onFolderAction: { action in
                 actionHandler.handle(action)
+            },
+            onCollectionCategorySelected: { category in
+                viewModel.handle(.collectionCategorySelected(category))
             }
         )
         .onAppear {
@@ -181,6 +200,32 @@ struct LibraryScreen: View {
         case .purchasedITunes:
             PurchasedITunesMusicView(
                 playerViewModel: playerViewModel
+            )
+                .onAppear {
+                    selectionActionBarConfig = nil
+                }
+
+        case .collectionCategory(let category):
+            LibraryCollectionValuesView(
+                viewModel: LibraryCollectionValuesViewModel(category: category),
+                playerViewModel: playerViewModel,
+                onValueSelected: { value in
+                    viewModel.handle(.collectionValueSelected(value))
+                }
+            )
+                .onAppear {
+                    selectionActionBarConfig = nil
+                }
+
+        case .collectionValue(let category, let value, let artistKey):
+            LibraryCollectionTracksView(
+                source: .collectionValue(
+                    category: category,
+                    rawValue: value,
+                    artistKey: artistKey
+                ),
+                playerViewModel: playerViewModel,
+                selectionActionBarConfig: $selectionActionBarConfig
             )
                 .onAppear {
                     selectionActionBarConfig = nil
@@ -212,6 +257,8 @@ struct LibraryScreen: View {
 private struct LibraryToolbarMenuButton: UIViewRepresentable {
     /// Готовое состояние корневого экрана фонотеки.
     let state: LibraryMasterScreenState
+    /// Текущий режим корня определяет набор доступных действий.
+    let displayMode: LibraryRootDisplayMode
     /// Передаёт пользовательские действия обработчику экрана.
     let onAction: (LibraryMasterAction) -> Void
 
@@ -233,14 +280,25 @@ private struct LibraryToolbarMenuButton: UIViewRepresentable {
 
     /// Собирает системное меню, где subtitle и checkmark рисуются UIKit.
     private func makeMenu() -> UIMenu {
-        let menu = UIMenu(
-            children: [
+        let children: [UIMenuElement]
+
+        switch displayMode {
+        case .folders:
+            children = [
                 makeAddFolderAction(),
                 makeSortMenu()
             ]
+        case .tracks:
+            children = [
+                makeAddFolderAction()
+            ]
+        }
+
+        let menu = UIMenu(
+            children: children
         )
 
-        // Разрешает системе показать title и subtitle для пункта "Сортировка".
+        // Разрешает системе показать title и subtitle для пункта "Сортировка" в режиме папок.
         let displayPreferences = UIMenuDisplayPreferences()
         displayPreferences.maximumNumberOfTitleLines = 2
         menu.displayPreferences = displayPreferences

@@ -100,6 +100,26 @@ final class NavigationCoordinator: ObservableObject {
         libraryPath = [.purchasedITunes]
     }
 
+    /// Открытие раздела музыкальной коллекции из корня фонотеки.
+    func openCollectionCategory(_ category: LibraryCollectionCategory) {
+        libraryPath = [.collectionCategory(category)]
+    }
+
+    /// Переход к выбранному значению раздела коллекции.
+    func pushCollectionValue(
+        category: LibraryCollectionCategory,
+        value: String,
+        artistKey: String? = nil
+    ) {
+        libraryPath.append(
+            .collectionValue(
+                category: category,
+                value: value,
+                artistKey: artistKey
+            )
+        )
+    }
+
     /// Переход внутрь папки (вложенный уровень).
     func pushFolder(_ id: UUID) {
         libraryPath.append(.folder(id))
@@ -147,6 +167,10 @@ final class NavigationCoordinator: ObservableObject {
         case root
         /// Виртуальный источник купленных треков iTunes, не связанный с LibraryFolder.
         case purchasedITunes
+        /// Раздел музыкальной коллекции из режима корня "Треки".
+        case collectionCategory(LibraryCollectionCategory)
+        /// Значение раздела коллекции, открывающее список связанных треков.
+        case collectionValue(category: LibraryCollectionCategory, value: String, artistKey: String?)
         case folder(UUID)
     }
 }

@@ -18,7 +18,15 @@ struct LibraryScreenState {
     // MARK: - Destination
 
     func destination(for route: NavigationCoordinator.LibraryRoute) -> LibraryScreenDestinationState {
-        destinations[route] ?? .missingFolder
+        if case .collectionValue(let category, let value, let artistKey) = route {
+            return .collectionValue(
+                category: category,
+                value: value,
+                artistKey: artistKey
+            )
+        }
+
+        return destinations[route] ?? .missingFolder
     }
 }
 
@@ -26,6 +34,10 @@ enum LibraryScreenDestinationState {
     case root
     /// Экран виртуального источника iTunes, который не является папкой фонотеки.
     case purchasedITunes
+    /// Экран значений выбранного раздела музыкальной коллекции.
+    case collectionCategory(LibraryCollectionCategory)
+    /// Экран списка треков по выбранному значению коллекции.
+    case collectionValue(category: LibraryCollectionCategory, value: String, artistKey: String?)
     case folder(LibraryScreenFolderDestinationState)
     case missingFolder
 }

@@ -11,6 +11,8 @@ import Foundation
 
 enum LibraryScreenAction {
     case appeared
+    case collectionCategorySelected(LibraryCollectionCategory)
+    case collectionValueSelected(LibraryCollectionValue)
     case libraryPathChanged([NavigationCoordinator.LibraryRoute])
     case revealHandled(UUID)
     case folderMissingAppeared

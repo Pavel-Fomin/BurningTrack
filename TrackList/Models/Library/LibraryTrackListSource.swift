@@ -1,0 +1,68 @@
+//
+//  LibraryTrackListSource.swift
+//  TrackList
+//
+//  Источник списка треков фонотеки.
+//
+//  Created by Pavel Fomin on 04.07.2026.
+//
+
+import Foundation
+
+// Описывает, откуда загружать строки общего списка треков фонотеки.
+enum LibraryTrackListSource: Hashable, Identifiable {
+    /// Обычная папка фонотеки.
+    case folder(folderId: UUID)
+    /// Все треки фонотеки из режима корня "Треки".
+    case allLibraryTracks
+    /// Значение раздела коллекции, выбранное в режиме корня "Треки".
+    case collectionValue(category: LibraryCollectionCategory, rawValue: String, artistKey: String?)
+
+    /// Стабильный идентификатор источника для SwiftUI и отладочной диагностики.
+    var id: String {
+        switch self {
+        case .folder(let folderId):
+            return "folder:\(folderId.uuidString)"
+        case .allLibraryTracks:
+            return "library:all-tracks"
+        case .collectionValue(let category, let rawValue, let artistKey):
+            let normalizedValue = category.normalizedMetadataKey(for: rawValue)
+            let normalizedArtist = artistKey.map { category.normalizedMetadataKey(for: $0) } ?? "none"
+            return "collection:\(category.rawValue):\(normalizedValue):artist:\(normalizedArtist)"
+        }
+    }
+
+    /// Заголовок экрана, если источник сам владеет отображаемым названием.
+    var navigationTitle: String? {
+        switch self {
+        case .folder:
+            return nil
+        case .allLibraryTracks:
+            return "Все треки"
+        case .collectionValue(_, let rawValue, _):
+            return rawValue
+        }
+    }
+
+    /// Идентификатор папки, если источник связан с папочной веткой фонотеки.
+    var folderId: UUID? {
+        switch self {
+        case .folder(let folderId):
+            return folderId
+        case .allLibraryTracks,
+             .collectionValue:
+            return nil
+        }
+    }
+
+    /// Можно ли читать и сохранять режим сортировки как настройку конкретной папки.
+    var canPersistFolderSortMode: Bool {
+        switch self {
+        case .folder:
+            return true
+        case .allLibraryTracks,
+             .collectionValue:
+            return false
+        }
+    }
+}

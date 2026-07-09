@@ -15,6 +15,8 @@ struct TrackCachedMetadata: Equatable, Identifiable {
     let title: String?
     let artist: String?
     let album: String?
+    /// Исполнитель альбома, если он сохранён в SQLite metadata.
+    let albumArtist: String?
     let duration: Double?
     let year: Int?
     let label: String?

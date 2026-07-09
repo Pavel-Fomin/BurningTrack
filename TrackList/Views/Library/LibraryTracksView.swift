@@ -472,7 +472,7 @@ struct LibraryTracksView: View {
 }
 
 /// Нативная кнопка toolbar-меню с subtitle выбранной сортировки, как в треклистах и папках.
-private struct LibraryTracksToolbarMenuButton: UIViewRepresentable {
+struct LibraryTracksToolbarMenuButton: UIViewRepresentable {
     /// Текущий режим сортировки треков в открытой папке.
     let selectedSortMode: LibraryTrackSortMode
     /// Запускает режим выбора.
@@ -481,13 +481,15 @@ private struct LibraryTracksToolbarMenuButton: UIViewRepresentable {
     let onSortModeSelection: (LibraryTrackSortMode) -> Void
     /// Передаёт выбранное batch-действие во View.
     let onBatchActionSelection: (BulkTrackAction) -> Void
+    /// Accessibility label для кнопки действий текущего списка.
+    let accessibilityLabel: String = "Действия папки фонотеки"
 
     func makeUIView(context: Context) -> UIButton {
         let button = UIButton(type: .system)
         button.setImage(UIImage(systemName: "ellipsis"), for: .normal)
         button.showsMenuAsPrimaryAction = true
         button.changesSelectionAsPrimaryAction = false
-        button.accessibilityLabel = "Действия папки фонотеки"
+        button.accessibilityLabel = accessibilityLabel
         button.setContentHuggingPriority(.required, for: .horizontal)
         button.setContentCompressionResistancePriority(.required, for: .horizontal)
         button.menu = makeMenu()

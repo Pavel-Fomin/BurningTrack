@@ -10,7 +10,19 @@ import Foundation
 
 final class DefaultLibraryTracksProvider: LibraryTracksProvider {
 
-    func tracks(inFolder folderId: UUID) async -> [LibraryTrack] {
+    func tracks(for source: LibraryTrackListSource) async -> [LibraryTrack] {
+        switch source {
+        case .folder(let folderId):
+            return await tracks(inFolder: folderId)
+        case .allLibraryTracks,
+             .collectionValue:
+            // Для непапочных источников используем быстрый SQLite-only путь без чтения файлов.
+            return await FastLibraryTracksProvider().tracks(for: source)
+        }
+    }
+
+    /// Возвращает треки папки старым способом с восстановлением bookmark.
+    private func tracks(inFolder folderId: UUID) async -> [LibraryTrack] {
 
         let entries = await TrackRegistry.shared.tracks(inFolder: folderId)
         var result: [LibraryTrack] = []

@@ -38,6 +38,14 @@ final class LibraryScreenActionHandler {
         switch action {
         case .appeared:
             handlePendingShowTrack()
+        case .collectionCategorySelected(let category):
+            navigationCoordinator.openCollectionCategory(category)
+        case .collectionValueSelected(let value):
+            navigationCoordinator.pushCollectionValue(
+                category: value.category,
+                value: value.rawValue,
+                artistKey: value.category == .albums ? value.artist : nil
+            )
         case .libraryPathChanged(let libraryPath):
             navigationCoordinator.libraryPath = libraryPath
         case .revealHandled(let requestId):

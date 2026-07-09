@@ -22,6 +22,11 @@ struct LibraryScreenStateBuilder {
             .purchasedITunes: .purchasedITunes
         ]
 
+        for category in LibraryCollectionCategory.allCases {
+            // Разделы коллекции открывают свои экраны значений через общую маршрутизацию.
+            destinations[.collectionCategory(category)] = .collectionCategory(category)
+        }
+
         for folder in musicLibraryManager.attachedFolders {
             appendDestination(
                 for: folder,
