@@ -34,6 +34,8 @@ enum LibraryScreenDestinationState {
     case root
     /// Экран виртуального источника iTunes, который не является папкой фонотеки.
     case purchasedITunes
+    /// Экран полного списка треков фонотеки из режима корня "Треки".
+    case allLibraryTracks
     /// Экран значений выбранного раздела музыкальной коллекции.
     case collectionCategory(LibraryCollectionCategory)
     /// Экран списка треков по выбранному значению коллекции.

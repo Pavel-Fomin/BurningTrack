@@ -100,6 +100,11 @@ final class NavigationCoordinator: ObservableObject {
         libraryPath = [.purchasedITunes]
     }
 
+    /// Открывает полный список треков фонотеки.
+    func openAllLibraryTracks() {
+        libraryPath = [.allLibraryTracks]
+    }
+
     /// Открытие раздела музыкальной коллекции из корня фонотеки.
     func openCollectionCategory(_ category: LibraryCollectionCategory) {
         libraryPath = [.collectionCategory(category)]
@@ -167,6 +172,8 @@ final class NavigationCoordinator: ObservableObject {
         case root
         /// Виртуальный источник купленных треков iTunes, не связанный с LibraryFolder.
         case purchasedITunes
+        /// Полный список треков фонотеки из режима корня "Треки".
+        case allLibraryTracks
         /// Раздел музыкальной коллекции из режима корня "Треки".
         case collectionCategory(LibraryCollectionCategory)
         /// Значение раздела коллекции, открывающее список связанных треков.

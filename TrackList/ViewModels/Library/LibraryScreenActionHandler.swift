@@ -38,8 +38,8 @@ final class LibraryScreenActionHandler {
         switch action {
         case .appeared:
             handlePendingShowTrack()
-        case .collectionCategorySelected(let category):
-            navigationCoordinator.openCollectionCategory(category)
+        case .collectionRootItemSelected(let item):
+            handleCollectionRootItemSelected(item)
         case .collectionValueSelected(let value):
             navigationCoordinator.pushCollectionValue(
                 category: value.category,
@@ -56,6 +56,16 @@ final class LibraryScreenActionHandler {
     }
 
     // MARK: - Private
+
+    /// Открывает маршрут, соответствующий выбранной строке корня режима "Треки".
+    private func handleCollectionRootItemSelected(_ item: LibraryCollectionRootItem) {
+        switch item {
+        case .allTracks:
+            navigationCoordinator.openAllLibraryTracks()
+        case .category(let category):
+            navigationCoordinator.openCollectionCategory(category)
+        }
+    }
 
     private func handlePendingShowTrack() {
         guard let trackId = navigationCoordinator.consumePendingShowTrackId() else { return }

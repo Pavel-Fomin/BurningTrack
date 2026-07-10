@@ -38,7 +38,7 @@ enum LibraryTrackListSource: Hashable, Identifiable {
         case .folder:
             return nil
         case .allLibraryTracks:
-            return "Все треки"
+            return "Треки"
         case .collectionValue(_, let rawValue, _):
             return rawValue
         }

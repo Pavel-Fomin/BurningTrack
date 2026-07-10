@@ -11,7 +11,8 @@ import Foundation
 
 enum LibraryScreenAction {
     case appeared
-    case collectionCategorySelected(LibraryCollectionCategory)
+    // Обрабатывает выбор строки корневого экрана режима "Треки".
+    case collectionRootItemSelected(LibraryCollectionRootItem)
     case collectionValueSelected(LibraryCollectionValue)
     case libraryPathChanged([NavigationCoordinator.LibraryRoute])
     case revealHandled(UUID)

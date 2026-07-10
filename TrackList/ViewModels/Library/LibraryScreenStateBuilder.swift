@@ -19,7 +19,9 @@ struct LibraryScreenStateBuilder {
         var destinations: [NavigationCoordinator.LibraryRoute: LibraryScreenDestinationState] = [
             .root: .root,
             // Виртуальный источник всегда доступен в корне и не зависит от списка папок.
-            .purchasedITunes: .purchasedITunes
+            .purchasedITunes: .purchasedITunes,
+            // Полный список треков всегда доступен в корне режима "Треки".
+            .allLibraryTracks: .allLibraryTracks
         ]
 
         for category in LibraryCollectionCategory.allCases {

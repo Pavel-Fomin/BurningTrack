@@ -16,16 +16,12 @@ struct LibraryRootView: View {
     let folderState: LibraryMasterScreenState
     /// Выбранный режим корня фонотеки, которым владеет контейнер с toolbar.
     let displayMode: LibraryRootDisplayMode
-    /// Разделы музыкальной коллекции для режима "Треки".
-    let collectionCategories: [LibraryCollectionCategory]
-    /// ViewModel плеера нужна только режиму "Треки" для строк общего списка.
-    @ObservedObject var playerViewModel: PlayerViewModel
-    /// Конфигурация нижней панели массового выбора в общем host фонотеки.
-    @Binding var selectionActionBarConfig: SelectionActionBarConfig?
+    /// Строки корневого списка режима "Треки" в явном порядке.
+    let collectionRootItems: [LibraryCollectionRootItem]
     /// Передаёт действия режима папок в существующий обработчик.
     let onFolderAction: (LibraryMasterAction) -> Void
-    /// Передаёт выбор раздела коллекции в контейнер фонотеки.
-    let onCollectionCategorySelected: (LibraryCollectionCategory) -> Void
+    /// Передаёт выбор строки режима "Треки" в контейнер фонотеки.
+    let onCollectionRootItemSelected: (LibraryCollectionRootItem) -> Void
 
     // MARK: - UI
 
@@ -45,10 +41,8 @@ struct LibraryRootView: View {
 
         case .tracks:
             LibraryTracksRootView(
-                categories: collectionCategories,
-                playerViewModel: playerViewModel,
-                selectionActionBarConfig: $selectionActionBarConfig,
-                onCategorySelected: onCollectionCategorySelected
+                rootItems: collectionRootItems,
+                onRootItemSelected: onCollectionRootItemSelected
             )
         }
     }

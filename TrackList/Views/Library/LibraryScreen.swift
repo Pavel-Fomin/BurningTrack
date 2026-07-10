@@ -172,14 +172,12 @@ struct LibraryScreen: View {
         LibraryRootView(
             folderState: masterViewModel.screenState,
             displayMode: rootDisplayMode,
-            collectionCategories: LibraryCollectionCategory.allCases,
-            playerViewModel: playerViewModel,
-            selectionActionBarConfig: $selectionActionBarConfig,
+            collectionRootItems: LibraryCollectionRootItem.rootItems,
             onFolderAction: { action in
                 actionHandler.handle(action)
             },
-            onCollectionCategorySelected: { category in
-                viewModel.handle(.collectionCategorySelected(category))
+            onCollectionRootItemSelected: { item in
+                viewModel.handle(.collectionRootItemSelected(item))
             }
         )
         .onAppear {
@@ -200,6 +198,16 @@ struct LibraryScreen: View {
         case .purchasedITunes:
             PurchasedITunesMusicView(
                 playerViewModel: playerViewModel
+            )
+                .onAppear {
+                    selectionActionBarConfig = nil
+                }
+
+        case .allLibraryTracks:
+            LibraryCollectionTracksView(
+                source: .allLibraryTracks,
+                playerViewModel: playerViewModel,
+                selectionActionBarConfig: $selectionActionBarConfig
             )
                 .onAppear {
                     selectionActionBarConfig = nil
