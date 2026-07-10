@@ -139,3 +139,48 @@ enum LibraryCollectionCategory: String, CaseIterable, Hashable, Identifiable {
         return value
     }
 }
+
+extension LibraryCollectionCategory {
+    /// Режимы сортировки, доступные для значений текущего раздела.
+    var availableValueSortModes: [LibraryCollectionValueSortMode] {
+        switch self {
+        case .artists, .genres, .labels:
+            return [
+                .titleAscending,
+                .titleDescending
+            ]
+        case .albums:
+            return [
+                .titleAscending,
+                .titleDescending,
+                .yearNewestFirst,
+                .yearOldestFirst,
+                .artistAscending,
+                .artistDescending
+            ]
+        case .years:
+            return [
+                .yearNewestFirst,
+                .yearOldestFirst
+            ]
+        }
+    }
+
+    /// Группы меню в порядке, который задан доступными режимами текущего раздела.
+    var availableValueSortMenuGroups: [LibraryCollectionValueSortMode.MenuGroup] {
+        availableValueSortModes.reduce(into: []) { groups, mode in
+            guard groups.contains(mode.menuGroup) == false else { return }
+            groups.append(mode.menuGroup)
+        }
+    }
+
+    /// Начальный режим сортировки значений текущего раздела.
+    var defaultValueSortMode: LibraryCollectionValueSortMode {
+        switch self {
+        case .years:
+            return .yearNewestFirst
+        case .artists, .albums, .genres, .labels:
+            return .titleAscending
+        }
+    }
+}

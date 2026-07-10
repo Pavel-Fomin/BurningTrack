@@ -29,6 +29,8 @@ final class LibraryCollectionValuesViewModel: ObservableObject {
 
     /// Готовое состояние экрана для SwiftUI.
     @Published private(set) var state: LibraryCollectionValuesScreenState
+    /// Текущий режим сортировки значений в рамках жизненного цикла экрана.
+    @Published private(set) var sortMode: LibraryCollectionValueSortMode
 
     // MARK: - Dependencies
 
@@ -38,6 +40,8 @@ final class LibraryCollectionValuesViewModel: ObservableObject {
     // MARK: - Private
 
     private var didLoad = false
+    /// Исходные значения после чтения provider, чтобы менять порядок без повторного чтения SQLite.
+    private var loadedValues: [LibraryCollectionValue] = []
 
     // MARK: - Init
 
@@ -52,6 +56,7 @@ final class LibraryCollectionValuesViewModel: ObservableObject {
             isLoading: true,
             values: []
         )
+        self.sortMode = category.defaultValueSortMode
     }
 
     // MARK: - Actions
@@ -70,10 +75,31 @@ final class LibraryCollectionValuesViewModel: ObservableObject {
         let values = await provider.values(for: category)
         guard Task.isCancelled == false else { return }
 
+        loadedValues = values
         state = LibraryCollectionValuesScreenState(
             category: category,
             isLoading: false,
-            values: values
+            values: sortedValues()
         )
+    }
+
+    /// Меняет сортировку уже загруженных значений без повторного обращения к provider.
+    func setSortMode(_ mode: LibraryCollectionValueSortMode) {
+        guard category.availableValueSortModes.contains(mode) else { return }
+        guard sortMode != mode else { return }
+
+        sortMode = mode
+        state = LibraryCollectionValuesScreenState(
+            category: category,
+            isLoading: state.isLoading,
+            values: sortedValues()
+        )
+    }
+
+    // MARK: - Private
+
+    /// Сортирует только сохранённый в памяти результат provider.
+    private func sortedValues() -> [LibraryCollectionValue] {
+        LibraryCollectionValueSorter.sort(loadedValues, mode: sortMode)
     }
 }

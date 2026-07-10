@@ -145,6 +145,7 @@ struct LibraryCollectionTracksView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 LibraryTracksToolbarMenuButton(
                     selectedSortMode: tracksViewModel.sortMode,
+                    availableSortModes: source.availableTrackSortModes,
                     onSelect: handleTapSelect,
                     onSortModeSelection: handleSortModeSelection,
                     onBatchActionSelection: handleBatchActionSelection

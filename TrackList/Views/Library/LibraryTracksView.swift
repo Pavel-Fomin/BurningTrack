@@ -174,6 +174,7 @@ struct LibraryTracksView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 LibraryTracksToolbarMenuButton(
                     selectedSortMode: tracksViewModel.sortMode,
+                    availableSortModes: LibraryTrackSortMode.allCases,
                     onSelect: handleTapSelect,
                     onSortModeSelection: handleSortModeSelection,
                     onBatchActionSelection: handleBatchActionSelection
@@ -475,6 +476,8 @@ struct LibraryTracksView: View {
 struct LibraryTracksToolbarMenuButton: UIViewRepresentable {
     /// Текущий режим сортировки треков в открытой папке.
     let selectedSortMode: LibraryTrackSortMode
+    /// Режимы сортировки, доступные для текущего списка.
+    let availableSortModes: [LibraryTrackSortMode]
     /// Запускает режим выбора.
     let onSelect: () -> Void
     /// Передаёт выбранный режим сортировки во View.
@@ -521,68 +524,71 @@ struct LibraryTracksToolbarMenuButton: UIViewRepresentable {
 
     /// Собирает вложенное меню сортировки с системной подписью выбранного режима.
     private func makeSortMenu() -> UIMenu {
+        // Каждый пункт добавляется только при наличии хотя бы одного разрешённого направления.
+        let children: [UIMenuElement] = [
+            makeDirectionalSortMenu(
+                title: "Артист",
+                firstTitle: "От А до Я",
+                firstMode: .artistAsc,
+                secondTitle: "От Я до А",
+                secondMode: .artistDesc
+            ),
+            makeDirectionalSortMenu(
+                title: "Название",
+                firstTitle: "От А до Я",
+                firstMode: .titleAsc,
+                secondTitle: "От Я до А",
+                secondMode: .titleDesc
+            ),
+            makeDirectionalSortMenu(
+                title: "Альбом",
+                firstTitle: "От А до Я",
+                firstMode: .albumAsc,
+                secondTitle: "От Я до А",
+                secondMode: .albumDesc
+            ),
+            makeDirectionalSortMenu(
+                title: "Год",
+                firstTitle: "Сначала новые",
+                firstMode: .yearDesc,
+                secondTitle: "Сначала старые",
+                secondMode: .yearAsc
+            ),
+            makeDirectionalSortMenu(
+                title: "Лейбл",
+                firstTitle: "От А до Я",
+                firstMode: .labelAsc,
+                secondTitle: "От Я до А",
+                secondMode: .labelDesc
+            ),
+            makeDirectionalSortMenu(
+                title: "Жанр",
+                firstTitle: "От А до Я",
+                firstMode: .genreAsc,
+                secondTitle: "От Я до А",
+                secondMode: .genreDesc
+            ),
+            makeSortAction(title: "Комментарий", mode: .commentAsc),
+            makeDirectionalSortMenu(
+                title: "Название файла",
+                firstTitle: "От А до Я",
+                firstMode: .fileNameAsc,
+                secondTitle: "От Я до А",
+                secondMode: .fileNameDesc
+            ),
+            makeDirectionalSortMenu(
+                title: "Дата",
+                firstTitle: "Сначала новые",
+                firstMode: .fileDateDesc,
+                secondTitle: "Сначала старые",
+                secondMode: .fileDateAsc
+            )
+        ].compactMap { $0 }
+
         let menu = UIMenu(
             title: "Сортировка",
             image: UIImage(systemName: "arrow.up.arrow.down"),
-            children: [
-                makeDirectionalSortMenu(
-                    title: "Артист",
-                    firstTitle: "От А до Я",
-                    firstMode: .artistAsc,
-                    secondTitle: "От Я до А",
-                    secondMode: .artistDesc
-                ),
-                makeDirectionalSortMenu(
-                    title: "Название",
-                    firstTitle: "От А до Я",
-                    firstMode: .titleAsc,
-                    secondTitle: "От Я до А",
-                    secondMode: .titleDesc
-                ),
-                makeDirectionalSortMenu(
-                    title: "Альбом",
-                    firstTitle: "От А до Я",
-                    firstMode: .albumAsc,
-                    secondTitle: "От Я до А",
-                    secondMode: .albumDesc
-                ),
-                makeDirectionalSortMenu(
-                    title: "Год",
-                    firstTitle: "Сначала новые",
-                    firstMode: .yearDesc,
-                    secondTitle: "Сначала старые",
-                    secondMode: .yearAsc
-                ),
-                makeDirectionalSortMenu(
-                    title: "Лейбл",
-                    firstTitle: "От А до Я",
-                    firstMode: .labelAsc,
-                    secondTitle: "От Я до А",
-                    secondMode: .labelDesc
-                ),
-                makeDirectionalSortMenu(
-                    title: "Жанр",
-                    firstTitle: "От А до Я",
-                    firstMode: .genreAsc,
-                    secondTitle: "От Я до А",
-                    secondMode: .genreDesc
-                ),
-                makeSortAction(title: "Комментарий", mode: .commentAsc),
-                makeDirectionalSortMenu(
-                    title: "Название файла",
-                    firstTitle: "От А до Я",
-                    firstMode: .fileNameAsc,
-                    secondTitle: "От Я до А",
-                    secondMode: .fileNameDesc
-                ),
-                makeDirectionalSortMenu(
-                    title: "Дата",
-                    firstTitle: "Сначала новые",
-                    firstMode: .fileDateDesc,
-                    secondTitle: "Сначала старые",
-                    secondMode: .fileDateAsc
-                )
-            ]
+            children: children
         )
         menu.subtitle = selectedSortMode.title
         return menu
@@ -595,14 +601,19 @@ struct LibraryTracksToolbarMenuButton: UIViewRepresentable {
         firstMode: LibraryTrackSortMode,
         secondTitle: String,
         secondMode: LibraryTrackSortMode
-    ) -> UIMenu {
-        UIMenu(
+    ) -> UIMenu? {
+        let modes = [firstMode, secondMode].filter { availableSortModes.contains($0) }
+        guard modes.isEmpty == false else { return nil }
+
+        return UIMenu(
             title: title,
             options: .singleSelection,
-            children: [
-                makeSortAction(title: firstTitle, mode: firstMode),
-                makeSortAction(title: secondTitle, mode: secondMode)
-            ]
+            children: modes.map { mode in
+                makeSortAction(
+                    title: mode == firstMode ? firstTitle : secondTitle,
+                    mode: mode
+                )
+            }
         )
     }
 

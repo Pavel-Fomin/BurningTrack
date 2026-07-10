@@ -41,9 +41,68 @@ struct LibraryCollectionValuesView: View {
         content
             .navigationTitle(viewModel.state.category.navigationTitle)
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    valueSortMenu
+                }
+            }
             .task {
                 await viewModel.load()
             }
+    }
+
+    /// Меню сортировки значений повторяет паттерн сортировки поиска; вложенные группы нужны только альбомам.
+    private var valueSortMenu: some View {
+        let category = viewModel.state.category
+
+        return Menu {
+            ForEach(category.availableValueSortMenuGroups) { group in
+                sortMenuGroup(group, category: category)
+            }
+        } label: {
+            Image(systemName: "arrow.up.arrow.down")
+        }
+        .accessibilityLabel("Сортировка значений коллекции")
+    }
+
+    /// Строит группу меню из тех режимов, которые разрешены для выбранного раздела.
+    @ViewBuilder
+    private func sortMenuGroup(
+        _ group: LibraryCollectionValueSortMode.MenuGroup,
+        category: LibraryCollectionCategory
+    ) -> some View {
+        let modes = category.availableValueSortModes.filter { $0.menuGroup == group }
+
+        if category != .albums {
+            ForEach(modes) { mode in
+                valueSortButton(mode)
+            }
+        } else {
+            Menu {
+                ForEach(modes) { mode in
+                    valueSortButton(mode)
+                }
+            } label: {
+                Text(group.title)
+            }
+        }
+    }
+
+    /// Передаёт выбранный режим во ViewModel и показывает checkmark у активного пункта.
+    private func valueSortButton(
+        _ mode: LibraryCollectionValueSortMode
+    ) -> some View {
+        Button {
+            viewModel.setSortMode(mode)
+        } label: {
+            Label {
+                Text(mode.menuTitle)
+            } icon: {
+                if viewModel.sortMode == mode {
+                    Image(systemName: "checkmark")
+                }
+            }
+        }
     }
 
     @ViewBuilder

@@ -44,6 +44,47 @@ enum LibraryTrackListSource: Hashable, Identifiable {
         }
     }
 
+    /// Раздел коллекции, если источник открыт из артиста, альбома, жанра, лейбла или года.
+    var collectionCategory: LibraryCollectionCategory? {
+        switch self {
+        case let .collectionValue(category, _, _):
+            return category
+        case .folder,
+             .allLibraryTracks:
+            return nil
+        }
+    }
+
+    /// Режимы сортировки треков, доступные для текущего источника списка.
+    var availableTrackSortModes: [LibraryTrackSortMode] {
+        guard let collectionCategory else {
+            return LibraryTrackSortMode.allCases
+        }
+
+        switch collectionCategory {
+        case .artists:
+            return LibraryTrackSortMode.allCases.filter {
+                $0 != .artistAsc && $0 != .artistDesc
+            }
+        case .albums:
+            return LibraryTrackSortMode.allCases.filter {
+                $0 != .albumAsc && $0 != .albumDesc
+            }
+        case .genres:
+            return LibraryTrackSortMode.allCases.filter {
+                $0 != .genreAsc && $0 != .genreDesc
+            }
+        case .labels:
+            return LibraryTrackSortMode.allCases.filter {
+                $0 != .labelAsc && $0 != .labelDesc
+            }
+        case .years:
+            return LibraryTrackSortMode.allCases.filter {
+                $0 != .yearDesc && $0 != .yearAsc
+            }
+        }
+    }
+
     /// Идентификатор папки, если источник связан с папочной веткой фонотеки.
     var folderId: UUID? {
         switch self {

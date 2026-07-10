@@ -18,6 +18,8 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
     // MARK: - Входные данные
 
     private let source: LibraryTrackListSource
+    /// Режимы сортировки, разрешённые для текущего типизированного источника.
+    private let availableSortModes: [LibraryTrackSortMode]
 
     // MARK: - Состояние списка
 
@@ -156,7 +158,10 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
     ) {
         let resolvedSettingsManager = settingsManager ?? AppSettingsManager.shared
 
+        let availableSortModes = source.availableTrackSortModes
+
         self.source = source
+        self.availableSortModes = availableSortModes
         self.renameActionHandler = renameActionHandler
         self.tracksProvider = tracksProvider
         self.badgeProvider = badgeProvider
@@ -164,7 +169,10 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         self.runtimeController = runtimeController
         self.settingsManager = resolvedSettingsManager
         self.usesLibrarySortSettings = usesLibrarySortSettings && source.canPersistFolderSortMode
-        self.sortMode = .fileDateDesc
+        self.sortMode = Self.resolvedSortMode(
+            .fileDateDesc,
+            availableSortModes: availableSortModes
+        )
         self.lastTagReadingEnabled = resolvedSettingsManager.settings.visible.metadata.isTagReadingEnabled
 
         bindRuntimeController()
@@ -242,6 +250,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
 
     /// Применяет выбранный режим сортировки и сохраняет его только для папочного источника.
     func setSortMode(_ mode: LibraryTrackSortMode) async {
+        guard availableSortModes.contains(mode) else { return }
         guard sortMode != mode else { return }
 
         sortMode = mode
@@ -502,7 +511,24 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         guard didLoadFolderSortMode == false else { return }
 
         didLoadFolderSortMode = true
-        sortMode = await TrackRegistry.shared.libraryTrackSortMode(forFolderId: folderId)
+        let requestedMode = await TrackRegistry.shared.libraryTrackSortMode(forFolderId: folderId)
+        sortMode = Self.resolvedSortMode(
+            requestedMode,
+            availableSortModes: availableSortModes
+        )
+    }
+
+    /// Возвращает доступный режим сортировки или безопасный режим по умолчанию.
+    private static func resolvedSortMode(
+        _ requestedMode: LibraryTrackSortMode,
+        availableSortModes: [LibraryTrackSortMode]
+    ) -> LibraryTrackSortMode {
+        if availableSortModes.contains(requestedMode) {
+            return requestedMode
+        }
+
+        // Недоступный режим не должен оставаться активным и скрытым от пользователя.
+        return .titleAsc
     }
 
     /// Применяет массовое переименование файлов через batch rename handler.

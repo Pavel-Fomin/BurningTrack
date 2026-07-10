@@ -76,14 +76,6 @@ final class DefaultLibraryCollectionValuesProvider: LibraryCollectionValuesProvi
                     trackIds: bucket.trackIds
                 )
             }
-            .sorted { left, right in
-                let titleOrder = left.title.localizedStandardCompare(right.title)
-                if titleOrder != .orderedSame {
-                    return titleOrder == .orderedAscending
-                }
-
-                return (left.artist ?? "").localizedStandardCompare(right.artist ?? "") == .orderedAscending
-            }
     }
 
     // MARK: - Private
