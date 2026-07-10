@@ -17,7 +17,7 @@ struct LibraryRootView: View {
     /// Выбранный режим корня фонотеки, которым владеет контейнер с toolbar.
     let displayMode: LibraryRootDisplayMode
     /// Строки корневого списка режима "Треки" в явном порядке.
-    let collectionRootItems: [LibraryCollectionRootItem]
+    let collectionRootItems: [LibraryCollectionRootItemState]
     /// Передаёт действия режима папок в существующий обработчик.
     let onFolderAction: (LibraryMasterAction) -> Void
     /// Передаёт выбор строки режима "Треки" в контейнер фонотеки.

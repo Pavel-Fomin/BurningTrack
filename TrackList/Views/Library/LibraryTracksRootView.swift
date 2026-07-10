@@ -13,26 +13,33 @@ struct LibraryTracksRootView: View {
     // MARK: - Входные данные
 
     /// Строки корневого списка в явном порядке.
-    let rootItems: [LibraryCollectionRootItem]
+    let rootItems: [LibraryCollectionRootItemState]
     /// Передаёт выбор строки корневого списка контейнеру фонотеки.
     let onRootItemSelected: (LibraryCollectionRootItem) -> Void
 
     // MARK: - UI
 
     var body: some View {
-        List(rootItems) { item in
+        List(rootItems) { itemState in
             Button {
-                onRootItemSelected(item)
+                onRootItemSelected(itemState.item)
             } label: {
                 HStack(spacing: 12) {
-                    Image(systemName: item.systemImage)
+                    Image(systemName: itemState.item.systemImage)
                         .foregroundColor(.blue)
                         .frame(width: 24)
 
-                    Text(item.title)
+                    Text(itemState.item.title)
                         .lineLimit(1)
 
                     Spacer()
+
+                    // Ноль является готовым значением и отображается наравне с остальными числами.
+                    if let count = itemState.count {
+                        Text("\(count)")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
 
                     Image(systemName: "chevron.right")
                         .font(.footnote)
@@ -43,11 +50,11 @@ struct LibraryTracksRootView: View {
             }
             .buttonStyle(.plain)
             .listRowSeparator(
-                item.id == rootItems.first?.id ? .hidden : .automatic,
+                itemState.id == rootItems.first?.id ? .hidden : .automatic,
                 edges: .top
             )
             .listRowSeparator(
-                item.id == rootItems.last?.id ? .hidden : .automatic,
+                itemState.id == rootItems.last?.id ? .hidden : .automatic,
                 edges: .bottom
             )
         }

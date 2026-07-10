@@ -157,7 +157,7 @@ struct LibraryCollectionValuesView: View {
         }
     }
 
-    /// Строит строку значения с количеством треков и переходом к списку треков.
+    /// Строит строку значения с переходом к списку треков.
     private func valueRow(_ value: LibraryCollectionValue) -> some View {
         Button {
             onValueSelected(value)
@@ -167,12 +167,6 @@ struct LibraryCollectionValuesView: View {
                     .lineLimit(1)
 
                 Spacer()
-
-                if value.tracksCount > 0 {
-                    Text("\(value.tracksCount)")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
 
                 Image(systemName: "chevron.right")
                     .font(.footnote)

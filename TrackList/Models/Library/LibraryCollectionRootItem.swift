@@ -56,3 +56,17 @@ enum LibraryCollectionRootItem: Identifiable, Hashable {
         }
     }
 }
+
+/// Готовое состояние строки корневого экрана режима "Треки".
+/// Nil означает, что счётчик ещё не загружен, а не отсутствие значения.
+struct LibraryCollectionRootItemState: Identifiable, Equatable {
+    /// Описание строки и действие, которое она открывает.
+    let item: LibraryCollectionRootItem
+    /// Количество строк, которые пользователь увидит после перехода.
+    let count: Int?
+
+    /// Стабильный идентификатор строки для SwiftUI-списка.
+    var id: String {
+        item.id
+    }
+}

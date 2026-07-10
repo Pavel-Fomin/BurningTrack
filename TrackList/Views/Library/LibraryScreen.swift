@@ -146,6 +146,11 @@ struct LibraryScreen: View {
         .onAppear {
             viewModel.handle(.appeared)
         }
+        .onChange(of: rootDisplayMode) { _, newMode in
+            // Перечитываем корень именно в момент перехода в режим "Треки".
+            guard newMode == .tracks else { return }
+            viewModel.refreshCollectionRootItems()
+        }
         // Выбор папки
         .fileImporter(
             isPresented: $isShowingFolderPicker,
@@ -172,7 +177,7 @@ struct LibraryScreen: View {
         LibraryRootView(
             folderState: masterViewModel.screenState,
             displayMode: rootDisplayMode,
-            collectionRootItems: LibraryCollectionRootItem.rootItems,
+            collectionRootItems: viewModel.collectionRootItems,
             onFolderAction: { action in
                 actionHandler.handle(action)
             },
@@ -182,6 +187,9 @@ struct LibraryScreen: View {
         )
         .onAppear {
             selectionActionBarConfig = nil
+            if rootDisplayMode == .tracks {
+                viewModel.refreshCollectionRootItems()
+            }
         }
     }
 

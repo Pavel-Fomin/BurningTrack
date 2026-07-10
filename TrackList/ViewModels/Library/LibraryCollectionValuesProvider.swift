@@ -12,9 +12,36 @@ import Foundation
 protocol LibraryCollectionValuesProvider {
     /// Возвращает значения выбранного раздела коллекции из сохранённых SQLite metadata.
     func values(for category: LibraryCollectionCategory) async -> [LibraryCollectionValue]
+
+    /// Возвращает значения нескольких разделов из одного общего снимка SQLite metadata.
+    func values(
+        for categories: [LibraryCollectionCategory]
+    ) async -> [LibraryCollectionCategory: [LibraryCollectionValue]]
 }
 
-final class DefaultLibraryCollectionValuesProvider: LibraryCollectionValuesProvider {
+extension LibraryCollectionValuesProvider {
+    /// Даёт совместимую реализацию пакетной загрузки для provider-ов,
+    /// которые пока умеют читать только один раздел за раз.
+    func values(
+        for categories: [LibraryCollectionCategory]
+    ) async -> [LibraryCollectionCategory: [LibraryCollectionValue]] {
+        var valuesByCategory: [LibraryCollectionCategory: [LibraryCollectionValue]] = [:]
+
+        for category in categories {
+            valuesByCategory[category] = await values(for: category)
+        }
+
+        return valuesByCategory
+    }
+}
+
+/// Provider готовых строк корня режима "Треки".
+protocol LibraryCollectionRootItemsProvider {
+    /// Возвращает строки корня с количеством фактических destination-строк.
+    func rootItemsState() async -> [LibraryCollectionRootItemState]
+}
+
+final class DefaultLibraryCollectionValuesProvider: LibraryCollectionValuesProvider, LibraryCollectionRootItemsProvider {
     // MARK: - Dependencies
 
     /// Фасад локального SQLite-индекса треков и сохранённых metadata.
@@ -28,42 +55,94 @@ final class DefaultLibraryCollectionValuesProvider: LibraryCollectionValuesProvi
 
     // MARK: - LibraryCollectionValuesProvider
 
+    /// Возвращает значения одного раздела из общего builder-а коллекции.
     func values(for category: LibraryCollectionCategory) async -> [LibraryCollectionValue] {
+        let snapshot = await makeSnapshot(for: [category])
+        return snapshot.valuesByCategory[category] ?? []
+    }
+
+    /// Возвращает значения всех переданных разделов одним чтением треков и metadata.
+    func values(
+        for categories: [LibraryCollectionCategory]
+    ) async -> [LibraryCollectionCategory: [LibraryCollectionValue]] {
+        await makeSnapshot(for: categories).valuesByCategory
+    }
+
+    // MARK: - LibraryCollectionRootItemsProvider
+
+    /// Возвращает корневые строки, используя количество построенных значений категорий.
+    func rootItemsState() async -> [LibraryCollectionRootItemState] {
+        let snapshot = await makeSnapshot(for: LibraryCollectionCategory.allCases)
+
+        return LibraryCollectionRootItem.rootItems.map { item in
+            let count: Int
+
+            switch item {
+            case .allTracks:
+                count = snapshot.allTracksCount
+            case .category(let category):
+                count = snapshot.valuesByCategory[category]?.count ?? 0
+            }
+
+            return LibraryCollectionRootItemState(
+                item: item,
+                count: count
+            )
+        }
+    }
+
+    // MARK: - Private
+
+    /// Собирает один снимок треков и metadata для всех запрошенных разделов.
+    private func makeSnapshot(
+        for categories: [LibraryCollectionCategory]
+    ) async -> CollectionValuesSnapshot {
+        let uniqueCategories = categories.reduce(into: [LibraryCollectionCategory]()) { result, category in
+            guard result.contains(category) == false else { return }
+            result.append(category)
+        }
         let tracks = await trackRegistry.allTracks().sorted(by: stableTrackOrder)
         let metadataByTrackId = await trackRegistry.cachedMetadata(
             forTrackIds: tracks.map(\.id)
         )
-        var buckets: [CollectionBucketKey: ValueBucket] = [:]
+        var bucketsByCategory: [LibraryCollectionCategory: [CollectionBucketKey: ValueBucket]] =
+            Dictionary(uniqueKeysWithValues: uniqueCategories.map { ($0, [:]) })
 
         for track in tracks {
-            // Значения считаются по тем же локальным строкам, которые потом может открыть список треков.
             guard track.relativePath != nil,
-                  let metadata = metadataByTrackId[track.id],
-                  let rawValue = category.metadataValue(from: metadata) else {
+                  let metadata = metadataByTrackId[track.id] else {
                 continue
             }
 
-            let artistKey = category == .albums
-                ? category.albumArtistKey(from: metadata)
-                : nil
-            let bucketKey = CollectionBucketKey(
-                category: category,
-                rawValue: rawValue,
-                artistKey: artistKey
-            )
-            guard bucketKey.valueKey.isEmpty == false else { continue }
+            for category in uniqueCategories {
+                guard let rawValue = category.metadataValue(from: metadata) else {
+                    continue
+                }
 
-            var bucket = buckets[bucketKey] ?? ValueBucket(rawValue: rawValue)
-            bucket.append(
-                trackId: track.id,
-                metadata: metadata,
-                category: category
-            )
-            buckets[bucketKey] = bucket
+                let artistKey = category == .albums
+                    ? category.albumArtistKey(from: metadata)
+                    : nil
+                let bucketKey = CollectionBucketKey(
+                    category: category,
+                    rawValue: rawValue,
+                    artistKey: artistKey
+                )
+                guard bucketKey.valueKey.isEmpty == false else { continue }
+
+                var buckets = bucketsByCategory[category] ?? [:]
+                var bucket = buckets[bucketKey] ?? ValueBucket(rawValue: rawValue)
+                bucket.append(
+                    trackId: track.id,
+                    metadata: metadata,
+                    category: category
+                )
+                buckets[bucketKey] = bucket
+                bucketsByCategory[category] = buckets
+            }
         }
 
-        return buckets
-            .map { key, bucket in
+        let valuesByCategory = Dictionary(uniqueKeysWithValues: uniqueCategories.map { category in
+            let values = bucketsByCategory[category, default: [:]].map { key, bucket in
                 LibraryCollectionValue(
                     id: "\(category.rawValue):\(key.idComponent)",
                     category: category,
@@ -76,9 +155,19 @@ final class DefaultLibraryCollectionValuesProvider: LibraryCollectionValuesProvi
                     trackIds: bucket.trackIds
                 )
             }
-    }
 
-    // MARK: - Private
+            return (category, values)
+        })
+
+        return CollectionValuesSnapshot(
+            allTracksCount: tracks.reduce(into: 0) { count, track in
+                if track.relativePath != nil {
+                    count += 1
+                }
+            },
+            valuesByCategory: valuesByCategory
+        )
+    }
 
     /// Задаёт стабильный порядок обхода треков, чтобы representative и trackIds не зависели от порядка SQLite при равных датах.
     private func stableTrackOrder(
@@ -114,6 +203,14 @@ final class DefaultLibraryCollectionValuesProvider: LibraryCollectionValuesProvi
             let artistComponent = artistKey.map { "\($0.count):\($0)" } ?? "none"
             return "\(valueKey.count):\(valueKey)|artist:\(artistComponent)"
         }
+    }
+
+    /// Результат одного чтения SQLite, используемый и корнем, и экраном значений.
+    private struct CollectionValuesSnapshot {
+        /// Количество локальных строк, которые открывает пункт "Треки".
+        let allTracksCount: Int
+        /// Готовые значения всех запрошенных категорий по их текущим правилам группировки.
+        let valuesByCategory: [LibraryCollectionCategory: [LibraryCollectionValue]]
     }
 
     private struct ValueBucket {

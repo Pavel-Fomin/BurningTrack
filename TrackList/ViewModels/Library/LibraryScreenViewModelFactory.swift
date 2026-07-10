@@ -35,12 +35,18 @@ enum LibraryScreenViewModelFactory {
             trackRegistry: trackRegistry,
             toastPresenter: toastPresenter
         )
+        // Один provider обслуживает общий builder значений и корневых счётчиков.
+        let collectionValuesProvider = DefaultLibraryCollectionValuesProvider(
+            trackRegistry: trackRegistry
+        )
 
         return LibraryScreenViewModel(
             navigationCoordinator: navigationCoordinator,
             musicLibraryManager: musicLibraryManager,
             stateBuilder: stateBuilder,
-            actionHandler: actionHandler
+            actionHandler: actionHandler,
+            collectionRootItemsProvider: collectionValuesProvider,
+            trackEventProvider: NotificationLibraryTrackEventProvider()
         )
     }
 }
