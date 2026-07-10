@@ -27,6 +27,8 @@ final class LibraryMasterViewModel: ObservableObject, LibraryMasterActionOutput 
     )
     /// Последняя сортировка, выбранная через меню; nil означает ручной порядок.
     @Published private(set) var sortMode: LibraryFoldersSortMode?
+    /// Последний выбранный режим корня фонотеки.
+    @Published private(set) var rootDisplayMode: LibraryRootDisplayMode
 
     /// Папка, ожидающая подтверждения открепления.
     private(set) var pendingDetachFolder: LibraryFolder?
@@ -53,6 +55,7 @@ final class LibraryMasterViewModel: ObservableObject, LibraryMasterActionOutput 
         self.toastPresenter = toastPresenter
         self.stateBuilder = stateBuilder
         self.sortMode = settingsManager.settings.internalSettings.libraryFoldersSortMode
+        self.rootDisplayMode = settingsManager.settings.internalSettings.libraryRootDisplayMode
 
         observeManager()
         observeSettings()
@@ -81,6 +84,22 @@ final class LibraryMasterViewModel: ObservableObject, LibraryMasterActionOutput 
     func clearPendingDetachFolder() {
         pendingDetachFolder = nil
         refreshState()
+    }
+
+    /// Переключает режим корня и сохраняет новое значение через SettingsManaging.
+    func toggleDisplayMode() {
+        let previousMode = rootDisplayMode
+        let newMode = previousMode.toggled
+        rootDisplayMode = newMode
+
+        do {
+            try settingsManager.setLibraryRootDisplayMode(newMode)
+        } catch {
+            rootDisplayMode = previousMode
+            toastPresenter.handle(
+                .operationFailed(message: "Не удалось сохранить режим отображения фонотеки")
+            )
+        }
     }
 
     /// Сортирует прикреплённые папки, сохраняет новый фактический порядок в SQLite и показывает caption режима.

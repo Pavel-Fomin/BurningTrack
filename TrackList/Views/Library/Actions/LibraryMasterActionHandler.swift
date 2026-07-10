@@ -50,6 +50,9 @@ final class LibraryMasterActionHandler {
         case .onAppear:
             output.refreshState()
 
+        case .toggleDisplayMode:
+            output.toggleDisplayMode()
+
         case .addFolderTapped:
             requestFolderPicker()
 

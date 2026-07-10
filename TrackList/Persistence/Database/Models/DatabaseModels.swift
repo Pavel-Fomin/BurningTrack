@@ -156,6 +156,7 @@ struct LibraryViewSettingsDatabaseModel: Equatable, Identifiable {
     var showUnavailableTracks: Bool
     var showFileFormat: Bool
     var showPurchasedITunesSource: Bool
+    var libraryRootDisplayMode: String?
     var lastOpenedFolderId: UUID?
     var updatedAt: Date
 }

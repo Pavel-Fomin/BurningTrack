@@ -55,8 +55,6 @@ struct LibraryScreen: View {
     // MARK: - State
 
     @State private var isShowingFolderPicker = false
-    /// Текущий режим корня фонотеки, переключаемый кнопкой в leading toolbar.
-    @State private var rootDisplayMode: LibraryRootDisplayMode = .folders
     /// Конфигурация верхней нижней панели для текущего экрана фонотеки.
     @State private var selectionActionBarConfig: SelectionActionBarConfig?
 
@@ -109,17 +107,17 @@ struct LibraryScreen: View {
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         Button {
-                            rootDisplayMode = rootDisplayMode.toggled
+                            actionHandler.handle(.toggleDisplayMode)
                         } label: {
-                            Image(systemName: rootDisplayMode.systemImage)
+                            Image(systemName: masterViewModel.rootDisplayMode.systemImage)
                         }
-                        .accessibilityLabel(rootDisplayMode.title)
+                        .accessibilityLabel(masterViewModel.rootDisplayMode.title)
                     }
 
                     ToolbarItem(placement: .topBarTrailing) {
                         LibraryToolbarMenuButton(
                             state: masterViewModel.screenState,
-                            displayMode: rootDisplayMode,
+                            displayMode: masterViewModel.rootDisplayMode,
                             onAction: { action in
                                 actionHandler.handle(action)
                             }
@@ -146,7 +144,7 @@ struct LibraryScreen: View {
         .onAppear {
             viewModel.handle(.appeared)
         }
-        .onChange(of: rootDisplayMode) { _, newMode in
+        .onChange(of: masterViewModel.rootDisplayMode) { _, newMode in
             // Перечитываем корень именно в момент перехода в режим "Треки".
             guard newMode == .tracks else { return }
             viewModel.refreshCollectionRootItems()
@@ -176,7 +174,7 @@ struct LibraryScreen: View {
     private var rootContent: some View {
         LibraryRootView(
             folderState: masterViewModel.screenState,
-            displayMode: rootDisplayMode,
+            displayMode: masterViewModel.rootDisplayMode,
             collectionRootItems: viewModel.collectionRootItems,
             onFolderAction: { action in
                 actionHandler.handle(action)
@@ -187,7 +185,7 @@ struct LibraryScreen: View {
         )
         .onAppear {
             selectionActionBarConfig = nil
-            if rootDisplayMode == .tracks {
+            if masterViewModel.rootDisplayMode == .tracks {
                 viewModel.refreshCollectionRootItems()
             }
         }

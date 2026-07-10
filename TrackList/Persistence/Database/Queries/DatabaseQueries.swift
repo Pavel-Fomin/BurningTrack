@@ -586,7 +586,8 @@ enum LibraryViewSettingsDatabaseQueries {
     static let fetch = """
     SELECT id, sort_mode, tracklists_sort_mode, library_folders_sort_mode, group_mode,
            show_tracklist_badges, show_unavailable_tracks, show_file_format,
-           show_purchased_itunes_source, last_opened_folder_id, updated_at
+           show_purchased_itunes_source, library_root_display_mode,
+           last_opened_folder_id, updated_at
     FROM library_view_settings
     WHERE id = 1;
     """
@@ -595,8 +596,9 @@ enum LibraryViewSettingsDatabaseQueries {
     INSERT INTO library_view_settings (
         id, sort_mode, tracklists_sort_mode, library_folders_sort_mode, group_mode,
         show_tracklist_badges, show_unavailable_tracks, show_file_format,
-        show_purchased_itunes_source, last_opened_folder_id, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        show_purchased_itunes_source, library_root_display_mode,
+        last_opened_folder_id, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
     """
 
     static let update = """
@@ -604,7 +606,7 @@ enum LibraryViewSettingsDatabaseQueries {
     SET sort_mode = ?, tracklists_sort_mode = ?, library_folders_sort_mode = ?,
         group_mode = ?, show_tracklist_badges = ?, show_unavailable_tracks = ?,
         show_file_format = ?, show_purchased_itunes_source = ?,
-        last_opened_folder_id = ?, updated_at = ?
+        library_root_display_mode = ?, last_opened_folder_id = ?, updated_at = ?
     WHERE id = ?;
     """
 
@@ -612,8 +614,9 @@ enum LibraryViewSettingsDatabaseQueries {
     INSERT INTO library_view_settings (
         id, sort_mode, tracklists_sort_mode, library_folders_sort_mode, group_mode,
         show_tracklist_badges, show_unavailable_tracks, show_file_format,
-        show_purchased_itunes_source, last_opened_folder_id, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        show_purchased_itunes_source, library_root_display_mode,
+        last_opened_folder_id, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
         sort_mode = excluded.sort_mode,
         tracklists_sort_mode = excluded.tracklists_sort_mode,
@@ -623,6 +626,7 @@ enum LibraryViewSettingsDatabaseQueries {
         show_unavailable_tracks = excluded.show_unavailable_tracks,
         show_file_format = excluded.show_file_format,
         show_purchased_itunes_source = excluded.show_purchased_itunes_source,
+        library_root_display_mode = excluded.library_root_display_mode,
         last_opened_folder_id = excluded.last_opened_folder_id,
         updated_at = excluded.updated_at;
     """

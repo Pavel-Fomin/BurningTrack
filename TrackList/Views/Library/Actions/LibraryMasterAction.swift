@@ -12,6 +12,8 @@ import Foundation
 enum LibraryMasterAction {
     /// Экран появился и должен синхронизировать отображаемое состояние.
     case onAppear
+    /// Пользователь переключил режим корня фонотеки.
+    case toggleDisplayMode
     /// Пользователь запросил выбор новой папки.
     case addFolderTapped
     /// Пользователь выбрал сортировку прикреплённых папок.

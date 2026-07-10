@@ -167,6 +167,7 @@ enum DatabaseSchema {
         static let showUnavailableTracks = "show_unavailable_tracks"
         static let showFileFormat = "show_file_format"
         static let showPurchasedITunesSource = "show_purchased_itunes_source"
+        static let libraryRootDisplayMode = "library_root_display_mode"
         static let lastOpenedFolderId = "last_opened_folder_id"
         static let updatedAt = "updated_at"
     }

@@ -17,6 +17,9 @@ protocol LibraryMasterActionOutput: AnyObject {
     /// Пересобирает состояние корневого экрана.
     func refreshState()
 
+    /// Переключает и сохраняет режим корня фонотеки.
+    func toggleDisplayMode()
+
     /// Показывает предупреждение перед откреплением папки.
     func setPendingDetachFolder(_ folder: LibraryFolder)
 

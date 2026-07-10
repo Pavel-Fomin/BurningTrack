@@ -10,7 +10,8 @@
 import Foundation
 
 // Описывает режим корня фонотеки без привязки к конкретному экрану.
-enum LibraryRootDisplayMode: CaseIterable, Hashable, Identifiable {
+// Стабильное строковое значение используется при сохранении режима в SQLite.
+enum LibraryRootDisplayMode: String, CaseIterable, Hashable, Identifiable {
     /// Текущий режим со списком источников и прикреплённых папок.
     case folders
     /// Новый режим со списком разделов музыкальной коллекции.

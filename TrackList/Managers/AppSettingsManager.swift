@@ -92,6 +92,23 @@ final class AppSettingsManager: ObservableObject, SettingsManaging {
         NotificationCenter.default.post(name: .appSettingsDidChange, object: nil)
     }
 
+    /// Сохраняет последний выбранный режим отображения корня фонотеки.
+    func setLibraryRootDisplayMode(_ mode: LibraryRootDisplayMode) throws {
+        guard settings.internalSettings.libraryRootDisplayMode != mode else { return }
+
+        let previousMode = settings.internalSettings.libraryRootDisplayMode
+        settings.internalSettings.libraryRootDisplayMode = mode
+
+        do {
+            try settingsStore.saveSettings(settings)
+        } catch {
+            settings.internalSettings.libraryRootDisplayMode = previousMode
+            throw error
+        }
+
+        NotificationCenter.default.post(name: .appSettingsDidChange, object: nil)
+    }
+
     /// Сохраняет выбранную сортировку треков внутри папки фонотеки.
     func setLibraryTrackSortMode(_ mode: LibraryTrackSortMode) throws {
         guard settings.internalSettings.libraryTrackSortMode != mode else { return }

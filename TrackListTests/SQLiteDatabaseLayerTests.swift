@@ -582,6 +582,7 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
         }
 
         XCTAssertEqual(initialSettings, AppSettings.defaultValue)
+        XCTAssertEqual(initialSettings.internalSettings.libraryRootDisplayMode, .folders)
 
         let reloadedSettings = try store.fetchSettings {
             nil
@@ -601,6 +602,7 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
         settings.visible.library.isTrackListMembershipVisible = false
         settings.visible.library.isFileFormatVisible = false
         settings.visible.library.isPurchasedITunesSourceVisible = false
+        settings.internalSettings.libraryRootDisplayMode = .tracks
         settings.internalSettings.trackListsSortMode = .name
         settings.internalSettings.libraryFoldersSortMode = .createdAt
 
@@ -614,8 +616,46 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
         XCTAssertFalse(reloadedSettings.visible.library.isTrackListMembershipVisible)
         XCTAssertFalse(reloadedSettings.visible.library.isFileFormatVisible)
         XCTAssertFalse(reloadedSettings.visible.library.isPurchasedITunesSourceVisible)
+        XCTAssertEqual(reloadedSettings.internalSettings.libraryRootDisplayMode, .tracks)
         XCTAssertEqual(reloadedSettings.internalSettings.trackListsSortMode, .name)
         XCTAssertEqual(reloadedSettings.internalSettings.libraryFoldersSortMode, .createdAt)
+
+        var foldersSettings = reloadedSettings
+        foldersSettings.internalSettings.libraryRootDisplayMode = .folders
+        try store.saveSettings(foldersSettings)
+
+        XCTAssertEqual(
+            try store.fetchSettings { AppSettings.defaultValue }
+                .internalSettings.libraryRootDisplayMode,
+            .folders
+        )
+    }
+
+    func testSettingsDatabaseStoreFallsBackToFoldersForMissingLibraryRootDisplayMode() throws {
+        let database = try makeDatabase()
+        let store = try SettingsDatabaseStore(database: database)
+        var settings = try store.fetchSettings {
+            nil
+        }
+
+        // NULL моделирует строку старой базы без сохранённого режима корня фонотеки.
+        settings.visible.library.isPurchasedITunesSourceVisible = false
+        try store.saveSettings(settings)
+
+        let executor = try database.databaseExecutor()
+        try executor.write { database in
+            let statement = try database.prepare(
+                "UPDATE library_view_settings SET library_root_display_mode = NULL WHERE id = 1;"
+            )
+            try statement.execute()
+        }
+
+        let reloadedSettings = try store.fetchSettings {
+            AppSettings.defaultValue
+        }
+
+        XCTAssertEqual(reloadedSettings.internalSettings.libraryRootDisplayMode, .folders)
+        XCTAssertFalse(reloadedSettings.visible.library.isPurchasedITunesSourceVisible)
     }
 
     #if DEBUG
@@ -717,7 +757,9 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
                 .trackListsSortModeSetting,
                 .libraryFoldersSorting,
                 .trackMetadataLabel,
-                .folderTrackSortMode
+                .folderTrackSortMode,
+                .libraryRootDisplayModeSetting,
+                .libraryRootDisplayModeColumnRepair
             ])
         )
 

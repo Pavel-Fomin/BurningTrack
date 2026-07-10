@@ -215,6 +215,7 @@ final class SettingsDatabaseStore {
         libraryModel.showTrackListBadges = settings.visible.library.isTrackListMembershipVisible
         libraryModel.showFileFormat = settings.visible.library.isFileFormatVisible
         libraryModel.showPurchasedITunesSource = settings.visible.library.isPurchasedITunesSourceVisible
+        libraryModel.libraryRootDisplayMode = settings.internalSettings.libraryRootDisplayMode.rawValue
         libraryModel.sortMode = settings.internalSettings.libraryTrackSortMode.rawValue
         libraryModel.trackListsSortMode = settings.internalSettings.trackListsSortMode?.rawValue
         libraryModel.libraryFoldersSortMode = settings.internalSettings.libraryFoldersSortMode?.rawValue
@@ -246,7 +247,10 @@ final class SettingsDatabaseStore {
             internalSettings: AppSettings.InternalSettings(
                 libraryTrackSortMode: LibraryTrackSortMode(rawValue: libraryModel.sortMode) ?? .fileDateDesc,
                 trackListsSortMode: libraryModel.trackListsSortMode.flatMap(TrackListsSortMode.init(rawValue:)),
-                libraryFoldersSortMode: libraryModel.libraryFoldersSortMode.flatMap(LibraryFoldersSortMode.init(rawValue:))
+                libraryFoldersSortMode: libraryModel.libraryFoldersSortMode.flatMap(LibraryFoldersSortMode.init(rawValue:)),
+                libraryRootDisplayMode: LibraryRootDisplayMode(
+                    rawValue: libraryModel.libraryRootDisplayMode ?? ""
+                ) ?? .folders
             )
         )
     }
@@ -282,6 +286,7 @@ final class SettingsDatabaseStore {
             showUnavailableTracks: true,
             showFileFormat: settings.visible.library.isFileFormatVisible,
             showPurchasedITunesSource: settings.visible.library.isPurchasedITunesSourceVisible,
+            libraryRootDisplayMode: settings.internalSettings.libraryRootDisplayMode.rawValue,
             lastOpenedFolderId: nil,
             updatedAt: updatedAt
         )

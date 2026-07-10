@@ -92,15 +92,19 @@ extension AppSettings {
         var libraryTrackSortMode: LibraryTrackSortMode
         var trackListsSortMode: TrackListsSortMode?
         var libraryFoldersSortMode: LibraryFoldersSortMode?
+        // Последний выбранный режим отображения корня фонотеки.
+        var libraryRootDisplayMode: LibraryRootDisplayMode
 
         init(
             libraryTrackSortMode: LibraryTrackSortMode,
             trackListsSortMode: TrackListsSortMode?,
-            libraryFoldersSortMode: LibraryFoldersSortMode?
+            libraryFoldersSortMode: LibraryFoldersSortMode?,
+            libraryRootDisplayMode: LibraryRootDisplayMode
         ) {
             self.libraryTrackSortMode = libraryTrackSortMode
             self.trackListsSortMode = trackListsSortMode
             self.libraryFoldersSortMode = libraryFoldersSortMode
+            self.libraryRootDisplayMode = libraryRootDisplayMode
         }
 
         // По умолчанию треки фонотеки идут по дате файла, а треклисты и папки — в сохранённом фактическом порядке.
@@ -108,7 +112,8 @@ extension AppSettings {
             InternalSettings(
                 libraryTrackSortMode: .fileDateDesc,
                 trackListsSortMode: nil,
-                libraryFoldersSortMode: nil
+                libraryFoldersSortMode: nil,
+                libraryRootDisplayMode: .folders
             )
         }
     }

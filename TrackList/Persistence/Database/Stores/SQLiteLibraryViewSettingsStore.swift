@@ -88,8 +88,9 @@ final class SQLiteLibraryViewSettingsStore: LibraryViewSettingsDatabaseReading, 
             showUnavailableTracks: try row.requiredBool(at: 6),
             showFileFormat: try row.requiredBool(at: 7),
             showPurchasedITunesSource: try row.requiredBool(at: 8),
-            lastOpenedFolderId: try row.uuid(at: 9),
-            updatedAt: try row.requiredDate(at: 10)
+            libraryRootDisplayMode: row.string(at: 9),
+            lastOpenedFolderId: try row.uuid(at: 10),
+            updatedAt: try row.requiredDate(at: 11)
         )
     }
 
@@ -107,8 +108,9 @@ final class SQLiteLibraryViewSettingsStore: LibraryViewSettingsDatabaseReading, 
         try statement.bind(model.showUnavailableTracks, at: 7)
         try statement.bind(model.showFileFormat, at: 8)
         try statement.bind(model.showPurchasedITunesSource, at: 9)
-        try statement.bind(model.lastOpenedFolderId, at: 10)
-        try statement.bind(model.updatedAt, at: 11)
+        try statement.bind(model.libraryRootDisplayMode, at: 10)
+        try statement.bind(model.lastOpenedFolderId, at: 11)
+        try statement.bind(model.updatedAt, at: 12)
     }
 
     private static func bindUpdate(
@@ -124,8 +126,9 @@ final class SQLiteLibraryViewSettingsStore: LibraryViewSettingsDatabaseReading, 
         try statement.bind(model.showUnavailableTracks, at: 6)
         try statement.bind(model.showFileFormat, at: 7)
         try statement.bind(model.showPurchasedITunesSource, at: 8)
-        try statement.bind(model.lastOpenedFolderId, at: 9)
-        try statement.bind(model.updatedAt, at: 10)
-        try statement.bind(model.id, at: 11)
+        try statement.bind(model.libraryRootDisplayMode, at: 9)
+        try statement.bind(model.lastOpenedFolderId, at: 10)
+        try statement.bind(model.updatedAt, at: 11)
+        try statement.bind(model.id, at: 12)
     }
 }

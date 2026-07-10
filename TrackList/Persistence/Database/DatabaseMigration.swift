@@ -24,7 +24,9 @@ extension DatabaseMigration {
         .trackListsSortModeSetting,
         .libraryFoldersSorting,
         .trackMetadataLabel,
-        .folderTrackSortMode
+        .folderTrackSortMode,
+        .libraryRootDisplayModeSetting,
+        .libraryRootDisplayModeColumnRepair
     ]
 
     // Первая миграция фиксирует стартовую версию схемы без создания бизнес-таблиц.
@@ -267,6 +269,7 @@ extension DatabaseMigration {
                 show_unavailable_tracks INTEGER NOT NULL DEFAULT 1 CHECK (show_unavailable_tracks IN (0, 1)),
                 show_file_format INTEGER NOT NULL DEFAULT 1 CHECK (show_file_format IN (0, 1)),
                 show_purchased_itunes_source INTEGER NOT NULL DEFAULT 1 CHECK (show_purchased_itunes_source IN (0, 1)),
+                library_root_display_mode TEXT CHECK (library_root_display_mode IN ('folders', 'tracks')),
                 last_opened_folder_id TEXT,
                 updated_at TEXT NOT NULL,
                 FOREIGN KEY (last_opened_folder_id) REFERENCES folders(id) ON DELETE SET NULL
@@ -642,6 +645,26 @@ extension DatabaseMigration {
             "track_sort_mode",
             in: "folders",
             definition: "TEXT",
+            database: database
+        )
+    }
+
+    // Десятая миграция добавляет сохранение последнего режима корня фонотеки.
+    static let libraryRootDisplayModeSetting = DatabaseMigration(identifier: "010_library_root_display_mode_setting") { database in
+        try ensureColumn(
+            "library_root_display_mode",
+            in: "library_view_settings",
+            definition: "TEXT CHECK (library_root_display_mode IN ('folders', 'tracks'))",
+            database: database
+        )
+    }
+
+    // Одиннадцатая миграция повторно проверяет колонку режима для баз, где идентификатор предыдущей миграции уже был записан.
+    static let libraryRootDisplayModeColumnRepair = DatabaseMigration(identifier: "011_library_root_display_mode_column_repair") { database in
+        try ensureColumn(
+            "library_root_display_mode",
+            in: "library_view_settings",
+            definition: "TEXT CHECK (library_root_display_mode IN ('folders', 'tracks'))",
             database: database
         )
     }
