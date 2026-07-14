@@ -35,15 +35,10 @@ struct BottomPanelsHostModifier<TopPanel: View>: ViewModifier {
                     topPanel()
                         .padding(.horizontal, 8)
                 } bottomPanel: {
-                    if showsBottomPanel,
-                       playerViewModel.currentTrackDisplayable != nil {
-                        MiniPlayerView(
+                    if showsBottomPanel {
+                        MiniPlayerWrapperView(
                             playerViewModel: playerViewModel
                         )
-                        // Возвращаем прежний внешний визуальный отступ мини-плеера.
-                        .padding(.horizontal, 8)
-                        .padding(.bottom, 8)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
                 }
                 .animation(.easeOut(duration: 0.25), value: showsTopPanel)

@@ -5,12 +5,13 @@
 //  Состояние мини-плеера.
 //
 //  Роль:
-//  - хранит данные для отображения мини-плеера
-//  - разделяет состояние на статическое и динамическое
+//  - явно описывает состояние отображения мини-плеера;
+//  - хранит данные для состояний воспроизведения;
+//  - позволяет добавлять новые состояния без изменения способа подключения View.
 //
 //  ВАЖНО:
-//  - static state меняется редко (смена трека, загрузка метаданных)
-//  - progress state меняется часто (обновление времени, play/pause)
+//  - static state меняется редко (смена трека, загрузка метаданных);
+//  - progress state меняется часто (обновление времени, play/pause).
 //
 //  Created by Pavel Fomin on 08.02.2026.
 //
@@ -51,8 +52,30 @@ struct MiniPlayerProgressState: Equatable {
 
 // MARK: - MiniPlayerState
 
-struct MiniPlayerState: Equatable {
+/// Явное состояние отображения мини-плеера.
+///
+/// Состояние `empty` не скрывает View, а задаёт его содержимое. Благодаря этому
+/// контейнер мини-плеера остаётся постоянной частью layout экрана.
+enum MiniPlayerState: Equatable {
 
-    let staticState: MiniPlayerStaticState
-    let progressState: MiniPlayerProgressState
+    /// Нет текущего трека.
+    case empty
+
+    /// Трек воспроизводится.
+    case playing(
+        staticState: MiniPlayerStaticState,
+        progressState: MiniPlayerProgressState
+    )
+
+    /// Трек поставлен на паузу или воспроизведение ещё не началось.
+    case paused(
+        staticState: MiniPlayerStaticState,
+        progressState: MiniPlayerProgressState
+    )
+
+    /// Трек или его данные загружаются.
+    case loading(staticState: MiniPlayerStaticState?)
+
+    /// Произошла ошибка воспроизведения.
+    case error(message: String)
 }

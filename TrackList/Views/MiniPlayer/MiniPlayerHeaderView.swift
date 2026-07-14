@@ -21,6 +21,8 @@ struct MiniPlayerHeaderView: View {
     let title: String
     let artist: String
     let isPlaying: Bool
+    /// Переопределение цвета заголовка для специальных состояний мини-плеера.
+    let titleColorOverride: Color?
 
     let onPrevious: () -> Void
     let onPlayPause: () -> Void
@@ -44,7 +46,9 @@ struct MiniPlayerHeaderView: View {
 
                     Text(title)
                         .font(artist.isEmpty ? .caption : .caption2)
-                        .foregroundColor(artist.isEmpty ? .primary : .secondary)
+                        .foregroundColor(
+                            titleColorOverride ?? (artist.isEmpty ? .primary : .secondary)
+                        )
                         .lineLimit(1)
                         .truncationMode(.tail)
                 }

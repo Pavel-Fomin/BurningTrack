@@ -8,6 +8,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct MiniPlayerView: View {
     let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
@@ -88,77 +89,133 @@ struct MiniPlayerView: View {
 
                 let newExpansionState = verticalDistance < 0
                 setExpanded(newExpansionState)
-            }
+        }
+    }
+
+    /// Данные для общей разметки мини-плеера, вычисленные из единого состояния.
+    private struct DisplayContent {
+        let artwork: UIImage?
+        let title: String
+        let artist: String
+        let currentTime: TimeInterval
+        let duration: TimeInterval
+        let isPlaying: Bool
+    }
+
+    /// Переводит состояние ViewModel в данные для общей разметки мини-плеера.
+    private var displayContent: DisplayContent {
+        switch playerViewModel.miniPlayerState {
+        case .empty:
+            return DisplayContent(
+                artwork: nil,
+                title: "Ничего не воспроизводится",
+                artist: "",
+                currentTime: 0,
+                duration: 0,
+                isPlaying: false
+            )
+
+        case let .playing(staticState, progressState),
+             let .paused(staticState, progressState):
+            return DisplayContent(
+                artwork: staticState.artwork,
+                title: staticState.title,
+                artist: staticState.artist,
+                currentTime: progressState.currentTime,
+                duration: progressState.duration,
+                isPlaying: progressState.isPlaying
+            )
+
+        case let .loading(staticState):
+            return DisplayContent(
+                artwork: staticState?.artwork,
+                title: staticState?.title ?? "Загрузка...",
+                artist: staticState?.artist ?? "",
+                currentTime: 0,
+                duration: 0,
+                isPlaying: false
+            )
+
+        case let .error(message):
+            return DisplayContent(
+                artwork: nil,
+                title: message,
+                artist: "",
+                currentTime: 0,
+                duration: 0,
+                isPlaying: false
+            )
+        }
     }
 
     var body: some View {
-        guard let track = playerViewModel.currentTrackDisplayable else { return AnyView(EmptyView()) }
-        let staticState = playerViewModel.miniPlayerStaticState
-        let title = staticState?.title ?? track.fileName
-        let artist = staticState?.artist ?? ""
-        let artwork = staticState?.artwork
-        let currentTime = playerViewModel.miniPlayerCurrentTime
-        let duration = playerViewModel.miniPlayerDuration
+        let content = displayContent
+        let hasTrack = playerViewModel.currentTrackDisplayable != nil
         let playbackMode = playerViewModel.playbackMode
 
-        return AnyView(
-            VStack(spacing: 0) {
-                dragIndicator
+        return VStack(spacing: 0) {
+            dragIndicator
 
-                MiniPlayerHeaderView(
-                    artwork: artwork,
-                    title: title,
-                    artist: artist,
-                    isPlaying: playerViewModel.isPlaying,
-                    onPrevious: {
-                        playerViewModel.playPreviousTrack()
-                    },
-                    onPlayPause: {
-                        playerViewModel.togglePlayPause()
-                    },
-                    onNext: {
-                        playerViewModel.playNextTrack()
-                    }
-                )
-
-                MiniPlayerProgressView(
-                    currentTime: currentTime,
-                    duration: duration,
-                    onSeek: { time in
-                        playerViewModel.seek(to: time)
-                    }
-                )
-
-                hitTestBlocker
-
-                if isExpanded {
-                    MiniPlayerExpandedContent(
-                        shuffleAction: {
-                            playerViewModel.toggleShuffle()
-                        },
-                        repeatAction: {
-                            playerViewModel.toggleRepeatAll()
-                        },
-                        repeatOneAction: {
-                            playerViewModel.toggleRepeatOne()
-                        },
-                        airPlayAction: nil,
-                        isShuffleEnabled: playbackMode.isShuffleEnabled,
-                        isRepeatAllEnabled: playbackMode.repeatMode == .all,
-                        isRepeatOneEnabled: playbackMode.repeatMode == .one
-                    )
-                    .padding(.top, 8)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+            MiniPlayerHeaderView(
+                artwork: content.artwork,
+                title: content.title,
+                artist: content.artist,
+                isPlaying: content.isPlaying,
+                // Пустое состояние не конкурирует визуально с содержимым трека.
+                titleColorOverride: hasTrack ? nil : .secondary,
+                onPrevious: {
+                    guard hasTrack else { return }
+                    playerViewModel.playPreviousTrack()
+                },
+                onPlayPause: {
+                    guard hasTrack else { return }
+                    playerViewModel.togglePlayPause()
+                },
+                onNext: {
+                    guard hasTrack else { return }
+                    playerViewModel.playNextTrack()
                 }
+            )
+
+            MiniPlayerProgressView(
+                currentTime: content.currentTime,
+                duration: content.duration,
+                onSeek: { time in
+                    guard hasTrack else { return }
+                    playerViewModel.seek(to: time)
+                }
+            )
+
+            hitTestBlocker
+
+            if isExpanded {
+                MiniPlayerExpandedContent(
+                    // В пустом состоянии режимы не должны менять состояние плеера.
+                    shuffleAction: hasTrack ? {
+                        playerViewModel.toggleShuffle()
+                    } : nil,
+                    repeatAction: hasTrack ? {
+                        playerViewModel.toggleRepeatAll()
+                    } : nil,
+                    repeatOneAction: hasTrack ? {
+                        playerViewModel.toggleRepeatOne()
+                    } : nil,
+                    airPlayAction: nil,
+                    isShuffleEnabled: playbackMode.isShuffleEnabled,
+                    isRepeatAllEnabled: playbackMode.repeatMode == .all,
+                    isRepeatOneEnabled: playbackMode.repeatMode == .one
+                )
+                .padding(.top, 8)
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 12)
-            .glassEffect(.regular, in: shape)
-            .clipShape(shape)
-            .contentShape(shape)
-            // Одновременное распознавание не блокирует горизонтальный seek прогресс-бара.
-            .simultaneousGesture(presentationGesture)
-            .padding(.horizontal, 16)
-        )
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
+        .glassEffect(.regular, in: shape)
+        .clipShape(shape)
+        .contentShape(shape)
+        // Одновременное распознавание не блокирует горизонтальный seek прогресс-бара.
+        .simultaneousGesture(presentationGesture)
+        .padding(.horizontal, 16)
     }
 }

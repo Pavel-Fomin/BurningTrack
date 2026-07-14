@@ -41,13 +41,11 @@ final class PlayerViewModel: ObservableObject {
     
     // MARK: - MiniPlayer State
     
-    /// Статическое состояние мини-плеера (обновляется редко).
-    /// В Шаге 4 сюда добавим сборку artwork через MiniPlayerStateBuilder.
-    @Published private(set) var miniPlayerStaticState: MiniPlayerStaticState?
-    
-    @Published private(set) var miniPlayerIsPlaying: Bool = false
-    @Published private(set) var miniPlayerCurrentTime: TimeInterval = 0
-    @Published private(set) var miniPlayerDuration: TimeInterval = 0
+    /// Единое явное состояние отображения мини-плеера.
+    @Published private(set) var miniPlayerState: MiniPlayerState = .empty
+
+    /// Статические данные сохраняются между обновлениями прогресса.
+    private var miniPlayerStaticState: MiniPlayerStaticState?
     
     // MARK: - Throttling
     
@@ -264,20 +262,50 @@ final class PlayerViewModel: ObservableObject {
     
     /// Пересобирает статическое состояние мини-плеера из текущего трека и runtime snapshot.
     private func updateMiniPlayerStaticState(for track: any TrackDisplayable) {
-        
         let snapshot = runtimeSnapshotController.snapshot(for: track.trackId)
-
         miniPlayerStaticState = MiniPlayerStateBuilder.buildStaticState(
             track: track,
             snapshot: snapshot
         )
+
+        updateMiniPlayerState()
     }
     
-    /// Пересобирает прогресс-состояние мини-плеера из текущих публичных полей.
+    /// Пересобирает состояние мини-плеера из текущих публичных полей ViewModel.
     private func updateMiniPlayerProgressState() {
-        miniPlayerIsPlaying = isPlaying
-        miniPlayerCurrentTime = currentTime
-        miniPlayerDuration = trackDuration
+        updateMiniPlayerState()
+    }
+
+    /// Публикует состояние мини-плеера без изменения существующей playback-логики.
+    private func updateMiniPlayerState() {
+        guard currentTrackDisplayable != nil else {
+            miniPlayerStaticState = nil
+            miniPlayerState = .empty
+            return
+        }
+
+        guard let staticState = miniPlayerStaticState else {
+            miniPlayerState = .loading(staticState: nil)
+            return
+        }
+
+        let progressState = MiniPlayerProgressState(
+            isPlaying: isPlaying,
+            currentTime: currentTime,
+            duration: trackDuration
+        )
+
+        if isPlaying {
+            miniPlayerState = .playing(
+                staticState: staticState,
+                progressState: progressState
+            )
+        } else {
+            miniPlayerState = .paused(
+                staticState: staticState,
+                progressState: progressState
+            )
+        }
     }
     
     // MARK: - Воспроизведение трека
@@ -366,6 +394,7 @@ final class PlayerViewModel: ObservableObject {
         // Новый трек: останавливаем доступ к старому
         playerManager.stopAccessingCurrentTrack()
         currentTrackDisplayable = track
+        miniPlayerStaticState = nil
         currentTime = 0
         trackDuration = 0
         requestSnapshotIfNeeded(for: track)
