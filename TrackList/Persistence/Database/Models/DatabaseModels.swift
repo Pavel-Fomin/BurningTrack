@@ -125,6 +125,8 @@ struct PlayerStateDatabaseModel: Equatable, Identifiable {
     let id: Int
     var currentQueueItemId: UUID?
     var currentTrackId: UUID?
+    var contextType: DatabasePlaybackContextType
+    var contextId: UUID?
     var playbackTime: Double
     var duration: Double?
     var isPlaying: Bool

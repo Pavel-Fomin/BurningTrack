@@ -22,6 +22,7 @@ protocol TrackListPlaybackManaging {
     /// Запускает трек в контексте треклиста.
     func play(
         track: Track,
-        context: [Track]
+        context: [Track],
+        source: PlaybackContextSource
     )
 }

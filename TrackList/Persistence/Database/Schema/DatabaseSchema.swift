@@ -134,6 +134,8 @@ enum DatabaseSchema {
         static let id = "id"
         static let currentQueueItemId = "current_queue_item_id"
         static let currentTrackId = "current_track_id"
+        static let contextType = "context_type"
+        static let contextId = "context_id"
         static let playbackTime = "playback_time"
         static let duration = "duration"
         static let isPlaying = "is_playing"

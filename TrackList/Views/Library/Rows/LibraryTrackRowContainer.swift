@@ -18,6 +18,7 @@ struct LibraryTrackRowContainer: View {
 
     let track: LibraryTrack                       /// Текущий трек строки
     let allTracks: [LibraryTrack]                 /// Контекст всех треков (для переключения)
+    let playbackSource: PlaybackContextSource?   /// Постоянный источник списка, переданный экраном
     let trackListNamesById: [UUID: [String]]      /// Названия треклистов, в которые входит трек
     let metadataProvider: TrackMetadataProviding  /// Провайдер runtime snapshot
     let isScrollingFast: Bool                     /// Флаг быстрого скролла (для оптимизации загрузки)
@@ -35,7 +36,8 @@ struct LibraryTrackRowContainer: View {
     /// Обработчик воспроизведения строки.
     private var playbackHandler: LibraryTrackPlaybackHandler {
         LibraryTrackPlaybackHandler(
-            playerViewModel: playerViewModel
+            playerViewModel: playerViewModel,
+            source: playbackSource
         )
     }
 

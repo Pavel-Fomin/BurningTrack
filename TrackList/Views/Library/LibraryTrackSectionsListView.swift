@@ -15,6 +15,7 @@ struct LibraryTrackSectionsListView: View {
 
     let sections: [TrackSection]
     let allTracks: [LibraryTrack]
+    let playbackSource: PlaybackContextSource?
 
     let trackListNamesById: [UUID: [String]]
     
@@ -38,6 +39,7 @@ struct LibraryTrackSectionsListView: View {
                 showsHeader: section.showsHeader,
                 tracks: section.tracks,
                 allTracks: allTracks,
+                playbackSource: playbackSource,
                 trackListNamesById: trackListNamesById,
                 playerViewModel: playerViewModel,
                 metadataProvider: metadataProvider,

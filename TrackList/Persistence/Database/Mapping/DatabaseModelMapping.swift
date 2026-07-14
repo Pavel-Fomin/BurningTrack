@@ -34,6 +34,54 @@ enum TrackSourceDatabaseMapper {
     }
 }
 
+// Преобразует runtime-источник playback в поля единственной строки player_state.
+enum PlaybackContextSourceDatabaseMapper {
+    static func databaseType(from source: PlaybackContextSource) -> DatabasePlaybackContextType {
+        switch source {
+        case .playerQueue:
+            return .playerQueue
+        case .trackList:
+            return .trackList
+        case .libraryFolder:
+            return .libraryFolder
+        case .libraryRoot:
+            return .libraryRoot
+        }
+    }
+
+    static func contextId(from source: PlaybackContextSource) -> UUID? {
+        switch source {
+        case .playerQueue:
+            return nil
+        case .trackList(let id):
+            return id
+        case .libraryFolder(let id):
+            return id
+        case .libraryRoot:
+            return nil
+        }
+    }
+
+    static func playbackSource(
+        from type: DatabasePlaybackContextType,
+        contextId: UUID?
+    ) -> PlaybackContextSource? {
+        switch type {
+        case .playerQueue:
+            return .playerQueue
+        case .trackList:
+            guard let contextId else { return nil }
+            return .trackList(id: contextId)
+        case .libraryFolder:
+            guard let contextId else { return nil }
+            return .libraryFolder(id: contextId)
+        case .libraryRoot:
+            guard contextId == nil else { return nil }
+            return .libraryRoot
+        }
+    }
+}
+
 // Преобразует метаданные треклиста между SQLite и бизнес-моделью.
 enum TrackListMetaDatabaseMapper {
     static func databaseModel(from meta: TrackListMeta, updatedAt: Date) -> TrackListDatabaseModel {

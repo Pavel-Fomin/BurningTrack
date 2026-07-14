@@ -61,6 +61,20 @@ final class PlayerViewModel: ObservableObject {
     private let eventObserver: any PlayerEventObserving
     /// Показывает пользовательские ошибки без прямой зависимости от ToastManager.shared.
     private let toastPresenter: any ToastPresenting
+    /// Изолирует постоянное состояние выбранного трека от playback- и UI-логики.
+    private let statePersistence: (any PlayerStatePersisting)?
+    /// Очередь используется для восстановления PlayerTrack и проверки удаления текущего элемента.
+    private let playlistManager: PlaylistManager
+    /// Загружает актуальные списки фонотеки без переноса SQLite-логики в PlayerViewModel.
+    private let libraryContextLoader: any LibraryPlaybackContextLoading
+    /// Показывает, что текущий трек восстановлен для интерфейса, но ещё не загружен в PlayerManager.
+    private var isCurrentTrackPreparedForPlayback = false
+    /// Источник текущего playback-контекста нужен для сохранения его при переходе Next/Previous.
+    private var currentPlaybackContextSource: PlaybackContextSource = .playerQueue
+    /// Не даёт повторно очищать состояние до завершения восстановления доступа к фонотеке.
+    private var didReceiveLibraryAccessRestored = false
+    /// Наблюдатель нужен для повторной попытки восстановления локального трека после открытия bookmark-доступа.
+    private var libraryAccessRestoredObserver: NSObjectProtocol?
 
     /// Конкретный PlayerManager нужен сценариям файловых операций,
     /// где используется проверка занятости трека.
@@ -104,8 +118,13 @@ final class PlayerViewModel: ObservableObject {
         nowPlayingSnapshotBuilder: any NowPlayingSnapshotBuilding = NowPlayingSnapshotBuilder(),
         runtimeSnapshotController: PlayerRuntimeSnapshotController = PlayerRuntimeSnapshotController(),
         eventObserver: any PlayerEventObserving = NotificationPlayerEventObserver(),
-        toastPresenter: (any ToastPresenting)? = nil
+        toastPresenter: (any ToastPresenting)? = nil,
+        statePersistence: (any PlayerStatePersisting)? = nil,
+        playlistManager: PlaylistManager? = nil,
+        libraryContextLoader: (any LibraryPlaybackContextLoading)? = nil
     ) {
+        let resolvedPlaylistManager = playlistManager ?? PlaylistManager.shared
+
         self.playerManager = playerManager
         // Store создаётся внутри main-actor и синхронно восстанавливает режим до первого контекста.
         self.playbackContextStore = playbackContextStore ?? PlayerPlaybackContextStore()
@@ -113,7 +132,31 @@ final class PlayerViewModel: ObservableObject {
         self.runtimeSnapshotController = runtimeSnapshotController
         self.eventObserver = eventObserver
         self.toastPresenter = toastPresenter ?? ToastManager.shared
+        self.statePersistence = statePersistence ?? (try? PlayerStatePersistence())
+        self.playlistManager = resolvedPlaylistManager
+        self.libraryContextLoader = libraryContextLoader ?? LibraryPlaybackContextLoader()
         self.concretePlayerManager = playerManager as? PlayerManager
+
+        if self.statePersistence == nil {
+            PersistentLogger.log("PlayerViewModel: не удалось создать хранилище состояния плеера")
+        }
+
+        // Очередь уведомляет ViewModel только после успешной синхронизации с SQLite.
+        resolvedPlaylistManager.onTracksChanged = { [weak self] tracks in
+            self?.handlePlaylistChanged(tracks)
+        }
+
+        libraryAccessRestoredObserver = NotificationCenter.default.addObserver(
+            forName: .libraryAccessRestored,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.didReceiveLibraryAccessRestored = true
+                self.restoreLastTrack()
+            }
+        }
 
         // Обновление длительности трека
         eventObserver.onTrackDurationUpdated = { [weak self] duration in
@@ -168,6 +211,330 @@ final class PlayerViewModel: ObservableObject {
                 }
             }
         )
+
+        // Восстановление только подготавливает состояние мини-плеера и не запускает AVPlayer.
+        restoreLastTrack()
+    }
+
+    // MARK: - Состояние выбранного трека
+
+    /// Сохраняет новый текущий трек и источник контекста после фактической смены selection.
+    private func persistCurrentTrack(
+        _ track: any TrackDisplayable,
+        source: PlaybackContextSource
+    ) {
+        guard let statePersistence else { return }
+
+        let queueItemId = (track as? PlayerTrack)?.queueItemId
+        do {
+            try statePersistence.saveCurrentTrack(
+                trackId: track.trackId,
+                queueItemId: queueItemId,
+                duration: track.duration,
+                playbackMode: playbackMode,
+                contextSource: source
+            )
+        } catch {
+            // Ошибка постоянного состояния не должна прерывать запуск воспроизведения.
+            PersistentLogger.log("PlayerViewModel: ошибка сохранения состояния плеера: \(error)")
+        }
+    }
+
+    /// Загружает состояние и восстанавливает последний трек без запуска playback.
+    private func restoreLastTrack() {
+        guard currentTrackDisplayable == nil,
+              let statePersistence
+        else {
+            return
+        }
+
+        let state: PlayerStateDatabaseModel?
+        do {
+            state = try statePersistence.loadState()
+        } catch {
+            PersistentLogger.log(
+                "PlayerViewModel: невалидное или недоступное состояние плеера: \(error)"
+            )
+            // Повреждённый context_type не должен оставлять старую запись для повторной ошибки на каждом запуске.
+            clearPersistedState()
+            return
+        }
+
+        guard let state,
+              let trackId = state.currentTrackId,
+              let source = PlaybackContextSourceDatabaseMapper.playbackSource(
+                  from: state.contextType,
+                  contextId: state.contextId
+              )
+        else {
+            if state?.contextType == .trackList {
+                clearPersistedState()
+            }
+            return
+        }
+
+        switch source {
+        case .playerQueue:
+            restoreQueueContext(state: state, trackId: trackId)
+        case .trackList(let trackListId):
+            restoreTrackListContext(trackListId: trackListId, trackId: trackId)
+        case .libraryFolder,
+             .libraryRoot:
+            restoreLibraryContext(source: source, trackId: trackId)
+        }
+    }
+
+    /// Восстанавливает очередь или сохраняет прежний fallback для состояния без queueItemId.
+    private func restoreQueueContext(
+        state: PlayerStateDatabaseModel,
+        trackId: UUID
+    ) {
+        // Элемент очереди восстанавливается первым, так как queueItemId различает повторные вхождения одного trackId.
+        if let queueItemId = state.currentQueueItemId,
+           let playerTrack = playlistManager.tracks.first(where: {
+               $0.queueItemId == queueItemId
+           }) {
+            let queue: [any TrackDisplayable] = playlistManager.tracks
+            PersistentLogger.log(
+                "Player restore queueItemId=\(playerTrack.queueItemId) " +
+                "currentId=\(playerTrack.id) queueCount=\(queue.count)"
+            )
+            applyRestoredTrack(
+                playerTrack,
+                context: queue,
+                source: .playerQueue
+            )
+            return
+        }
+
+        // Legacy-состояния без queueItemId сохраняют прежнее восстановление одиночного трека.
+        restoreFallbackTrack(trackId: trackId, duration: state.duration)
+    }
+
+    /// Восстанавливает актуальный состав треклиста из SQLite без сохранения массива в player_state.
+    private func restoreTrackListContext(
+        trackListId: UUID,
+        trackId: UUID
+    ) {
+        Task { @MainActor [weak self] in
+            guard let self, self.currentTrackDisplayable == nil else {
+                return
+            }
+
+            do {
+                let trackList = try TrackListManager.shared.getTrackListById(trackListId)
+                guard let restoredTrack = trackList.tracks.first(where: { $0.trackId == trackId }) else {
+                    PersistentLogger.log(
+                        "Player restore trackList track not found listId=\(trackListId) trackId=\(trackId)"
+                    )
+                    self.clearPersistedState()
+                    return
+                }
+
+                let context: [any TrackDisplayable] = trackList.tracks
+                PersistentLogger.log(
+                    "Player restore trackListId=\(trackListId) " +
+                    "trackId=\(restoredTrack.trackId) trackCount=\(context.count)"
+                )
+                self.applyRestoredTrack(
+                    restoredTrack,
+                    context: context,
+                    source: .trackList(id: trackListId)
+                )
+            } catch {
+                PersistentLogger.log(
+                    "Player restore trackList failed listId=\(trackListId) error=\(error)"
+                )
+                self.clearPersistedState()
+            }
+        }
+    }
+
+    /// Восстанавливает папочный или корневой контекст фонотеки через общий loader.
+    private func restoreLibraryContext(
+        source: PlaybackContextSource,
+        trackId: UUID
+    ) {
+        Task { @MainActor [weak self] in
+            guard let self, self.currentTrackDisplayable == nil else {
+                return
+            }
+
+            do {
+                let tracks: [LibraryTrack]
+                switch source {
+                case .libraryFolder(let folderId):
+                    tracks = try await self.libraryContextLoader.loadFolderContext(
+                        folderId: folderId
+                    )
+                case .libraryRoot:
+                    tracks = try await self.libraryContextLoader.loadRootContext()
+                case .playerQueue,
+                     .trackList:
+                    return
+                }
+
+                guard let restoredTrack = tracks.first(where: { $0.trackId == trackId }) else {
+                    PersistentLogger.log(
+                        "Player restore library track not found source=\(source) trackId=\(trackId)"
+                    )
+                    self.clearPersistedState()
+                    return
+                }
+
+                let context: [any TrackDisplayable] = tracks
+                PersistentLogger.log(
+                    "Player restore library source=\(source) " +
+                    "trackId=\(restoredTrack.trackId) trackCount=\(context.count)"
+                )
+                self.applyRestoredTrack(
+                    restoredTrack,
+                    context: context,
+                    source: source
+                )
+            } catch {
+                PersistentLogger.log(
+                    "Player restore library context failed source=\(source) error=\(error)"
+                )
+                self.clearPersistedState()
+            }
+        }
+    }
+
+    /// Восстанавливает одиночный display-трек для старого состояния без контекста списка.
+    private func restoreFallbackTrack(
+        trackId: UUID,
+        duration: TimeInterval?
+    ) {
+        Task { @MainActor [weak self] in
+            guard let self,
+                  self.currentTrackDisplayable == nil,
+                  let restoredTrack = await self.restoreTrack(
+                      trackId: trackId,
+                      duration: duration
+                  )
+            else {
+                guard let self,
+                      self.currentTrackDisplayable == nil,
+                      self.didReceiveLibraryAccessRestored
+                else {
+                    return
+                }
+
+                self.clearPersistedState()
+                return
+            }
+
+            self.applyRestoredTrack(
+                restoredTrack,
+                context: [restoredTrack],
+                source: .playerQueue
+            )
+        }
+    }
+
+    /// Восстанавливает display-модель локального или доступного iTunes-трека по стабильному trackId.
+    private func restoreTrack(
+        trackId: UUID,
+        duration: TimeInterval?
+    ) async -> (any TrackDisplayable)? {
+        let registryEntry = await TrackRegistry.shared.entry(for: trackId)
+
+        if registryEntry?.source != .purchasedITunes,
+           let url = await BookmarkResolver.url(forTrack: trackId),
+           FileManager.default.fileExists(atPath: url.path) {
+            // LibraryTrack является общей display-моделью для восстановленного локального файла.
+            return LibraryTrack(
+                id: trackId,
+                fileURL: url,
+                title: nil,
+                artist: nil,
+                duration: duration ?? 0,
+                addedDate: registryEntry?.fileDate ?? Date(),
+                isAvailable: true
+            )
+        }
+
+        // Для iTunes используется существующий provider и тот же UUID.v5 из persistentID.
+        let purchasedTrack = PurchasedITunesMusicProvider()
+            .loadTracks()
+            .map(PurchasedITunesPlayableTrack.init(track:))
+            .first(where: { $0.trackId == trackId })
+
+        return purchasedTrack
+    }
+
+    /// Применяет восстановленную модель и контекст только к интерфейсному playback-состоянию.
+    /// AVPlayerItem создаётся позднее первым нажатием Play.
+    private func applyRestoredTrack(
+        _ track: any TrackDisplayable,
+        context: [any TrackDisplayable],
+        source: PlaybackContextSource
+    ) {
+        guard currentTrackDisplayable == nil else { return }
+
+        currentTrackDisplayable = track
+        currentPlaybackContextSource = source
+        currentContext = PlaybackContext.detect(from: context)
+        _ = playbackContextStore.updateContext(
+            currentTrack: track,
+            context: context
+        )
+        isCurrentTrackPreparedForPlayback = false
+        currentTime = 0
+        trackDuration = track.duration
+        isPlaying = false
+        miniPlayerStaticState = nil
+        requestSnapshotIfNeeded(for: track)
+        updateMiniPlayerStaticState(for: track)
+        updateMiniPlayerProgressState()
+    }
+
+    /// Удаляет запись, если последний трек больше нельзя восстановить.
+    private func clearPersistedState() {
+        guard let statePersistence else { return }
+
+        do {
+            try statePersistence.clearState()
+        } catch {
+            PersistentLogger.log("PlayerViewModel: ошибка очистки состояния плеера: \(error)")
+        }
+    }
+
+    /// Очищает UI и сохранённое состояние, когда удалён текущий элемент очереди.
+    private func handlePlaylistChanged(_ tracks: [PlayerTrack]) {
+        guard let current = currentTrackDisplayable as? PlayerTrack,
+              tracks.contains(where: { $0.queueItemId == current.queueItemId }) == false,
+              let statePersistence
+        else {
+            return
+        }
+
+        do {
+            guard let state = try statePersistence.loadState(),
+                  state.currentTrackId == current.trackId,
+                  state.currentQueueItemId == nil || state.currentQueueItemId == current.queueItemId
+            else {
+                return
+            }
+
+            try statePersistence.clearState()
+        } catch {
+            PersistentLogger.log("PlayerViewModel: ошибка очистки удалённого состояния плеера: \(error)")
+            return
+        }
+
+        playerManager.pause()
+        playerManager.stopAccessingCurrentTrack()
+        currentTrackDisplayable = nil
+        currentContext = nil
+        currentPlaybackContextSource = .playerQueue
+        currentTime = 0
+        trackDuration = 0
+        isPlaying = false
+        isCurrentTrackPreparedForPlayback = false
+        miniPlayerStaticState = nil
+        updateMiniPlayerProgressState()
     }
     
     // MARK: - Snapshot
@@ -359,8 +726,12 @@ final class PlayerViewModel: ObservableObject {
         setPlaybackMode(mode)
     }
     
-    /// Запуск воспроизведения трека в заданном контексте
-    func play(track: any TrackDisplayable, context: [any TrackDisplayable] = []) {
+    /// Запускает трек в заданном playback-контексте.
+    func play(
+        track: any TrackDisplayable,
+        context: [any TrackDisplayable] = [],
+        source: PlaybackContextSource = .playerQueue
+    ) {
         
         // Определяем контекст воспроизведения
         let contextType = PlaybackContext.detect(from: context)
@@ -370,12 +741,14 @@ final class PlayerViewModel: ObservableObject {
             isSameTrack = current.id == track.id &&
                 type(of: current) == type(of: track) &&
                 currentContext == contextType &&
-                isSameContext
+                isSameContext &&
+                currentPlaybackContextSource == source
         } else {
             isSameTrack = false
         }
 
         currentContext = contextType
+        currentPlaybackContextSource = source
 
         // Обновляем контекст до проверки текущего трека, чтобы не потерять его позицию.
         _ = playbackContextStore.updateContext(
@@ -383,8 +756,8 @@ final class PlayerViewModel: ObservableObject {
             context: context
         )
 
-        // Если это тот же трек и тот же контекст — просто продолжить.
-        if isSameTrack {
+        // Если это тот же уже загруженный трек и тот же контекст — просто продолжить.
+        if isSameTrack && isCurrentTrackPreparedForPlayback {
             playerManager.playCurrent()
             isPlaying = true
             updateMiniPlayerProgressState()
@@ -397,6 +770,8 @@ final class PlayerViewModel: ObservableObject {
         miniPlayerStaticState = nil
         currentTime = 0
         trackDuration = 0
+        isCurrentTrackPreparedForPlayback = false
+        persistCurrentTrack(track, source: source)
         requestSnapshotIfNeeded(for: track)
         
         updateMiniPlayerStaticState(for: track)
@@ -409,31 +784,19 @@ final class PlayerViewModel: ObservableObject {
                 // а currentTrackDisplayable оставляем исходным для подсветки контекста.
                 let playbackTrack = playbackTrack(for: track)
                 try await playerManager.play(track: playbackTrack)
+                isCurrentTrackPreparedForPlayback = true
                 isPlaying = true
                 updateMiniPlayerProgressState()
                 // Первичное заполнение Now Playing Info (duration ещё может быть 0)
                 playerManager.applyNowPlaying(snapshot: makeNowPlayingSnapshot(for: track))
-                // Наблюдаем прогресс воспроизведения
-                playerManager.observeProgress { [weak self] time in
-                    guard let self else { return }
-                    self.currentTime = time
-                    let now = CACurrentMediaTime()
-                    // UI прогресс: ~20 Hz
-                    if now - self.lastMiniPlayerTick >= 1.0 {
-                        self.lastMiniPlayerTick = now
-                        self.updateMiniPlayerProgressState()
-                    }
-                    // Now Playing: 1 Hz
-                    if now - self.lastNowPlayingTick >= 1.0 {
-                        self.lastNowPlayingTick = now
-                        self.playerManager.applyPlaybackTime(currentTime: time, isPlaying: self.isPlaying)
-                    }
-                }
+                startObservingProgress()
             } catch let appError as AppError {
+                isCurrentTrackPreparedForPlayback = false
                 isPlaying = false
                 updateMiniPlayerProgressState()
                 toastPresenter.handle(appError)
             } catch {
+                isCurrentTrackPreparedForPlayback = false
                 isPlaying = false
                 updateMiniPlayerProgressState()
                 toastPresenter.handle(.playbackFailed(title: track.title ?? track.fileName))
@@ -448,26 +811,84 @@ final class PlayerViewModel: ObservableObject {
     ) -> any TrackDisplayable {
         track.asPurchasedITunesPlayableTrack() ?? track
     }
-    
-    // MARK: - Управление воспроизведением
 
-    func togglePlayPause() {
-        if isPlaying {
-            playerManager.pause()
-        } else {
-            guard currentTrackDisplayable != nil else { return }
-            playerManager.playCurrent()
+    /// Подключает единственное наблюдение прогресса для обычного и восстановленного запуска.
+    private func startObservingProgress() {
+        playerManager.observeProgress { [weak self] time in
+            guard let self else { return }
+            self.currentTime = time
+            let now = CACurrentMediaTime()
+            // UI прогресс: ~20 Hz.
+            if now - self.lastMiniPlayerTick >= 1.0 {
+                self.lastMiniPlayerTick = now
+                self.updateMiniPlayerProgressState()
+            }
+            // Now Playing: 1 Hz.
+            if now - self.lastNowPlayingTick >= 1.0 {
+                self.lastNowPlayingTick = now
+                self.playerManager.applyPlaybackTime(currentTime: time, isPlaying: self.isPlaying)
+            }
         }
+    }
 
-        isPlaying.toggle()
+    /// Загружает восстановленный трек в PlayerManager только после первого нажатия Play.
+    private func prepareAndPlayRestoredTrack(_ track: any TrackDisplayable) {
+        Task { @MainActor in
+            do {
+                let playbackTrack = playbackTrack(for: track)
+                try await playerManager.play(track: playbackTrack)
+                isCurrentTrackPreparedForPlayback = true
+                isPlaying = true
+                updateMiniPlayerProgressState()
+                playerManager.applyNowPlaying(snapshot: makeNowPlayingSnapshot(for: track))
+                startObservingProgress()
+            } catch let appError as AppError {
+                isCurrentTrackPreparedForPlayback = false
+                isPlaying = false
+                updateMiniPlayerProgressState()
+                toastPresenter.handle(appError)
+            } catch {
+                isCurrentTrackPreparedForPlayback = false
+                isPlaying = false
+                updateMiniPlayerProgressState()
+                toastPresenter.handle(
+                    .playbackFailed(title: track.title ?? track.fileName)
+                )
+            }
+        }
+    }
+
+    /// Обновляет мини-плеер и Now Playing после изменения состояния воспроизведения.
+    private func applyCurrentPlaybackState() {
         updateMiniPlayerProgressState()
-
         lastNowPlayingTick = 0
         playerManager.applyPlaybackTime(currentTime: currentTime, isPlaying: isPlaying)
 
         if let current = currentTrackDisplayable {
             playerManager.applyNowPlaying(snapshot: makeNowPlayingSnapshot(for: current))
         }
+    }
+
+    // MARK: - Управление воспроизведением
+
+    func togglePlayPause() {
+        if isPlaying {
+            playerManager.pause()
+            isPlaying = false
+            applyCurrentPlaybackState()
+            return
+        }
+
+        guard let currentTrack = currentTrackDisplayable else { return }
+
+        if isCurrentTrackPreparedForPlayback {
+            playerManager.playCurrent()
+            isPlaying = true
+            applyCurrentPlaybackState()
+            return
+        }
+
+        prepareAndPlayRestoredTrack(currentTrack)
     }
 
     /// Обрабатывает завершение текущего трека с учётом режима повтора.
@@ -556,7 +977,11 @@ final class PlayerViewModel: ObservableObject {
            type(of: next.track) == type(of: current) {
             restartCurrentTrack()
         } else {
-            play(track: next.track, context: next.context)
+            play(
+                track: next.track,
+                context: next.context,
+                source: currentPlaybackContextSource
+            )
         }
         return true
     }
@@ -564,6 +989,7 @@ final class PlayerViewModel: ObservableObject {
     /// Предыдущий трек в текущем контексте
     func playPreviousTrack() {
         guard let current = currentTrackDisplayable else { return }
+        guard playbackContextStore.hasMultipleTracks else { return }
         
         if currentTime > 3 {
             seek(to: 0)
@@ -578,7 +1004,11 @@ final class PlayerViewModel: ObservableObject {
             return
         }
 
-        play(track: previous.track, context: previous.context)
+        play(
+            track: previous.track,
+            context: previous.context,
+            source: currentPlaybackContextSource
+        )
     }
     
     
@@ -596,6 +1026,9 @@ final class PlayerViewModel: ObservableObject {
     // MARK: - Деинициализация
     
     deinit {
+        if let libraryAccessRestoredObserver {
+            NotificationCenter.default.removeObserver(libraryAccessRestoredObserver)
+        }
         playerManager.removeTimeObserver()
     }
 }

@@ -234,6 +234,7 @@ struct LibraryTracksView: View {
                 LibraryTrackSectionsListView(
                     sections: tracksViewModel.trackSections,
                     allTracks: allVisibleTracks,
+                    playbackSource: .libraryFolder(id: folder.id),
                     trackListNamesById: tracksViewModel.trackListNamesById,
                     metadataProvider: tracksViewModel,
                     playerViewModel: playerViewModel,

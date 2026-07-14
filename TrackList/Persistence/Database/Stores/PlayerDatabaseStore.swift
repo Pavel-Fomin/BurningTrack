@@ -47,7 +47,19 @@ final class PlayerDatabaseStore {
             )
         }
 
+        let savedState = try stateStore.fetch()
+
         try queueStore.replaceAll(models)
+
+        // replaceAll удаляет старые строки очереди, поэтому SQLite может временно обнулить внешний ключ.
+        // Если текущий элемент остался в новой очереди, возвращаем ссылку на единственную строку состояния.
+        guard let savedState,
+              let queueItemId = savedState.currentQueueItemId,
+              models.contains(where: { $0.id == queueItemId }) else {
+            return
+        }
+
+        try stateStore.upsert(savedState)
     }
 
     /// Очищает очередь плеера без раскрытия низкоуровневого Store наружу.

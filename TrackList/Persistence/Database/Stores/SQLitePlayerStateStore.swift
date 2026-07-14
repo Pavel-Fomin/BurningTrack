@@ -78,21 +78,31 @@ final class SQLitePlayerStateStore: PlayerStateDatabaseReading, PlayerStateDatab
     }
 
     private static func map(_ row: DatabaseRowReader) throws -> PlayerStateDatabaseModel {
-        let repeatRawValue = try row.requiredString(at: 6)
+        let contextRawValue = try row.requiredString(at: 3)
+        guard let contextType = DatabasePlaybackContextType(rawValue: contextRawValue) else {
+            throw DatabaseError.invalidColumnValue(column: DatabaseSchema.PlayerState.contextType, value: contextRawValue)
+        }
+
+        let repeatRawValue = try row.requiredString(at: 8)
         guard let repeatMode = DatabaseRepeatMode(rawValue: repeatRawValue) else {
-            throw DatabaseError.invalidColumnValue(column: DatabaseSchema.PlayerState.repeatMode, value: repeatRawValue)
+            throw DatabaseError.invalidColumnValue(
+                column: DatabaseSchema.PlayerState.repeatMode,
+                value: repeatRawValue
+            )
         }
 
         return PlayerStateDatabaseModel(
             id: try row.requiredInt(at: 0),
             currentQueueItemId: try row.uuid(at: 1),
             currentTrackId: try row.uuid(at: 2),
-            playbackTime: try row.requiredDouble(at: 3),
-            duration: row.double(at: 4),
-            isPlaying: try row.requiredBool(at: 5),
+            contextType: contextType,
+            contextId: try row.uuid(at: 4),
+            playbackTime: try row.requiredDouble(at: 5),
+            duration: row.double(at: 6),
+            isPlaying: try row.requiredBool(at: 7),
             repeatMode: repeatMode,
-            shuffleEnabled: try row.requiredBool(at: 7),
-            updatedAt: try row.requiredDate(at: 8)
+            shuffleEnabled: try row.requiredBool(at: 9),
+            updatedAt: try row.requiredDate(at: 10)
         )
     }
 
@@ -104,12 +114,14 @@ final class SQLitePlayerStateStore: PlayerStateDatabaseReading, PlayerStateDatab
         try statement.bind(model.id, at: 1)
         try statement.bind(model.currentQueueItemId, at: 2)
         try statement.bind(model.currentTrackId, at: 3)
-        try statement.bind(model.playbackTime, at: 4)
-        try statement.bind(model.duration, at: 5)
-        try statement.bind(model.isPlaying, at: 6)
-        try statement.bind(model.repeatMode.rawValue, at: 7)
-        try statement.bind(model.shuffleEnabled, at: 8)
-        try statement.bind(model.updatedAt, at: 9)
+        try statement.bind(model.contextType.rawValue, at: 4)
+        try statement.bind(model.contextId, at: 5)
+        try statement.bind(model.playbackTime, at: 6)
+        try statement.bind(model.duration, at: 7)
+        try statement.bind(model.isPlaying, at: 8)
+        try statement.bind(model.repeatMode.rawValue, at: 9)
+        try statement.bind(model.shuffleEnabled, at: 10)
+        try statement.bind(model.updatedAt, at: 11)
     }
 
     private static func bindUpdate(
@@ -119,12 +131,14 @@ final class SQLitePlayerStateStore: PlayerStateDatabaseReading, PlayerStateDatab
         // UPDATE держит id последним, чтобы изменяемые поля шли в порядке схемы.
         try statement.bind(model.currentQueueItemId, at: 1)
         try statement.bind(model.currentTrackId, at: 2)
-        try statement.bind(model.playbackTime, at: 3)
-        try statement.bind(model.duration, at: 4)
-        try statement.bind(model.isPlaying, at: 5)
-        try statement.bind(model.repeatMode.rawValue, at: 6)
-        try statement.bind(model.shuffleEnabled, at: 7)
-        try statement.bind(model.updatedAt, at: 8)
-        try statement.bind(model.id, at: 9)
+        try statement.bind(model.contextType.rawValue, at: 3)
+        try statement.bind(model.contextId, at: 4)
+        try statement.bind(model.playbackTime, at: 5)
+        try statement.bind(model.duration, at: 6)
+        try statement.bind(model.isPlaying, at: 7)
+        try statement.bind(model.repeatMode.rawValue, at: 8)
+        try statement.bind(model.shuffleEnabled, at: 9)
+        try statement.bind(model.updatedAt, at: 10)
+        try statement.bind(model.id, at: 11)
     }
 }

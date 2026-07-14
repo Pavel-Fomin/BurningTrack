@@ -15,8 +15,11 @@ import Foundation
 import UIKit
 struct PlayerTrack: Identifiable, TrackDisplayable, Equatable {
     // MARK: - Identity
-    let queueItemId: UUID     // id конкретного вхождения трека в очереди плеера
-    let trackId: UUID         // trackId из TrackRegistry
+    /// Идентифицирует конкретное вхождение трека в очереди, включая дубликаты.
+    let queueItemId: UUID
+    /// Идентифицирует сам музыкальный трек в TrackRegistry.
+    let trackId: UUID
+    /// UI-идентичность элемента очереди; переходы в очереди используют queueItemId.
     var id: UUID { queueItemId }
     // MARK: - Metadata
     let title: String?

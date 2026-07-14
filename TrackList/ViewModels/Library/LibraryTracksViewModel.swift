@@ -280,16 +280,11 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
 
     /// Применяет общий TrackSorter через адаптер с SQLite metadata.
     private func sortTracks(_ tracks: [LibraryTrack]) -> [LibraryTrack] {
-        let adapters = tracks.map { track in
-            LibraryTrackSortAdapter(
-                track: track,
-                cachedMetadata: cachedMetadataByTrackId[track.trackId]
-            )
-        }
-
-        return TrackSorter
-            .sort(adapters, using: sortMode.descriptor)
-            .map(\.track)
+        LibraryTrackOrdering.sort(
+            tracks,
+            mode: sortMode,
+            cachedMetadataByTrackId: cachedMetadataByTrackId
+        )
     }
 
     /// Догружает SQLite metadata только для режимов, которым нужны сохранённые metadata-ключи.
@@ -701,81 +696,5 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         return currentURL
             .deletingLastPathComponent()
             .appendingPathComponent(snapshot.fileName)
-    }
-}
-
-/// Адаптер даёт TrackSorter сортировочные значения фонотеки без записи metadata обратно в LibraryTrack.
-private struct LibraryTrackSortAdapter: TrackDisplayable, TrackSortDateProviding, TrackSortMetadataProviding {
-    let track: LibraryTrack
-    let cachedMetadata: TrackCachedMetadata?
-
-    var id: UUID {
-        track.id
-    }
-
-    var trackId: UUID {
-        track.trackId
-    }
-
-    var fileName: String {
-        track.fileName
-    }
-
-    /// Для сортировки title используются только сохранённые metadata без fallback на имя файла.
-    var title: String? {
-        Self.nonEmptyString(cachedMetadata?.title)
-    }
-
-    /// Для сортировки artist используются только сохранённые metadata без fallback на имя файла.
-    var artist: String? {
-        Self.nonEmptyString(cachedMetadata?.artist)
-    }
-
-    /// Для сортировки album используются только сохранённые metadata без fallback на имя файла.
-    var trackSortAlbum: String? {
-        Self.nonEmptyString(cachedMetadata?.album)
-    }
-
-    /// Для сортировки year fallback на fileName не применяется.
-    var trackSortYear: Int? {
-        cachedMetadata?.year
-    }
-
-    /// Для сортировки label используются только сохранённые metadata без fallback на имя файла.
-    var trackSortLabel: String? {
-        Self.nonEmptyString(cachedMetadata?.label)
-    }
-
-    /// Для сортировки genre используются только сохранённые metadata без fallback на имя файла.
-    var trackSortGenre: String? {
-        Self.nonEmptyString(cachedMetadata?.genre)
-    }
-
-    /// Для сортировки comment используются только сохранённые metadata без fallback на имя файла.
-    var trackSortComment: String? {
-        Self.nonEmptyString(cachedMetadata?.comment)
-    }
-
-    var duration: Double {
-        track.duration
-    }
-
-    var artwork: UIImage? {
-        track.artwork
-    }
-
-    var isAvailable: Bool {
-        track.isAvailable
-    }
-
-    /// Дата сортировки остаётся датой фонотеки из исходного LibraryTrack.
-    var trackSortDate: Date? {
-        track.trackSortDate
-    }
-
-    /// Пустые строки из SQLite не участвуют в сортировке как самостоятельное значение.
-    private static func nonEmptyString(_ value: String?) -> String? {
-        let trimmedValue = value?.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmedValue?.isEmpty == false ? trimmedValue : nil
     }
 }

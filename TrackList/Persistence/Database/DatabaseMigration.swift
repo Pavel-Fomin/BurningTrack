@@ -28,7 +28,9 @@ extension DatabaseMigration {
         .libraryRootDisplayModeSetting,
         .libraryRootDisplayModeColumnRepair,
         .playbackModeSettings,
-        .miniPlayerPresentationState
+        .miniPlayerPresentationState,
+        .playerContextSource,
+        .libraryPlaybackContextSource
     ]
 
     // Первая миграция фиксирует стартовую версию схемы без создания бизнес-таблиц.
@@ -697,6 +699,60 @@ extension DatabaseMigration {
             in: "app_settings",
             definition: "INTEGER NOT NULL DEFAULT 0 CHECK (mini_player_expanded IN (0, 1))",
             database: database
+        )
+    }
+
+    // Четырнадцатая миграция сохраняет источник текущего playback-контекста.
+    static let playerContextSource = DatabaseMigration(identifier: "014_player_context_source") { database in
+        try ensureColumn(
+            "context_type",
+            in: "player_state",
+            definition: "TEXT NOT NULL DEFAULT 'playerQueue' CHECK (context_type IN ('playerQueue', 'trackList'))",
+            database: database
+        )
+        try ensureColumn(
+            "context_id",
+            in: "player_state",
+            definition: "TEXT",
+            database: database
+        )
+    }
+
+    // Пятнадцатая миграция расширяет CHECK-ограничение источников playback-контекста.
+    static let libraryPlaybackContextSource = DatabaseMigration(identifier: "015_library_playback_context_source") { database in
+        try database.executeScript(
+            """
+            PRAGMA defer_foreign_keys = ON;
+
+            CREATE TABLE player_state_rebuilt (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                current_queue_item_id TEXT,
+                current_track_id TEXT,
+                context_type TEXT NOT NULL DEFAULT 'playerQueue'
+                    CHECK (context_type IN ('playerQueue', 'trackList', 'libraryFolder', 'libraryRoot')),
+                context_id TEXT,
+                playback_time REAL NOT NULL DEFAULT 0,
+                duration REAL,
+                is_playing INTEGER NOT NULL DEFAULT 0 CHECK (is_playing IN (0, 1)),
+                repeat_mode TEXT NOT NULL DEFAULT 'off' CHECK (repeat_mode IN ('off', 'one', 'all')),
+                shuffle_enabled INTEGER NOT NULL DEFAULT 0 CHECK (shuffle_enabled IN (0, 1)),
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY (current_queue_item_id) REFERENCES player_queue(id) ON DELETE SET NULL,
+                FOREIGN KEY (current_track_id) REFERENCES tracks(id) ON DELETE SET NULL
+            );
+
+            INSERT INTO player_state_rebuilt (
+                id, current_queue_item_id, current_track_id, context_type, context_id,
+                playback_time, duration, is_playing, repeat_mode, shuffle_enabled, updated_at
+            )
+            SELECT
+                id, current_queue_item_id, current_track_id, context_type, context_id,
+                playback_time, duration, is_playing, repeat_mode, shuffle_enabled, updated_at
+            FROM player_state;
+
+            DROP TABLE player_state;
+            ALTER TABLE player_state_rebuilt RENAME TO player_state;
+            """
         )
     }
 

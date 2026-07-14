@@ -84,6 +84,19 @@ struct LibraryCollectionTracksView: View {
         tracksViewModel.trackSections.flatMap(\.tracks)
     }
 
+    /// Возвращает источник только для поддержанных playback-контекстов фонотеки.
+    private var playbackSource: PlaybackContextSource? {
+        switch source {
+        case .allLibraryTracks:
+            return .libraryRoot
+        case .folder(let folderId):
+            return .libraryFolder(id: folderId)
+        case .collectionValue:
+            // Коллекционные разделы пока не входят в восстановление контекста.
+            return nil
+        }
+    }
+
     // MARK: - UI
 
     var body: some View {
@@ -202,6 +215,7 @@ struct LibraryCollectionTracksView: View {
                 LibraryTrackSectionsListView(
                     sections: tracksViewModel.trackSections,
                     allTracks: allVisibleTracks,
+                    playbackSource: playbackSource,
                     trackListNamesById: tracksViewModel.trackListNamesById,
                     metadataProvider: tracksViewModel,
                     playerViewModel: playerViewModel,

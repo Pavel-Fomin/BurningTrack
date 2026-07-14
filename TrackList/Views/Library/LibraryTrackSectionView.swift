@@ -19,6 +19,7 @@ struct LibraryTrackSectionView: View {
     
     let tracks: [LibraryTrack]
     let allTracks: [LibraryTrack]
+    let playbackSource: PlaybackContextSource?
 
     let trackListNamesById: [UUID: [String]]
 
@@ -73,6 +74,7 @@ struct LibraryTrackSectionView: View {
         return LibraryTrackRowContainer(
             track: track,
             allTracks: allTracks,
+            playbackSource: playbackSource,
             trackListNamesById: trackListNamesById,
             metadataProvider: metadataProvider,
             isScrollingFast: isScrollingFast,

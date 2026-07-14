@@ -34,8 +34,12 @@ final class TrackListPlaybackHandler {
         if track.isAvailable {
             if (playbackManager.currentTrackDisplayable as? Track)?.id == track.id {
                 playbackManager.togglePlayPause()
-            } else {
-                playbackManager.play(track: track, context: reader.tracks)
+            } else if let trackListId = reader.currentListId {
+                playbackManager.play(
+                    track: track,
+                    context: reader.tracks,
+                    source: .trackList(id: trackListId)
+                )
             }
         } else {
             print("❌ Трек недоступен: \(track.title ?? track.fileName)")

@@ -107,8 +107,13 @@ final class PlayerPlaybackContextStore {
 
     /// Возвращает следующий трек в текущем контексте.
     func nextTrack(after currentTrack: any TrackDisplayable) -> (track: any TrackDisplayable, context: [any TrackDisplayable])? {
-        guard !playbackIndexes.isEmpty,
-              let resolvedCurrentIndex = playbackIndex(for: currentTrack) else {
+        guard playbackIndexes.count > 1 else {
+            return nil
+        }
+        guard let resolvedCurrentIndex = playbackIndex(for: currentTrack) else {
+            PersistentLogger.log(
+                "Player context current track not found id=\(currentTrack.id)"
+            )
             return nil
         }
         currentPlaybackIndex = resolvedCurrentIndex
@@ -130,8 +135,13 @@ final class PlayerPlaybackContextStore {
 
     /// Возвращает предыдущий трек в текущем контексте.
     func previousTrack(before currentTrack: any TrackDisplayable) -> (track: any TrackDisplayable, context: [any TrackDisplayable])? {
-        guard !playbackIndexes.isEmpty,
-              let resolvedCurrentIndex = playbackIndex(for: currentTrack) else {
+        guard playbackIndexes.count > 1 else {
+            return nil
+        }
+        guard let resolvedCurrentIndex = playbackIndex(for: currentTrack) else {
+            PersistentLogger.log(
+                "Player context current track not found id=\(currentTrack.id)"
+            )
             return nil
         }
         currentPlaybackIndex = resolvedCurrentIndex
@@ -149,6 +159,11 @@ final class PlayerPlaybackContextStore {
         currentPlaybackIndex = previousIndex
         let originalIndex = playbackIndexes[previousIndex]
         return (originalTracks[originalIndex], originalTracks)
+    }
+
+    /// Показывает, можно ли выполнять переходы внутри текущего контекста.
+    var hasMultipleTracks: Bool {
+        originalTracks.count > 1
     }
 
     /// Очищает все контексты.

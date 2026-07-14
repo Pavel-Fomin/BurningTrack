@@ -137,6 +137,154 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
         XCTAssertEqual(queue.first?.position, 0)
     }
 
+    func testPlayerStatePersistenceUpsertsSinglePausedRow() throws {
+        let database = try makeDatabase()
+        let executor = try database.databaseExecutor()
+        let trackStore = SQLiteTrackStore(executor: executor)
+        let trackId = UUID()
+        let firstDate = Date(timeIntervalSince1970: 100)
+
+        try trackStore.insert(
+            TrackDatabaseModel(
+                id: trackId,
+                source: .library,
+                folderId: nil,
+                rootFolderId: nil,
+                fileName: "State.mp3",
+                relativePath: "State.mp3",
+                fileExtension: "mp3",
+                fileSize: nil,
+                fileDate: firstDate,
+                importedAt: firstDate,
+                updatedAt: firstDate,
+                bookmarkBase64: nil,
+                assetURLString: nil,
+                isAvailable: true,
+                isDeleted: false
+            )
+        )
+
+        let databaseStore = PlayerDatabaseStore(
+            queueStore: SQLitePlayerQueueStore(executor: executor),
+            stateStore: SQLitePlayerStateStore(executor: executor)
+        )
+        let persistence = PlayerStatePersistence(databaseStore: databaseStore)
+
+        try persistence.saveCurrentTrack(
+            trackId: trackId,
+            queueItemId: nil,
+            duration: 120,
+            playbackMode: PlaybackMode(
+                isShuffleEnabled: true,
+                repeatMode: .all
+            )
+        )
+        try persistence.saveCurrentTrack(
+            trackId: trackId,
+            queueItemId: nil,
+            duration: 0,
+            playbackMode: .defaultValue
+        )
+
+        let state = try XCTUnwrap(persistence.loadState())
+        XCTAssertEqual(state.id, 1)
+        XCTAssertEqual(state.currentTrackId, trackId)
+        XCTAssertNil(state.currentQueueItemId)
+        XCTAssertEqual(state.playbackTime, 0)
+        XCTAssertNil(state.duration)
+        XCTAssertFalse(state.isPlaying)
+        XCTAssertEqual(state.contextType, .playerQueue)
+        XCTAssertNil(state.contextId)
+        XCTAssertEqual(state.repeatMode, .off)
+        XCTAssertFalse(state.shuffleEnabled)
+
+        let ids = try executor.fetchAll(
+            "SELECT id FROM player_state;",
+            map: { try $0.requiredInt(at: 0) }
+        )
+        XCTAssertEqual(ids, [1])
+
+        let trackListId = UUID()
+        try persistence.saveCurrentTrack(
+            trackId: trackId,
+            queueItemId: nil,
+            duration: 120,
+            playbackMode: .defaultValue,
+            contextSource: .trackList(id: trackListId)
+        )
+
+        let trackListState = try XCTUnwrap(persistence.loadState())
+        XCTAssertEqual(trackListState.id, 1)
+        XCTAssertEqual(trackListState.contextType, .trackList)
+        XCTAssertEqual(trackListState.contextId, trackListId)
+
+        let folderId = UUID()
+        try persistence.saveCurrentTrack(
+            trackId: trackId,
+            queueItemId: nil,
+            duration: 120,
+            playbackMode: .defaultValue,
+            contextSource: .libraryFolder(id: folderId)
+        )
+
+        let folderState = try XCTUnwrap(persistence.loadState())
+        XCTAssertEqual(folderState.contextType, .libraryFolder)
+        XCTAssertEqual(folderState.contextId, folderId)
+
+        try persistence.saveCurrentTrack(
+            trackId: trackId,
+            queueItemId: nil,
+            duration: 120,
+            playbackMode: .defaultValue,
+            contextSource: .libraryRoot
+        )
+
+        let rootState = try XCTUnwrap(persistence.loadState())
+        XCTAssertEqual(rootState.contextType, .libraryRoot)
+        XCTAssertNil(rootState.contextId)
+
+        try persistence.clearState()
+        XCTAssertNil(try persistence.loadState())
+    }
+
+    func testPlayerDatabaseStorePreservesCurrentQueueReferenceWhenReplacingQueue() throws {
+        let database = try makeDatabase()
+        let executor = try database.databaseExecutor()
+        let trackStore = SQLiteTrackStore(executor: executor)
+        let databaseStore = PlayerDatabaseStore(
+            queueStore: SQLitePlayerQueueStore(executor: executor),
+            stateStore: SQLitePlayerStateStore(executor: executor)
+        )
+        let track = makeTrack(fileName: "QueueState.mp3")
+        let queueItemId = UUID()
+
+        try trackStore.insert(track)
+
+        let playerTrack = PlayerTrack(
+            queueItemId: queueItemId,
+            trackId: track.id,
+            title: "Queue state",
+            artist: nil,
+            duration: 30,
+            fileName: track.fileName,
+            isAvailable: true
+        )
+        try databaseStore.replaceQueue([playerTrack])
+
+        let persistence = PlayerStatePersistence(databaseStore: databaseStore)
+        try persistence.saveCurrentTrack(
+            trackId: track.id,
+            queueItemId: queueItemId,
+            duration: playerTrack.duration,
+            playbackMode: .defaultValue
+        )
+
+        // Повторная запись очереди не должна терять ссылку на оставшийся текущий элемент.
+        try databaseStore.replaceQueue([playerTrack])
+
+        XCTAssertEqual(try databaseStore.fetchState()?.currentQueueItemId, queueItemId)
+    }
+
     func testPlayerPlaybackModePersistsStableValues() throws {
         let database = try makeDatabase()
         let store = try SQLitePlayerSettingsStore(database: database)
@@ -843,7 +991,9 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
                 .libraryRootDisplayModeSetting,
                 .libraryRootDisplayModeColumnRepair,
                 .playbackModeSettings,
-                .miniPlayerPresentationState
+                .miniPlayerPresentationState,
+                .playerContextSource,
+                .libraryPlaybackContextSource
             ])
         )
 

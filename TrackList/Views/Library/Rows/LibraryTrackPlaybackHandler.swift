@@ -4,6 +4,16 @@ import Foundation
 @MainActor
 struct LibraryTrackPlaybackHandler {
     let playerViewModel: PlayerViewModel
+    /// Источник передаётся экраном, который сформировал текущий список.
+    let source: PlaybackContextSource?
+
+    init(
+        playerViewModel: PlayerViewModel,
+        source: PlaybackContextSource? = nil
+    ) {
+        self.playerViewModel = playerViewModel
+        self.source = source
+    }
 
     /// Проверяет, является ли трек текущим в контексте фонотеки.
     func isCurrent(_ track: LibraryTrack) -> Bool {
@@ -19,7 +29,14 @@ struct LibraryTrackPlaybackHandler {
     func handleTap(track: LibraryTrack, context: [LibraryTrack]) {
         if isCurrent(track) {
             playerViewModel.togglePlayPause()
+        } else if let source {
+            playerViewModel.play(
+                track: track,
+                context: context,
+                source: source
+            )
         } else {
+            // Разделы коллекции пока сохраняют прежний playback-путь без нового постоянного источника.
             playerViewModel.play(track: track, context: context)
         }
     }

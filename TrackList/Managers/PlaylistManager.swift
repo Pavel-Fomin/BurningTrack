@@ -53,6 +53,9 @@ final class PlaylistManager: ObservableObject {
             PersistentLogger.log("⚠️ PlaylistManager: SQLite queue load error \(error)")
             print("⚠️ Ошибка загрузки очереди плеера из SQLite: \(error)")
         }
+
+        // Обновление нужно и после reload, чтобы текущий удалённый элемент не оставался в мини-плеере.
+        onTracksChanged?(tracks)
     }
 
     // MARK: - Сохранение очереди плеера
@@ -62,6 +65,8 @@ final class PlaylistManager: ObservableObject {
     func saveQueue() -> Bool {
         do {
             try databaseStore.replaceQueue(tracks)
+            // Сообщаем владельцам playback-состояния только после успешной записи очереди.
+            onTracksChanged?(tracks)
             PersistentLogger.log("💾 PlaylistManager: saved SQLite player queue items=\(tracks.count)")
             return true
         } catch {

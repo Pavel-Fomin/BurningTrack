@@ -23,6 +23,14 @@ enum DatabaseRepeatMode: String, Equatable {
     case all
 }
 
+// Источник playback-контекста, сохранённый в player_state.
+enum DatabasePlaybackContextType: String, Equatable {
+    case playerQueue
+    case trackList
+    case libraryFolder
+    case libraryRoot
+}
+
 // Цветовая схема приложения в app_settings.
 enum DatabasePreferredColorScheme: String, Equatable {
     case system

@@ -11,7 +11,8 @@ extension PlayerViewModel: TrackListPlaybackManaging {
     /// Запускает трек из detail-flow треклиста через общий playback API.
     func play(
         track: Track,
-        context: [Track]
+        context: [Track],
+        source: PlaybackContextSource
     ) {
         let playbackTrack: any TrackDisplayable = track
         let playbackContext = context.map { track in
@@ -20,7 +21,8 @@ extension PlayerViewModel: TrackListPlaybackManaging {
 
         play(
             track: playbackTrack,
-            context: playbackContext
+            context: playbackContext,
+            source: source
         )
     }
 }
