@@ -151,6 +151,7 @@ enum DatabaseSchema {
         static let accentColorName = "accent_color_name"
         static let lastOpenedTab = "last_opened_tab"
         static let isTagReadingEnabled = "is_tag_reading_enabled"
+        static let miniPlayerExpanded = "mini_player_expanded"
         static let createdAt = "created_at"
         static let updatedAt = "updated_at"
     }
@@ -180,6 +181,8 @@ enum DatabaseSchema {
         static let restoreLastPosition = "restore_last_position"
         static let showMiniPlayer = "show_mini_player"
         static let backgroundPlaybackEnabled = "background_playback_enabled"
+        static let repeatMode = "repeat_mode"
+        static let shuffleEnabled = "shuffle_enabled"
         static let updatedAt = "updated_at"
     }
 

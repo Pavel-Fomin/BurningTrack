@@ -7,7 +7,7 @@
 
 import Foundation
 
-enum PlaybackContext {
+enum PlaybackContext: Equatable {
     /// Очередь основного плеера.
     case player
     /// Экран пользовательского треклиста.

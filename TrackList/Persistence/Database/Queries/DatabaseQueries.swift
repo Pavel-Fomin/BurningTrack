@@ -541,7 +541,8 @@ enum PlayerStateDatabaseQueries {
 enum AppSettingsDatabaseQueries {
     static let fetch = """
     SELECT id, schema_version, preferred_color_scheme, accent_color_name,
-           last_opened_tab, is_tag_reading_enabled, created_at, updated_at
+           last_opened_tab, is_tag_reading_enabled, mini_player_expanded,
+           created_at, updated_at
     FROM app_settings
     WHERE id = 1;
     """
@@ -549,28 +550,32 @@ enum AppSettingsDatabaseQueries {
     static let insert = """
     INSERT INTO app_settings (
         id, schema_version, preferred_color_scheme, accent_color_name,
-        last_opened_tab, is_tag_reading_enabled, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+        last_opened_tab, is_tag_reading_enabled, mini_player_expanded,
+        created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
     """
 
     static let update = """
     UPDATE app_settings
     SET schema_version = ?, preferred_color_scheme = ?, accent_color_name = ?,
-        last_opened_tab = ?, is_tag_reading_enabled = ?, created_at = ?, updated_at = ?
+        last_opened_tab = ?, is_tag_reading_enabled = ?, mini_player_expanded = ?,
+        created_at = ?, updated_at = ?
     WHERE id = ?;
     """
 
     static let upsert = """
     INSERT INTO app_settings (
         id, schema_version, preferred_color_scheme, accent_color_name,
-        last_opened_tab, is_tag_reading_enabled, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        last_opened_tab, is_tag_reading_enabled, mini_player_expanded,
+        created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
         schema_version = excluded.schema_version,
         preferred_color_scheme = excluded.preferred_color_scheme,
         accent_color_name = excluded.accent_color_name,
         last_opened_tab = excluded.last_opened_tab,
         is_tag_reading_enabled = excluded.is_tag_reading_enabled,
+        mini_player_expanded = excluded.mini_player_expanded,
         created_at = excluded.created_at,
         updated_at = excluded.updated_at;
     """
@@ -676,5 +681,23 @@ enum PlayerSettingsDatabaseQueries {
     static let delete = """
     DELETE FROM player_settings
     WHERE id = 1;
+    """
+
+    // Режимы воспроизведения читаются отдельно, чтобы не смешивать их с общими настройками player_settings.
+    static let fetchPlaybackMode = """
+    SELECT repeat_mode, shuffle_enabled, updated_at
+    FROM player_settings
+    WHERE id = 1;
+    """
+
+    // Upsert режима не затрагивает остальные настройки плеера и использует значения схемы по умолчанию.
+    static let upsertPlaybackMode = """
+    INSERT INTO player_settings (
+        id, repeat_mode, shuffle_enabled, updated_at
+    ) VALUES (?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+        repeat_mode = excluded.repeat_mode,
+        shuffle_enabled = excluded.shuffle_enabled,
+        updated_at = excluded.updated_at;
     """
 }

@@ -94,17 +94,21 @@ extension AppSettings {
         var libraryFoldersSortMode: LibraryFoldersSortMode?
         // Последний выбранный режим отображения корня фонотеки.
         var libraryRootDisplayMode: LibraryRootDisplayMode
+        // Последнее состояние раскрытия мини-плеера хранится как настройка интерфейса.
+        var isMiniPlayerExpanded: Bool
 
         init(
             libraryTrackSortMode: LibraryTrackSortMode,
             trackListsSortMode: TrackListsSortMode?,
             libraryFoldersSortMode: LibraryFoldersSortMode?,
-            libraryRootDisplayMode: LibraryRootDisplayMode
+            libraryRootDisplayMode: LibraryRootDisplayMode,
+            isMiniPlayerExpanded: Bool
         ) {
             self.libraryTrackSortMode = libraryTrackSortMode
             self.trackListsSortMode = trackListsSortMode
             self.libraryFoldersSortMode = libraryFoldersSortMode
             self.libraryRootDisplayMode = libraryRootDisplayMode
+            self.isMiniPlayerExpanded = isMiniPlayerExpanded
         }
 
         // По умолчанию треки фонотеки идут по дате файла, а треклисты и папки — в сохранённом фактическом порядке.
@@ -113,7 +117,8 @@ extension AppSettings {
                 libraryTrackSortMode: .fileDateDesc,
                 trackListsSortMode: nil,
                 libraryFoldersSortMode: nil,
-                libraryRootDisplayMode: .folders
+                libraryRootDisplayMode: .folders,
+                isMiniPlayerExpanded: false
             )
         }
     }

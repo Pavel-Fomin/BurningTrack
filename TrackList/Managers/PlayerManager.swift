@@ -160,6 +160,20 @@ final class PlayerManager {
         }
     }
 
+    /// Перезапускает текущий item с нулевой позиции без создания нового item.
+    func restartCurrent() {
+        guard player.currentItem != nil else { return }
+
+        player.seek(
+            to: .zero,
+            toleranceBefore: .zero,
+            toleranceAfter: .zero
+        ) { [weak self] _ in
+            self?.player.play()
+        }
+        isPlaying = true
+    }
+
     func seek(to time: TimeInterval) {
         let cm = CMTime(seconds: time, preferredTimescale: 600)
         player.seek(to: cm)

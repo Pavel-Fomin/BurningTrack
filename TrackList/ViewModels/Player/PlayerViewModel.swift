@@ -33,6 +33,11 @@ final class PlayerViewModel: ObservableObject {
     @Published var trackDuration: TimeInterval = 0.0                 /// Длительность текущего трека
     @Published var currentContext: PlaybackContext?                  /// Контекст воспроизведения
     @Published private(set) var snapshotsByTrackId: [UUID: TrackRuntimeSnapshot] = [:] /// Runtime snapshot треков по id
+
+    /// Текущий режим читается из хранилища playback-контекста.
+    var playbackMode: PlaybackMode {
+        playbackContextStore.playbackMode
+    }
     
     // MARK: - MiniPlayer State
     
@@ -97,14 +102,15 @@ final class PlayerViewModel: ObservableObject {
     
     init(
         playerManager: any PlayerManaging = PlayerManager(),
-        playbackContextStore: PlayerPlaybackContextStore = PlayerPlaybackContextStore(),
+        playbackContextStore: PlayerPlaybackContextStore? = nil,
         nowPlayingSnapshotBuilder: any NowPlayingSnapshotBuilding = NowPlayingSnapshotBuilder(),
         runtimeSnapshotController: PlayerRuntimeSnapshotController = PlayerRuntimeSnapshotController(),
         eventObserver: any PlayerEventObserving = NotificationPlayerEventObserver(),
         toastPresenter: (any ToastPresenting)? = nil
     ) {
         self.playerManager = playerManager
-        self.playbackContextStore = playbackContextStore
+        // Store создаётся внутри main-actor и синхронно восстанавливает режим до первого контекста.
+        self.playbackContextStore = playbackContextStore ?? PlayerPlaybackContextStore()
         self.nowPlayingSnapshotBuilder = nowPlayingSnapshotBuilder
         self.runtimeSnapshotController = runtimeSnapshotController
         self.eventObserver = eventObserver
@@ -128,7 +134,7 @@ final class PlayerViewModel: ObservableObject {
         
         // Автопереход к следующему треку по завершении
         eventObserver.onTrackDidFinish = { [weak self] in
-            self?.playNextTrack()
+            self?.handleTrackDidFinish()
         }
 
         // Обновление runtime snapshot трека
@@ -275,22 +281,86 @@ final class PlayerViewModel: ObservableObject {
     }
     
     // MARK: - Воспроизведение трека
+
+    /// Атомарно изменяет режимы воспроизведения текущего контекста.
+    func setPlaybackMode(_ mode: PlaybackMode) {
+        let normalizedMode = mode.normalized
+        guard playbackMode != normalizedMode else { return }
+
+        // Сообщаем SwiftUI об изменении вычисляемого состояния до изменения Store.
+        objectWillChange.send()
+        playbackContextStore.setPlaybackMode(
+            normalizedMode,
+            currentTrack: currentTrackDisplayable
+        )
+    }
+
+    /// Переключает Shuffle и выключает Repeat при включении перемешивания.
+    func toggleShuffle() {
+        var mode = playbackMode
+        if mode.isShuffleEnabled {
+            mode.isShuffleEnabled = false
+        } else {
+            mode.isShuffleEnabled = true
+            mode.repeatMode = .off
+        }
+        setPlaybackMode(mode)
+    }
+
+    /// Включает Repeat All и выключает остальные режимы.
+    func toggleRepeatAll() {
+        var mode = playbackMode
+        if mode.repeatMode == .all {
+            mode.repeatMode = .off
+        } else {
+            mode.isShuffleEnabled = false
+            mode.repeatMode = .all
+        }
+        setPlaybackMode(mode)
+    }
+
+    /// Включает Repeat One и выключает остальные режимы.
+    func toggleRepeatOne() {
+        var mode = playbackMode
+        if mode.repeatMode == .one {
+            mode.repeatMode = .off
+        } else {
+            mode.isShuffleEnabled = false
+            mode.repeatMode = .one
+        }
+        setPlaybackMode(mode)
+    }
     
     /// Запуск воспроизведения трека в заданном контексте
     func play(track: any TrackDisplayable, context: [any TrackDisplayable] = []) {
         
         // Определяем контекст воспроизведения
         let contextType = PlaybackContext.detect(from: context)
+        let isSameContext = playbackContextStore.isCurrentContext(context)
+        let isSameTrack: Bool
+        if let current = currentTrackDisplayable {
+            isSameTrack = current.id == track.id &&
+                type(of: current) == type(of: track) &&
+                currentContext == contextType &&
+                isSameContext
+        } else {
+            isSameTrack = false
+        }
+
         currentContext = contextType
-        
-        // Если это тот же самый трек и тот же тип — просто продолжить
-        if let current = currentTrackDisplayable,
-           current.id == track.id,
-           type(of: current) == type(of: track) {
+
+        // Обновляем контекст до проверки текущего трека, чтобы не потерять его позицию.
+        _ = playbackContextStore.updateContext(
+            currentTrack: track,
+            context: context
+        )
+
+        // Если это тот же трек и тот же контекст — просто продолжить.
+        if isSameTrack {
             playerManager.playCurrent()
             isPlaying = true
+            updateMiniPlayerProgressState()
             return
-            
         }
         
         // Новый трек: останавливаем доступ к старому
@@ -302,12 +372,6 @@ final class PlayerViewModel: ObservableObject {
         
         updateMiniPlayerStaticState(for: track)
         updateMiniPlayerProgressState()
-        
-        // Обновляем контексты
-        playbackContextStore.updateContext(
-            currentTrack: track,
-            context: context
-        )
         
         // Стартуем воспроизведение через PlayerManager
         Task { @MainActor in
@@ -377,6 +441,59 @@ final class PlayerViewModel: ObservableObject {
         }
     }
 
+    /// Обрабатывает завершение текущего трека с учётом режима повтора.
+    private func handleTrackDidFinish() {
+        if playbackMode.repeatMode == .one {
+            restartCurrentTrack()
+            return
+        }
+
+        guard startNextTrack() else {
+            markPlaybackFinished()
+            return
+        }
+    }
+
+    /// Перезапускает текущий трек без повторной загрузки его модели.
+    private func restartCurrentTrack() {
+        guard currentTrackDisplayable != nil else { return }
+
+        currentTime = 0
+        isPlaying = true
+        playerManager.restartCurrent()
+        updateMiniPlayerProgressState()
+
+        lastNowPlayingTick = 0
+        playerManager.applyPlaybackTime(
+            currentTime: currentTime,
+            isPlaying: isPlaying
+        )
+
+        if let current = currentTrackDisplayable {
+            playerManager.applyNowPlaying(
+                snapshot: makeNowPlayingSnapshot(for: current)
+            )
+        }
+    }
+
+    /// Синхронизирует состояние ViewModel, если текущий контекст закончился без перехода.
+    private func markPlaybackFinished() {
+        isPlaying = false
+        updateMiniPlayerProgressState()
+
+        lastNowPlayingTick = 0
+        playerManager.applyPlaybackTime(
+            currentTime: currentTime,
+            isPlaying: false
+        )
+
+        if let current = currentTrackDisplayable {
+            playerManager.applyNowPlaying(
+                snapshot: makeNowPlayingSnapshot(for: current)
+            )
+        }
+    }
+
     func seek(to time: TimeInterval) {
         playerManager.seek(to: time)
         currentTime = time
@@ -395,10 +512,24 @@ final class PlayerViewModel: ObservableObject {
     
     /// Следующий трек в текущем контексте
     func playNextTrack() {
-        guard let current = currentTrackDisplayable else { return }
-        guard let next = playbackContextStore.nextTrack(after: current) else { return }
+        _ = startNextTrack()
+    }
 
-        play(track: next.track, context: next.context)
+    /// Запускает следующий трек и сообщает, был ли найден переход.
+    @discardableResult
+    private func startNextTrack() -> Bool {
+        guard let current = currentTrackDisplayable,
+              let next = playbackContextStore.nextTrack(after: current) else {
+            return false
+        }
+
+        if next.track.id == current.id,
+           type(of: next.track) == type(of: current) {
+            restartCurrentTrack()
+        } else {
+            play(track: next.track, context: next.context)
+        }
+        return true
     }
     
     /// Предыдущий трек в текущем контексте
@@ -411,6 +542,12 @@ final class PlayerViewModel: ObservableObject {
         }
 
         guard let previous = playbackContextStore.previousTrack(before: current) else { return }
+
+        if previous.track.id == current.id,
+           type(of: previous.track) == type(of: current) {
+            restartCurrentTrack()
+            return
+        }
 
         play(track: previous.track, context: previous.context)
     }

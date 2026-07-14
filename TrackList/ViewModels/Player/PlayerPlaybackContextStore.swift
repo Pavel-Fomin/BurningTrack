@@ -9,150 +9,154 @@
 
 import Foundation
 
+/// Абстрагирует синхронное постоянное хранилище режима от playback-механизма.
+@MainActor
+protocol PlaybackModePersisting: AnyObject {
+    func loadPlaybackMode() -> PlaybackMode
+    func savePlaybackMode(_ mode: PlaybackMode)
+}
+
 /// Хранит текущий контекст воспроизведения.
 /// Отвечает только за:
-/// - сохранение контекста плеера / треклиста / фонотеки / купленных iTunes-треков;
-/// - очистку неактивных контекстов;
+/// - сохранение исходного контекста воспроизведения;
+/// - построение playback-порядка через индексы без изменения исходного массива;
+/// - применение Shuffle и Repeat к текущему контексту;
 /// - поиск следующего и предыдущего трека.
 @MainActor
 final class PlayerPlaybackContextStore {
 
-    private var playerTracksContext: [PlayerTrack] = []
-    private var trackListContext: [Track] = []
-    private var libraryTracksContext: [LibraryTrack] = []
-    /// Контекст купленных iTunes-треков хранится отдельно от обычной фонотеки.
-    private var purchasedITunesTracksContext: [PurchasedITunesPlayableTrack] = []
+    /// Единственный источник данных текущего контекста в исходном порядке.
+    private var originalTracks: [any TrackDisplayable] = []
 
-    /// Позволяет создавать store как зависимость по умолчанию в init PlayerViewModel.
-    nonisolated init() {}
+    /// Индексы элементов originalTracks в фактическом порядке воспроизведения.
+    private var playbackIndexes: [Int] = []
 
-    /// Обновляет контекст воспроизведения под тип текущего трека.
+    /// Текущая позиция в playbackIndexes.
+    private var currentPlaybackIndex: Int?
+
+    /// Идентичность контекста нужна, чтобы не сбрасывать Shuffle при переходе к следующему треку.
+    private var contextIdentity: ContextIdentity?
+
+    /// Режимы относятся к текущей playback-сессии и не смешиваются с моделями UI или базы данных.
+    private(set) var playbackMode: PlaybackMode
+
+    /// Синхронный адаптер постоянных настроек; чтение выполняется до первого контекста.
+    private let playbackModePersistence: any PlaybackModePersisting
+
+    private struct ContextIdentity: Equatable {
+        let kind: PlaybackContext
+        let trackIDs: [UUID]
+    }
+
+    /// Создаёт store с уже восстановленным режимом до построения playback-индексов.
+    init(
+        playbackModePersistence: (any PlaybackModePersisting)? = nil
+    ) {
+        let resolvedPersistence = playbackModePersistence ?? AppSettingsManager.shared
+        self.playbackModePersistence = resolvedPersistence
+        self.playbackMode = resolvedPersistence.loadPlaybackMode().normalized
+    }
+
+    /// Проверяет, совпадает ли переданный массив с активным контекстом.
+    func isCurrentContext(_ context: [any TrackDisplayable]) -> Bool {
+        contextIdentity == makeContextIdentity(for: context)
+    }
+
+    /// Обновляет контекст воспроизведения и возвращает true для нового контекста.
     func updateContext(
         currentTrack: any TrackDisplayable,
         context: [any TrackDisplayable]
-    ) {
-        if currentTrack is PlayerTrack {
-            playerTracksContext = context.compactMap { $0 as? PlayerTrack }
-            trackListContext = []
-            libraryTracksContext = []
-            purchasedITunesTracksContext = []
-        } else if currentTrack is Track {
-            trackListContext = context.compactMap { $0 as? Track }
-            playerTracksContext = []
-            libraryTracksContext = []
-            purchasedITunesTracksContext = []
-        } else if currentTrack is LibraryTrack {
-            libraryTracksContext = context.compactMap { $0 as? LibraryTrack }
-            trackListContext = []
-            playerTracksContext = []
-            purchasedITunesTracksContext = []
-        } else if currentTrack is PurchasedITunesPlayableTrack {
-            // Купленные iTunes-треки живут отдельно от фонотеки и не попадают в LibraryTrack.
-            purchasedITunesTracksContext = context.compactMap { $0 as? PurchasedITunesPlayableTrack }
-            playerTracksContext = []
-            trackListContext = []
-            libraryTracksContext = []
-        } else {
+    ) -> Bool {
+        guard !context.isEmpty else {
             clear()
+            return true
+        }
+
+        let newIdentity = makeContextIdentity(for: context)
+        guard newIdentity != contextIdentity else {
+            currentPlaybackIndex = playbackIndex(for: currentTrack)
+            return false
+        }
+
+        originalTracks = context
+        contextIdentity = newIdentity
+        playbackIndexes = makePlaybackIndexes(currentTrack: currentTrack)
+        currentPlaybackIndex = playbackIndex(for: currentTrack)
+        return true
+    }
+
+    /// Атомарно заменяет оба режима и перестраивает только индексный порядок Shuffle.
+    func setPlaybackMode(
+        _ mode: PlaybackMode,
+        currentTrack: (any TrackDisplayable)?
+    ) {
+        let normalizedMode = mode.normalized
+        let shuffleChanged = normalizedMode.isShuffleEnabled != playbackMode.isShuffleEnabled
+        playbackMode = normalizedMode
+
+        // Store остаётся единственным владельцем состояния, а запись выполняется централизованно.
+        playbackModePersistence.savePlaybackMode(normalizedMode)
+
+        guard shuffleChanged, !originalTracks.isEmpty else { return }
+
+        playbackIndexes = makePlaybackIndexes(currentTrack: currentTrack)
+        currentPlaybackIndex = currentTrack.flatMap { track in
+            playbackIndex(for: track)
         }
     }
 
     /// Возвращает следующий трек в текущем контексте.
     func nextTrack(after currentTrack: any TrackDisplayable) -> (track: any TrackDisplayable, context: [any TrackDisplayable])? {
-        if let libraryTrack = currentTrack as? LibraryTrack {
-            guard let index = libraryTracksContext.firstIndex(where: { $0.id == libraryTrack.id }),
-                  index + 1 < libraryTracksContext.count else { return nil }
+        guard !playbackIndexes.isEmpty,
+              let resolvedCurrentIndex = playbackIndex(for: currentTrack) else {
+            return nil
+        }
+        currentPlaybackIndex = resolvedCurrentIndex
+        guard let currentIndex = currentPlaybackIndex else { return nil }
 
-            return (
-                libraryTracksContext[index + 1],
-                libraryTracksContext.map { $0 as any TrackDisplayable }
-            )
+        let nextIndex: Int
+        if currentIndex + 1 < playbackIndexes.count {
+            nextIndex = currentIndex + 1
+        } else if playbackMode.repeatMode == .all {
+            nextIndex = 0
+        } else {
+            return nil
         }
 
-        if let track = currentTrack as? Track {
-            guard let index = trackListContext.firstIndex(where: { $0.id == track.id }),
-                  index + 1 < trackListContext.count else { return nil }
-
-            return (
-                trackListContext[index + 1],
-                trackListContext.map { $0 as any TrackDisplayable }
-            )
-        }
-
-        if let playerTrack = currentTrack as? PlayerTrack {
-            guard let index = playerTracksContext.firstIndex(where: { $0.id == playerTrack.id }),
-                  index + 1 < playerTracksContext.count else { return nil }
-
-            return (
-                playerTracksContext[index + 1],
-                playerTracksContext.map { $0 as any TrackDisplayable }
-            )
-        }
-
-        if let purchasedTrack = currentTrack as? PurchasedITunesPlayableTrack {
-            guard let index = purchasedITunesTracksContext.firstIndex(where: { $0.trackId == purchasedTrack.trackId }),
-                  index + 1 < purchasedITunesTracksContext.count else { return nil }
-
-            return (
-                purchasedITunesTracksContext[index + 1],
-                purchasedITunesTracksContext.map { $0 as any TrackDisplayable }
-            )
-        }
-
-        return nil
+        currentPlaybackIndex = nextIndex
+        let originalIndex = playbackIndexes[nextIndex]
+        return (originalTracks[originalIndex], originalTracks)
     }
 
     /// Возвращает предыдущий трек в текущем контексте.
     func previousTrack(before currentTrack: any TrackDisplayable) -> (track: any TrackDisplayable, context: [any TrackDisplayable])? {
-        if let libraryTrack = currentTrack as? LibraryTrack {
-            guard let index = libraryTracksContext.firstIndex(where: { $0.id == libraryTrack.id }),
-                  index - 1 >= 0 else { return nil }
+        guard !playbackIndexes.isEmpty,
+              let resolvedCurrentIndex = playbackIndex(for: currentTrack) else {
+            return nil
+        }
+        currentPlaybackIndex = resolvedCurrentIndex
+        guard let currentIndex = currentPlaybackIndex else { return nil }
 
-            return (
-                libraryTracksContext[index - 1],
-                libraryTracksContext.map { $0 as any TrackDisplayable }
-            )
+        let previousIndex: Int
+        if currentIndex > 0 {
+            previousIndex = currentIndex - 1
+        } else if playbackMode.repeatMode == .all {
+            previousIndex = playbackIndexes.count - 1
+        } else {
+            return nil
         }
 
-        if let track = currentTrack as? Track {
-            guard let index = trackListContext.firstIndex(where: { $0.id == track.id }),
-                  index - 1 >= 0 else { return nil }
-
-            return (
-                trackListContext[index - 1],
-                trackListContext.map { $0 as any TrackDisplayable }
-            )
-        }
-
-        if let playerTrack = currentTrack as? PlayerTrack {
-            guard let index = playerTracksContext.firstIndex(where: { $0.id == playerTrack.id }),
-                  index - 1 >= 0 else { return nil }
-
-            return (
-                playerTracksContext[index - 1],
-                playerTracksContext.map { $0 as any TrackDisplayable }
-            )
-        }
-
-        if let purchasedTrack = currentTrack as? PurchasedITunesPlayableTrack {
-            guard let index = purchasedITunesTracksContext.firstIndex(where: { $0.trackId == purchasedTrack.trackId }),
-                  index - 1 >= 0 else { return nil }
-
-            return (
-                purchasedITunesTracksContext[index - 1],
-                purchasedITunesTracksContext.map { $0 as any TrackDisplayable }
-            )
-        }
-
-        return nil
+        currentPlaybackIndex = previousIndex
+        let originalIndex = playbackIndexes[previousIndex]
+        return (originalTracks[originalIndex], originalTracks)
     }
 
     /// Очищает все контексты.
     func clear() {
-        playerTracksContext = []
-        trackListContext = []
-        libraryTracksContext = []
-        purchasedITunesTracksContext = []
+        originalTracks = []
+        playbackIndexes = []
+        currentPlaybackIndex = nil
+        contextIdentity = nil
     }
 
     /// Возвращает все известные trackId из текущих контекстов.
@@ -164,20 +168,56 @@ final class PlayerPlaybackContextStore {
             ids.insert(currentTrack.trackId)
         }
 
-        for track in playerTracksContext {
+        for track in originalTracks {
             guard !track.isPurchasedITunesRuntimeTrack else { continue }
-            ids.insert(track.trackId)
-        }
-
-        for track in trackListContext {
-            guard !track.isPurchasedITunesRuntimeTrack else { continue }
-            ids.insert(track.trackId)
-        }
-
-        for track in libraryTracksContext {
             ids.insert(track.trackId)
         }
 
         return ids
+    }
+
+    // MARK: - Индексный порядок
+
+    /// Создаёт playback-порядок, оставляя текущий трек первым при включении Shuffle.
+    private func makePlaybackIndexes(
+        currentTrack: (any TrackDisplayable)?
+    ) -> [Int] {
+        let allIndexes = Array(originalTracks.indices)
+
+        guard playbackMode.isShuffleEnabled else {
+            return allIndexes
+        }
+
+        guard let currentTrack,
+              let currentOriginalIndex = originalTracks.firstIndex(where: { $0.id == currentTrack.id }) else {
+            var shuffledIndexes = allIndexes
+            shuffledIndexes.shuffle()
+            return shuffledIndexes
+        }
+
+        var remainingIndexes = allIndexes.filter { $0 != currentOriginalIndex }
+        remainingIndexes.shuffle()
+        return [currentOriginalIndex] + remainingIndexes
+    }
+
+    /// Возвращает позицию исходного трека в текущем playback-порядке.
+    private func playbackIndex(
+        for track: any TrackDisplayable
+    ) -> Int? {
+        guard let originalIndex = originalTracks.firstIndex(where: { $0.id == track.id }) else {
+            return nil
+        }
+
+        return playbackIndexes.firstIndex(of: originalIndex)
+    }
+
+    /// Строит стабильный идентификатор контекста по типу и исходному порядку элементов.
+    private func makeContextIdentity(
+        for context: [any TrackDisplayable]
+    ) -> ContextIdentity {
+        ContextIdentity(
+            kind: PlaybackContext.detect(from: context),
+            trackIDs: context.map { $0.id }
+        )
     }
 }

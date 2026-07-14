@@ -83,6 +83,14 @@ final class SQLiteAppSettingsStore: AppSettingsDatabaseReading, AppSettingsDatab
             throw DatabaseError.invalidColumnValue(column: DatabaseSchema.AppSettings.preferredColorScheme, value: schemeRawValue)
         }
 
+        let miniPlayerExpandedValue = try row.requiredInt(at: 6)
+        guard miniPlayerExpandedValue == 0 || miniPlayerExpandedValue == 1 else {
+            throw DatabaseError.invalidColumnValue(
+                column: DatabaseSchema.AppSettings.miniPlayerExpanded,
+                value: String(miniPlayerExpandedValue)
+            )
+        }
+
         return AppSettingsDatabaseModel(
             id: try row.requiredInt(at: 0),
             schemaVersion: try row.requiredInt(at: 1),
@@ -90,8 +98,9 @@ final class SQLiteAppSettingsStore: AppSettingsDatabaseReading, AppSettingsDatab
             accentColorName: row.string(at: 3),
             lastOpenedTab: row.string(at: 4),
             isTagReadingEnabled: try row.requiredBool(at: 5),
-            createdAt: try row.requiredDate(at: 6),
-            updatedAt: try row.requiredDate(at: 7)
+            miniPlayerExpanded: miniPlayerExpandedValue == 1,
+            createdAt: try row.requiredDate(at: 7),
+            updatedAt: try row.requiredDate(at: 8)
         )
     }
 
@@ -106,8 +115,9 @@ final class SQLiteAppSettingsStore: AppSettingsDatabaseReading, AppSettingsDatab
         try statement.bind(model.accentColorName, at: 4)
         try statement.bind(model.lastOpenedTab, at: 5)
         try statement.bind(model.isTagReadingEnabled, at: 6)
-        try statement.bind(model.createdAt, at: 7)
-        try statement.bind(model.updatedAt, at: 8)
+        try statement.bind(model.miniPlayerExpanded, at: 7)
+        try statement.bind(model.createdAt, at: 8)
+        try statement.bind(model.updatedAt, at: 9)
     }
 
     private static func bindUpdate(
@@ -120,9 +130,10 @@ final class SQLiteAppSettingsStore: AppSettingsDatabaseReading, AppSettingsDatab
         try statement.bind(model.accentColorName, at: 3)
         try statement.bind(model.lastOpenedTab, at: 4)
         try statement.bind(model.isTagReadingEnabled, at: 5)
-        try statement.bind(model.createdAt, at: 6)
-        try statement.bind(model.updatedAt, at: 7)
-        try statement.bind(model.id, at: 8)
+        try statement.bind(model.miniPlayerExpanded, at: 6)
+        try statement.bind(model.createdAt, at: 7)
+        try statement.bind(model.updatedAt, at: 8)
+        try statement.bind(model.id, at: 9)
     }
 }
 
@@ -210,6 +221,7 @@ final class SettingsDatabaseStore {
         // Обновляем только рабочие поля текущей бизнес-модели AppSettings.
         appModel.schemaVersion = settings.schemaVersion
         appModel.isTagReadingEnabled = settings.visible.metadata.isTagReadingEnabled
+        appModel.miniPlayerExpanded = settings.internalSettings.isMiniPlayerExpanded
         appModel.updatedAt = now
 
         libraryModel.showTrackListBadges = settings.visible.library.isTrackListMembershipVisible
@@ -250,7 +262,8 @@ final class SettingsDatabaseStore {
                 libraryFoldersSortMode: libraryModel.libraryFoldersSortMode.flatMap(LibraryFoldersSortMode.init(rawValue:)),
                 libraryRootDisplayMode: LibraryRootDisplayMode(
                     rawValue: libraryModel.libraryRootDisplayMode ?? ""
-                ) ?? .folders
+                ) ?? .folders,
+                isMiniPlayerExpanded: appModel.miniPlayerExpanded
             )
         )
     }
@@ -267,6 +280,7 @@ final class SettingsDatabaseStore {
             accentColorName: nil,
             lastOpenedTab: nil,
             isTagReadingEnabled: settings.visible.metadata.isTagReadingEnabled,
+            miniPlayerExpanded: settings.internalSettings.isMiniPlayerExpanded,
             createdAt: createdAt,
             updatedAt: updatedAt
         )

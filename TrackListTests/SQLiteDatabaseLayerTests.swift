@@ -137,6 +137,38 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
         XCTAssertEqual(queue.first?.position, 0)
     }
 
+    func testPlayerPlaybackModePersistsStableValues() throws {
+        let database = try makeDatabase()
+        let store = try SQLitePlayerSettingsStore(database: database)
+        let updatedAt = Date(timeIntervalSince1970: 100)
+
+        // Проверяем, что режим хранится в player_settings, а не во временном runtime-состоянии.
+        try store.upsertPlaybackMode(
+            PlayerPlaybackModeDatabaseModel(
+                repeatMode: .all,
+                shuffleEnabled: false,
+                updatedAt: updatedAt
+            )
+        )
+
+        let loaded = try XCTUnwrap(store.fetchPlaybackMode())
+        XCTAssertEqual(loaded.repeatMode, .all)
+        XCTAssertFalse(loaded.shuffleEnabled)
+        XCTAssertEqual(loaded.updatedAt, updatedAt)
+
+        try store.upsertPlaybackMode(
+            PlayerPlaybackModeDatabaseModel(
+                repeatMode: .off,
+                shuffleEnabled: true,
+                updatedAt: updatedAt.addingTimeInterval(1)
+            )
+        )
+
+        let updated = try XCTUnwrap(store.fetchPlaybackMode())
+        XCTAssertEqual(updated.repeatMode, .off)
+        XCTAssertTrue(updated.shuffleEnabled)
+    }
+
     func testTrackListDatabaseStorePersistsBusinessModels() throws {
         let database = try makeDatabase()
         let executor = try database.databaseExecutor()
@@ -626,9 +658,59 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
 
         XCTAssertEqual(
             try store.fetchSettings { AppSettings.defaultValue }
-                .internalSettings.libraryRootDisplayMode,
+            .internalSettings.libraryRootDisplayMode,
             .folders
         )
+    }
+
+    func testSettingsDatabaseStorePersistsMiniPlayerPresentationState() throws {
+        let database = try makeDatabase()
+        let store = try SettingsDatabaseStore(database: database)
+        let initialSettings = try store.fetchSettings {
+            nil
+        }
+
+        XCTAssertFalse(initialSettings.internalSettings.isMiniPlayerExpanded)
+
+        var expandedSettings = initialSettings
+        expandedSettings.internalSettings.isMiniPlayerExpanded = true
+        try store.saveSettings(expandedSettings)
+
+        let reloadedExpandedSettings = try store.fetchSettings {
+            AppSettings.defaultValue
+        }
+        XCTAssertTrue(reloadedExpandedSettings.internalSettings.isMiniPlayerExpanded)
+
+        var collapsedSettings = reloadedExpandedSettings
+        collapsedSettings.internalSettings.isMiniPlayerExpanded = false
+        try store.saveSettings(collapsedSettings)
+
+        let reloadedCollapsedSettings = try store.fetchSettings {
+            AppSettings.defaultValue
+        }
+        XCTAssertFalse(reloadedCollapsedSettings.internalSettings.isMiniPlayerExpanded)
+    }
+
+    func testSQLiteAppSettingsStoreRejectsCorruptedMiniPlayerPresentationState() throws {
+        let database = try makeDatabase()
+        let settingsStore = try SettingsDatabaseStore(database: database)
+        _ = try settingsStore.fetchSettings {
+            nil
+        }
+
+        let executor = try database.databaseExecutor()
+        try executor.write { database in
+            // Отключаем проверку ограничения только в тесте, чтобы смоделировать повреждённую базу.
+            try database.executeScript(
+                """
+                PRAGMA ignore_check_constraints = ON;
+                UPDATE app_settings SET mini_player_expanded = 2 WHERE id = 1;
+                """
+            )
+        }
+
+        let appSettingsStore = try SQLiteAppSettingsStore(database: database)
+        XCTAssertThrowsError(try appSettingsStore.fetch())
     }
 
     func testSettingsDatabaseStoreFallsBackToFoldersForMissingLibraryRootDisplayMode() throws {
@@ -759,7 +841,9 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
                 .trackMetadataLabel,
                 .folderTrackSortMode,
                 .libraryRootDisplayModeSetting,
-                .libraryRootDisplayModeColumnRepair
+                .libraryRootDisplayModeColumnRepair,
+                .playbackModeSettings,
+                .miniPlayerPresentationState
             ])
         )
 

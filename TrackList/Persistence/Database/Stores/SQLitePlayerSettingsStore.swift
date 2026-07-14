@@ -77,6 +77,31 @@ final class SQLitePlayerSettingsStore: PlayerSettingsDatabaseReading, PlayerSett
         }
     }
 
+    /// Читает только постоянную часть режима воспроизведения из player_settings.
+    func fetchPlaybackMode() throws -> PlayerPlaybackModeDatabaseModel? {
+        try executor.read { database in
+            let statement = try database.prepare(PlayerSettingsDatabaseQueries.fetchPlaybackMode)
+
+            guard try statement.step() == .row else {
+                return nil
+            }
+
+            return try Self.mapPlaybackMode(statement.rowReader())
+        }
+    }
+
+    /// Атомарно обновляет только поля режима воспроизведения.
+    func upsertPlaybackMode(_ model: PlayerPlaybackModeDatabaseModel) throws {
+        try executor.write { database in
+            let statement = try database.prepare(PlayerSettingsDatabaseQueries.upsertPlaybackMode)
+            try statement.bind(1, at: 1)
+            try statement.bind(model.repeatMode.rawValue, at: 2)
+            try statement.bind(model.shuffleEnabled, at: 3)
+            try statement.bind(model.updatedAt, at: 4)
+            try statement.execute()
+        }
+    }
+
     private static func map(_ row: DatabaseRowReader) throws -> PlayerSettingsDatabaseModel {
         PlayerSettingsDatabaseModel(
             id: try row.requiredInt(at: 0),
@@ -85,6 +110,32 @@ final class SQLitePlayerSettingsStore: PlayerSettingsDatabaseReading, PlayerSett
             showMiniPlayer: try row.requiredBool(at: 3),
             backgroundPlaybackEnabled: try row.requiredBool(at: 4),
             updatedAt: try row.requiredDate(at: 5)
+        )
+    }
+
+    private static func mapPlaybackMode(
+        _ row: DatabaseRowReader
+    ) throws -> PlayerPlaybackModeDatabaseModel {
+        let repeatRawValue = try row.requiredString(at: 0)
+        guard let repeatMode = DatabaseRepeatMode(rawValue: repeatRawValue) else {
+            throw DatabaseError.invalidColumnValue(
+                column: DatabaseSchema.PlayerSettings.repeatMode,
+                value: repeatRawValue
+            )
+        }
+
+        let shuffleRawValue = try row.requiredInt(at: 1)
+        guard shuffleRawValue == 0 || shuffleRawValue == 1 else {
+            throw DatabaseError.invalidColumnValue(
+                column: DatabaseSchema.PlayerSettings.shuffleEnabled,
+                value: String(shuffleRawValue)
+            )
+        }
+
+        return PlayerPlaybackModeDatabaseModel(
+            repeatMode: repeatMode,
+            shuffleEnabled: shuffleRawValue == 1,
+            updatedAt: try row.requiredDate(at: 2)
         )
     }
 

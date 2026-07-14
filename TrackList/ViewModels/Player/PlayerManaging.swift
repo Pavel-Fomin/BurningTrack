@@ -18,6 +18,9 @@ protocol PlayerManaging: AnyObject {
     /// Продолжает воспроизведение текущего AVPlayerItem.
     func playCurrent()
 
+    /// Перезапускает текущий AVPlayerItem с начала.
+    func restartCurrent()
+
     /// Ставит текущее воспроизведение на паузу.
     func pause()
 

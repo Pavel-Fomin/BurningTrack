@@ -141,6 +141,7 @@ struct AppSettingsDatabaseModel: Equatable, Identifiable {
     var accentColorName: String?
     var lastOpenedTab: String?
     var isTagReadingEnabled: Bool
+    var miniPlayerExpanded: Bool
     var createdAt: Date
     var updatedAt: Date
 }
@@ -168,5 +169,12 @@ struct PlayerSettingsDatabaseModel: Equatable, Identifiable {
     var restoreLastPosition: Bool
     var showMiniPlayer: Bool
     var backgroundPlaybackEnabled: Bool
+    var updatedAt: Date
+}
+
+// Часть строки player_settings, отвечающая только за режим воспроизведения.
+struct PlayerPlaybackModeDatabaseModel: Equatable {
+    var repeatMode: DatabaseRepeatMode
+    var shuffleEnabled: Bool
     var updatedAt: Date
 }

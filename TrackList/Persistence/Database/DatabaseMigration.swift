@@ -26,7 +26,9 @@ extension DatabaseMigration {
         .trackMetadataLabel,
         .folderTrackSortMode,
         .libraryRootDisplayModeSetting,
-        .libraryRootDisplayModeColumnRepair
+        .libraryRootDisplayModeColumnRepair,
+        .playbackModeSettings,
+        .miniPlayerPresentationState
     ]
 
     // Первая миграция фиксирует стартовую версию схемы без создания бизнес-таблиц.
@@ -255,6 +257,7 @@ extension DatabaseMigration {
                 accent_color_name TEXT,
                 last_opened_tab TEXT,
                 is_tag_reading_enabled INTEGER NOT NULL DEFAULT 1 CHECK (is_tag_reading_enabled IN (0, 1)),
+                mini_player_expanded INTEGER NOT NULL DEFAULT 0 CHECK (mini_player_expanded IN (0, 1)),
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );
@@ -281,6 +284,8 @@ extension DatabaseMigration {
                 restore_last_position INTEGER NOT NULL DEFAULT 1 CHECK (restore_last_position IN (0, 1)),
                 show_mini_player INTEGER NOT NULL DEFAULT 1 CHECK (show_mini_player IN (0, 1)),
                 background_playback_enabled INTEGER NOT NULL DEFAULT 1 CHECK (background_playback_enabled IN (0, 1)),
+                repeat_mode TEXT NOT NULL DEFAULT 'off' CHECK (repeat_mode IN ('off', 'one', 'all')),
+                shuffle_enabled INTEGER NOT NULL DEFAULT 0 CHECK (shuffle_enabled IN (0, 1)),
                 updated_at TEXT NOT NULL
             );
 
@@ -665,6 +670,32 @@ extension DatabaseMigration {
             "library_root_display_mode",
             in: "library_view_settings",
             definition: "TEXT CHECK (library_root_display_mode IN ('folders', 'tracks'))",
+            database: database
+        )
+    }
+
+    // Двенадцатая миграция добавляет постоянный режим воспроизведения в настройки плеера.
+    static let playbackModeSettings = DatabaseMigration(identifier: "012_playback_mode_settings") { database in
+        try ensureColumn(
+            "repeat_mode",
+            in: "player_settings",
+            definition: "TEXT NOT NULL DEFAULT 'off' CHECK (repeat_mode IN ('off', 'one', 'all'))",
+            database: database
+        )
+        try ensureColumn(
+            "shuffle_enabled",
+            in: "player_settings",
+            definition: "INTEGER NOT NULL DEFAULT 0 CHECK (shuffle_enabled IN (0, 1))",
+            database: database
+        )
+    }
+
+    // Тринадцатая миграция добавляет сохранение состояния раскрытия мини-плеера в общие настройки приложения.
+    static let miniPlayerPresentationState = DatabaseMigration(identifier: "013_mini_player_presentation_state") { database in
+        try ensureColumn(
+            "mini_player_expanded",
+            in: "app_settings",
+            definition: "INTEGER NOT NULL DEFAULT 0 CHECK (mini_player_expanded IN (0, 1))",
             database: database
         )
     }
