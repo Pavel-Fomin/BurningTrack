@@ -13,6 +13,7 @@ import SwiftUI
 struct TrackListScreen: View {
     let trackList: TrackList
     let playerViewModel: PlayerViewModel
+    @ObservedObject var exportProgressViewModel: ExportProgressViewModel
     @StateObject private var viewModel: TrackListViewModel
 
     /// Фабрика production ViewModel для detail-flow одного треклиста.
@@ -27,13 +28,19 @@ struct TrackListScreen: View {
             reader: viewModel,
             playbackManager: playerViewModel,
             mutator: viewModel,
-            renamer: viewModel
+            renamer: viewModel,
+            exportProgressViewModel: exportProgressViewModel
         )
     }
 
-    init(trackList: TrackList, playerViewModel: PlayerViewModel) {
+    init(
+        trackList: TrackList,
+        playerViewModel: PlayerViewModel,
+        exportProgressViewModel: ExportProgressViewModel
+    ) {
         self.trackList = trackList
         self.playerViewModel = playerViewModel
+        self.exportProgressViewModel = exportProgressViewModel
         _viewModel = StateObject(
             wrappedValue: Self.viewModelFactory.make(
                 trackList: trackList,

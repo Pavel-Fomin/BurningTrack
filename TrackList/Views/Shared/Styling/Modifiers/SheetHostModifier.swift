@@ -132,6 +132,11 @@ struct SheetHostModifier: ViewModifier {
             case .createTrackList:
                 CreateTrackListContainer()
                     .appSheet(detents: [.fraction(0.55), .medium])
+
+                /// Подробности глобального экспорта.
+            case .exportProgress:
+                ExportProgressDetailsView()
+                    .appSheet(detents: [.medium, .large])
             }
         }
     }

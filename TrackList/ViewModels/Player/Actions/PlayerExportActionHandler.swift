@@ -19,8 +19,8 @@ final class PlayerExportActionHandler {
     /// Хранилище очереди плеера.
     private let playlistManager: PlaylistManager
 
-    /// Менеджер экспорта файлов.
-    private let exportManager: ExportManager
+    /// Глобальная ViewModel, владеющая жизненным циклом экспорта.
+    private let exportProgressViewModel: ExportProgressViewModel
 
     /// Менеджер пользовательских уведомлений.
     private let toastManager: ToastManager
@@ -32,12 +32,12 @@ final class PlayerExportActionHandler {
 
     init(
         playlistManager: PlaylistManager,
-        exportManager: ExportManager,
+        exportProgressViewModel: ExportProgressViewModel,
         toastManager: ToastManager,
         presenterProvider: @escaping () -> UIViewController?
     ) {
         self.playlistManager = playlistManager
-        self.exportManager = exportManager
+        self.exportProgressViewModel = exportProgressViewModel
         self.toastManager = toastManager
         self.presenterProvider = presenterProvider
     }
@@ -58,17 +58,11 @@ final class PlayerExportActionHandler {
             return
         }
 
-        Task {
-            do {
-                _ = try await exportManager.exportViaTempAndPicker(
-                    tracks,
-                    presenter: topVC
-                )
-            } catch let appError as AppError {
-                toastManager.handle(appError)
-            } catch {
-                toastManager.handle(.exportFailed)
-            }
-        }
+        // Action handler только передаёт команду глобальному владельцу операции.
+        exportProgressViewModel.startExport(
+            tracks: tracks,
+            exportFolderName: "Плеер",
+            presenter: topVC
+        )
     }
 }

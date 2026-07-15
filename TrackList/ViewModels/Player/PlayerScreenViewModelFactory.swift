@@ -16,7 +16,8 @@ struct PlayerScreenViewModelFactory {
 
     /// Создаёт production ViewModel для Player-flow.
     func make(
-        playerViewModel: PlayerViewModel
+        playerViewModel: PlayerViewModel,
+        exportProgressViewModel: ExportProgressViewModel
     ) -> PlayerScreenViewModel {
         let rowStateBuilder = PlayerTrackRowStateBuilder(
             artworkProvider: ArtworkProvider.shared
@@ -25,7 +26,8 @@ struct PlayerScreenViewModelFactory {
         return PlayerScreenViewModel(
             playerViewModel: playerViewModel,
             actionHandler: actionHandlerFactory.make(
-                playerViewModel: playerViewModel
+                playerViewModel: playerViewModel,
+                exportProgressViewModel: exportProgressViewModel
             ),
             sheetManager: SheetManager.shared,
             playlistManager: PlaylistManager.shared,

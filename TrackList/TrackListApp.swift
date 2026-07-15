@@ -15,6 +15,9 @@ import SwiftUI
 struct TrackListApp: App {
     
     let playerViewModel: PlayerViewModel
+
+    /// Глобальная ViewModel сохраняет экспорт при смене вкладок и закрытии picker-а.
+    @StateObject private var exportProgressViewModel: ExportProgressViewModel
     
     init() {
         do {
@@ -27,6 +30,12 @@ struct TrackListApp: App {
 
         let playerVM = PlayerViewModel() // без аргументов
         self.playerViewModel = playerVM
+        _exportProgressViewModel = StateObject(
+            wrappedValue: ExportProgressViewModel(
+                exporter: ExportManager.shared,
+                toastPresenter: ToastManager.shared
+            )
+        )
     }
 
     var body: some Scene {
@@ -35,6 +44,7 @@ struct TrackListApp: App {
                 playerViewModel: playerViewModel
             )
             .environmentObject(SheetManager.shared)
+            .environmentObject(exportProgressViewModel)
         }
     }
 }

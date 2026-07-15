@@ -28,6 +28,9 @@ struct ContentView: View {
 
     @ObservedObject var playerViewModel: PlayerViewModel
 
+    /// Единое состояние экспорта передаётся в корневой контейнер вкладок.
+    @EnvironmentObject private var exportProgressViewModel: ExportProgressViewModel
+
     // MARK: - Обёртка для sheet(item:)
     
     private struct IdentifiableTrack: Identifiable {
@@ -43,7 +46,8 @@ struct ContentView: View {
     
     var body: some View {
         MainTabView(
-            playerViewModel: playerViewModel
+            playerViewModel: playerViewModel,
+            exportProgressViewModel: exportProgressViewModel
         )
         .sheetHost(playerManager: playerViewModel.fileOperationPlayerManager)
         .toastHost()

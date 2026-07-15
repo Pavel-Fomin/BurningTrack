@@ -16,7 +16,8 @@ struct TrackListFlowActionHandlerFactory {
         reader: any TrackListReading,
         playbackManager: any TrackListPlaybackManaging,
         mutator: any TrackListMutating,
-        renamer: any TrackListRenaming
+        renamer: any TrackListRenaming,
+        exportProgressViewModel: ExportProgressViewModel
     ) -> TrackListFlowActionHandler {
         TrackListFlowActionHandler(
             reader: reader,
@@ -27,7 +28,7 @@ struct TrackListFlowActionHandlerFactory {
                 sheetManager: SheetManager.shared,
                 sheetActionCoordinator: SheetActionCoordinator.shared
             ),
-            exporter: ExportManager.shared,
+            exportProgressViewModel: exportProgressViewModel,
             viewControllerProvider: ApplicationViewControllerProvider(),
             toastPresenter: ToastManager.shared
         )

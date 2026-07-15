@@ -15,8 +15,8 @@ final class TrackListExportHandler {
     /// Источник read-only данных одного треклиста.
     private let reader: any TrackListReading
 
-    /// Экспортер треков.
-    private let exporter: any TrackExporting
+    /// Глобальная ViewModel, владеющая жизненным циклом экспорта.
+    private let exportProgressViewModel: ExportProgressViewModel
 
     /// Провайдер верхнего UIViewController для системного picker.
     private let viewControllerProvider: any ViewControllerProviding
@@ -27,12 +27,12 @@ final class TrackListExportHandler {
     /// Создаёт обработчик export-flow одного треклиста.
     init(
         reader: any TrackListReading,
-        exporter: any TrackExporting,
+        exportProgressViewModel: ExportProgressViewModel,
         viewControllerProvider: any ViewControllerProviding,
         toastPresenter: any ToastPresenting
     ) {
         self.reader = reader
-        self.exporter = exporter
+        self.exportProgressViewModel = exportProgressViewModel
         self.viewControllerProvider = viewControllerProvider
         self.toastPresenter = toastPresenter
     }
@@ -51,17 +51,11 @@ final class TrackListExportHandler {
             return
         }
 
-        Task {
-            do {
-                _ = try await exporter.exportViaTempAndPicker(
-                    tracks,
-                    presenter: topVC
-                )
-            } catch let appError as AppError {
-                toastPresenter.handle(appError)
-            } catch {
-                toastPresenter.handle(.exportFailed)
-            }
-        }
+        // Action handler не запускает копирование и не привязывает его к экрану.
+        exportProgressViewModel.startExport(
+            tracks: tracks,
+            exportFolderName: reader.name,
+            presenter: topVC
+        )
     }
 }

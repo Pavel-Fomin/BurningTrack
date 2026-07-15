@@ -20,6 +20,8 @@ struct BottomPanelsHostModifier<TopPanel: View>: ViewModifier {
     // MARK: - Input
 
     @ObservedObject var playerViewModel: PlayerViewModel
+    /// Читает единое состояние экспорта, не создавая локальную копию на экране.
+    @EnvironmentObject private var exportProgressViewModel: ExportProgressViewModel
     let showsTopPanel: Bool
     let showsBottomPanel: Bool
     let topPanel: () -> TopPanel
@@ -27,13 +29,39 @@ struct BottomPanelsHostModifier<TopPanel: View>: ViewModifier {
     // MARK: - Body
 
     func body(content: Content) -> some View {
-        content
+        let exportProgress = exportProgressViewModel.progress
+        let showsExportPanel = exportProgress != nil
+
+        return content
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 BottomPanelsHost(
-                    showsTopPanel: showsTopPanel
+                    // Оставляем панель экспорта отделённой от мини-плеера в одном layout-потоке.
+                    spacing: showsExportPanel && showsBottomPanel ? 8 : 0,
+                    showsTopPanel: showsTopPanel || showsExportPanel
                 ) {
-                    topPanel()
-                        .padding(.horizontal, 8)
+                    VStack(spacing: 8) {
+                        if let exportProgress {
+                            ExportProgressCompactView(
+                                progress: exportProgress,
+                                onTap: {
+                                    exportProgressViewModel.presentDetails()
+                                },
+                                onDismiss: {
+                                    exportProgressViewModel.dismissCompletedExport()
+                                }
+                            )
+                            .padding(.horizontal, 8)
+                            .transition(
+                                .move(edge: .bottom)
+                                    .combined(with: .opacity)
+                            )
+                        }
+
+                        if showsTopPanel {
+                            topPanel()
+                                .padding(.horizontal, 8)
+                        }
+                    }
                 } bottomPanel: {
                     if showsBottomPanel {
                         MiniPlayerWrapperView(
@@ -41,6 +69,10 @@ struct BottomPanelsHostModifier<TopPanel: View>: ViewModifier {
                         )
                     }
                 }
+                .animation(
+                    .easeOut(duration: 0.25),
+                    value: showsExportPanel
+                )
                 .animation(.easeOut(duration: 0.25), value: showsTopPanel)
                 .animation(
                     .easeOut(duration: 0.25),

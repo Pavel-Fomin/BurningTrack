@@ -34,7 +34,7 @@ final class TrackListFlowActionHandler {
         mutator: any TrackListMutating,
         renamer: any TrackListRenaming,
         presenter: any TrackListPresenting,
-        exporter: any TrackExporting,
+        exportProgressViewModel: ExportProgressViewModel,
         viewControllerProvider: any ViewControllerProviding,
         toastPresenter: any ToastPresenting
     ) {
@@ -50,7 +50,7 @@ final class TrackListFlowActionHandler {
         self.mutationHandler = TrackListMutationHandler(mutator: mutator)
         self.exportHandler = TrackListExportHandler(
             reader: reader,
-            exporter: exporter,
+            exportProgressViewModel: exportProgressViewModel,
             viewControllerProvider: viewControllerProvider,
             toastPresenter: toastPresenter
         )

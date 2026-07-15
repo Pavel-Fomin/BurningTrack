@@ -10,10 +10,15 @@ import UIKit
 /// Выполняет экспорт треков.
 @MainActor
 protocol TrackExporting {
-    /// Экспортирует треки через временную папку и системный picker.
+    /// Выбирает папку и экспортирует треки напрямую в неё.
     @discardableResult
-    func exportViaTempAndPicker(
+    func exportTracks(
         _ tracks: [Track],
-        presenter: UIViewController
+        exportFolderName: String,
+        presenter: UIViewController,
+        onProgress: @escaping ExportProgressHandler
     ) async throws -> ExportManager.ExportResult
+
+    /// Отменяет активный picker или копирование.
+    func cancelCurrentExport()
 }

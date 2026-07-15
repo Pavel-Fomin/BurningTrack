@@ -23,6 +23,9 @@ struct MainTabView: View {
 
     @ObservedObject var playerViewModel: PlayerViewModel
 
+    /// Глобальная ViewModel экспорта передаётся в обе точки запуска операции.
+    @ObservedObject var exportProgressViewModel: ExportProgressViewModel
+
     /// Фабрика production ViewModel для master-flow списка треклистов.
     private static let trackListsViewModelFactory = TrackListsViewModelFactory()
 
@@ -43,7 +46,8 @@ struct MainTabView: View {
                 value: ScenePhaseHandler.Tab.player
             ) {
                 PlayerScreen(
-                    playerViewModel: playerViewModel
+                    playerViewModel: playerViewModel,
+                    exportProgressViewModel: exportProgressViewModel
                 )
             }
 
@@ -68,7 +72,8 @@ struct MainTabView: View {
             ) {
                 TrackListsScreen(
                     trackListsViewModel: trackListsVM,
-                    playerViewModel: playerViewModel
+                    playerViewModel: playerViewModel,
+                    exportProgressViewModel: exportProgressViewModel
                 )
             }
 

@@ -193,6 +193,7 @@ enum AppSheetKind: Equatable {
     case batchFilenameRename
     case batchAddToTrackList
     case createTrackList
+    case exportProgress
 }
 
 enum AppSheet: Identifiable, Equatable {
@@ -208,6 +209,7 @@ enum AppSheet: Identifiable, Equatable {
     case batchFilenameRename(BatchFilenameRenameSheetData)
     case batchAddToTrackList(AddToTrackListSheetData)
     case createTrackList
+    case exportProgress
     
 
     var id: String {
@@ -224,6 +226,7 @@ enum AppSheet: Identifiable, Equatable {
         case .batchFilenameRename(let data): return "batchFilenameRename_\(data.id)"
         case .batchAddToTrackList(let data): return "batchAddToTrackList_\(data.id)"
         case .createTrackList: return "createTrackList"
+        case .exportProgress: return "exportProgress"
         }
     }
 
@@ -246,6 +249,7 @@ enum AppSheet: Identifiable, Equatable {
         case .batchFilenameRename: return .batchFilenameRename
         case .batchAddToTrackList: return .batchAddToTrackList
         case .createTrackList: return .createTrackList
+        case .exportProgress: return .exportProgress
         }
     }
 }
@@ -505,6 +509,7 @@ final class SheetManager: ObservableObject {
              .saveTrackList,
              .newTrackListSelection,
              .createTrackList,
+             .exportProgress,
              nil:
             return
         }
@@ -550,6 +555,7 @@ private extension AppSheet {
         case .batchFilenameRename: return nil
         case .batchAddToTrackList(let data): return data.firstTrack?.id
         case .createTrackList: return nil
+        case .exportProgress: return nil
         }
     }
 }

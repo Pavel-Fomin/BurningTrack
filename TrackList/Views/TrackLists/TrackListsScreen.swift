@@ -16,6 +16,7 @@ struct TrackListsScreen: View {
 
     @ObservedObject var trackListsViewModel: TrackListsViewModel
     @ObservedObject var playerViewModel: PlayerViewModel
+    @ObservedObject var exportProgressViewModel: ExportProgressViewModel
     @ObservedObject private var navigationCoordinator = NavigationCoordinator.shared
 
     /// Фабрика production action handler для master-flow списка треклистов.
@@ -43,7 +44,8 @@ struct TrackListsScreen: View {
                 if let trackList = trackListsViewModel.trackList(for: id) {
                     TrackListScreen(
                         trackList: trackList,
-                        playerViewModel: playerViewModel
+                        playerViewModel: playerViewModel,
+                        exportProgressViewModel: exportProgressViewModel
                     )
                 }
             }

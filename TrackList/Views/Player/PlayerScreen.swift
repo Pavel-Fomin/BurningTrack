@@ -12,6 +12,7 @@ import SwiftUI
 struct PlayerScreen: View {
 
     @ObservedObject var playerViewModel: PlayerViewModel
+    @ObservedObject var exportProgressViewModel: ExportProgressViewModel
 
     @StateObject private var screenViewModel: PlayerScreenViewModel
 
@@ -19,12 +20,15 @@ struct PlayerScreen: View {
     private static let viewModelFactory = PlayerScreenViewModelFactory()
 
     init(
-        playerViewModel: PlayerViewModel
+        playerViewModel: PlayerViewModel,
+        exportProgressViewModel: ExportProgressViewModel
     ) {
         self.playerViewModel = playerViewModel
+        self.exportProgressViewModel = exportProgressViewModel
         _screenViewModel = StateObject(
             wrappedValue: Self.viewModelFactory.make(
-                playerViewModel: playerViewModel
+                playerViewModel: playerViewModel,
+                exportProgressViewModel: exportProgressViewModel
             )
         )
     }
