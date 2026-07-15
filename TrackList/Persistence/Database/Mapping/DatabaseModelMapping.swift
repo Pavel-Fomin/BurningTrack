@@ -46,6 +46,8 @@ enum PlaybackContextSourceDatabaseMapper {
             return .libraryFolder
         case .libraryRoot:
             return .libraryRoot
+        case .libraryCollection:
+            return .libraryCollection
         }
     }
 
@@ -59,12 +61,35 @@ enum PlaybackContextSourceDatabaseMapper {
             return id
         case .libraryRoot:
             return nil
+        case .libraryCollection:
+            return nil
         }
+    }
+
+    /// Возвращает сохранённую строку категории или nil для остальных источников.
+    static func collectionCategory(from source: PlaybackContextSource) -> String? {
+        guard case let .libraryCollection(category, _, _) = source else { return nil }
+        return category.rawValue
+    }
+
+    /// Возвращает сохранённое значение категории или nil для остальных источников.
+    static func collectionValue(from source: PlaybackContextSource) -> String? {
+        guard case let .libraryCollection(_, rawValue, _) = source else { return nil }
+        return rawValue
+    }
+
+    /// Возвращает сохранённый artist-ключ альбома или nil для остальных источников.
+    static func collectionArtistKey(from source: PlaybackContextSource) -> String? {
+        guard case let .libraryCollection(_, _, artistKey) = source else { return nil }
+        return artistKey
     }
 
     static func playbackSource(
         from type: DatabasePlaybackContextType,
-        contextId: UUID?
+        contextId: UUID?,
+        collectionCategory: String? = nil,
+        collectionValue: String? = nil,
+        collectionArtistKey: String? = nil
     ) -> PlaybackContextSource? {
         switch type {
         case .playerQueue:
@@ -78,6 +103,21 @@ enum PlaybackContextSourceDatabaseMapper {
         case .libraryRoot:
             guard contextId == nil else { return nil }
             return .libraryRoot
+        case .libraryCollection:
+            // Для категории идентификатор не используется: источник определяется строковыми полями.
+            guard contextId == nil,
+                  let collectionCategory,
+                  let category = LibraryCollectionCategory(rawValue: collectionCategory),
+                  let collectionValue
+            else {
+                return nil
+            }
+
+            return .libraryCollection(
+                category: category,
+                rawValue: collectionValue,
+                artistKey: collectionArtistKey
+            )
         }
     }
 }

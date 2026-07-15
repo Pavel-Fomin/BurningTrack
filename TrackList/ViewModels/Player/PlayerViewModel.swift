@@ -226,6 +226,11 @@ final class PlayerViewModel: ObservableObject {
         guard let statePersistence else { return }
 
         let queueItemId = (track as? PlayerTrack)?.queueItemId
+        PersistentLogger.log(
+            "Player state save begin: trackId=\(track.trackId) " +
+            "source=\(playbackSourceLogDescription(source))"
+        )
+
         do {
             try statePersistence.saveCurrentTrack(
                 trackId: track.trackId,
@@ -233,6 +238,10 @@ final class PlayerViewModel: ObservableObject {
                 duration: track.duration,
                 playbackMode: playbackMode,
                 contextSource: source
+            )
+            PersistentLogger.log(
+                "Player state save success: trackId=\(track.trackId) " +
+                "source=\(playbackSourceLogDescription(source))"
             )
         } catch {
             // Ошибка постоянного состояния не должна прерывать запуск воспроизведения.
@@ -255,20 +264,46 @@ final class PlayerViewModel: ObservableObject {
             PersistentLogger.log(
                 "PlayerViewModel: невалидное или недоступное состояние плеера: \(error)"
             )
-            // Повреждённый context_type не должен оставлять старую запись для повторной ошибки на каждом запуске.
-            clearPersistedState()
+            // Повреждённое состояние не должно оставлять старую запись для повторной ошибки на каждом запуске.
+            clearPersistedState(reason: stateLoadClearReason(for: error))
             return
         }
 
-        guard let state,
-              let trackId = state.currentTrackId,
-              let source = PlaybackContextSourceDatabaseMapper.playbackSource(
-                  from: state.contextType,
-                  contextId: state.contextId
-              )
-        else {
-            if state?.contextType == .trackList {
-                clearPersistedState()
+        guard let state else {
+            PersistentLogger.log("Player state load: empty")
+            return
+        }
+
+        PersistentLogger.log(
+            "Player state load: \(playerStateLogDescription(state))"
+        )
+
+        guard let trackId = state.currentTrackId else {
+            if state.contextType == .libraryCollection {
+                PersistentLogger.log(
+                    "Player restore library collection has no current track"
+                )
+                clearPersistedState(reason: "отсутствует currentTrackId для libraryCollection")
+            }
+            return
+        }
+
+        guard let source = PlaybackContextSourceDatabaseMapper.playbackSource(
+            from: state.contextType,
+            contextId: state.contextId,
+            collectionCategory: state.collectionCategory,
+            collectionValue: state.collectionValue,
+            collectionArtistKey: state.collectionArtistKey
+        ) else {
+            PersistentLogger.log(
+                "Player restore invalid playback context type=\(state.contextType.rawValue)"
+            )
+            // Невалидный источник не должен повторно приводить к ошибке на следующем запуске.
+            if state.contextType == .trackList || state.contextType == .libraryCollection {
+                clearPersistedState(
+                    reason: "невалидные обязательные поля playback-контекста " +
+                        "contextType=\(state.contextType.rawValue)"
+                )
             }
             return
         }
@@ -279,7 +314,16 @@ final class PlayerViewModel: ObservableObject {
         case .trackList(let trackListId):
             restoreTrackListContext(trackListId: trackListId, trackId: trackId)
         case .libraryFolder,
-             .libraryRoot:
+             .libraryRoot,
+             .libraryCollection:
+            // Источник фонотеки нельзя считать пустым до завершения восстановления доступа.
+            guard MusicLibraryManager.shared.isAccessRestored else {
+                PersistentLogger.log(
+                    "Player restore deferred: библиотека ещё не готова " +
+                    "source=\(playbackSourceLogDescription(source))"
+                )
+                return
+            }
             restoreLibraryContext(source: source, trackId: trackId)
         }
     }
@@ -307,6 +351,19 @@ final class PlayerViewModel: ObservableObject {
             return
         }
 
+        if let queueItemId = state.currentQueueItemId {
+            PersistentLogger.log(
+                "Player restore queue item not found: " +
+                "queueItemId=\(queueItemId) trackId=\(trackId) " +
+                "queueCount=\(playlistManager.tracks.count); using trackId fallback"
+            )
+        } else {
+            PersistentLogger.log(
+                "Player restore queue item id missing: " +
+                "trackId=\(trackId); using trackId fallback"
+            )
+        }
+
         // Legacy-состояния без queueItemId сохраняют прежнее восстановление одиночного трека.
         restoreFallbackTrack(trackId: trackId, duration: state.duration)
     }
@@ -327,7 +384,10 @@ final class PlayerViewModel: ObservableObject {
                     PersistentLogger.log(
                         "Player restore trackList track not found listId=\(trackListId) trackId=\(trackId)"
                     )
-                    self.clearPersistedState()
+                    self.clearPersistedState(
+                        reason: "currentTrackId отсутствует в восстановленном треклисте " +
+                            "listId=\(trackListId) trackId=\(trackId)"
+                    )
                     return
                 }
 
@@ -345,7 +405,9 @@ final class PlayerViewModel: ObservableObject {
                 PersistentLogger.log(
                     "Player restore trackList failed listId=\(trackListId) error=\(error)"
                 )
-                self.clearPersistedState()
+                self.clearPersistedState(
+                    reason: "треклист не найден или не загрузился listId=\(trackListId) error=\(error)"
+                )
             }
         }
     }
@@ -369,6 +431,16 @@ final class PlayerViewModel: ObservableObject {
                     )
                 case .libraryRoot:
                     tracks = try await self.libraryContextLoader.loadRootContext()
+                case .libraryCollection(
+                    let category,
+                    let rawValue,
+                    let artistKey
+                ):
+                    tracks = try await self.libraryContextLoader.loadCollectionContext(
+                        category: category,
+                        rawValue: rawValue,
+                        artistKey: artistKey
+                    )
                 case .playerQueue,
                      .trackList:
                     return
@@ -378,7 +450,10 @@ final class PlayerViewModel: ObservableObject {
                     PersistentLogger.log(
                         "Player restore library track not found source=\(source) trackId=\(trackId)"
                     )
-                    self.clearPersistedState()
+                    self.clearPersistedState(
+                        reason: "currentTrackId отсутствует в восстановленном списке " +
+                            "source=\(self.playbackSourceLogDescription(source)) trackId=\(trackId)"
+                    )
                     return
                 }
 
@@ -396,7 +471,19 @@ final class PlayerViewModel: ObservableObject {
                 PersistentLogger.log(
                     "Player restore library context failed source=\(source) error=\(error)"
                 )
-                self.clearPersistedState()
+                let reason: String
+                switch source {
+                case .libraryFolder:
+                    reason = "папка не найдена или не загрузилась source=\(self.playbackSourceLogDescription(source)) error=\(error)"
+                case .libraryRoot:
+                    reason = "корень фонотеки не загрузился source=\(self.playbackSourceLogDescription(source)) error=\(error)"
+                case .libraryCollection:
+                    reason = "категория не найдена или не загрузилась source=\(self.playbackSourceLogDescription(source)) error=\(error)"
+                case .playerQueue,
+                     .trackList:
+                    reason = "неожиданный источник library-восстановления source=\(self.playbackSourceLogDescription(source)) error=\(error)"
+                }
+                self.clearPersistedState(reason: reason)
             }
         }
     }
@@ -407,21 +494,29 @@ final class PlayerViewModel: ObservableObject {
         duration: TimeInterval?
     ) {
         Task { @MainActor [weak self] in
-            guard let self,
-                  self.currentTrackDisplayable == nil,
-                  let restoredTrack = await self.restoreTrack(
-                      trackId: trackId,
-                      duration: duration
-                  )
-            else {
-                guard let self,
-                      self.currentTrackDisplayable == nil,
-                      self.didReceiveLibraryAccessRestored
-                else {
+            guard let self, self.currentTrackDisplayable == nil else {
+                return
+            }
+
+            guard let restoredTrack = await self.restoreTrack(
+                trackId: trackId,
+                duration: duration
+            ) else {
+                guard self.currentTrackDisplayable == nil else {
                     return
                 }
 
-                self.clearPersistedState()
+                guard self.didReceiveLibraryAccessRestored else {
+                    PersistentLogger.log(
+                        "Player restore deferred: fallback track unavailable before " +
+                        "libraryAccessRestored trackId=\(trackId)"
+                    )
+                    return
+                }
+
+                self.clearPersistedState(
+                    reason: "трек не найден после восстановления доступа trackId=\(trackId)"
+                )
                 return
             }
 
@@ -488,11 +583,20 @@ final class PlayerViewModel: ObservableObject {
         requestSnapshotIfNeeded(for: track)
         updateMiniPlayerStaticState(for: track)
         updateMiniPlayerProgressState()
+        PersistentLogger.log(
+            "Player state restore success: trackId=\(track.trackId) " +
+            "source=\(playbackSourceLogDescription(source)) contextCount=\(context.count)"
+        )
     }
 
     /// Удаляет запись, если последний трек больше нельзя восстановить.
-    private func clearPersistedState() {
-        guard let statePersistence else { return }
+    private func clearPersistedState(reason: String) {
+        PersistentLogger.log("Player state clear: причина=\(reason)")
+
+        guard let statePersistence else {
+            PersistentLogger.log("Player state clear skipped: хранилище состояния недоступно")
+            return
+        }
 
         do {
             try statePersistence.clearState()
@@ -518,6 +622,10 @@ final class PlayerViewModel: ObservableObject {
                 return
             }
 
+            PersistentLogger.log(
+                "Player state clear: причина=удалён текущий элемент очереди " +
+                "queueItemId=\(current.queueItemId) trackId=\(current.trackId)"
+            )
             try statePersistence.clearState()
         } catch {
             PersistentLogger.log("PlayerViewModel: ошибка очистки удалённого состояния плеера: \(error)")
@@ -535,6 +643,75 @@ final class PlayerViewModel: ObservableObject {
         isCurrentTrackPreparedForPlayback = false
         miniPlayerStaticState = nil
         updateMiniPlayerProgressState()
+    }
+
+    /// Формирует безопасное описание источника без URL и security-scoped bookmark-данных.
+    private func playbackSourceLogDescription(_ source: PlaybackContextSource) -> String {
+        switch source {
+        case .playerQueue:
+            return "playerQueue"
+        case .trackList(let id):
+            return "trackList id=\(id)"
+        case .libraryFolder(let id):
+            return "libraryFolder id=\(id)"
+        case .libraryRoot:
+            return "libraryRoot"
+        case .libraryCollection(let category, let rawValue, let artistKey):
+            return "libraryCollection category=\(category.rawValue) " +
+                "rawValue=\(rawValue) artistKey=\(artistKey ?? "nil")"
+        }
+    }
+
+    /// Формирует полное безопасное описание сохранённого состояния без URL и bookmark-данных.
+    private func playerStateLogDescription(_ state: PlayerStateDatabaseModel) -> String {
+        let queueItemId = state.currentQueueItemId?.uuidString ?? "nil"
+        let trackId = state.currentTrackId?.uuidString ?? "nil"
+        let contextId = state.contextId?.uuidString ?? "nil"
+        let category = state.collectionCategory ?? "nil"
+        let value = state.collectionValue ?? "nil"
+        let artistKey = state.collectionArtistKey ?? "nil"
+        let duration = state.duration.map { String($0) } ?? "nil"
+
+        return [
+            "id=\(state.id)",
+            "currentQueueItemId=\(queueItemId)",
+            "currentTrackId=\(trackId)",
+            "contextType=\(state.contextType.rawValue)",
+            "contextId=\(contextId)",
+            "collectionCategory=\(category)",
+            "collectionValue=\(value)",
+            "collectionArtistKey=\(artistKey)",
+            "playbackTime=\(state.playbackTime)",
+            "duration=\(duration)",
+            "isPlaying=\(state.isPlaying)",
+            "repeatMode=\(state.repeatMode.rawValue)",
+            "shuffleEnabled=\(state.shuffleEnabled)",
+            "updatedAt=\(state.updatedAt)"
+        ].joined(separator: " ")
+    }
+
+    /// Переводит ошибку чтения player_state в конкретную причину очистки.
+    private func stateLoadClearReason(for error: Error) -> String {
+        guard let databaseError = error as? DatabaseError else {
+            return "ошибка чтения состояния SQLite: \(error)"
+        }
+
+        switch databaseError {
+        case .invalidColumnValue(let column, let value):
+            if column == DatabaseSchema.PlayerState.contextType {
+                return "невалидный context_type value=\(value)"
+            }
+
+            if column == DatabaseSchema.PlayerState.repeatMode {
+                return "невалидный repeat_mode value=\(value)"
+            }
+
+            return "некорректное значение SQLite-колонки column=\(column) value=\(value)"
+        case .missingRequiredColumn(let name):
+            return "отсутствует обязательная SQLite-колонка name=\(name)"
+        default:
+            return "ошибка чтения состояния SQLite: \(error)"
+        }
     }
     
     // MARK: - Snapshot

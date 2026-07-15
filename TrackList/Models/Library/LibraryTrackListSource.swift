@@ -107,3 +107,21 @@ enum LibraryTrackListSource: Hashable, Identifiable {
         }
     }
 }
+
+extension LibraryTrackListSource {
+    /// Возвращает источник, который можно сохранить как playback-контекст.
+    var playbackContextSource: PlaybackContextSource {
+        switch self {
+        case .folder(let folderId):
+            return .libraryFolder(id: folderId)
+        case .allLibraryTracks:
+            return .libraryRoot
+        case let .collectionValue(category, rawValue, artistKey):
+            return .libraryCollection(
+                category: category,
+                rawValue: rawValue,
+                artistKey: artistKey
+            )
+        }
+    }
+}

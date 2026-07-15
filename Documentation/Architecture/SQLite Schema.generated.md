@@ -8,15 +8,15 @@
 
 | Table | Columns | Foreign Keys | Indexes |
 | --- | ---: | ---: | ---: |
-| app_settings | 8 | 0 | 0 |
-| folders | 12 | 2 | 6 |
-| library_view_settings | 11 | 1 | 0 |
+| app_settings | 9 | 0 | 0 |
+| folders | 13 | 2 | 6 |
+| library_view_settings | 12 | 1 | 0 |
 | player_queue | 12 | 1 | 4 |
-| player_settings | 6 | 0 | 0 |
-| player_state | 9 | 2 | 0 |
+| player_settings | 8 | 0 | 0 |
+| player_state | 14 | 2 | 0 |
 | schema_migrations | 2 | 0 | 1 |
 | track_identity_keys | 5 | 1 | 2 |
-| track_metadata | 17 | 1 | 5 |
+| track_metadata | 18 | 1 | 5 |
 | tracklist_tracks | 13 | 1 | 5 |
 | tracklists | 6 | 0 | 4 |
 | tracks | 15 | 2 | 9 |
@@ -33,6 +33,7 @@
 | accent_color_name | TEXT | no | - | 0 | 0 |
 | last_opened_tab | TEXT | no | - | 0 | 0 |
 | is_tag_reading_enabled | INTEGER | yes | 1 | 0 | 0 |
+| mini_player_expanded | INTEGER | yes | 0 | 0 | 0 |
 | created_at | TEXT | yes | - | 0 | 0 |
 | updated_at | TEXT | yes | - | 0 | 0 |
 
@@ -62,6 +63,7 @@ No indexes.
 | updated_at | TEXT | yes | - | 0 | 0 |
 | sort_order | INTEGER | no | - | 0 | 0 |
 | last_scanned_at | TEXT | no | - | 0 | 0 |
+| track_sort_mode | TEXT | no | - | 0 | 0 |
 
 ### Foreign Keys
 
@@ -96,6 +98,7 @@ No indexes.
 | show_unavailable_tracks | INTEGER | yes | 1 | 0 | 0 |
 | show_file_format | INTEGER | yes | 1 | 0 | 0 |
 | show_purchased_itunes_source | INTEGER | yes | 1 | 0 | 0 |
+| library_root_display_mode | TEXT | no | - | 0 | 0 |
 | last_opened_folder_id | TEXT | no | - | 0 | 0 |
 | updated_at | TEXT | yes | - | 0 | 0 |
 
@@ -154,6 +157,8 @@ No indexes.
 | restore_last_position | INTEGER | yes | 1 | 0 | 0 |
 | show_mini_player | INTEGER | yes | 1 | 0 | 0 |
 | background_playback_enabled | INTEGER | yes | 1 | 0 | 0 |
+| repeat_mode | TEXT | yes | 'off' | 0 | 0 |
+| shuffle_enabled | INTEGER | yes | 0 | 0 | 0 |
 | updated_at | TEXT | yes | - | 0 | 0 |
 
 ### Foreign Keys
@@ -173,6 +178,11 @@ No indexes.
 | id | INTEGER | no | - | 1 | 0 |
 | current_queue_item_id | TEXT | no | - | 0 | 0 |
 | current_track_id | TEXT | no | - | 0 | 0 |
+| context_type | TEXT | yes | 'playerQueue' | 0 | 0 |
+| context_id | TEXT | no | - | 0 | 0 |
+| collection_category | TEXT | no | - | 0 | 0 |
+| collection_value | TEXT | no | - | 0 | 0 |
+| collection_artist_key | TEXT | no | - | 0 | 0 |
 | playback_time | REAL | yes | 0 | 0 | 0 |
 | duration | REAL | no | - | 0 | 0 |
 | is_playing | INTEGER | yes | 0 | 0 | 0 |
@@ -258,6 +268,7 @@ No foreign keys.
 | sample_rate | INTEGER | no | - | 0 | 0 |
 | channel_count | INTEGER | no | - | 0 | 0 |
 | metadata_updated_at | TEXT | yes | - | 0 | 0 |
+| label | TEXT | no | - | 0 | 0 |
 
 ### Foreign Keys
 

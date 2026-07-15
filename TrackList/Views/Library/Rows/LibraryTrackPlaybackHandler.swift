@@ -36,7 +36,7 @@ struct LibraryTrackPlaybackHandler {
                 source: source
             )
         } else {
-            // Разделы коллекции пока сохраняют прежний playback-путь без нового постоянного источника.
+            // Защищаем старый вызов для экранов, которые ещё не передали источник списка.
             playerViewModel.play(track: track, context: context)
         }
     }

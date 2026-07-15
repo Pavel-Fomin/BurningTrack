@@ -195,6 +195,9 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
         XCTAssertFalse(state.isPlaying)
         XCTAssertEqual(state.contextType, .playerQueue)
         XCTAssertNil(state.contextId)
+        XCTAssertNil(state.collectionCategory)
+        XCTAssertNil(state.collectionValue)
+        XCTAssertNil(state.collectionArtistKey)
         XCTAssertEqual(state.repeatMode, .off)
         XCTAssertFalse(state.shuffleEnabled)
 
@@ -217,6 +220,9 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
         XCTAssertEqual(trackListState.id, 1)
         XCTAssertEqual(trackListState.contextType, .trackList)
         XCTAssertEqual(trackListState.contextId, trackListId)
+        XCTAssertNil(trackListState.collectionCategory)
+        XCTAssertNil(trackListState.collectionValue)
+        XCTAssertNil(trackListState.collectionArtistKey)
 
         let folderId = UUID()
         try persistence.saveCurrentTrack(
@@ -230,6 +236,9 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
         let folderState = try XCTUnwrap(persistence.loadState())
         XCTAssertEqual(folderState.contextType, .libraryFolder)
         XCTAssertEqual(folderState.contextId, folderId)
+        XCTAssertNil(folderState.collectionCategory)
+        XCTAssertNil(folderState.collectionValue)
+        XCTAssertNil(folderState.collectionArtistKey)
 
         try persistence.saveCurrentTrack(
             trackId: trackId,
@@ -242,9 +251,193 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
         let rootState = try XCTUnwrap(persistence.loadState())
         XCTAssertEqual(rootState.contextType, .libraryRoot)
         XCTAssertNil(rootState.contextId)
+        XCTAssertNil(rootState.collectionCategory)
+        XCTAssertNil(rootState.collectionValue)
+        XCTAssertNil(rootState.collectionArtistKey)
+
+        try persistence.saveCurrentTrack(
+            trackId: trackId,
+            queueItemId: nil,
+            duration: 120,
+            playbackMode: .defaultValue,
+            contextSource: .libraryCollection(
+                category: .albums,
+                rawValue: "Discovery",
+                artistKey: "Daft Punk"
+            )
+        )
+
+        let collectionState = try XCTUnwrap(persistence.loadState())
+        XCTAssertEqual(collectionState.contextType, .libraryCollection)
+        XCTAssertNil(collectionState.contextId)
+        XCTAssertEqual(collectionState.collectionCategory, "albums")
+        XCTAssertEqual(collectionState.collectionValue, "Discovery")
+        XCTAssertEqual(collectionState.collectionArtistKey, "Daft Punk")
 
         try persistence.clearState()
         XCTAssertNil(try persistence.loadState())
+    }
+
+    func testSQLitePlayerStateStoreUpsertsEveryPlaybackContext() throws {
+        let database = try makeDatabase()
+        let executor = try database.databaseExecutor()
+        let stateStore = SQLitePlayerStateStore(executor: executor)
+        let trackId = UUID()
+        let trackListId = UUID()
+        let folderId = UUID()
+        let now = Date(timeIntervalSince1970: 200)
+
+        let trackStore = SQLiteTrackStore(executor: executor)
+        try trackStore.insert(
+            TrackDatabaseModel(
+                id: trackId,
+                source: .library,
+                folderId: nil,
+                rootFolderId: nil,
+                fileName: "PlaybackContext.mp3",
+                relativePath: "PlaybackContext.mp3",
+                fileExtension: "mp3",
+                fileSize: nil,
+                fileDate: now,
+                importedAt: now,
+                updatedAt: now,
+                bookmarkBase64: nil,
+                assetURLString: nil,
+                isAvailable: true,
+                isDeleted: false
+            )
+        )
+
+        let sources: [PlaybackContextSource] = [
+            .playerQueue,
+            .trackList(id: trackListId),
+            .libraryFolder(id: folderId),
+            .libraryRoot,
+            .libraryCollection(
+                category: .genres,
+                rawValue: "House",
+                artistKey: nil
+            )
+        ]
+
+        for source in sources {
+            let model = PlayerStateDatabaseModel(
+                id: 1,
+                currentQueueItemId: nil,
+                currentTrackId: trackId,
+                contextType: PlaybackContextSourceDatabaseMapper.databaseType(from: source),
+                contextId: PlaybackContextSourceDatabaseMapper.contextId(from: source),
+                collectionCategory: PlaybackContextSourceDatabaseMapper.collectionCategory(from: source),
+                collectionValue: PlaybackContextSourceDatabaseMapper.collectionValue(from: source),
+                collectionArtistKey: PlaybackContextSourceDatabaseMapper.collectionArtistKey(from: source),
+                playbackTime: 0,
+                duration: 120,
+                isPlaying: false,
+                repeatMode: .off,
+                shuffleEnabled: false,
+                updatedAt: now
+            )
+
+            try stateStore.upsert(model)
+
+            let restored = try XCTUnwrap(stateStore.fetch())
+            XCTAssertEqual(restored.currentTrackId, trackId)
+            XCTAssertEqual(restored.contextType, model.contextType)
+            XCTAssertEqual(restored.contextId, model.contextId)
+            XCTAssertEqual(restored.collectionCategory, model.collectionCategory)
+            XCTAssertEqual(restored.collectionValue, model.collectionValue)
+            XCTAssertEqual(restored.collectionArtistKey, model.collectionArtistKey)
+        }
+
+        let collectionModel = PlayerStateDatabaseModel(
+            id: 1,
+            currentQueueItemId: nil,
+            currentTrackId: trackId,
+            contextType: .libraryCollection,
+            contextId: nil,
+            collectionCategory: "genres",
+            collectionValue: "House",
+            collectionArtistKey: nil,
+            playbackTime: 0,
+            duration: 120,
+            isPlaying: false,
+            repeatMode: .off,
+            shuffleEnabled: false,
+            updatedAt: now
+        )
+        try stateStore.upsert(collectionModel)
+
+        let folderModel = PlayerStateDatabaseModel(
+            id: 1,
+            currentQueueItemId: nil,
+            currentTrackId: trackId,
+            contextType: .libraryFolder,
+            contextId: folderId,
+            collectionCategory: nil,
+            collectionValue: nil,
+            collectionArtistKey: nil,
+            playbackTime: 0,
+            duration: 120,
+            isPlaying: false,
+            repeatMode: .off,
+            shuffleEnabled: false,
+            updatedAt: now.addingTimeInterval(1)
+        )
+        try stateStore.upsert(folderModel)
+
+        let restoredFolder = try XCTUnwrap(stateStore.fetch())
+        XCTAssertEqual(restoredFolder.contextType, .libraryFolder)
+        XCTAssertEqual(restoredFolder.contextId, folderId)
+        XCTAssertNil(restoredFolder.collectionCategory)
+        XCTAssertNil(restoredFolder.collectionValue)
+        XCTAssertNil(restoredFolder.collectionArtistKey)
+    }
+
+    func testSQLitePlayerStateStoreInsertAndUpdateKeepParameterOrder() throws {
+        let database = try makeDatabase()
+        let executor = try database.databaseExecutor()
+        let trackStore = SQLiteTrackStore(executor: executor)
+        let stateStore = SQLitePlayerStateStore(executor: executor)
+        let track = makeTrack(fileName: "InsertUpdateState.mp3")
+
+        try trackStore.insert(track)
+
+        let now = Date(timeIntervalSince1970: 300)
+        let initial = PlayerStateDatabaseModel(
+            id: 1,
+            currentQueueItemId: nil,
+            currentTrackId: track.id,
+            contextType: .libraryCollection,
+            contextId: nil,
+            collectionCategory: "genres",
+            collectionValue: "House",
+            collectionArtistKey: nil,
+            playbackTime: 0,
+            duration: 120,
+            isPlaying: false,
+            repeatMode: .off,
+            shuffleEnabled: false,
+            updatedAt: now
+        )
+        try stateStore.insert(initial)
+
+        let inserted = try XCTUnwrap(stateStore.fetch())
+        XCTAssertEqual(inserted.collectionCategory, "genres")
+        XCTAssertEqual(inserted.collectionValue, "House")
+
+        var updated = initial
+        updated.contextType = .libraryRoot
+        updated.collectionCategory = nil
+        updated.collectionValue = nil
+        updated.updatedAt = now.addingTimeInterval(1)
+        try stateStore.update(updated)
+
+        let restored = try XCTUnwrap(stateStore.fetch())
+        XCTAssertEqual(restored.contextType, .libraryRoot)
+        XCTAssertNil(restored.contextId)
+        XCTAssertNil(restored.collectionCategory)
+        XCTAssertNil(restored.collectionValue)
+        XCTAssertNil(restored.collectionArtistKey)
     }
 
     func testPlayerDatabaseStorePreservesCurrentQueueReferenceWhenReplacingQueue() throws {
@@ -993,7 +1186,8 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
                 .playbackModeSettings,
                 .miniPlayerPresentationState,
                 .playerContextSource,
-                .libraryPlaybackContextSource
+                .libraryPlaybackContextSource,
+                .libraryCollectionPlaybackContextSource
             ])
         )
 

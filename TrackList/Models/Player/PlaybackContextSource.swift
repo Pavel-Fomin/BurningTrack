@@ -19,4 +19,10 @@ enum PlaybackContextSource: Equatable {
     case libraryFolder(id: UUID)
     /// Корневой список всех локальных треков фонотеки.
     case libraryRoot
+    /// Выбранное значение категории музыкальной коллекции.
+    case libraryCollection(
+        category: LibraryCollectionCategory,
+        rawValue: String,
+        artistKey: String?
+    )
 }

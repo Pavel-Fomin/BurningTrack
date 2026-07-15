@@ -127,6 +127,10 @@ struct PlayerStateDatabaseModel: Equatable, Identifiable {
     var currentTrackId: UUID?
     var contextType: DatabasePlaybackContextType
     var contextId: UUID?
+    // Строковые параметры значения коллекции; для остальных источников остаются NULL.
+    var collectionCategory: String?
+    var collectionValue: String?
+    var collectionArtistKey: String?
     var playbackTime: Double
     var duration: Double?
     var isPlaying: Bool

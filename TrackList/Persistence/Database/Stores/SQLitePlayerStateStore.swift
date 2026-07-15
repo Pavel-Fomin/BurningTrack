@@ -83,7 +83,8 @@ final class SQLitePlayerStateStore: PlayerStateDatabaseReading, PlayerStateDatab
             throw DatabaseError.invalidColumnValue(column: DatabaseSchema.PlayerState.contextType, value: contextRawValue)
         }
 
-        let repeatRawValue = try row.requiredString(at: 8)
+        // После collection-полей repeat_mode находится в колонке 11, а playback_time — в колонке 8.
+        let repeatRawValue = try row.requiredString(at: 11)
         guard let repeatMode = DatabaseRepeatMode(rawValue: repeatRawValue) else {
             throw DatabaseError.invalidColumnValue(
                 column: DatabaseSchema.PlayerState.repeatMode,
@@ -97,12 +98,15 @@ final class SQLitePlayerStateStore: PlayerStateDatabaseReading, PlayerStateDatab
             currentTrackId: try row.uuid(at: 2),
             contextType: contextType,
             contextId: try row.uuid(at: 4),
-            playbackTime: try row.requiredDouble(at: 5),
-            duration: row.double(at: 6),
-            isPlaying: try row.requiredBool(at: 7),
+            collectionCategory: row.string(at: 5),
+            collectionValue: row.string(at: 6),
+            collectionArtistKey: row.string(at: 7),
+            playbackTime: try row.requiredDouble(at: 8),
+            duration: row.double(at: 9),
+            isPlaying: try row.requiredBool(at: 10),
             repeatMode: repeatMode,
-            shuffleEnabled: try row.requiredBool(at: 9),
-            updatedAt: try row.requiredDate(at: 10)
+            shuffleEnabled: try row.requiredBool(at: 12),
+            updatedAt: try row.requiredDate(at: 13)
         )
     }
 
@@ -116,12 +120,15 @@ final class SQLitePlayerStateStore: PlayerStateDatabaseReading, PlayerStateDatab
         try statement.bind(model.currentTrackId, at: 3)
         try statement.bind(model.contextType.rawValue, at: 4)
         try statement.bind(model.contextId, at: 5)
-        try statement.bind(model.playbackTime, at: 6)
-        try statement.bind(model.duration, at: 7)
-        try statement.bind(model.isPlaying, at: 8)
-        try statement.bind(model.repeatMode.rawValue, at: 9)
-        try statement.bind(model.shuffleEnabled, at: 10)
-        try statement.bind(model.updatedAt, at: 11)
+        try statement.bind(model.collectionCategory, at: 6)
+        try statement.bind(model.collectionValue, at: 7)
+        try statement.bind(model.collectionArtistKey, at: 8)
+        try statement.bind(model.playbackTime, at: 9)
+        try statement.bind(model.duration, at: 10)
+        try statement.bind(model.isPlaying, at: 11)
+        try statement.bind(model.repeatMode.rawValue, at: 12)
+        try statement.bind(model.shuffleEnabled, at: 13)
+        try statement.bind(model.updatedAt, at: 14)
     }
 
     private static func bindUpdate(
@@ -133,12 +140,15 @@ final class SQLitePlayerStateStore: PlayerStateDatabaseReading, PlayerStateDatab
         try statement.bind(model.currentTrackId, at: 2)
         try statement.bind(model.contextType.rawValue, at: 3)
         try statement.bind(model.contextId, at: 4)
-        try statement.bind(model.playbackTime, at: 5)
-        try statement.bind(model.duration, at: 6)
-        try statement.bind(model.isPlaying, at: 7)
-        try statement.bind(model.repeatMode.rawValue, at: 8)
-        try statement.bind(model.shuffleEnabled, at: 9)
-        try statement.bind(model.updatedAt, at: 10)
-        try statement.bind(model.id, at: 11)
+        try statement.bind(model.collectionCategory, at: 5)
+        try statement.bind(model.collectionValue, at: 6)
+        try statement.bind(model.collectionArtistKey, at: 7)
+        try statement.bind(model.playbackTime, at: 8)
+        try statement.bind(model.duration, at: 9)
+        try statement.bind(model.isPlaying, at: 10)
+        try statement.bind(model.repeatMode.rawValue, at: 11)
+        try statement.bind(model.shuffleEnabled, at: 12)
+        try statement.bind(model.updatedAt, at: 13)
+        try statement.bind(model.id, at: 14)
     }
 }

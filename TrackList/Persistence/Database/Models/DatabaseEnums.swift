@@ -29,6 +29,7 @@ enum DatabasePlaybackContextType: String, Equatable {
     case trackList
     case libraryFolder
     case libraryRoot
+    case libraryCollection
 }
 
 // Цветовая схема приложения в app_settings.

@@ -495,6 +495,7 @@ enum PlayerQueueDatabaseQueries {
 enum PlayerStateDatabaseQueries {
     static let fetch = """
     SELECT id, current_queue_item_id, current_track_id, context_type, context_id,
+           collection_category, collection_value, collection_artist_key,
            playback_time, duration, is_playing, repeat_mode, shuffle_enabled, updated_at
     FROM player_state
     WHERE id = 1;
@@ -503,13 +504,15 @@ enum PlayerStateDatabaseQueries {
     static let insert = """
     INSERT INTO player_state (
         id, current_queue_item_id, current_track_id, context_type, context_id,
+        collection_category, collection_value, collection_artist_key,
         playback_time, duration, is_playing, repeat_mode, shuffle_enabled, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
     """
 
     static let update = """
     UPDATE player_state
     SET current_queue_item_id = ?, current_track_id = ?, context_type = ?, context_id = ?,
+        collection_category = ?, collection_value = ?, collection_artist_key = ?,
         playback_time = ?, duration = ?, is_playing = ?, repeat_mode = ?,
         shuffle_enabled = ?, updated_at = ?
     WHERE id = ?;
@@ -518,13 +521,17 @@ enum PlayerStateDatabaseQueries {
     static let upsert = """
     INSERT INTO player_state (
         id, current_queue_item_id, current_track_id, context_type, context_id,
+        collection_category, collection_value, collection_artist_key,
         playback_time, duration, is_playing, repeat_mode, shuffle_enabled, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
         current_queue_item_id = excluded.current_queue_item_id,
         current_track_id = excluded.current_track_id,
         context_type = excluded.context_type,
         context_id = excluded.context_id,
+        collection_category = excluded.collection_category,
+        collection_value = excluded.collection_value,
+        collection_artist_key = excluded.collection_artist_key,
         playback_time = excluded.playback_time,
         duration = excluded.duration,
         is_playing = excluded.is_playing,

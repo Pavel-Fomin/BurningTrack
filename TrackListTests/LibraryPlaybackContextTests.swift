@@ -45,7 +45,12 @@ final class LibraryPlaybackContextTests: XCTestCase {
             .playerQueue,
             .trackList(id: UUID()),
             .libraryFolder(id: folderId),
-            .libraryRoot
+            .libraryRoot,
+            .libraryCollection(
+                category: .genres,
+                rawValue: "House",
+                artistKey: nil
+            )
         ]
 
         for source in sources {
@@ -53,11 +58,30 @@ final class LibraryPlaybackContextTests: XCTestCase {
             let contextId = PlaybackContextSourceDatabaseMapper.contextId(from: source)
             let restored = PlaybackContextSourceDatabaseMapper.playbackSource(
                 from: databaseType,
-                contextId: contextId
+                contextId: contextId,
+                collectionCategory: PlaybackContextSourceDatabaseMapper.collectionCategory(from: source),
+                collectionValue: PlaybackContextSourceDatabaseMapper.collectionValue(from: source),
+                collectionArtistKey: PlaybackContextSourceDatabaseMapper.collectionArtistKey(from: source)
             )
 
             XCTAssertEqual(restored, source)
         }
+
+        let albumSource = PlaybackContextSource.libraryCollection(
+            category: .albums,
+            rawValue: "Discovery",
+            artistKey: "Daft Punk"
+        )
+        XCTAssertEqual(
+            PlaybackContextSourceDatabaseMapper.playbackSource(
+                from: .libraryCollection,
+                contextId: nil,
+                collectionCategory: "albums",
+                collectionValue: "Discovery",
+                collectionArtistKey: "Daft Punk"
+            ),
+            albumSource
+        )
 
         XCTAssertNil(
             PlaybackContextSourceDatabaseMapper.playbackSource(
@@ -69,6 +93,54 @@ final class LibraryPlaybackContextTests: XCTestCase {
             PlaybackContextSourceDatabaseMapper.playbackSource(
                 from: .libraryRoot,
                 contextId: folderId
+            )
+        )
+        XCTAssertNil(
+            PlaybackContextSourceDatabaseMapper.playbackSource(
+                from: .libraryCollection,
+                contextId: nil,
+                collectionCategory: "unsupported",
+                collectionValue: "House"
+            )
+        )
+        XCTAssertNil(
+            PlaybackContextSourceDatabaseMapper.playbackSource(
+                from: .libraryCollection,
+                contextId: nil,
+                collectionCategory: "genres"
+            )
+        )
+        XCTAssertNil(
+            PlaybackContextSourceDatabaseMapper.playbackSource(
+                from: .libraryCollection,
+                contextId: folderId,
+                collectionCategory: "genres",
+                collectionValue: "House"
+            )
+        )
+    }
+
+    func testLibraryTrackListSourceConvertsToPlaybackSource() {
+        let folderId = UUID()
+
+        XCTAssertEqual(
+            LibraryTrackListSource.folder(folderId: folderId).playbackContextSource,
+            .libraryFolder(id: folderId)
+        )
+        XCTAssertEqual(
+            LibraryTrackListSource.allLibraryTracks.playbackContextSource,
+            .libraryRoot
+        )
+        XCTAssertEqual(
+            LibraryTrackListSource.collectionValue(
+                category: .albums,
+                rawValue: "Discovery",
+                artistKey: "Daft Punk"
+            ).playbackContextSource,
+            .libraryCollection(
+                category: .albums,
+                rawValue: "Discovery",
+                artistKey: "Daft Punk"
             )
         )
     }

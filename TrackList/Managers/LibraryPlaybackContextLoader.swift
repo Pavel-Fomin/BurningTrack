@@ -17,6 +17,13 @@ protocol LibraryPlaybackContextLoading {
 
     /// Возвращает отсортированный корневой список локальных треков фонотеки.
     func loadRootContext() async throws -> [LibraryTrack]
+
+    /// Возвращает актуальный список треков выбранного значения коллекции.
+    func loadCollectionContext(
+        category: LibraryCollectionCategory,
+        rawValue: String,
+        artistKey: String?
+    ) async throws -> [LibraryTrack]
 }
 
 /// Ошибки определения постоянного источника фонотеки.
@@ -53,6 +60,23 @@ final class LibraryPlaybackContextLoader: LibraryPlaybackContextLoading {
         // Корневой экран фонотеки не хранит отдельную сортировку, поэтому используется его текущий default.
         return await loadAndSort(
             source: .allLibraryTracks,
+            sortMode: .fileDateDesc
+        )
+    }
+
+    func loadCollectionContext(
+        category: LibraryCollectionCategory,
+        rawValue: String,
+        artistKey: String?
+    ) async throws -> [LibraryTrack] {
+        // Режим сортировки значения коллекции не является постоянной настройкой,
+        // поэтому восстановление использует тот же канонический порядок, что и экран списка.
+        return await loadAndSort(
+            source: .collectionValue(
+                category: category,
+                rawValue: rawValue,
+                artistKey: artistKey
+            ),
             sortMode: .fileDateDesc
         )
     }
