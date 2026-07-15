@@ -4,7 +4,7 @@
 //
 //  Общие основные кнопки управления мини-плеером.
 //
-//  Created by Pavel Fomin on 04.07.2026.
+//  Created by Pavel Fomin on 14.07.2026.
 //
 
 import SwiftUI

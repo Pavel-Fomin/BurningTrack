@@ -4,7 +4,7 @@
 //
 //  Проверки глобального состояния и жизненного цикла экспорта.
 //
-//  Created by Pavel Fomin on 04.07.2026.
+//  Created by Pavel Fomin on 15.07.2026.
 //
 
 import Foundation

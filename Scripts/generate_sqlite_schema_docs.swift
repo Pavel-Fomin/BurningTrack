@@ -1,5 +1,13 @@
 #!/usr/bin/env swift
 
+//
+//  generate_sqlite_schema_docs.swift
+//  TrackList
+//
+//  Генерация документации схемы SQLite.
+//
+//  Created by Pavel Fomin on 06.07.2026.
+
 import Foundation
 
 // Ошибка скрипта с понятным текстом для developer-команды.

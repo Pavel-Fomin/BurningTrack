@@ -3,7 +3,7 @@
 //  TrackList
 //
 //  View раздела поиска.
-//  Created by Pavel Fomin on 04.07.2026.
+//  Created by Pavel Fomin on 08.07.2026.
 //
 
 import SwiftUI

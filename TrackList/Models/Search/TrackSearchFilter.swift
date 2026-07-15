@@ -3,7 +3,7 @@
 //  TrackList
 //
 //  Модели и вычисление фильтров совпадений поиска треков.
-//  Created by Pavel Fomin on 04.07.2026.
+//  Created by Pavel Fomin on 08.07.2026.
 //
 
 import Foundation

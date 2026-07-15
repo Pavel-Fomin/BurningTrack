@@ -4,7 +4,7 @@
 //
 //  Строка альбома в списке значений музыкальной коллекции.
 //
-//  Created by Pavel Fomin on 04.07.2026.
+//  Created by Pavel Fomin on 10.07.2026.
 //
 
 import SwiftUI
