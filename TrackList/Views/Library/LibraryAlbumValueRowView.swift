@@ -50,8 +50,7 @@ struct LibraryAlbumValueRowView: View {
             }
 
             if isCurrent {
-                activeArtworkDimmingView
-                currentTrackBadge
+                ActiveArtworkOverlayView(isPlaying: isPlaying)
             }
         }
         .frame(width: 52, height: 52)
@@ -72,24 +71,6 @@ struct LibraryAlbumValueRowView: View {
                 .font(.system(size: 21, weight: .semibold))
                 .foregroundStyle(Color.secondary.opacity(0.7))
         }
-    }
-
-    /// Слегка затемняет активную обложку, чтобы иконка читалась без отдельной подложки.
-    private var activeArtworkDimmingView: some View {
-        Color.black.opacity(0.26)
-    }
-
-    /// Индикатор того, что внутри альбома находится текущий трек.
-    private var currentTrackBadge: some View {
-        Image(systemName: "waveform.mid")
-            .font(.system(size: 18, weight: .bold))
-            .foregroundStyle(.white)
-            // Анимация включается только во время воспроизведения трека из этого альбома.
-            .symbolEffect(
-                .variableColor.iterative.dimInactiveLayers.nonReversing,
-                options: .repeat(.continuous),
-                isActive: isPlaying
-            )
     }
 
     /// Центральная колонка с названием альбома и артистом.

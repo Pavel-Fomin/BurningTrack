@@ -228,31 +228,24 @@ struct TrackRowView<ActionMenuContent: View>: View {
 
     // MARK: - Обложка
 
+    /// Статичная круглая обложка трека с индикатором текущего воспроизведения.
     private var artworkView: some View {
         ZStack {
             if let artwork {
-                RotatingArtworkView(
-                    image: artwork,
-                    isActive: isCurrent,
-                    isPlaying: isPlaying,
-                    size: 48,
-                    rpm: 10
-                )
-                .frame(width: 48, height: 48)
-
+                Image(uiImage: artwork)
+                    .resizable()
+                    .scaledToFill()
             } else {
                 Circle()
                     .fill(Color.gray.opacity(0.3))
-                    .frame(width: 48, height: 48)
+            }
 
-                if isCurrent {
-                    Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                        .foregroundColor(.accentColor)
-                        .font(.system(size: 16, weight: .semibold))
-                        .shadow(radius: 1)
-                }
+            if isCurrent {
+                ActiveArtworkOverlayView(isPlaying: isPlaying)
             }
         }
+        .frame(width: 48, height: 48)
+        .clipShape(Circle())
     }
 
     // MARK: - Информация о треке

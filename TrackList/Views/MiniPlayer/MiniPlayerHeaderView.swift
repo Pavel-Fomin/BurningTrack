@@ -71,20 +71,22 @@ struct MiniPlayerHeaderView: View {
 
     // MARK: - Artwork
 
-    /// Повторяет существующий fallback мини-плеера при отсутствии обложки.
+    /// Показывает вращающуюся обложку текущего трека или статичную круглую заглушку.
     @ViewBuilder
     private var artworkView: some View {
         if let artwork {
-            Image(uiImage: artwork)
-                .resizable()
-                .aspectRatio(1, contentMode: .fill)
-                .frame(width: 40, height: 40)
-                .cornerRadius(5)
+            RotatingArtworkView(
+                image: artwork,
+                isActive: true,
+                isPlaying: isPlaying,
+                size: 40,
+                rpm: 10
+            )
+            .frame(width: 40, height: 40)
         } else {
-            Rectangle()
+            Circle()
                 .fill(Color.gray.opacity(0.3))
                 .frame(width: 40, height: 40)
-                .cornerRadius(5)
         }
     }
 }
