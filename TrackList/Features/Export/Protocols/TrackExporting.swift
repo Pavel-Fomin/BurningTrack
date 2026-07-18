@@ -17,7 +17,7 @@ protocol TrackExporting {
         exportFolderName: String,
         presenter: UIViewController,
         onProgress: @escaping ExportProgressHandler
-    ) async throws -> ExportManager.ExportResult
+    ) async throws -> ExportSummary
 
     /// Отменяет активный picker или копирование.
     func cancelCurrentExport()

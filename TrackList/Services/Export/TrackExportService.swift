@@ -257,6 +257,13 @@ actor TrackExportService {
         for preparedItem in items {
             try throwIfCancelled()
 
+            #if DEBUG
+            ExportDiagnostics.shared.recordCurrentFile(
+                number: preparedItem.item.index + 1,
+                size: preparedItem.byteCount
+            )
+            #endif
+
             progress.currentFileName = preparedItem.item.exportFileName
             progress.currentFileBytes = preparedItem.byteCount
             progress.currentFileCopiedBytes = 0
@@ -275,6 +282,9 @@ actor TrackExportService {
                         cancellationToken.isCancelled || Task.isCancelled
                     },
                     onBytesCopied: { copiedBytes in
+                        #if DEBUG
+                        ExportDiagnostics.shared.recordByteCallback()
+                        #endif
                         progress.currentFileCopiedBytes = copiedBytes
                         progress.copiedBytes = completedBytes + copiedBytes
                         onProgress(progress)

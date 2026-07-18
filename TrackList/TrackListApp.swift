@@ -30,11 +30,10 @@ struct TrackListApp: App {
 
         let playerVM = PlayerViewModel() // без аргументов
         self.playerViewModel = playerVM
+        // Фабрика скрывает внутреннюю последовательность сборки export feature.
+        let exportFeatureFactory = ExportFeatureFactory()
         _exportProgressViewModel = StateObject(
-            wrappedValue: ExportProgressViewModel(
-                exporter: ExportManager.shared,
-                toastPresenter: ToastManager.shared
-            )
+            wrappedValue: exportFeatureFactory.makeExportProgressViewModel()
         )
     }
 

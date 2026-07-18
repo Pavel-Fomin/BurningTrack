@@ -68,10 +68,4 @@ struct ExportSummary: Sendable {
 
     /// Финальное состояние операции.
     let state: ExportState
-
-    /// Совместимое с прежним ExportResult имя количества успешных файлов.
-    var exported: Int { completedFiles }
-
-    /// Совместимое с прежним ExportResult имя количества ошибочных файлов.
-    var failed: Int { failedFiles.count }
 }

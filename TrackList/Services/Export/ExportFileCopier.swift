@@ -99,10 +99,19 @@ final class ExportFileCopier {
             }
 
             let sourceHandle = try FileHandle(forReadingFrom: sourceURL)
+            defer {
+                try? sourceHandle.close()
+            }
+
             let destinationHandle = try FileHandle(forWritingTo: partialURL)
+            #if DEBUG
+            ExportDiagnostics.shared.recordFileHandlesOpened()
+            #endif
             defer {
                 try? destinationHandle.close()
-                try? sourceHandle.close()
+                #if DEBUG
+                ExportDiagnostics.shared.recordFileHandlesClosed()
+                #endif
             }
 
             var copiedBytes: Int64 = 0
@@ -110,13 +119,26 @@ final class ExportFileCopier {
             while true {
                 try throwIfCancelled(shouldCancel)
 
-                guard let data = try sourceHandle.read(upToCount: bufferSize),
-                      data.isEmpty == false else {
+                var reachedEndOfFile = false
+                var copiedBlockByteCount: Int64 = 0
+
+                // Локальный autoreleasepool ограничивает время жизни временных
+                // Foundation-объектов чтения и записи одним блоком копирования.
+                try autoreleasepool {
+                    if let data = try sourceHandle.read(upToCount: bufferSize),
+                       data.isEmpty == false {
+                        try destinationHandle.write(contentsOf: data)
+                        copiedBlockByteCount = Int64(data.count)
+                    } else {
+                        reachedEndOfFile = true
+                    }
+                }
+
+                if reachedEndOfFile {
                     break
                 }
 
-                try destinationHandle.write(contentsOf: data)
-                copiedBytes += Int64(data.count)
+                copiedBytes += copiedBlockByteCount
                 onBytesCopied(copiedBytes)
 
                 try throwIfCancelled(shouldCancel)

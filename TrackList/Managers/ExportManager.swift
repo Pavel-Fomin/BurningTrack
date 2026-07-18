@@ -18,9 +18,6 @@ final class ExportManager {
     /// Единый production-фасад, используемый текущими action handler-ами.
     static let shared = ExportManager()
 
-    /// Сохраняет прежнее имя типа результата для вызывающего кода.
-    typealias ExportResult = ExportSummary
-
     /// Отдельный сервис выбора папки назначения.
     private let destinationResolver: any ExportDestinationResolving
 
@@ -44,7 +41,7 @@ final class ExportManager {
         exportFolderName: String,
         presenter: UIViewController,
         onProgress: @escaping ExportProgressHandler = { _ in }
-    ) async throws -> ExportResult {
+    ) async throws -> ExportSummary {
         let destination = try await destinationResolver.resolveDestination(
             presenter: presenter
         )

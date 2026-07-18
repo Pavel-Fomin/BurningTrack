@@ -14,7 +14,7 @@ import XCTest
 /// Проверяет контракт этапа 1 без запуска UI и файлового провайдера.
 final class TrackExportModelTests: XCTestCase {
 
-    /// Проверяет, что нумерация совпадает с прежним ExportManager.
+    /// Проверяет сохранение нумерации файлов в задании экспорта.
     func testExportJobPreservesNumbering() {
         let firstTrack = Track(
             trackId: UUID(),
