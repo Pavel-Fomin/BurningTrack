@@ -263,6 +263,34 @@ final class ExportProgressViewModelTests: XCTestCase {
         XCTAssertEqual(exporter.cancelCallCount, 0)
     }
 
+    /// Проверяет ручную очистку результатов с ошибкой копирования.
+    func testErrorStateCanBeClearedManually() async {
+        let terminalStates: [ExportState] = [.completedWithErrors, .failed]
+
+        for terminalState in terminalStates {
+            let exporter = ExportingSpy()
+            exporter.snapshots = [
+                makeProgress(
+                    failedFiles: terminalState == .completedWithErrors ? 1 : 0,
+                    state: terminalState
+                )
+            ]
+            let viewModel = makeViewModel(exporter: exporter)
+
+            viewModel.startExport(
+                tracks: [makeTrack()],
+                exportFolderName: "Плеер",
+                presenter: UIViewController()
+            )
+            await yieldToExportTask()
+
+            viewModel.dismissCompletedExport()
+
+            XCTAssertNil(viewModel.progress)
+            XCTAssertFalse(viewModel.isVisible)
+        }
+    }
+
     /// Проверяет, что action очистки удаляет только завершённый результат.
     func testDismissCompletedActionClearsTerminalResult() async {
         let exporter = ExportingSpy()

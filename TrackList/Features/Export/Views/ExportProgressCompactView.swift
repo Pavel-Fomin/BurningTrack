@@ -32,7 +32,7 @@ struct ExportProgressCompactView: View {
     /// Открывает подробный результат операции.
     let onTap: () -> Void
 
-    /// Удаляет завершённый или отменённый результат из глобального состояния.
+    /// Удаляет терминальный результат из глобального состояния.
     let onDismiss: () -> Void
 
     // MARK: - Presentation
@@ -42,14 +42,14 @@ struct ExportProgressCompactView: View {
         progress.state == .completed
     }
 
-    /// Отменённая операция получает отдельное состояние до ручного закрытия.
-    private var isCancelled: Bool {
-        progress.state == .cancelled
-    }
-
-    /// Только завершённый или отменённый результат можно закрыть вручную.
+    /// Любой терминальный результат можно закрыть вручную.
     private var isDismissibleResult: Bool {
-        isCompleted || isCancelled
+        switch progress.state {
+        case .completed, .completedWithErrors, .cancelled, .failed:
+            return true
+        case .idle, .preparing, .copying:
+            return false
+        }
     }
 
     /// Формирует короткий итоговый текст успешного копирования.
@@ -62,12 +62,33 @@ struct ExportProgressCompactView: View {
         "Копирование отменено"
     }
 
-    /// Возвращает текст компактной панели для терминального результата.
-    private var resultTitle: String {
-        isCancelled ? cancelledTitle : completedTitle
+    /// Формирует короткий итоговый текст частично завершённого копирования.
+    private var completedWithErrorsTitle: String {
+        "Копирование завершено с ошибками"
     }
 
-    /// Выбирает цвет текста для успешного или отменённого результата.
+    /// Формирует короткий итоговый текст копирования с инфраструктурной ошибкой.
+    private var failedTitle: String {
+        "Копирование завершилось с ошибкой"
+    }
+
+    /// Возвращает текст компактной панели для терминального результата.
+    private var resultTitle: String {
+        switch progress.state {
+        case .completed:
+            return completedTitle
+        case .completedWithErrors:
+            return completedWithErrorsTitle
+        case .cancelled:
+            return cancelledTitle
+        case .failed:
+            return failedTitle
+        case .idle, .preparing, .copying:
+            return "Экспортирую"
+        }
+    }
+
+    /// Выбирает цвет текста для успешного результата, отмены или ошибки.
     private var resultTitleColor: Color {
         isCompleted ? .green : .orange
     }
