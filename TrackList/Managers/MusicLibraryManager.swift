@@ -239,6 +239,9 @@ final class MusicLibraryManager: ObservableObject {
         try await BookmarksRegistry.shared.throwPendingPersistenceError()
         try await TrackRegistry.shared.throwPendingPersistenceError()
 
+        // Сигнал отправляется после полного удаления папки и её треков из SQLite.
+        NotificationCenter.default.post(name: .libraryDataDidChange, object: nil)
+
         // Обновляем UI-список прикреплённых папок
         attachedFolders.removeAll { $0.url == url }
 

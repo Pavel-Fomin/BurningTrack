@@ -156,7 +156,8 @@ final class AppSettingsManager: ObservableObject, SettingsManaging, PlaybackMode
             throw error
         }
 
-        NotificationCenter.default.post(name: .appSettingsDidChange, object: nil)
+        // Режим корня меняет только компоновку фонотеки и не влияет на metadata или artwork.
+        // Общее событие запускало пересборку snapshot-ов всей очереди плеера при каждом переключении.
     }
 
     /// Сохраняет выбранную сортировку треков внутри папки фонотеки.

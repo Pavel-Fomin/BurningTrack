@@ -21,6 +21,9 @@ protocol LibraryTrackEventProvider {
     /// Событие пакетного обновления треков.
     var trackBatchDidUpdate: AnyPublisher<[TrackUpdateEvent], Never> { get }
 
+    /// Завершённое изменение состава фонотеки после записи в SQLite.
+    var libraryDataDidChange: AnyPublisher<Void, Never> { get }
+
     /// Событие изменения настроек приложения,
     /// влияющих на отображение runtime metadata.
     var appSettingsDidChange: AnyPublisher<Void, Never> { get }

@@ -19,6 +19,12 @@
 
 import Foundation
 
+/// Ошибка подготовки одного элемента пакетного post-update pipeline.
+/// Нужна вызывающему batch-сценарию, чтобы показать ошибку именно у трека без публикации ложного batch-события.
+enum TrackUpdateCoordinatorError: Error {
+    case updateFailed(trackId: UUID, underlying: Error)
+}
+
 final class TrackUpdateCoordinator {
 
     // MARK: - Singleton
@@ -50,15 +56,15 @@ final class TrackUpdateCoordinator {
         reason: TrackUpdateReason,
         changedFields: Set<TrackChangedField>,
         previousURL: URL? = nil
-    ) async -> TrackUpdateEvent? {
-        guard let updateEvent = await makeTrackUpdateEvent(
+    ) async throws -> TrackUpdateEvent? {
+        guard let updateEvent = try await makeTrackUpdateEvent(
             forTrackId: trackId,
             reason: reason,
             changedFields: changedFields,
             previousURL: previousURL
         ) else { return nil }
 
-        // Публикуем событие для подписчиков.
+        // Публикуем событие только после успешного сохранения snapshot metadata в SQLite.
         await publishTrackUpdateEvent(updateEvent)
 
         return updateEvent
@@ -70,20 +76,29 @@ final class TrackUpdateCoordinator {
     /// - сбрасывает cache;
     /// - пересобирает runtime snapshot;
     /// - публикует track update event.
-    func handleTrackUpdates(_ updates: [TrackUpdateRequest]) async -> [TrackUpdateEvent] {
+    func handleTrackUpdates(_ updates: [TrackUpdateRequest]) async throws -> [TrackUpdateEvent] {
         var events: [TrackUpdateEvent] = []
 
         for update in updates {
-            if let event = await makeTrackUpdateEvent(
-                forTrackId: update.trackId,
-                reason: .fileRenamed,
-                changedFields: [.fileName],
-                previousURL: update.previousURL
-            ) {
-                events.append(event)
+            do {
+                if let event = try await makeTrackUpdateEvent(
+                    forTrackId: update.trackId,
+                    reason: .fileRenamed,
+                    changedFields: [.fileName],
+                    previousURL: update.previousURL
+                ) {
+                    events.append(event)
+                }
+            } catch {
+                // Batch-сценарий получает trackId ошибки и не публикует подготовленные события до полного успеха.
+                throw TrackUpdateCoordinatorError.updateFailed(
+                    trackId: update.trackId,
+                    underlying: error
+                )
             }
         }
 
+        // Пакетное событие публикуется только для полностью подготовленного набора успешно сохранённых snapshot.
         await publishTrackBatchUpdateEvent(events)
 
         return events
@@ -95,7 +110,7 @@ final class TrackUpdateCoordinator {
         reason: TrackUpdateReason,
         changedFields: Set<TrackChangedField>,
         previousURL: URL? = nil
-    ) async -> TrackUpdateEvent? {
+    ) async throws -> TrackUpdateEvent? {
 
         // Получаем актуальный URL трека через существующий bookmark pipeline.
         guard let url = await BookmarkResolver.url(forTrack: trackId) else { return nil }
@@ -108,7 +123,7 @@ final class TrackUpdateCoordinator {
         )
 
         // Пересобираем каноничный snapshot трека.
-        guard let snapshot = await TrackRuntimeSnapshotBuilder.shared.buildSnapshot(forTrackId: trackId) else {
+        guard let snapshot = try await TrackRuntimeSnapshotBuilder.shared.buildSnapshot(forTrackId: trackId) else {
             return nil
         }
 

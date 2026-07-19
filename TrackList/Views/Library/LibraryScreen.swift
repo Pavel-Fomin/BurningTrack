@@ -145,9 +145,9 @@ struct LibraryScreen: View {
             viewModel.handle(.appeared)
         }
         .onChange(of: masterViewModel.rootDisplayMode) { _, newMode in
-            // Перечитываем корень именно в момент перехода в режим "Треки".
-            guard newMode == .tracks else { return }
-            viewModel.refreshCollectionRootItems()
+            // При смене режима обновляем видимость корневого списка и читаем данные только при необходимости.
+            guard viewModel.screenState.libraryPath.isEmpty else { return }
+            viewModel.setCollectionRootVisibility(newMode == .tracks)
         }
         // Выбор папки
         .fileImporter(
@@ -185,9 +185,10 @@ struct LibraryScreen: View {
         )
         .onAppear {
             selectionActionBarConfig = nil
-            if masterViewModel.rootDisplayMode == .tracks {
-                viewModel.refreshCollectionRootItems()
-            }
+            viewModel.setCollectionRootVisibility(masterViewModel.rootDisplayMode == .tracks)
+        }
+        .onDisappear {
+            viewModel.setCollectionRootVisibility(false)
         }
     }
 

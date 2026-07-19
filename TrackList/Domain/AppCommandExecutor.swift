@@ -57,7 +57,7 @@ actor AppCommandExecutor {
         }
         
         // 3. Запускаем единый post-update pipeline.
-        let updateEvent = await TrackUpdateCoordinator.shared.handleTrackUpdate(
+        let updateEvent = try await TrackUpdateCoordinator.shared.handleTrackUpdate(
             forTrackId: trackId,
             reason: .fileMoved,
             changedFields: [.fileName],
@@ -154,7 +154,7 @@ actor AppCommandExecutor {
         }
         
         // 3. Запускаем единый post-update pipeline.
-        let updateEvent = await TrackUpdateCoordinator.shared.handleTrackUpdate(
+        let updateEvent = try await TrackUpdateCoordinator.shared.handleTrackUpdate(
             forTrackId: trackId,
             reason: .fileRenamed,
             changedFields: [.fileName],
@@ -228,7 +228,51 @@ actor AppCommandExecutor {
             }
         }
 
-        _ = await TrackUpdateCoordinator.shared.handleTrackUpdates(successfulUpdates)
+        // Post-update pipeline может отклонить уже переименованный файл, если его metadata не удалось сохранить.
+        // Файл не откатываем: отмечаем конкретный элемент ошибкой и публикуем batch-событие только для подтверждённых треков.
+        var pendingUpdates = successfulUpdates
+        let commandsByTrackId = Dictionary(
+            uniqueKeysWithValues: commands.map { ($0.trackId, $0) }
+        )
+
+        while pendingUpdates.isEmpty == false {
+            do {
+                _ = try await TrackUpdateCoordinator.shared.handleTrackUpdates(pendingUpdates)
+                break
+            } catch let error as TrackUpdateCoordinatorError {
+                let failedTrackId: UUID
+                let underlyingError: Error
+
+                switch error {
+                case let .updateFailed(trackId, underlying):
+                    failedTrackId = trackId
+                    underlyingError = underlying
+                }
+
+                guard let failedIndex = pendingUpdates.firstIndex(where: { $0.trackId == failedTrackId }),
+                      let command = commandsByTrackId[failedTrackId] else {
+                    PersistentLogger.log("❌ batch rename: не удалось сопоставить ошибку post-update с треком \(failedTrackId)")
+                    break
+                }
+
+                pendingUpdates.remove(at: failedIndex)
+                succeeded.removeAll { $0.trackId == failedTrackId }
+                failed.append(
+                    BatchFilenameRenameFailure(
+                        trackId: failedTrackId,
+                        targetFileName: command.targetFileName,
+                        error: underlyingError
+                    )
+                )
+                PersistentLogger.log("❌ batch rename post-update failed trackId=\(failedTrackId) file already renamed: \(underlyingError)")
+
+                // Повторяем подготовку оставшихся элементов: координатор публикует один batch только после полного успешного прохода.
+            } catch {
+                // Все ошибки подготовки оборачиваются координатором вместе с trackId, поэтому этот путь диагностический.
+                PersistentLogger.log("❌ batch rename: unexpected post-update error \(error)")
+                break
+            }
+        }
 
         return BatchFilenameRenameResult(
             succeeded: succeeded,
@@ -726,7 +770,8 @@ actor AppCommandExecutor {
             updateReason = .fileRenamed
         }
         // 6. Запускаем единый post-update pipeline после всех успешных операций.
-        let updateEvent = await TrackUpdateCoordinator.shared.handleTrackUpdate(
+        // Ошибка сохранения metadata намеренно доходит до action handler, который показывает существующий error-toast.
+        let updateEvent = try await TrackUpdateCoordinator.shared.handleTrackUpdate(
             forTrackId: trackId,
             reason: updateReason,
             changedFields: changedFields,
@@ -807,7 +852,8 @@ actor AppCommandExecutor {
             ? .metadataUpdated
             : .artworkUpdated
 
-        let updateEvent = await TrackUpdateCoordinator.shared.handleTrackUpdate(
+        // Ошибка сохранения metadata не превращается в success-toast и обрабатывается вызывающим action handler.
+        let updateEvent = try await TrackUpdateCoordinator.shared.handleTrackUpdate(
             forTrackId: trackId,
             reason: updateReason,
             changedFields: changedFields
@@ -1049,5 +1095,5 @@ private func resolveSnapshot(for trackId: UUID) async -> TrackRuntimeSnapshot? {
     }
     
     // 2. Fallback: собираем snapshot напрямую
-    return await TrackRuntimeSnapshotBuilder.shared.buildSnapshot(forTrackId: trackId)
+    return try? await TrackRuntimeSnapshotBuilder.shared.buildSnapshot(forTrackId: trackId)
 }

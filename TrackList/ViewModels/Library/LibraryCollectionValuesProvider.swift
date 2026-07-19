@@ -70,9 +70,9 @@ final class DefaultLibraryCollectionValuesProvider: LibraryCollectionValuesProvi
 
     // MARK: - LibraryCollectionRootItemsProvider
 
-    /// Возвращает корневые строки, используя количество построенных значений категорий.
+    /// Возвращает корневые строки, используя количество уникальных ключей категорий.
     func rootItemsState() async -> [LibraryCollectionRootItemState] {
-        let snapshot = await makeSnapshot(for: LibraryCollectionCategory.allCases)
+        let snapshot = await makeRootSnapshot(for: LibraryCollectionCategory.allCases)
 
         return LibraryCollectionRootItem.rootItems.map { item in
             let count: Int
@@ -81,7 +81,7 @@ final class DefaultLibraryCollectionValuesProvider: LibraryCollectionValuesProvi
             case .allTracks:
                 count = snapshot.allTracksCount
             case .category(let category):
-                count = snapshot.valuesByCategory[category]?.count ?? 0
+                count = snapshot.valueCountsByCategory[category] ?? 0
             }
 
             return LibraryCollectionRootItemState(
@@ -101,44 +101,41 @@ final class DefaultLibraryCollectionValuesProvider: LibraryCollectionValuesProvi
             guard result.contains(category) == false else { return }
             result.append(category)
         }
-        let tracks = await trackRegistry.allTracks().sorted(by: stableTrackOrder)
+        // Imported-треки не участвуют в разделах фонотеки, поэтому не читаем для них metadata.
+        let tracks = await trackRegistry.allTracks()
+            .filter { $0.relativePath != nil }
+            .sorted(by: stableTrackOrder)
         let metadataByTrackId = await trackRegistry.cachedMetadata(
             forTrackIds: tracks.map(\.id)
         )
-        var bucketsByCategory: [LibraryCollectionCategory: [CollectionBucketKey: ValueBucket]] =
-            Dictionary(uniqueKeysWithValues: uniqueCategories.map { ($0, [:]) })
+        var bucketsByCategory: [LibraryCollectionCategory: [CollectionBucketKey: ValueBucket]] = [:]
 
-        for track in tracks {
-            guard track.relativePath != nil,
-                  let metadata = metadataByTrackId[track.id] else {
-                continue
-            }
+        // Внутренний словарь каждой категории изменяется на месте.
+        // Промежуточное чтение и повторное присваивание словаря приводило к копированию
+        // всех уже собранных значений на каждом треке.
+        for category in uniqueCategories {
+            var buckets: [CollectionBucketKey: ValueBucket] = [:]
 
-            for category in uniqueCategories {
-                guard let rawValue = category.metadataValue(from: metadata) else {
+            for track in tracks {
+                guard let metadata = metadataByTrackId[track.id] else {
                     continue
                 }
 
-                let artistKey = category == .albums
-                    ? category.albumArtistKey(from: metadata)
-                    : nil
-                let bucketKey = CollectionBucketKey(
+                guard let bucket = makeBucket(
                     category: category,
-                    rawValue: rawValue,
-                    artistKey: artistKey
-                )
-                guard bucketKey.valueKey.isEmpty == false else { continue }
+                    metadata: metadata
+                ) else {
+                    continue
+                }
 
-                var buckets = bucketsByCategory[category] ?? [:]
-                var bucket = buckets[bucketKey] ?? ValueBucket(rawValue: rawValue)
-                bucket.append(
+                buckets[bucket.key, default: ValueBucket(rawValue: bucket.rawValue)].append(
                     trackId: track.id,
                     metadata: metadata,
                     category: category
                 )
-                buckets[bucketKey] = bucket
-                bucketsByCategory[category] = buckets
             }
+
+            bucketsByCategory[category] = buckets
         }
 
         let valuesByCategory = Dictionary(uniqueKeysWithValues: uniqueCategories.map { category in
@@ -160,12 +157,76 @@ final class DefaultLibraryCollectionValuesProvider: LibraryCollectionValuesProvi
         })
 
         return CollectionValuesSnapshot(
-            allTracksCount: tracks.reduce(into: 0) { count, track in
-                if track.relativePath != nil {
-                    count += 1
-                }
-            },
+            allTracksCount: tracks.count,
             valuesByCategory: valuesByCategory
+        )
+    }
+
+    /// Собирает только ключи значений, необходимые для счётчиков корневого экрана.
+    /// Полные album-данные и списки trackId здесь не нужны и заметно увеличивают стоимость переключения режима.
+    private func makeRootSnapshot(
+        for categories: [LibraryCollectionCategory]
+    ) async -> CollectionRootValuesSnapshot {
+        let uniqueCategories = categories.reduce(into: [LibraryCollectionCategory]()) { result, category in
+            guard result.contains(category) == false else { return }
+            result.append(category)
+        }
+        // Imported-треки не показываются в режиме фонотеки и не должны влиять на счётчики категорий.
+        let tracks = await trackRegistry.allTracks().filter { $0.relativePath != nil }
+        let metadataByTrackId = await trackRegistry.cachedMetadata(
+            forTrackIds: tracks.map(\.id)
+        )
+        var valueCountsByCategory: [LibraryCollectionCategory: Int] = [:]
+
+        // Считаем уникальные ключи отдельно по каждой категории, не создавая полные модели значений.
+        for category in uniqueCategories {
+            var keys = Set<CollectionBucketKey>()
+
+            for track in tracks {
+                guard let metadata = metadataByTrackId[track.id],
+                      let bucket = makeBucket(
+                          category: category,
+                          metadata: metadata
+                      ) else {
+                    continue
+                }
+
+                keys.insert(bucket.key)
+            }
+
+            valueCountsByCategory[category] = keys.count
+        }
+
+        return CollectionRootValuesSnapshot(
+            allTracksCount: tracks.count,
+            valueCountsByCategory: valueCountsByCategory
+        )
+    }
+
+    /// Строит единый ключ группировки для полного списка значений и корневых счётчиков.
+    /// Для альбомов сохраняется отдельная часть ключа исполнителя, поэтому одинаковые названия
+    /// альбомов разных исполнителей не объединяются.
+    private func makeBucket(
+        category: LibraryCollectionCategory,
+        metadata: TrackCachedMetadata
+    ) -> CollectionBucket? {
+        guard let rawValue = category.metadataValue(from: metadata) else {
+            return nil
+        }
+
+        let artistKey = category == .albums
+            ? category.albumArtistKey(from: metadata)
+            : nil
+        let key = CollectionBucketKey(
+            category: category,
+            rawValue: rawValue,
+            artistKey: artistKey
+        )
+        guard key.valueKey.isEmpty == false else { return nil }
+
+        return CollectionBucket(
+            key: key,
+            rawValue: rawValue
         )
     }
 
@@ -205,12 +266,28 @@ final class DefaultLibraryCollectionValuesProvider: LibraryCollectionValuesProvi
         }
     }
 
-    /// Результат одного чтения SQLite, используемый и корнем, и экраном значений.
+    /// Результат одного чтения SQLite для экранов значений категорий.
     private struct CollectionValuesSnapshot {
         /// Количество локальных строк, которые открывает пункт "Треки".
         let allTracksCount: Int
         /// Готовые значения всех запрошенных категорий по их текущим правилам группировки.
         let valuesByCategory: [LibraryCollectionCategory: [LibraryCollectionValue]]
+    }
+
+    /// Облегчённый результат для корневых счётчиков без данных, нужных только экрану album-значений.
+    private struct CollectionRootValuesSnapshot {
+        /// Количество локальных строк, которые открывает пункт "Треки".
+        let allTracksCount: Int
+        /// Количество уникальных destination-строк по каждой категории.
+        let valueCountsByCategory: [LibraryCollectionCategory: Int]
+    }
+
+    /// Исходное значение и нормализованный ключ одной группы.
+    private struct CollectionBucket {
+        /// Нормализованный ключ категории.
+        let key: CollectionBucketKey
+        /// Первое отображаемое значение группы.
+        let rawValue: String
     }
 
     private struct ValueBucket {

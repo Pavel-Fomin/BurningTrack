@@ -38,7 +38,8 @@ final class TrackRuntimeSnapshotBuilder {
     /// - TrackMetadataCacheManager
     /// - Parameter trackId: Идентификатор трека
     /// - Returns: Готовый TrackRuntimeSnapshot или nil, если URL не удалось разрешить
-    func buildSnapshot(forTrackId trackId: UUID) async -> TrackRuntimeSnapshot? {
+    /// - Throws: Ошибку сохранения metadata в SQLite
+    func buildSnapshot(forTrackId trackId: UUID) async throws -> TrackRuntimeSnapshot? {
 
         // Пытаемся получить URL файла по существующему bookmark pipeline.
         guard let url = await BookmarkResolver.url(forTrack: trackId) else { return nil }
@@ -107,13 +108,14 @@ final class TrackRuntimeSnapshotBuilder {
         )
 
         // Сохраняем прочитанные metadata в SQLite, не превращая runtime-кэш в persistence-слой.
-        persistMetadata(snapshot)
+        // Ошибка должна дойти до post-update pipeline, иначе событие могло бы объявить устаревшее состояние актуальным.
+        try persistMetadata(snapshot)
 
         return snapshot
     }
 
     /// Сохраняет metadata snapshot в постоянное хранилище фонотеки.
-    private func persistMetadata(_ snapshot: TrackRuntimeSnapshot) {
+    private func persistMetadata(_ snapshot: TrackRuntimeSnapshot) throws {
         do {
             let store = try LibraryDatabaseStore()
             var model = TrackMetadataDatabaseMapper.databaseModel(from: snapshot)
@@ -126,6 +128,7 @@ final class TrackRuntimeSnapshotBuilder {
             try store.upsertTrackMetadata(model)
         } catch {
             PersistentLogger.log("❌ TrackRuntimeSnapshotBuilder: metadata persist failed \(error)")
+            throw error
         }
     }
 }

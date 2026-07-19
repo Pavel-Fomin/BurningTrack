@@ -26,6 +26,7 @@ extension Notification.Name {
     // MARK: - Library
     
     static let trackDidMove = Notification.Name("trackDidMove")                   /// Перемещение трека
+    static let libraryDataDidChange = Notification.Name("libraryDataDidChange")   /// Завершено изменение состава фонотеки в SQLite
     static let libraryAccessRestored = Notification.Name("libraryAccessRestored") /// Доступ к прикреплённым папкам восстановлен (root-scope открыт)
     
     // MARK: - Player

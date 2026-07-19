@@ -190,6 +190,12 @@ actor LibrarySyncModule {
         // Если запись в SQLite не прошла, sync не должен считаться успешным.
         try await TrackRegistry.shared.throwPendingPersistenceError()
         try await BookmarksRegistry.shared.throwPendingPersistenceError()
+
+        // Сигнал отправляется только после завершения всех записей реестров,
+        // чтобы корневые счётчики не начинали чтение промежуточного состояния.
+        await MainActor.run {
+            NotificationCenter.default.post(name: .libraryDataDidChange, object: nil)
+        }
         
         // Лог завершения sync не содержит счётчик удалений, потому что фактическое состояние БД логируется отдельно.
         print("✅ syncRootFolder завершён:", rootURL.lastPathComponent, "режим:", mode, "файлов:", scanned.count)

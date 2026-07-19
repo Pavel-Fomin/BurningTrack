@@ -55,7 +55,7 @@ final class PlayerRuntimeSnapshotController {
         if let storedSnapshot = TrackRuntimeStore.shared.snapshot(forTrackId: trackId) {
             snapshot = storedSnapshot
         } else {
-            snapshot = await TrackRuntimeSnapshotBuilder.shared.buildSnapshot(forTrackId: trackId)
+            snapshot = try? await TrackRuntimeSnapshotBuilder.shared.buildSnapshot(forTrackId: trackId)
         }
 
         guard let snapshot else {

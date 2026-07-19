@@ -96,7 +96,7 @@ struct BatchTagMetadataLoader {
             return storedSnapshot
         }
 
-        guard let builtSnapshot = await snapshotBuilder.buildSnapshot(forTrackId: trackID) else {
+        guard let builtSnapshot = try? await snapshotBuilder.buildSnapshot(forTrackId: trackID) else {
             return nil
         }
 

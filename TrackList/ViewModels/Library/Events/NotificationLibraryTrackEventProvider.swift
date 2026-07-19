@@ -38,6 +38,14 @@ final class NotificationLibraryTrackEventProvider: LibraryTrackEventProvider {
             .eraseToAnyPublisher()
     }
 
+    /// Публикует событие только после завершения изменения состава фонотеки в SQLite.
+    var libraryDataDidChange: AnyPublisher<Void, Never> {
+        NotificationCenter.default.publisher(for: .libraryDataDidChange)
+            .map { _ in () }
+            .receive(on: RunLoop.main)
+            .eraseToAnyPublisher()
+    }
+
     /// Событие изменения настроек приложения.
     var appSettingsDidChange: AnyPublisher<Void, Never> {
         NotificationCenter.default.publisher(for: .appSettingsDidChange)

@@ -71,7 +71,7 @@ final class LibraryTrackRuntimeController: ObservableObject {
         if let storedSnapshot = TrackRuntimeStore.shared.snapshot(forTrackId: trackId) {
             snapshot = storedSnapshot
         } else {
-            snapshot = await TrackRuntimeSnapshotBuilder.shared.buildSnapshot(forTrackId: trackId)
+            snapshot = try? await TrackRuntimeSnapshotBuilder.shared.buildSnapshot(forTrackId: trackId)
 
             // Новый snapshot сразу фиксируем в общем runtime store.
             if let snapshot {

@@ -32,10 +32,14 @@ final class LibraryScreenViewModel: ObservableObject {
     // MARK: - Private
 
     private var cancellables = Set<AnyCancellable>()
-    /// Отменяет устаревшую загрузку перед началом нового общего снимка.
+    /// Текущая загрузка корневого снимка; одновременно выполняется только одна задача.
     private var collectionRootRefreshTask: Task<Void, Never>?
-    /// Не даёт отменённой задаче очистить состояние уже запущенной загрузки.
-    private var collectionRootRefreshGeneration = 0
+    /// Признак устаревшего снимка корневых счётчиков.
+    private var collectionRootItemsNeedsRefresh = true
+    /// Запоминает изменение, пришедшее во время чтения текущего снимка.
+    private var collectionRootRefreshRequestedWhileLoading = false
+    /// Корневой список режима "Треки" сейчас виден пользователю.
+    private var isCollectionRootVisible = false
 
     // MARK: - Init
 
@@ -71,23 +75,55 @@ final class LibraryScreenViewModel: ObservableObject {
         refreshState()
     }
 
+    /// Сообщает ViewModel, виден ли корневой список режима "Треки".
+    func setCollectionRootVisibility(_ isVisible: Bool) {
+        isCollectionRootVisible = isVisible
+
+        guard isVisible else { return }
+        refreshCollectionRootItems()
+    }
+
     /// Запускает чтение корневых счётчиков при появлении корня и после возврата из destination-экрана.
     func refreshCollectionRootItems() {
-        collectionRootRefreshGeneration += 1
-        let generation = collectionRootRefreshGeneration
+        guard isCollectionRootVisible else { return }
+        guard collectionRootItemsNeedsRefresh else { return }
+        guard collectionRootRefreshTask == nil else { return }
 
-        collectionRootRefreshTask?.cancel()
-        collectionRootItems = Self.loadingCollectionRootItems
+        collectionRootItemsNeedsRefresh = false
 
+        // После первой успешной загрузки сохраняем старые счётчики до готовности нового снимка,
+        // чтобы при переключении режима не было лишнего мигания и повторной перестройки списка.
+        if collectionRootItems.contains(where: { $0.count != nil }) == false {
+            collectionRootItems = Self.loadingCollectionRootItems
+        }
+
+        let provider = collectionRootItemsProvider
         collectionRootRefreshTask = Task { [weak self] in
+            let items = await provider.rootItemsState()
             guard let self else { return }
 
-            let items = await collectionRootItemsProvider.rootItemsState()
-            guard Task.isCancelled == false else { return }
-            guard collectionRootRefreshGeneration == generation else { return }
+            guard Task.isCancelled == false else {
+                collectionRootItemsNeedsRefresh = true
+                collectionRootRefreshTask = nil
+                return
+            }
 
-            collectionRootItems = items
+            let shouldRefreshAgain = collectionRootRefreshRequestedWhileLoading
+            if shouldRefreshAgain == false {
+                // Публикуем только снимок, для которого не было новых событий во время чтения.
+                collectionRootItems = items
+                collectionRootItemsNeedsRefresh = false
+            } else {
+                // Текущий результат уже потенциально устарел, поэтому оставляем старые строки.
+                collectionRootItemsNeedsRefresh = true
+            }
+
+            collectionRootRefreshRequestedWhileLoading = false
             collectionRootRefreshTask = nil
+
+            if shouldRefreshAgain {
+                refreshCollectionRootItems()
+            }
         }
     }
 
@@ -96,6 +132,39 @@ final class LibraryScreenViewModel: ObservableObject {
     /// Строит шесть строк корня без ложных нулей до завершения первого чтения SQLite.
     private static let loadingCollectionRootItems = LibraryCollectionRootItem.rootItems.map {
         LibraryCollectionRootItemState(item: $0, count: nil)
+    }
+
+    /// Помечает корневые счётчики устаревшими после завершённого изменения данных.
+    /// Пока выполняется чтение, несколько событий объединяются в один следующий снимок.
+    private func invalidateCollectionRootItems() {
+        collectionRootItemsNeedsRefresh = true
+
+        guard collectionRootRefreshTask != nil else {
+            refreshCollectionRootItems()
+            return
+        }
+
+        collectionRootRefreshRequestedWhileLoading = true
+    }
+
+    /// Поля события трека, которые могут изменить строки или счётчики корня коллекции.
+    private static let collectionRootChangedFields: Set<TrackChangedField> =
+        LibraryCollectionCategory.allCases.reduce(into: Set<TrackChangedField>()) { fields, category in
+            fields.formUnion(category.changedFields)
+        }
+
+    /// Проверяет событие, которое может изменить состав фонотеки или ключ участия трека.
+    private static func affectsCollectionRoot(
+        _ event: TrackUpdateEvent
+    ) -> Bool {
+        switch event.reason {
+        case .fileMoved, .imported, .reloaded:
+            // Перемещение может перевести imported-трек в фонотеку,
+            // даже если payload содержит только изменение имени файла.
+            return true
+        case .metadataUpdated, .artworkUpdated, .fileRenamed, .availabilityUpdated:
+            return event.changedFields.isDisjoint(with: collectionRootChangedFields) == false
+        }
     }
 
     private func refreshState() {
@@ -118,23 +187,38 @@ final class LibraryScreenViewModel: ObservableObject {
             .sink { [weak self] _ in
                 Task { @MainActor in
                     self?.refreshState()
-                    self?.refreshCollectionRootItems()
                 }
             }
             .store(in: &cancellables)
 
         trackEventProvider.trackDidUpdate
-            .sink { [weak self] _ in
+            .sink { [weak self] event in
                 Task { @MainActor in
-                    self?.refreshCollectionRootItems()
+                    guard Self.affectsCollectionRoot(event) else {
+                        return
+                    }
+
+                    self?.invalidateCollectionRootItems()
                 }
             }
             .store(in: &cancellables)
 
         trackEventProvider.trackBatchDidUpdate
+            .sink { [weak self] events in
+                Task { @MainActor in
+                    guard events.contains(where: Self.affectsCollectionRoot) else {
+                        return
+                    }
+
+                    self?.invalidateCollectionRootItems()
+                }
+            }
+            .store(in: &cancellables)
+
+        trackEventProvider.libraryDataDidChange
             .sink { [weak self] _ in
                 Task { @MainActor in
-                    self?.refreshCollectionRootItems()
+                    self?.invalidateCollectionRootItems()
                 }
             }
             .store(in: &cancellables)

@@ -129,7 +129,7 @@ struct TrackDetailSheet: View {
             return snapshot
         }
 
-        return await TrackRuntimeSnapshotBuilder.shared.buildSnapshot(forTrackId: track.trackId)
+        return try? await TrackRuntimeSnapshotBuilder.shared.buildSnapshot(forTrackId: track.trackId)
     }
 
     /// Применяет runtime snapshot к состоянию sheet.

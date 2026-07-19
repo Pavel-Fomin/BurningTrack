@@ -268,7 +268,7 @@ final class TrackListViewModel: ObservableObject {
             if let storedSnapshot = runtimeSnapshotProvider.snapshot(forTrackId: trackId) {
                 snapshot = storedSnapshot
             } else {
-                snapshot = await runtimeSnapshotBuilder.buildSnapshot(forTrackId: trackId)
+                snapshot = try? await runtimeSnapshotBuilder.buildSnapshot(forTrackId: trackId)
             }
 
             guard let snapshot else { return }
