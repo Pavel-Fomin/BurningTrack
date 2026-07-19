@@ -211,7 +211,7 @@ final class ExportOperationCoordinatorTests: XCTestCase {
         await yieldToCoordinator()
 
         XCTAssertEqual(liveActivityManager.startCalls.count, 1)
-        XCTAssertEqual(liveActivityManager.startCalls.first?.operationTitle, "Экспорт")
+        XCTAssertEqual(liveActivityManager.startCalls.first?.operationTitle, "Экспортирую")
         XCTAssertEqual(liveActivityManager.startCalls.first?.subjectTitle, "Плеер")
         XCTAssertEqual(liveActivityManager.finishCalls.count, 1)
         XCTAssertEqual(liveActivityManager.finishCalls.first?.progress.phase, .completed)

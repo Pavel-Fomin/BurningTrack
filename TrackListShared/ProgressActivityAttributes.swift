@@ -14,7 +14,7 @@ import Foundation
 @available(iOS 16.1, *)
 struct ProgressActivityAttributes: ActivityAttributes {
 
-    /// Тип выполняемой операции, например «Экспорт».
+    /// Тип выполняемой операции, например «Экспортирую».
     let operationTitle: String
 
     /// Название объекта операции, например имя экспортной папки.

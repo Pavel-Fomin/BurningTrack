@@ -18,8 +18,8 @@ struct ExportProgressCompactView: View {
     /// Фиксирует высоту верхней строки для активного и завершённого состояний.
     private let topRowHeight: CGFloat = 40
 
-    /// Фиксирует область системной иконки, чтобы разные символы не меняли высоту строки.
-    private let statusIconSize: CGFloat = 24
+    /// Фиксирует размер иконки закрытия, чтобы она не меняла высоту строки.
+    private let dismissIconSize: CGFloat = 24
 
     /// Размер интерактивной области кнопки закрытия.
     private let dismissButtonSize: CGFloat = 36
@@ -36,16 +36,6 @@ struct ExportProgressCompactView: View {
     let onDismiss: () -> Void
 
     // MARK: - Presentation
-
-    /// Пульсация нужна только во время подготовки и фактического копирования.
-    private var isExportActive: Bool {
-        switch progress.state {
-        case .preparing, .copying:
-            return true
-        case .idle, .completed, .completedWithErrors, .cancelled, .failed:
-            return false
-        }
-    }
 
     /// Успешное завершение получает отдельный текст и кнопку закрытия.
     private var isCompleted: Bool {
@@ -72,32 +62,6 @@ struct ExportProgressCompactView: View {
         "Копирование отменено"
     }
 
-    /// Выбирает системную иконку для текущего состояния операции.
-    private var statusIconName: String {
-        if isCompleted {
-            return "checkmark.circle.fill"
-        }
-
-        if isCancelled {
-            return "xmark.circle.fill"
-        }
-
-        return "document.on.document.fill"
-    }
-
-    /// Выбирает цвет итоговой иконки, не меняя оформление активного состояния.
-    private var statusIconColor: Color {
-        if isCompleted {
-            return .green
-        }
-
-        if isCancelled {
-            return .orange
-        }
-
-        return .accentColor
-    }
-
     /// Возвращает текст компактной панели для терминального результата.
     private var resultTitle: String {
         isCancelled ? cancelledTitle : completedTitle
@@ -108,25 +72,23 @@ struct ExportProgressCompactView: View {
         isCompleted ? .green : .orange
     }
 
-    /// Показывает долю записанных байтов, а для пустых файлов использует счётчик файлов.
+    /// Показывает долю завершённых файлов, как кольцо прогресса Live Activity.
     private var progressFraction: Double {
-        if progress.totalBytes > 0 {
-            return fraction(
-                completed: progress.copiedBytes,
-                total: progress.totalBytes
-            )
-        }
-
         return fraction(
-            completed: Int64(progress.completedFiles),
-            total: Int64(progress.totalFiles)
+            completed: progress.completedFiles,
+            total: progress.totalFiles
         )
     }
 
     /// Возвращает значение прогресса в безопасном диапазоне от нуля до единицы.
-    private func fraction(completed: Int64, total: Int64) -> Double {
+    private func fraction(completed: Int, total: Int) -> Double {
         guard total > 0 else { return 0 }
         return min(max(Double(completed) / Double(total), 0), 1)
+    }
+
+    /// Форматирует процент для значения доступности компактного индикатора.
+    private var progressPercentageText: String {
+        "\(Int((progressFraction * 100).rounded()))%"
     }
 
     // MARK: - UI
@@ -136,56 +98,36 @@ struct ExportProgressCompactView: View {
             // Основное содержимое остаётся отдельной кнопкой и открывает детали.
             // Кнопка закрытия размещается рядом, поэтому вложенных Button нет.
             Button(action: onTap) {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 8) {
-                        Image(systemName: statusIconName)
-                            .symbolEffect(
-                                .pulse,
-                                options: .repeating,
-                                isActive: isExportActive
-                            )
-                            .foregroundStyle(statusIconColor)
-                            .frame(width: statusIconSize, height: statusIconSize)
-
-                        if isDismissibleResult {
-                            Text(resultTitle)
+                HStack(spacing: 8) {
+                    if isDismissibleResult {
+                        Text(resultTitle)
+                            .font(.subheadline)
+                            .foregroundStyle(resultTitleColor)
+                            .lineLimit(1)
+                    } else {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Экспортирую")
                                 .font(.subheadline)
-                                .foregroundStyle(resultTitleColor)
                                 .lineLimit(1)
-                        } else {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Копирование")
-                                    .font(.subheadline)
-                                    .lineLimit(1)
 
-                                Text(
-                                    "Из «\(progress.sourceName)» "
-                                        + "в «\(progress.rootDestinationName)»"
-                                )
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                            }
-                        }
-
-                        Spacer(minLength: 8)
-
-                        if !isCompleted {
-                            Text("\(progress.completedFiles)/\(progress.totalFiles)")
-                                .font(.subheadline.monospacedDigit())
+                            Text(progress.sourceName)
+                                .font(.subheadline)
                                 .foregroundStyle(.secondary)
+                                .lineLimit(1)
                         }
                     }
-                    // Резервируем место под крестик только в строке текста.
-                    // ProgressView сохраняет полную ширину панели во всех состояниях.
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .frame(height: topRowHeight, alignment: .center)
-                    .padding(.trailing, isDismissibleResult ? 30 : 0)
 
-                    ProgressView(value: progressFraction)
-                        .tint(.accentColor)
+                    Spacer(minLength: 8)
+
+                    if !isCompleted {
+                        ExportProgressRingView(progress: progressFraction)
+                    }
                 }
+                // Резервируем место под крестик только в строке текста.
+                // Кольцо сохраняет полную ширину панели во всех активных состояниях.
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(height: topRowHeight, alignment: .center)
+                .padding(.trailing, isDismissibleResult ? 30 : 0)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -196,7 +138,7 @@ struct ExportProgressCompactView: View {
                 Button(action: onDismiss) {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.secondary)
-                        .frame(width: statusIconSize, height: statusIconSize)
+                        .frame(width: dismissIconSize, height: dismissIconSize)
                         .frame(
                             width: dismissButtonSize,
                             height: topRowHeight,
@@ -205,7 +147,7 @@ struct ExportProgressCompactView: View {
                 }
                 .buttonStyle(.plain)
                 // Область кнопки равна высоте верхней строки, поэтому крестик
-                // центрируется рядом с иконкой и текстом без влияния на ProgressView.
+                // центрируется рядом с текстом и не меняет ширину содержимого панели.
                 .accessibilityLabel("Закрыть результат копирования")
                 .zIndex(1)
             }
@@ -230,8 +172,57 @@ struct ExportProgressCompactView: View {
         .accessibilityValue(
             isDismissibleResult
                 ? resultTitle
-                : "\(progress.completedFiles) из \(progress.totalFiles), Копирование"
+                : "\(progressPercentageText), Экспортирую"
         )
+    }
+}
+
+/// Показывает процент завершённых файлов внутри кольца прогресса.
+private struct ExportProgressRingView: View {
+
+    /// Доля завершения операции в диапазоне от нуля до единицы.
+    let progress: Double
+
+    /// Строит кольцо с теми же цветом, направлением и процентом, что Live Activity.
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(
+                    Color.secondary.opacity(0.28),
+                    lineWidth: 3
+                )
+
+            Circle()
+                .trim(from: 0, to: normalizedProgress)
+                .stroke(
+                    Color.accentColor,
+                    style: StrokeStyle(
+                        lineWidth: 3,
+                        lineCap: .round
+                    )
+                )
+                .rotationEffect(.degrees(-90))
+
+            Text(percentageText)
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(Color.accentColor)
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.65)
+        }
+        .frame(width: 40, height: 40)
+        .accessibilityLabel("Прогресс экспорта")
+        .accessibilityValue(percentageText)
+    }
+
+    /// Ограничивает значение, чтобы неполный или ошибочный снимок не ломал кольцо.
+    private var normalizedProgress: Double {
+        min(max(progress, 0), 1)
+    }
+
+    /// Форматирует долю операции для центральной подписи кольца.
+    private var percentageText: String {
+        "\(Int((normalizedProgress * 100).rounded()))%"
     }
 }
 
