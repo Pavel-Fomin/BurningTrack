@@ -10,7 +10,7 @@
 		A912E3B52DA911BD0046A8B6 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = A912E3B42DA911BD0046A8B6 /* LaunchScreen.storyboard */; };
 		A9BCE0F82F09B99F000DDCD3 /* libz.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = A9BCE0F72F09B99F000DDCD3 /* libz.tbd */; };
 		A9C9F1012F19A50100DB0001 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = A9C9F1002F19A50100DB0001 /* libsqlite3.tbd */; };
-		B1000001 /* TrackListLiveActivity.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = B1000002 /* TrackListLiveActivity.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		B1000001 /* TrackListLiveActivity.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B1000002 /* TrackListLiveActivity.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -48,15 +48,15 @@
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		B1000023 /* Embed App Extensions */ = {
+		B1000023 /* Embed Foundation Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
-				B1000001 /* TrackListLiveActivity.appex in Embed App Extensions */,
+				B1000001 /* TrackListLiveActivity.appex in Embed Foundation Extensions */,
 			);
-			name = "Embed App Extensions";
+			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
@@ -239,7 +239,7 @@
 				A97C86252DA326C000ED2E99 /* Frameworks */,
 				A97C86262DA326C000ED2E99 /* Resources */,
 				A97F99782E05DBF8000BCB2E /* Embed Frameworks */,
-				B1000023 /* Embed App Extensions */,
+				B1000023 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
