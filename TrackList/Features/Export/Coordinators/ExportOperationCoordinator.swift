@@ -30,6 +30,9 @@ final class ExportOperationCoordinator {
     /// Выполняет сценарий запуска и штатной отмены экспорта.
     private let actionHandler: ExportActionHandler
 
+    /// Универсальный слой внешнего прогресса, не знающий о моделях экспорта.
+    private let liveActivityManager: any ProgressLiveActivityManaging
+
     // MARK: - Operation lifecycle
 
     /// Удерживает текущую операцию независимой от экранов приложения.
@@ -41,11 +44,36 @@ final class ExportOperationCoordinator {
     /// Схлопывает быстрые callback-и до публикации на MainActor.
     private var progressRelay: ExportProgressRelay?
 
+    /// Отделяет Activity текущего запуска от Activity предыдущего запуска.
+    private var liveActivityOperationID: UUID?
+
+    /// Рассчитывает оставшееся время по тем же доставленным снимкам операции.
+    private var timeEstimator = OperationTimeEstimator()
+
+    /// Последняя дата завершения, разрешённая к передаче в Activity.
+    private var estimatedEndDate: Date?
+
+    /// Отмечает запуск расчёта времени после перехода к фактическому копированию.
+    private var isTimeEstimationStarted = false
+
+    /// Название папки, выбранное для текущей операции и показанное пользователю.
+    private var liveActivitySubjectTitle = ""
+
     // MARK: - Init
 
     /// Создаёт координатор с обработчиком сценария экспорта.
     init(actionHandler: ExportActionHandler) {
         self.actionHandler = actionHandler
+        self.liveActivityManager = UnavailableProgressLiveActivityManager()
+    }
+
+    /// Создаёт Coordinator с явно переданным универсальным слоем внешнего прогресса.
+    init(
+        actionHandler: ExportActionHandler,
+        liveActivityManager: any ProgressLiveActivityManaging
+    ) {
+        self.actionHandler = actionHandler
+        self.liveActivityManager = liveActivityManager
     }
 
     // MARK: - State
@@ -70,6 +98,11 @@ final class ExportOperationCoordinator {
         let relay = ExportProgressRelay()
         activeOperationID = operationID
         progressRelay = relay
+        liveActivityOperationID = nil
+        estimatedEndDate = nil
+        isTimeEstimationStarted = false
+        liveActivitySubjectTitle = exportFolderName
+        timeEstimator.stop()
 
         exportTask = Task { [weak self] in
             guard let self else { return }
@@ -182,6 +215,14 @@ final class ExportOperationCoordinator {
         operationID: UUID
     ) {
         guard activeOperationID == operationID else { return }
+
+        let liveActivityProgress = makeOperationProgress(from: snapshot)
+        publishLiveActivityProgress(
+            liveActivityProgress,
+            operationID: operationID,
+            subjectTitle: liveActivitySubjectTitle
+        )
+
         #if DEBUG
         ExportDiagnostics.shared.recordAppliedProgress()
         #endif
@@ -204,6 +245,130 @@ final class ExportOperationCoordinator {
         exportTask = nil
         activeOperationID = nil
         progressRelay = nil
+        liveActivityOperationID = nil
+        estimatedEndDate = nil
+        isTimeEstimationStarted = false
+        liveActivitySubjectTitle = ""
+        timeEstimator.stop()
         onOperationFinished?()
+    }
+
+    // MARK: - Live Activity progress
+
+    /// Преобразует экспортный снимок в абстрактную модель внешнего прогресса.
+    /// Здесь заканчивается знание об ExportProgress и начинается универсальный слой.
+    private func makeOperationProgress(
+        from snapshot: ExportProgress
+    ) -> OperationProgress {
+        let phase: ProgressActivityPhase
+        switch snapshot.state {
+        case .idle, .preparing:
+            phase = .preparing
+        case .copying:
+            phase = .running
+        case .completed:
+            phase = .completed
+        case .completedWithErrors, .failed:
+            // Activity не показывает технические детали и сообщает общий результат.
+            phase = .failed
+        case .cancelled:
+            phase = .cancelled
+        }
+
+        switch phase {
+        case .preparing:
+            break
+        case .running:
+            startTimeEstimationIfNeeded()
+            let estimationUnits = liveActivityEstimationUnits(from: snapshot)
+
+            if let newEstimatedEndDate = timeEstimator.recordProgress(
+                completedUnits: estimationUnits.completed,
+                totalUnits: estimationUnits.total,
+                date: Date()
+            ) {
+                guard let estimatedEndDate else {
+                    self.estimatedEndDate = newEstimatedEndDate
+                    break
+                }
+
+                if abs(newEstimatedEndDate.timeIntervalSince(estimatedEndDate))
+                    >= ProgressLiveActivityManager.estimatedEndDateUpdateThreshold {
+                    self.estimatedEndDate = newEstimatedEndDate
+                }
+            }
+        case .completed, .failed, .cancelled:
+            // После фактического окончания операции прогноз больше не нужен.
+            timeEstimator.stop()
+            isTimeEstimationStarted = false
+            estimatedEndDate = nil
+        }
+
+        return OperationProgress(
+            completedUnits: max(snapshot.completedFiles, 0),
+            totalUnits: max(snapshot.totalFiles, 0),
+            estimatedEndDate: estimatedEndDate,
+            phase: phase
+        )
+    }
+
+    /// Начинает измерять скорость только после перехода к копированию байтов.
+    /// Подготовка файлов не должна искусственно замедлять первую оценку ETA.
+    private func startTimeEstimationIfNeeded() {
+        guard !isTimeEstimationStarted else { return }
+
+        isTimeEstimationStarted = true
+        estimatedEndDate = nil
+        timeEstimator.reset(startDate: Date())
+    }
+
+    /// Возвращает байтовый прогресс для стабильной оценки времени экспорта.
+    /// Количество файлов остаётся пользовательским прогрессом, но не подходит
+    /// для ETA: длительность копирования треков зависит от их размера.
+    private func liveActivityEstimationUnits(
+        from snapshot: ExportProgress
+    ) -> (completed: Int64, total: Int64) {
+        guard snapshot.totalBytes > 0 else {
+            return (
+                completed: Int64(max(snapshot.completedFiles, 0)),
+                total: Int64(max(snapshot.totalFiles, 0))
+            )
+        }
+
+        let totalBytes = max(snapshot.totalBytes, 0)
+        return (
+            completed: min(max(snapshot.copiedBytes, 0), totalBytes),
+            total: totalBytes
+        )
+    }
+
+    /// Передаёт первый, изменившийся и итоговый снимок универсальному менеджеру.
+    private func publishLiveActivityProgress(
+        _ progress: OperationProgress,
+        operationID: UUID,
+        subjectTitle: String
+    ) {
+        if liveActivityOperationID != operationID {
+            liveActivityOperationID = operationID
+            liveActivityManager.start(
+                operationID: operationID,
+                operationTitle: "Экспорт",
+                subjectTitle: subjectTitle,
+                progress: progress
+            )
+        }
+
+        switch progress.phase {
+        case .completed, .failed, .cancelled:
+            liveActivityManager.finish(
+                operationID: operationID,
+                progress: progress
+            )
+        case .preparing, .running:
+            liveActivityManager.update(
+                operationID: operationID,
+                progress: progress
+            )
+        }
     }
 }

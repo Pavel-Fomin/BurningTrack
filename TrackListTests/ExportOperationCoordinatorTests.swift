@@ -186,6 +186,37 @@ final class ExportOperationCoordinatorTests: XCTestCase {
         XCTAssertFalse(coordinator.isExportActive)
     }
 
+    /// Проверяет, что Activity получает тот же поток снимков и завершается один раз.
+    func testLiveActivityFollowsCoordinatorProgressLifecycle() async {
+        let exporter = CoordinatorExportingSpy()
+        exporter.snapshots = [
+            makeProgress(state: .preparing),
+            makeProgress(
+                completedFiles: 1,
+                copiedBytes: 100,
+                totalBytes: 100,
+                state: .completed
+            )
+        ]
+        let liveActivityManager = CoordinatorLiveActivityManagerSpy()
+        let coordinator = ExportOperationCoordinator(
+            actionHandler: ExportActionHandler(
+                exporter: exporter,
+                toastPresenter: CoordinatorToastPresenterSpy()
+            ),
+            liveActivityManager: liveActivityManager
+        )
+
+        XCTAssertTrue(startExport(coordinator))
+        await yieldToCoordinator()
+
+        XCTAssertEqual(liveActivityManager.startCalls.count, 1)
+        XCTAssertEqual(liveActivityManager.startCalls.first?.operationTitle, "Экспорт")
+        XCTAssertEqual(liveActivityManager.startCalls.first?.subjectTitle, "Плеер")
+        XCTAssertEqual(liveActivityManager.finishCalls.count, 1)
+        XCTAssertEqual(liveActivityManager.finishCalls.first?.progress.phase, .completed)
+    }
+
     /// Собирает Coordinator с тестовыми доменными зависимостями.
     private func makeCoordinator(
         exporter: CoordinatorExportingSpy
@@ -246,6 +277,67 @@ final class ExportOperationCoordinatorTests: XCTestCase {
         for _ in 0..<6 {
             await Task.yield()
         }
+    }
+}
+
+/// Запоминает вызовы универсального контракта без обращения к ActivityKit.
+@MainActor
+private final class CoordinatorLiveActivityManagerSpy: ProgressLiveActivityManaging {
+
+    /// Начальные снимки принятых операций.
+    private(set) var startCalls: [StartCall] = []
+
+    /// Итоговые снимки завершённых операций.
+    private(set) var finishCalls: [FinishCall] = []
+
+    /// Запоминает запуск Activity после первого реального снимка.
+    func start(
+        operationID: UUID,
+        operationTitle: String,
+        subjectTitle: String,
+        progress: OperationProgress
+    ) {
+        startCalls.append(
+            StartCall(
+                operationID: operationID,
+                operationTitle: operationTitle,
+                subjectTitle: subjectTitle,
+                progress: progress
+            )
+        )
+    }
+
+    /// Обновления нужны Coordinator-у, но для этого теста отдельно не сохраняются.
+    func update(
+        operationID: UUID,
+        progress: OperationProgress
+    ) {}
+
+    /// Запоминает единственное терминальное событие.
+    func finish(
+        operationID: UUID,
+        progress: OperationProgress
+    ) {
+        finishCalls.append(
+            FinishCall(
+                operationID: operationID,
+                progress: progress
+            )
+        )
+    }
+
+    /// Данные вызова запуска для проверок теста.
+    struct StartCall {
+        let operationID: UUID
+        let operationTitle: String
+        let subjectTitle: String
+        let progress: OperationProgress
+    }
+
+    /// Данные вызова завершения для проверок теста.
+    struct FinishCall {
+        let operationID: UUID
+        let progress: OperationProgress
     }
 }
 

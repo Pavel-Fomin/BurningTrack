@@ -43,7 +43,8 @@ struct ExportFeatureFactory {
             toastPresenter: toastPresenter
         )
         let coordinator = ExportOperationCoordinator(
-            actionHandler: actionHandler
+            actionHandler: actionHandler,
+            liveActivityManager: ProgressLiveActivityManager()
         )
 
         return ExportProgressViewModel(

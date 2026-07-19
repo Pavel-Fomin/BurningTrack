@@ -10,6 +10,7 @@
 		A912E3B52DA911BD0046A8B6 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = A912E3B42DA911BD0046A8B6 /* LaunchScreen.storyboard */; };
 		A9BCE0F82F09B99F000DDCD3 /* libz.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = A9BCE0F72F09B99F000DDCD3 /* libz.tbd */; };
 		A9C9F1012F19A50100DB0001 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = A9C9F1002F19A50100DB0001 /* libsqlite3.tbd */; };
+		B1000001 /* TrackListLiveActivity.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = B1000002 /* TrackListLiveActivity.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -27,6 +28,13 @@
 			remoteGlobalIDString = A97C86272DA326C000ED2E99;
 			remoteInfo = TrackList;
 		};
+		B1000030 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A97C86202DA326C000ED2E99 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B1000032;
+			remoteInfo = TrackListLiveActivity;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -40,6 +48,17 @@
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B1000023 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				B1000001 /* TrackListLiveActivity.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
@@ -50,6 +69,7 @@
 		A992A15C2E04ADE800BA637D /* TrackList-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TrackList-Bridging-Header.h"; sourceTree = "<group>"; };
 		A9BCE0F72F09B99F000DDCD3 /* libz.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libz.tbd; path = usr/lib/libz.tbd; sourceTree = SDKROOT; };
 		A9C9F1002F19A50100DB0001 /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
+		B1000002 /* TrackListLiveActivity.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = TrackListLiveActivity.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -74,6 +94,13 @@
 				Readme.md,
 			);
 			target = A97C86272DA326C000ED2E99 /* TrackList */;
+		};
+		B1000010 /* Exceptions for "TrackListLiveActivity" folder in "TrackListLiveActivity" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = B1000032 /* TrackListLiveActivity */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -123,6 +150,19 @@
 			path = Documentation;
 			sourceTree = "<group>";
 		};
+		B1000011 /* TrackListShared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = TrackListShared;
+			sourceTree = "<group>";
+		};
+		B1000012 /* TrackListLiveActivity */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				B1000010 /* Exceptions for "TrackListLiveActivity" folder in "TrackListLiveActivity" target */,
+			);
+			path = TrackListLiveActivity;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -149,6 +189,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B1000021 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -158,6 +205,8 @@
 				A9E247A92F12D3AE00169DB2 /* Documentation */,
 				A9B8BF8D2F0986F1004E4000 /* Libraries */,
 				A97C862A2DA326C000ED2E99 /* TrackList */,
+				B1000011 /* TrackListShared */,
+				B1000012 /* TrackListLiveActivity */,
 				A97C86382DA326C200ED2E99 /* TrackListTests */,
 				A97C86422DA326C200ED2E99 /* TrackListUITests */,
 				A992A15C2E04ADE800BA637D /* TrackList-Bridging-Header.h */,
@@ -165,6 +214,7 @@
 				A90C56022E0DF38300AAA02B /* TrackList.app */,
 				A90C56032E0DF38300AAA02B /* TrackListTests.xctest */,
 				A90C56042E0DF38300AAA02B /* TrackListUITests.xctest */,
+				B1000002 /* TrackListLiveActivity.appex */,
 				A912E3B42DA911BD0046A8B6 /* LaunchScreen.storyboard */,
 			);
 			sourceTree = "<group>";
@@ -189,13 +239,16 @@
 				A97C86252DA326C000ED2E99 /* Frameworks */,
 				A97C86262DA326C000ED2E99 /* Resources */,
 				A97F99782E05DBF8000BCB2E /* Embed Frameworks */,
+				B1000023 /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				B1000031 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				A97C862A2DA326C000ED2E99 /* TrackList */,
+				B1000011 /* TrackListShared */,
 			);
 			name = TrackList;
 			packageProductDependencies = (
@@ -250,6 +303,29 @@
 			productReference = A90C56042E0DF38300AAA02B /* TrackListUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		B1000032 /* TrackListLiveActivity */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B1000042 /* Build configuration list for PBXNativeTarget "TrackListLiveActivity" */;
+			buildPhases = (
+				B1000020 /* Sources */,
+				B1000021 /* Frameworks */,
+				B1000022 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				B1000011 /* TrackListShared */,
+				B1000012 /* TrackListLiveActivity */,
+			);
+			name = TrackListLiveActivity;
+			packageProductDependencies = (
+			);
+			productName = TrackListLiveActivity;
+			productReference = B1000002 /* TrackListLiveActivity.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -272,6 +348,9 @@
 						CreatedOnToolsVersion = 16.3;
 						TestTargetID = A97C86272DA326C000ED2E99;
 					};
+					B1000032 = {
+						CreatedOnToolsVersion = 26.0;
+					};
 				};
 			};
 			buildConfigurationList = A97C86232DA326C000ED2E99 /* Build configuration list for PBXProject "TrackList" */;
@@ -291,6 +370,7 @@
 			projectRoot = "";
 			targets = (
 				A97C86272DA326C000ED2E99 /* TrackList */,
+				B1000032 /* TrackListLiveActivity */,
 				A97C86342DA326C200ED2E99 /* TrackListTests */,
 				A97C863E2DA326C200ED2E99 /* TrackListUITests */,
 			);
@@ -314,6 +394,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		A97C863D2DA326C200ED2E99 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B1000022 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -344,6 +431,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B1000020 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -356,6 +450,11 @@
 			isa = PBXTargetDependency;
 			target = A97C86272DA326C000ED2E99 /* TrackList */;
 			targetProxy = A97C86402DA326C200ED2E99 /* PBXContainerItemProxy */;
+		};
+		B1000031 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B1000032 /* TrackListLiveActivity */;
+			targetProxy = B1000030 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -648,6 +747,50 @@
 			};
 			name = Release;
 		};
+		B1000040 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 3NQUU7Y5T7;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = TrackListLiveActivity/Info.plist;
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "Pavel-Fomin.TrackList.LiveActivity";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		B1000041 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 3NQUU7Y5T7;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = TrackListLiveActivity/Info.plist;
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "Pavel-Fomin.TrackList.LiveActivity";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -683,6 +826,15 @@
 			buildConfigurations = (
 				A97C86502DA326C200ED2E99 /* Debug */,
 				A97C86512DA326C200ED2E99 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B1000042 /* Build configuration list for PBXNativeTarget "TrackListLiveActivity" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B1000040 /* Debug */,
+				B1000041 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
