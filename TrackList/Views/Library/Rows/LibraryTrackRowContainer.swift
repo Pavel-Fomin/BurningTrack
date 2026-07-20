@@ -21,6 +21,7 @@ struct LibraryTrackRowContainer: View {
     let playbackSource: PlaybackContextSource?   /// Постоянный источник списка, переданный экраном
     let trackListNamesById: [UUID: [String]]      /// Названия треклистов, в которые входит трек
     let metadataProvider: TrackMetadataProviding  /// Провайдер runtime snapshot
+    @ObservedObject var cloudAvailabilityController: CloudTrackAvailabilityController /// Контроллер runtime-состояний iCloud
     let isScrollingFast: Bool                     /// Флаг быстрого скролла (для оптимизации загрузки)
     let isRevealed: Bool                          /// Состояние раскрытия (для свайпов)
     let showsSelection: Bool                      /// Включён ли режим выбора
@@ -54,6 +55,7 @@ struct LibraryTrackRowContainer: View {
             sheetManager: sheetManager,
             playbackHandler: playbackHandler,
             presentationHandler: presentationHandler,
+            cloudAvailabilityController: cloudAvailabilityController,
             onToggleSelection: onToggleSelection,
             onRenameTrack: onRenameTrack
         )
@@ -92,7 +94,8 @@ struct LibraryTrackRowContainer: View {
             isSelected: isSelected,
             shouldShowTags: shouldShowTags,
             shouldShowTrackListMembership: shouldShowTrackListMembership,
-            shouldShowFileFormat: shouldShowFileFormat
+            shouldShowFileFormat: shouldShowFileFormat,
+            cloudAvailabilityState: cloudAvailabilityController.state(for: track.trackId)
         )
     }
 
@@ -135,7 +138,9 @@ struct LibraryTrackRowContainer: View {
             },
             selectionPlacement: .trailing,
             showsFileFormat: rowState.showsFileFormat,
-            trackListNames: rowState.trackListNames
+            isContentAvailable: rowState.isContentAvailable,
+            trackListNames: rowState.trackListNames,
+            trailingContent: cloudAvailabilityIndicator
         ) {
             libraryActionMenuContent
         }
@@ -146,8 +151,19 @@ struct LibraryTrackRowContainer: View {
                 .requestSnapshot(trackId: track.trackId)
             )
         }
+        // Состояние iCloud запрашивается через Action → ActionHandler, а не напрямую из View.
+        .task(id: track.trackId) {
+            commandHandler.handle(
+                .beginCloudAvailabilityObservation(trackId: track.trackId)
+            )
+        }
+        .onDisappear {
+            commandHandler.handle(
+                .stopCloudAvailabilityObservation(trackId: track.trackId)
+            )
+        }
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            if !showsSelection {
+            if !showsSelection && rowState.isContentAvailable {
                 // Добавить в плеер
                 if isMenuActionAvailable(.addToPlayer) {
                     Button {
@@ -225,5 +241,44 @@ struct LibraryTrackRowContainer: View {
                 )
             }
         )
+    }
+
+    /// Готовит единственный индикатор iCloud вместо меню для недоступного локально файла.
+    private var cloudAvailabilityIndicator: AnyView? {
+        switch rowState.cloudAvailabilityState {
+        case .notDownloaded:
+            return AnyView(
+                Image(systemName: "icloud.and.arrow.down")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel("Трек не загружен из iCloud")
+            )
+
+        case .downloading:
+            return AnyView(
+                ProgressView()
+                    .controlSize(.small)
+                    .accessibilityLabel("Трек загружается из iCloud")
+            )
+
+        case .downloadFailed:
+            return AnyView(
+                Button {
+                    commandHandler.handle(
+                        .retryCloudDownload(trackId: track.trackId)
+                    )
+                } label: {
+                    Image(systemName: "exclamationmark.icloud")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(.red)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Повторить загрузку трека из iCloud")
+            )
+
+        case .local,
+             .none:
+            return nil
+        }
     }
 }

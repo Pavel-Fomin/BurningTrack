@@ -28,7 +28,8 @@ struct LibraryTrackRowStateBuilder {
         isSelected: Bool,
         shouldShowTags: Bool,
         shouldShowTrackListMembership: Bool,
-        shouldShowFileFormat: Bool
+        shouldShowFileFormat: Bool,
+        cloudAvailabilityState: CloudTrackAvailabilityState?
     ) -> LibraryTrackRowState {
         let displayFileName = snapshot?.fileName ?? track.fileName
         let artwork = makeArtwork(
@@ -49,7 +50,10 @@ struct LibraryTrackRowStateBuilder {
             showsSelection: showsSelection,
             isSelected: isSelected,
             showsFileFormat: shouldShowFileFormat,
-            trackListNames: shouldShowTrackListMembership ? trackListNames : nil
+            trackListNames: shouldShowTrackListMembership ? trackListNames : nil,
+            cloudAvailabilityState: cloudAvailabilityState,
+            // Неопределённое iCloud-состояние сохраняет прежнюю доступность модели трека.
+            isContentAvailable: cloudAvailabilityState?.isContentAvailable ?? track.isAvailable
         )
     }
 

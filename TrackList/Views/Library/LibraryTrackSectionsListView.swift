@@ -20,6 +20,7 @@ struct LibraryTrackSectionsListView: View {
     let trackListNamesById: [UUID: [String]]
     
     let metadataProvider: TrackMetadataProviding
+    let cloudAvailabilityController: CloudTrackAvailabilityController
     
     let playerViewModel: PlayerViewModel
     
@@ -43,6 +44,7 @@ struct LibraryTrackSectionsListView: View {
                 trackListNamesById: trackListNamesById,
                 playerViewModel: playerViewModel,
                 metadataProvider: metadataProvider,
+                cloudAvailabilityController: cloudAvailabilityController,
                 isScrollingFast: isScrollingFast,
                 revealedTrackID: revealedTrackID,
                 onRenameTrack: onRenameTrack,

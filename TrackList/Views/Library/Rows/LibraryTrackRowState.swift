@@ -15,4 +15,6 @@ struct LibraryTrackRowState {
     let isSelected: Bool
     let showsFileFormat: Bool
     let trackListNames: [String]?
+    let cloudAvailabilityState: CloudTrackAvailabilityState?
+    let isContentAvailable: Bool
 }

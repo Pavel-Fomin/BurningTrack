@@ -6,6 +6,7 @@ struct LibraryTrackCommandHandler {
     let sheetManager: SheetManager
     let playbackHandler: LibraryTrackPlaybackHandler
     let presentationHandler: LibraryTrackPresentationHandler
+    let cloudAvailabilityController: CloudTrackAvailabilityController
     let onToggleSelection: () -> Void
     let onRenameTrack: (UUID, FileRenameStrategy) -> Void
 
@@ -34,6 +35,14 @@ struct LibraryTrackCommandHandler {
             onToggleSelection()
         case .requestSnapshot(let trackId):
             presentationHandler.requestSnapshotIfNeeded(for: trackId)
+        case .beginCloudAvailabilityObservation(let trackId):
+            cloudAvailabilityController.beginObserving(trackId: trackId)
+        case .stopCloudAvailabilityObservation(let trackId):
+            cloudAvailabilityController.stopObserving(trackId: trackId)
+        case .retryCloudDownload(let trackId):
+            Task {
+                await cloudAvailabilityController.retryDownloading(trackId: trackId)
+            }
         }
     }
 

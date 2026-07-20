@@ -33,11 +33,14 @@ struct TrackRowView<ActionMenuContent: View>: View {
     let onToggleSelection: (() -> Void)?
     let selectionPlacement: TrackRowSelectionPlacement
     let showsFileFormat: Bool         /// Показывать формат файла в правой колонке
+    let isContentAvailable: Bool      /// Доступно ли локальное содержимое файла для действий строки
     
     var trackListNames: [String]? = nil
     var useNativeSwipeActions: Bool = false
     /// Внешнее содержимое меню действий строки.
     private let actionMenuContent: (() -> ActionMenuContent)?
+    /// Внешнее содержимое правой части строки, которое при наличии заменяет меню действий.
+    private let trailingContent: AnyView?
 
     
     init(
@@ -55,8 +58,10 @@ struct TrackRowView<ActionMenuContent: View>: View {
         onToggleSelection: (() -> Void)? = nil,
         selectionPlacement: TrackRowSelectionPlacement = .leading,
         showsFileFormat: Bool = true,
+        isContentAvailable: Bool? = nil,
         trackListNames: [String]? = nil,
         useNativeSwipeActions: Bool = false,
+        trailingContent: AnyView? = nil,
         @ViewBuilder actionMenuContent: @escaping () -> ActionMenuContent
     ) {
         self.init(
@@ -74,8 +79,10 @@ struct TrackRowView<ActionMenuContent: View>: View {
             onToggleSelection: onToggleSelection,
             selectionPlacement: selectionPlacement,
             showsFileFormat: showsFileFormat,
+            isContentAvailable: isContentAvailable,
             trackListNames: trackListNames,
             useNativeSwipeActions: useNativeSwipeActions,
+            trailingContent: trailingContent,
             storedActionMenuContent: actionMenuContent
         )
     }
@@ -95,8 +102,10 @@ struct TrackRowView<ActionMenuContent: View>: View {
         onToggleSelection: (() -> Void)? = nil,
         selectionPlacement: TrackRowSelectionPlacement = .leading,
         showsFileFormat: Bool = true,
+        isContentAvailable: Bool? = nil,
         trackListNames: [String]? = nil,
         useNativeSwipeActions: Bool = false,
+        trailingContent: AnyView? = nil,
         storedActionMenuContent: (() -> ActionMenuContent)?
     ) {
         self.track = track
@@ -113,8 +122,10 @@ struct TrackRowView<ActionMenuContent: View>: View {
         self.onToggleSelection = onToggleSelection
         self.selectionPlacement = selectionPlacement
         self.showsFileFormat = showsFileFormat
+        self.isContentAvailable = isContentAvailable ?? track.isAvailable
         self.trackListNames = trackListNames
         self.useNativeSwipeActions = useNativeSwipeActions
+        self.trailingContent = trailingContent
         self.actionMenuContent = storedActionMenuContent
     }
     // MARK: - UI
@@ -154,8 +165,8 @@ struct TrackRowView<ActionMenuContent: View>: View {
 
             rowTapContent
 
-            // Кнопка меню показывается только если экран передал пункты действий.
-            trackActionsMenu
+            // Экран может нейтрально заменить меню совместимым содержимым правой части строки.
+            trailingArea
 
             if showsSelection && selectionPlacement == .trailing {
                 selectionButton
@@ -163,7 +174,7 @@ struct TrackRowView<ActionMenuContent: View>: View {
         }
         .padding(.vertical, 0)
         .padding(.horizontal, 4)
-        .opacity(track.isAvailable ? 1 : 0.4)
+        .opacity(isContentAvailable ? 1 : 0.4)
         .listRowBackground(rowHighlightColor)
     }
 
@@ -182,7 +193,7 @@ struct TrackRowView<ActionMenuContent: View>: View {
 
     /// Выполняет единое действие строки для основной области строки.
     private func handleRowTap() {
-        guard track.isAvailable else {
+        guard isContentAvailable else {
             ToastManager.shared.handle(
                 .trackUnavailable(title: track.title ?? track.fileName)
             )
@@ -223,6 +234,18 @@ struct TrackRowView<ActionMenuContent: View>: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+        }
+    }
+
+    /// Выбирает внешнее содержимое правой области или сохраняет существующее меню действий.
+    @ViewBuilder
+    private var trailingArea: some View {
+        if let trailingContent {
+            trailingContent
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        } else {
+            trackActionsMenu
         }
     }
 
@@ -334,6 +357,7 @@ extension TrackRowView where ActionMenuContent == EmptyView {
         onToggleSelection: (() -> Void)? = nil,
         selectionPlacement: TrackRowSelectionPlacement = .leading,
         showsFileFormat: Bool = true,
+        isContentAvailable: Bool? = nil,
         trackListNames: [String]? = nil,
         useNativeSwipeActions: Bool = false
     ) {
@@ -352,8 +376,10 @@ extension TrackRowView where ActionMenuContent == EmptyView {
             onToggleSelection: onToggleSelection,
             selectionPlacement: selectionPlacement,
             showsFileFormat: showsFileFormat,
+            isContentAvailable: isContentAvailable,
             trackListNames: trackListNames,
             useNativeSwipeActions: useNativeSwipeActions,
+            trailingContent: nil,
             storedActionMenuContent: nil
         )
     }

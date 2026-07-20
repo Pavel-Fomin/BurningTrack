@@ -28,7 +28,8 @@ struct LibraryTrackPresentationHandler {
         isSelected: Bool,
         shouldShowTags: Bool,
         shouldShowTrackListMembership: Bool,
-        shouldShowFileFormat: Bool
+        shouldShowFileFormat: Bool,
+        cloudAvailabilityState: CloudTrackAvailabilityState?
     ) -> LibraryTrackRowState {
         stateBuilder.build(
             track: track,
@@ -41,7 +42,8 @@ struct LibraryTrackPresentationHandler {
             isSelected: isSelected,
             shouldShowTags: shouldShowTags,
             shouldShowTrackListMembership: shouldShowTrackListMembership,
-            shouldShowFileFormat: shouldShowFileFormat
+            shouldShowFileFormat: shouldShowFileFormat,
+            cloudAvailabilityState: cloudAvailabilityState
         )
     }
 }

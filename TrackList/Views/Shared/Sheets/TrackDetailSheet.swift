@@ -172,7 +172,16 @@ struct TrackDetailSheet: View {
         }
 
         if let range = path.range(of: "/Mobile Documents/") {
-            return "iCloud: " + String(path[range.upperBound...])
+            // После Mobile Documents первым компонентом находится системное имя iCloud Drive.
+            let relativeComponents = path[range.upperBound...]
+                .split(separator: "/", omittingEmptySubsequences: true)
+
+            guard relativeComponents.first == "com~apple~CloudDocs" else {
+                return "iCloud: /" + relativeComponents.joined(separator: "/")
+            }
+
+            let userPathComponents = relativeComponents.dropFirst()
+            return "iCloud: /" + userPathComponents.joined(separator: "/")
         }
 
         return url.deletingLastPathComponent().lastPathComponent

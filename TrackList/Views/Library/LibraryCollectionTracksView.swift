@@ -32,6 +32,7 @@ struct LibraryCollectionTracksView: View {
     // MARK: - ViewModel
 
     @StateObject private var tracksViewModel: LibraryTracksViewModel
+    @StateObject private var cloudAvailabilityController = CloudTrackAvailabilityController()
     @StateObject private var scrollSpeed = ScrollSpeedModel(thresholdPtPerSec: 1500, debounceMs: 180)
 
     // MARK: - Coordinators
@@ -243,6 +244,7 @@ struct LibraryCollectionTracksView: View {
                     playbackSource: playbackSource,
                     trackListNamesById: tracksViewModel.trackListNamesById,
                     metadataProvider: tracksViewModel,
+                    cloudAvailabilityController: cloudAvailabilityController,
                     playerViewModel: playerViewModel,
                     isScrollingFast: scrollSpeed.isFast,
                     revealedTrackID: nil,

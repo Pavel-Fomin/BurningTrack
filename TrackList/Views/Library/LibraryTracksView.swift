@@ -28,6 +28,7 @@ struct LibraryTracksView: View {
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject var sheetManager: SheetManager
     @StateObject private var tracksViewModel: LibraryTracksViewModel
+    @StateObject private var cloudAvailabilityController = CloudTrackAvailabilityController()
     @StateObject private var scrollSpeed = ScrollSpeedModel(thresholdPtPerSec: 1500,debounceMs: 180)
     @StateObject private var revealCoordinator: LibraryTrackRevealCoordinator
     private let selectionActionBarCoordinator = LibrarySelectionActionBarCoordinator()
@@ -242,6 +243,7 @@ struct LibraryTracksView: View {
                     playbackSource: .libraryFolder(id: folder.id),
                     trackListNamesById: tracksViewModel.trackListNamesById,
                     metadataProvider: tracksViewModel,
+                    cloudAvailabilityController: cloudAvailabilityController,
                     playerViewModel: playerViewModel,
                     isScrollingFast: scrollSpeed.isFast,
                     revealedTrackID: revealCoordinator.revealedTrackID,

@@ -26,6 +26,7 @@ struct LibraryTrackSectionView: View {
     let playerViewModel: PlayerViewModel
     
     let metadataProvider: TrackMetadataProviding
+    let cloudAvailabilityController: CloudTrackAvailabilityController
 
     let isScrollingFast: Bool
     let revealedTrackID: UUID?
@@ -77,6 +78,7 @@ struct LibraryTrackSectionView: View {
             playbackSource: playbackSource,
             trackListNamesById: trackListNamesById,
             metadataProvider: metadataProvider,
+            cloudAvailabilityController: cloudAvailabilityController,
             isScrollingFast: isScrollingFast,
             isRevealed: isRevealed,
             showsSelection: isSelecting,
