@@ -14,6 +14,7 @@ struct MiniPlayerExpandedContent: View {
 
     // MARK: - Input
 
+    let showInLibraryAction: (() -> Void)?
     let shuffleAction: (() -> Void)?
     let repeatAction: (() -> Void)?
     let repeatOneAction: (() -> Void)?
@@ -25,27 +26,40 @@ struct MiniPlayerExpandedContent: View {
     // MARK: - UI
 
     var body: some View {
-        HStack(spacing: 20) {
+        HStack {
             optionalActionButton(
-                systemName: "shuffle",
-                accessibilityLabel: "Перемешать",
-                action: shuffleAction,
-                isActive: isShuffleEnabled
+                systemName: "scope",
+                accessibilityLabel: "Показать в фонотеке",
+                action: showInLibraryAction
             )
 
-            optionalActionButton(
-                systemName: "repeat",
-                accessibilityLabel: "Повтор",
-                action: repeatAction,
-                isActive: isRepeatAllEnabled
-            )
+            Spacer()
 
-            optionalActionButton(
-                systemName: "repeat.1",
-                accessibilityLabel: "Повтор одного трека",
-                action: repeatOneAction,
-                isActive: isRepeatOneEnabled
-            )
+            // Равные крайние области удерживают режимы воспроизведения по центру мини-плеера.
+            HStack(spacing: 20) {
+                optionalActionButton(
+                    systemName: "shuffle",
+                    accessibilityLabel: "Перемешать",
+                    action: shuffleAction,
+                    isActive: isShuffleEnabled
+                )
+
+                optionalActionButton(
+                    systemName: "repeat",
+                    accessibilityLabel: "Повтор",
+                    action: repeatAction,
+                    isActive: isRepeatAllEnabled
+                )
+
+                optionalActionButton(
+                    systemName: "repeat.1",
+                    accessibilityLabel: "Повтор одного трека",
+                    action: repeatOneAction,
+                    isActive: isRepeatOneEnabled
+                )
+            }
+
+            Spacer()
 
             airPlayButton
         }

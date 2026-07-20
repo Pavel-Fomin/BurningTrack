@@ -41,7 +41,7 @@ final class NavigationCoordinator: ObservableObject {
     @Published var libraryPath: [LibraryRoute] = []
 
     /// Отложенное событие "показать трек во фонотеке".
-    private var pendingShowTrackId: UUID? = nil
+    @Published private(set) var pendingShowTrackId: UUID? = nil
 
     /// Одноразовый intent подсветки трека внутри открытой папки.
     @Published private(set) var pendingRevealRequest: LibraryRevealRequest?

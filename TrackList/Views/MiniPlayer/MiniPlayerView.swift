@@ -16,18 +16,25 @@ struct MiniPlayerView: View {
     @ObservedObject var playerViewModel: PlayerViewModel
     /// Менеджер общих настроек используется только для сохранения состояния интерфейса.
     private let settingsManager: AppSettingsManager
+    /// Обработчик передаёт действия мини-плеера в сценарий представления.
+    private let actionHandler: MiniPlayerActionHandler
 
     /// Состояние раскрытия относится к интерфейсу, а не к состоянию плеера.
     @State private var isExpanded: Bool
 
     init(
         playerViewModel: PlayerViewModel,
-        settingsManager: AppSettingsManager? = nil
+        settingsManager: AppSettingsManager? = nil,
+        actionHandler: MiniPlayerActionHandler? = nil
     ) {
         self.playerViewModel = playerViewModel
 
         let resolvedSettingsManager = settingsManager ?? AppSettingsManager.shared
         self.settingsManager = resolvedSettingsManager
+        self.actionHandler = actionHandler ?? MiniPlayerActionHandler(
+            playerViewModel: playerViewModel,
+            sheetActionCoordinator: SheetActionCoordinator.shared
+        )
         _isExpanded = State(
             initialValue: resolvedSettingsManager.settings.internalSettings.isMiniPlayerExpanded
         )
@@ -190,6 +197,10 @@ struct MiniPlayerView: View {
 
             if isExpanded {
                 MiniPlayerExpandedContent(
+                    // Кнопка всегда остаётся в разметке и отключается без доступного действия.
+                    showInLibraryAction: actionHandler.canShowCurrentTrackInLibrary ? {
+                        actionHandler.handle(.showCurrentTrackInLibrary)
+                    } : nil,
                     // В пустом состоянии режимы не должны менять состояние плеера.
                     shuffleAction: hasTrack ? {
                         playerViewModel.toggleShuffle()
