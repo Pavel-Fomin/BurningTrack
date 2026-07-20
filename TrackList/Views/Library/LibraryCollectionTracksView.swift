@@ -19,6 +19,10 @@ struct LibraryCollectionTracksView: View {
     @ObservedObject var playerViewModel: PlayerViewModel
     /// Конфигурация нижней панели массового выбора в общем host фонотеки.
     @Binding var selectionActionBarConfig: SelectionActionBarConfig?
+    /// Передаёт действия общего списка в отдельный обработчик экспорта.
+    let onAllTracksAction: ((LibraryAllTracksAction) -> Void)?
+    /// Передаёт действия выбранного значения коллекции отдельному обработчику экспорта.
+    let onCollectionTracksAction: ((LibraryCollectionTracksAction) -> Void)?
 
     // MARK: - Environment
 
@@ -45,11 +49,15 @@ struct LibraryCollectionTracksView: View {
     init(
         source: LibraryTrackListSource,
         playerViewModel: PlayerViewModel,
-        selectionActionBarConfig: Binding<SelectionActionBarConfig?> = .constant(nil)
+        selectionActionBarConfig: Binding<SelectionActionBarConfig?> = .constant(nil),
+        onAllTracksAction: ((LibraryAllTracksAction) -> Void)? = nil,
+        onCollectionTracksAction: ((LibraryCollectionTracksAction) -> Void)? = nil
     ) {
         self.source = source
         self.playerViewModel = playerViewModel
         self._selectionActionBarConfig = selectionActionBarConfig
+        self.onAllTracksAction = onAllTracksAction
+        self.onCollectionTracksAction = onCollectionTracksAction
         self._tracksViewModel = StateObject(
             wrappedValue: LibraryTracksViewModel(
                 source: source,
@@ -82,6 +90,29 @@ struct LibraryCollectionTracksView: View {
     /// Все видимые треки текущих секций для передачи в строки списком контекста.
     private var allVisibleTracks: [LibraryTrack] {
         tracksViewModel.trackSections.flatMap(\.tracks)
+    }
+
+    /// Показывает экспорт внутри общего меню только для общего списка фонотеки.
+    private var canExportAllTracks: Bool {
+        source.isAllLibraryTracks && onAllTracksAction != nil
+    }
+
+    /// Разрешает экспорт только у выбранного значения коллекции.
+    private var canExportCollectionTracks: Bool {
+        source.isCollectionValue && onCollectionTracksAction != nil
+    }
+
+    /// Возвращает действие экспорта для типа текущего списка.
+    private var exportAction: (() -> Void)? {
+        if canExportAllTracks {
+            return handleTapAllTracksExport
+        }
+
+        if canExportCollectionTracks {
+            return handleTapCollectionTracksExport
+        }
+
+        return nil
     }
 
     /// Возвращает постоянный источник текущего типизированного списка.
@@ -153,7 +184,9 @@ struct LibraryCollectionTracksView: View {
                     availableSortModes: source.availableTrackSortModes,
                     onSelect: handleTapSelect,
                     onSortModeSelection: handleSortModeSelection,
-                    onBatchActionSelection: handleBatchActionSelection
+                    onBatchActionSelection: handleBatchActionSelection,
+                    onExport: exportAction,
+                    isExportEnabled: allVisibleTracks.isEmpty == false
                 )
             }
         }
@@ -279,6 +312,18 @@ struct LibraryCollectionTracksView: View {
     private func handleTapSelect() {
         tracksViewModel.activateBulkSelection()
         updateSelectionActionBarConfig()
+    }
+
+    /// Передаёт треки в текущем отображаемом порядке обработчику общего списка.
+    private func handleTapAllTracksExport() {
+        guard canExportAllTracks, allVisibleTracks.isEmpty == false else { return }
+        onAllTracksAction?(.exportTracks(allVisibleTracks))
+    }
+
+    /// Передаёт треки выбранного значения в текущем отображаемом порядке отдельному обработчику.
+    private func handleTapCollectionTracksExport() {
+        guard canExportCollectionTracks, allVisibleTracks.isEmpty == false else { return }
+        onCollectionTracksAction?(.exportTracks(allVisibleTracks))
     }
 
     /// Обрабатывает массовое переключение выбора в toolbar.

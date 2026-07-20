@@ -44,6 +44,9 @@ struct LibraryFolderView: View {
                     onSubfolderTap: { subfolder in
                         onAction(.subfolderTapped(subfolder))
                     },
+                    onExportTracks: { libraryTracks in
+                        onAction(.exportTracks(libraryTracks))
+                    },
                     revealRequest: revealRequest,
                     onRevealHandled: onRevealHandled,
                     playerViewModel: playerViewModel,

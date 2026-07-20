@@ -39,13 +39,57 @@ final class TrackExportModelTests: XCTestCase {
         let job = ExportJob(
             tracks: [firstTrack, secondTrack],
             destination: destination,
-            exportFolderName: "Peak Time"
+            exportFolderName: "Peak Time",
+            fileNamingMode: .numbered
         )
 
         XCTAssertEqual(job.exportFolderName, "Peak Time")
         XCTAssertEqual(job.items.map(\.exportFileName), [
             "01 first.flac",
             "02 second.flac"
+        ])
+    }
+
+    /// Проверяет сохранение исходных имён, порядка и идентификаторов треков.
+    func testExportJobPreservesOriginalFileNamesAndTrackOrder() {
+        let firstTrackID = UUID()
+        let secondTrackID = UUID()
+        let firstFileName = "  Original 01.FLAC  "
+        let secondFileName = "Live—Track.Mp3"
+        let tracks = [
+            Track(
+                trackId: firstTrackID,
+                title: "Первый",
+                artist: "Артист",
+                duration: 10,
+                fileName: firstFileName,
+                isAvailable: true
+            ),
+            Track(
+                trackId: secondTrackID,
+                title: "Второй",
+                artist: "Артист",
+                duration: 20,
+                fileName: secondFileName,
+                isAvailable: true
+            )
+        ]
+        let destination = ExportDestination(
+            folderURL: URL(fileURLWithPath: "/tmp/export")
+        )
+
+        let job = ExportJob(
+            tracks: tracks,
+            destination: destination,
+            exportFolderName: "Original",
+            fileNamingMode: .original
+        )
+
+        XCTAssertEqual(job.items.map(\.index), [0, 1])
+        XCTAssertEqual(job.items.map(\.trackID), [firstTrackID, secondTrackID])
+        XCTAssertEqual(job.items.map(\.exportFileName), [
+            firstFileName,
+            secondFileName
         ])
     }
 

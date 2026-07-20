@@ -16,6 +16,7 @@ enum ExportAction {
     case start(
         tracks: [Track],
         exportFolderName: String,
+        fileNamingMode: ExportFileNamingMode,
         presenter: UIViewController
     )
 

@@ -29,6 +29,7 @@ final class ExportActionHandlerTests: XCTestCase {
         let result = try await handler.startExport(
             tracks: [],
             exportFolderName: "Плеер",
+            fileNamingMode: .numbered,
             presenter: UIViewController(),
             onExportAccepted: {
                 wasAccepted = true
@@ -57,6 +58,7 @@ final class ExportActionHandlerTests: XCTestCase {
         let result = try await handler.startExport(
             tracks: [track],
             exportFolderName: "Экспорт",
+            fileNamingMode: .numbered,
             presenter: UIViewController(),
             onExportAccepted: {
                 wasAccepted = true
@@ -71,6 +73,15 @@ final class ExportActionHandlerTests: XCTestCase {
         XCTAssertEqual(exporter.exportCallCount, 1)
         XCTAssertEqual(exporter.exportFolderNames, ["Экспорт"])
         XCTAssertEqual(exporter.exportedTrackIDs, [[track.trackId]])
+        guard let fileNamingMode = exporter.fileNamingModes.first else {
+            XCTFail("Режим именования не был передан в exporter")
+            return
+        }
+        if case .numbered = fileNamingMode {
+            // Существующий экспорт должен сохранять нумерованные имена.
+        } else {
+            XCTFail("Для существующего экспорта ожидался режим numbered")
+        }
         XCTAssertTrue(toastPresenter.events.isEmpty)
         XCTAssertTrue(toastPresenter.errors.isEmpty)
     }
@@ -178,6 +189,7 @@ final class ExportActionHandlerTests: XCTestCase {
         try await handler.startExport(
             tracks: [makeTrack()],
             exportFolderName: "Плеер",
+            fileNamingMode: .numbered,
             presenter: UIViewController(),
             onExportAccepted: {},
             onProgress: { _ in }
@@ -207,6 +219,9 @@ private final class ExportingSpy: TrackExporting {
     /// Имена папок, переданные при запусках экспорта.
     private(set) var exportFolderNames: [String] = []
 
+    /// Режимы формирования имён, переданные при запусках экспорта.
+    private(set) var fileNamingModes: [ExportFileNamingMode] = []
+
     /// Идентификаторы треков, переданные при запусках экспорта.
     private(set) var exportedTrackIDs: [[UUID]] = []
 
@@ -224,11 +239,13 @@ private final class ExportingSpy: TrackExporting {
     func exportTracks(
         _ tracks: [Track],
         exportFolderName: String,
+        fileNamingMode: ExportFileNamingMode,
         presenter: UIViewController,
         onProgress: @escaping ExportProgressHandler
     ) async throws -> ExportSummary {
         exportCallCount += 1
         exportFolderNames.append(exportFolderName)
+        fileNamingModes.append(fileNamingMode)
         exportedTrackIDs.append(tracks.map(\.trackId))
 
         if let errorToThrow {

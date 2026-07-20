@@ -1,55 +1,47 @@
 //
-//  LibraryFolderActionHandler.swift
+//  LibraryCollectionTracksActionHandler.swift
 //  TrackList
 //
-//  Обрабатывает действия экрана папки фонотеки.
-//  Здесь находятся навигация и побочные эффекты, а не во View.
+//  Обрабатывает экспорт треков выбранного значения музыкальной коллекции.
 //
-//  Created by Pavel Fomin on 20.06.2026.
+//  Created by Pavel Fomin on 20.07.2026.
 //
+
 import Foundation
 
+/// Запускает экспорт видимых треков выбранного значения музыкальной коллекции.
 @MainActor
-final class LibraryFolderActionHandler {
+final class LibraryCollectionTracksActionHandler {
+
     // MARK: - Dependencies
 
-    private let navigationCoordinator: NavigationCoordinator
-    private let clearSelectionActionBar: @MainActor () -> Void
+    /// Типизированный источник хранит отображаемое имя выбранного значения для экспорта.
+    private let source: LibraryTrackListSource
     /// Глобальный владелец прогресса и жизненного цикла экспорта.
     private let exportProgressViewModel: ExportProgressViewModel
     /// Предоставляет presenter системного picker-а папки назначения.
     private let viewControllerProvider: any ViewControllerProviding
     /// Показывает ошибку, если системный picker нельзя презентовать.
     private let toastPresenter: any ToastPresenting
-    /// Имя дочерней папки экспортируемого содержимого.
-    private let exportFolderName: String
 
     // MARK: - Init
 
     init(
-        navigationCoordinator: NavigationCoordinator,
+        source: LibraryTrackListSource,
         exportProgressViewModel: ExportProgressViewModel,
         viewControllerProvider: any ViewControllerProviding,
-        toastPresenter: any ToastPresenting,
-        exportFolderName: String,
-        clearSelectionActionBar: @escaping @MainActor () -> Void
+        toastPresenter: any ToastPresenting
     ) {
-        self.navigationCoordinator = navigationCoordinator
+        self.source = source
         self.exportProgressViewModel = exportProgressViewModel
         self.viewControllerProvider = viewControllerProvider
         self.toastPresenter = toastPresenter
-        self.exportFolderName = exportFolderName
-        self.clearSelectionActionBar = clearSelectionActionBar
     }
 
     // MARK: - Handle
 
-    func handle(_ action: LibraryFolderAction) {
+    func handle(_ action: LibraryCollectionTracksAction) {
         switch action {
-        case .appeared:
-            clearSelectionActionBar()
-        case .subfolderTapped(let subfolder):
-            navigationCoordinator.pushFolder(subfolder.url.libraryFolderId)
         case .exportTracks(let libraryTracks):
             exportTracks(libraryTracks)
         }
@@ -57,16 +49,19 @@ final class LibraryFolderActionHandler {
 
     // MARK: - Export
 
-    /// Запускает общий экспорт треков текущей папки без нумерации имён файлов.
+    /// Запускает экспорт треков выбранного значения без изменения текущего порядка строк.
     private func exportTracks(_ libraryTracks: [LibraryTrack]) {
-        guard libraryTracks.isEmpty == false else { return }
+        guard source.isCollectionValue,
+              let exportFolderName = source.exportFolderName,
+              libraryTracks.isEmpty == false else {
+            return
+        }
 
         guard let presenter = viewControllerProvider.topViewController() else {
             toastPresenter.handle(.presenterUnavailable)
             return
         }
 
-        // Секции уже собраны в текущем порядке отображения, поэтому не пересортировываем треки.
         let tracks = libraryTracks.map(Track.init(libraryTrack:))
         exportProgressViewModel.startExport(
             tracks: tracks,

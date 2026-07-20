@@ -17,10 +17,10 @@ enum TrackExportServiceError: LocalizedError {
     /// Выбранный URL не является папкой назначения.
     case destinationIsNotDirectory
 
-    /// Внутри назначения уже существует объект с именем папки треклиста, но это не папка.
+    /// Внутри назначения уже существует объект с именем экспортной папки, но это не папка.
     case exportFolderIsNotDirectory
 
-    /// Не удалось подготовить содержимое дочерней папки треклиста.
+    /// Не удалось подготовить содержимое дочерней экспортной папки.
     case exportFolderPreparationFailed(underlying: Error)
 
     /// Не удалось определить размер исходного файла.
@@ -82,7 +82,7 @@ private struct PreparedExportItem {
     /// Исходный URL, восстановленный через существующий bookmark pipeline.
     let sourceURL: URL
 
-    /// Элемент исходного задания с нумерованным именем.
+    /// Элемент исходного задания с итоговым именем файла.
     let item: ExportJob.Item
 
     /// Размер файла до начала копирования.
@@ -359,7 +359,7 @@ actor TrackExportService {
         return Int64(endOffset)
     }
 
-    /// Создаёт дочернюю папку треклиста или очищает только её содержимое.
+    /// Создаёт дочернюю экспортную папку или очищает только её содержимое.
     private func prepareExportFolder(
         inside rootFolderURL: URL,
         named requestedName: String
@@ -417,7 +417,7 @@ actor TrackExportService {
         }
     }
 
-    /// Преобразует имя треклиста в один безопасный компонент URL.
+    /// Преобразует имя экспортной папки в один безопасный компонент URL.
     private func sanitizedExportFolderName(_ name: String) -> String {
         let invalidCharacters = CharacterSet(charactersIn: "/\\:")
             .union(.controlCharacters)

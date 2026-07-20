@@ -15,6 +15,7 @@ protocol TrackExporting {
     func exportTracks(
         _ tracks: [Track],
         exportFolderName: String,
+        fileNamingMode: ExportFileNamingMode,
         presenter: UIViewController,
         onProgress: @escaping ExportProgressHandler
     ) async throws -> ExportSummary

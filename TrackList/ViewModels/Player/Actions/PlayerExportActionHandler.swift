@@ -62,6 +62,7 @@ final class PlayerExportActionHandler {
         exportProgressViewModel.startExport(
             tracks: tracks,
             exportFolderName: "Плеер",
+            fileNamingMode: .numbered,
             presenter: topVC
         )
     }

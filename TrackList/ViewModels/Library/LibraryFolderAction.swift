@@ -12,4 +12,6 @@ import Foundation
 enum LibraryFolderAction {
     case appeared
     case subfolderTapped(LibraryFolder)
+    /// Запускает экспорт видимых треков текущей папки в их отображаемом порядке.
+    case exportTracks([LibraryTrack])
 }

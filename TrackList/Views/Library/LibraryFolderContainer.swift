@@ -19,6 +19,7 @@ struct LibraryFolderContainer: View {
     let revealRequest: LibraryRevealRequest?
     let onRevealHandled: (UUID) -> Void
     let playerViewModel: PlayerViewModel
+    let exportProgressViewModel: ExportProgressViewModel
     @Binding var selectionActionBarConfig: SelectionActionBarConfig?
 
     // MARK: - Init
@@ -28,12 +29,14 @@ struct LibraryFolderContainer: View {
         revealRequest: LibraryRevealRequest? = nil,
         onRevealHandled: @escaping (UUID) -> Void = { _ in },
         playerViewModel: PlayerViewModel,
+        exportProgressViewModel: ExportProgressViewModel,
         selectionActionBarConfig: Binding<SelectionActionBarConfig?>
     ) {
         self.folder = folder
         self.revealRequest = revealRequest
         self.onRevealHandled = onRevealHandled
         self.playerViewModel = playerViewModel
+        self.exportProgressViewModel = exportProgressViewModel
         self._selectionActionBarConfig = selectionActionBarConfig
     }
 
@@ -45,6 +48,7 @@ struct LibraryFolderContainer: View {
             revealRequest: revealRequest,
             onRevealHandled: onRevealHandled,
             playerViewModel: playerViewModel,
+            exportProgressViewModel: exportProgressViewModel,
             selectionActionBarConfig: $selectionActionBarConfig
         )
         .id(folder.id)
@@ -59,6 +63,7 @@ private struct LibraryFolderContent: View {
     let revealRequest: LibraryRevealRequest?
     let onRevealHandled: (UUID) -> Void
     let playerViewModel: PlayerViewModel
+    let exportProgressViewModel: ExportProgressViewModel
     @Binding var selectionActionBarConfig: SelectionActionBarConfig?
 
     // MARK: - ViewModel
@@ -72,18 +77,21 @@ private struct LibraryFolderContent: View {
         revealRequest: LibraryRevealRequest?,
         onRevealHandled: @escaping (UUID) -> Void,
         playerViewModel: PlayerViewModel,
+        exportProgressViewModel: ExportProgressViewModel,
         selectionActionBarConfig: Binding<SelectionActionBarConfig?>
     ) {
         self.folder = folder
         self.revealRequest = revealRequest
         self.onRevealHandled = onRevealHandled
         self.playerViewModel = playerViewModel
+        self.exportProgressViewModel = exportProgressViewModel
         self._selectionActionBarConfig = selectionActionBarConfig
         // Сохраняем Binding локально, чтобы action handler очищал текущую панель выбора.
         let selectionActionBarConfig = selectionActionBarConfig
         self._viewModel = StateObject(
             wrappedValue: LibraryFolderViewModelFactory.make(
                 folder: folder,
+                exportProgressViewModel: exportProgressViewModel,
                 clearSelectionActionBar: {
                     selectionActionBarConfig.wrappedValue = nil
                 }

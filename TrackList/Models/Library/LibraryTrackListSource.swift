@@ -85,6 +85,30 @@ enum LibraryTrackListSource: Hashable, Identifiable {
         }
     }
 
+    /// Относится ли источник к общему списку треков фонотеки.
+    var isAllLibraryTracks: Bool {
+        guard case .allLibraryTracks = self else { return false }
+        return true
+    }
+
+    /// Относится ли источник к выбранному значению раздела музыкальной коллекции.
+    var isCollectionValue: Bool {
+        guard case .collectionValue = self else { return false }
+        return true
+    }
+
+    /// Отображаемое имя дочерней папки для экспорта, если источник поддерживает экспорт.
+    var exportFolderName: String? {
+        switch self {
+        case .allLibraryTracks:
+            return "Треки"
+        case .collectionValue(_, let rawValue, _):
+            return rawValue
+        case .folder:
+            return nil
+        }
+    }
+
     /// Идентификатор папки, если источник связан с папочной веткой фонотеки.
     var folderId: UUID? {
         switch self {

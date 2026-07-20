@@ -90,6 +90,7 @@ final class ExportOperationCoordinator {
     func startExport(
         tracks: [Track],
         exportFolderName: String,
+        fileNamingMode: ExportFileNamingMode,
         presenter: UIViewController
     ) -> Bool {
         guard exportTask == nil else { return false }
@@ -122,6 +123,7 @@ final class ExportOperationCoordinator {
                 _ = try await self.actionHandler.startExport(
                     tracks: tracks,
                     exportFolderName: exportFolderName,
+                    fileNamingMode: fileNamingMode,
                     presenter: presenter,
                     onExportAccepted: {
                         exportWasAccepted = true

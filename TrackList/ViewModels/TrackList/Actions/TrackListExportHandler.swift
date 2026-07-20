@@ -55,6 +55,7 @@ final class TrackListExportHandler {
         exportProgressViewModel.startExport(
             tracks: tracks,
             exportFolderName: reader.name,
+            fileNamingMode: .numbered,
             presenter: topVC
         )
     }

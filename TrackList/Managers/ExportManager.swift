@@ -39,6 +39,7 @@ final class ExportManager {
     func exportTracks(
         _ tracks: [Track],
         exportFolderName: String,
+        fileNamingMode: ExportFileNamingMode,
         presenter: UIViewController,
         onProgress: @escaping ExportProgressHandler = { _ in }
     ) async throws -> ExportSummary {
@@ -49,7 +50,8 @@ final class ExportManager {
         let job = ExportJob(
             tracks: tracks,
             destination: destination,
-            exportFolderName: exportFolderName
+            exportFolderName: exportFolderName,
+            fileNamingMode: fileNamingMode
         )
         return try await trackExportService.export(
             job: job,

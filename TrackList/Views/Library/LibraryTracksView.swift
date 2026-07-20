@@ -18,6 +18,8 @@ struct LibraryTracksView: View {
     let subfolders: [LibraryFolder]
     /// Передаёт навигационное действие владельцу flow фонотеки.
     let onSubfolderTap: (LibraryFolder) -> Void
+    /// Передаёт видимые треки для экспорта владельцу flow папки.
+    let onExportTracks: ([LibraryTrack]) -> Void
     let revealRequest: LibraryRevealRequest?
     let onRevealHandled: (UUID) -> Void
     @Binding var selectionActionBarConfig: SelectionActionBarConfig?
@@ -59,6 +61,7 @@ struct LibraryTracksView: View {
         folder: LibraryFolder,
         subfolders: [LibraryFolder] = [],
         onSubfolderTap: @escaping (LibraryFolder) -> Void = { _ in },
+        onExportTracks: @escaping ([LibraryTrack]) -> Void = { _ in },
         revealRequest: LibraryRevealRequest? = nil,
         onRevealHandled: @escaping (UUID) -> Void = { _ in },
         playerViewModel: PlayerViewModel,
@@ -67,6 +70,7 @@ struct LibraryTracksView: View {
         self.folder = folder
         self.subfolders = subfolders
         self.onSubfolderTap = onSubfolderTap
+        self.onExportTracks = onExportTracks
         self.revealRequest = revealRequest
         self.onRevealHandled = onRevealHandled
         self.playerViewModel = playerViewModel
@@ -140,7 +144,6 @@ struct LibraryTracksView: View {
     // Контент справа отдаёт наружу только пользовательские намерения.
     @ToolbarContentBuilder
     private var navigationToolbarContent: some ToolbarContent {
-
         if isSelecting {
 
             // Меню batch-действий в режиме выбора.
@@ -177,7 +180,9 @@ struct LibraryTracksView: View {
                     availableSortModes: LibraryTrackSortMode.allCases,
                     onSelect: handleTapSelect,
                     onSortModeSelection: handleSortModeSelection,
-                    onBatchActionSelection: handleBatchActionSelection
+                    onBatchActionSelection: handleBatchActionSelection,
+                    onExport: handleTapExport,
+                    isExportEnabled: allVisibleTracks.isEmpty == false
                 )
             }
         }
@@ -326,6 +331,12 @@ struct LibraryTracksView: View {
         // Вход в выбор без заранее выбранного batch-действия.
         tracksViewModel.activateBulkSelection()
         updateSelectionActionBarConfig()
+    }
+
+    /// Передаёт треки в текущем отображаемом порядке обработчику папки.
+    private func handleTapExport() {
+        guard allVisibleTracks.isEmpty == false else { return }
+        onExportTracks(allVisibleTracks)
     }
 
     /// Обрабатывает массовое переключение выбора в toolbar.
@@ -485,8 +496,35 @@ struct LibraryTracksToolbarMenuButton: UIViewRepresentable {
     let onSortModeSelection: (LibraryTrackSortMode) -> Void
     /// Передаёт выбранное batch-действие во View.
     let onBatchActionSelection: (BulkTrackAction) -> Void
+    /// Запускает экспорт видимых треков, если он доступен для текущего экрана.
+    let onExport: (() -> Void)?
+    /// Определяет доступность пункта экспорта.
+    let isExportEnabled: Bool
     /// Accessibility label для кнопки действий текущего списка.
-    let accessibilityLabel: String = "Действия папки фонотеки"
+    let accessibilityLabel: String
+
+    // MARK: - Init
+
+    /// Создаёт меню действий списка с необязательным пунктом экспорта.
+    init(
+        selectedSortMode: LibraryTrackSortMode,
+        availableSortModes: [LibraryTrackSortMode],
+        onSelect: @escaping () -> Void,
+        onSortModeSelection: @escaping (LibraryTrackSortMode) -> Void,
+        onBatchActionSelection: @escaping (BulkTrackAction) -> Void,
+        onExport: (() -> Void)? = nil,
+        isExportEnabled: Bool = false,
+        accessibilityLabel: String = "Действия папки фонотеки"
+    ) {
+        self.selectedSortMode = selectedSortMode
+        self.availableSortModes = availableSortModes
+        self.onSelect = onSelect
+        self.onSortModeSelection = onSortModeSelection
+        self.onBatchActionSelection = onBatchActionSelection
+        self.onExport = onExport
+        self.isExportEnabled = isExportEnabled
+        self.accessibilityLabel = accessibilityLabel
+    }
 
     func makeUIView(context: Context) -> UIButton {
         let button = UIButton(type: .system)
@@ -506,14 +544,20 @@ struct LibraryTracksToolbarMenuButton: UIViewRepresentable {
 
     /// Собирает системное меню, где subtitle и checkmark рисуются UIKit.
     private func makeMenu() -> UIMenu {
-        let menu = UIMenu(
-            children: [
-                makeSelectAction(),
-                makeSortMenu(),
-                makeAddMenu(),
-                makeEditMenu()
-            ]
-        )
+        var children: [UIMenuElement] = [
+            makeSelectAction(),
+            makeSortMenu()
+        ]
+
+        if let onExport {
+            children.append(makeExportAction(onExport))
+        }
+
+        children.append(contentsOf: [
+            makeAddMenu(),
+            makeEditMenu()
+        ])
+        let menu = UIMenu(children: children)
 
         // Разрешает системе показать title и subtitle для пункта "Сортировка".
         let displayPreferences = UIMenuDisplayPreferences()
@@ -638,6 +682,17 @@ struct LibraryTracksToolbarMenuButton: UIViewRepresentable {
             image: UIImage(systemName: "checkmark.circle")
         ) { _ in
             onSelect()
+        }
+    }
+
+    /// Собирает пункт экспорта всех видимых треков текущей папки.
+    private func makeExportAction(_ onExport: @escaping () -> Void) -> UIAction {
+        UIAction(
+            title: "Экспорт",
+            image: UIImage(systemName: "externaldrive"),
+            attributes: isExportEnabled ? [] : [.disabled]
+        ) { _ in
+            onExport()
         }
     }
 

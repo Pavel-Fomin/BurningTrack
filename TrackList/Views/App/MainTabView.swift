@@ -59,7 +59,8 @@ struct MainTabView: View {
                 value: ScenePhaseHandler.Tab.library
             ) {
                 LibraryScreen(
-                    playerViewModel: playerViewModel
+                    playerViewModel: playerViewModel,
+                    exportProgressViewModel: exportProgressViewModel
                 )
             }
 

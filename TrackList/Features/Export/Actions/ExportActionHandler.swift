@@ -34,6 +34,7 @@ final class ExportActionHandler {
     func startExport(
         tracks: [Track],
         exportFolderName: String,
+        fileNamingMode: ExportFileNamingMode,
         presenter: UIViewController,
         onExportAccepted: () -> Void,
         onProgress: @escaping ExportProgressHandler
@@ -49,6 +50,7 @@ final class ExportActionHandler {
             return try await exporter.exportTracks(
                 tracks,
                 exportFolderName: exportFolderName,
+                fileNamingMode: fileNamingMode,
                 presenter: presenter,
                 onProgress: onProgress
             )

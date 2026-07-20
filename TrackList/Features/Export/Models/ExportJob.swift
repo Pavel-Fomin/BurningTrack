@@ -9,10 +9,20 @@
 
 import Foundation
 
+/// Определяет способ формирования итогового имени файла при экспорте.
+enum ExportFileNamingMode: Sendable {
+
+    /// Добавляет к исходному имени файла двухзначный порядковый номер.
+    case numbered
+
+    /// Передаёт исходное имя файла без изменений.
+    case original
+}
+
 /// Подготовленное к выполнению задание экспорта.
 ///
 /// В задание передаются только Sendable-данные, нужные сервису: идентификатор
-/// трека и итоговое нумерованное имя файла. Тяжёлая display-модель Track не
+/// трека и итоговое имя файла. Тяжёлая display-модель Track не
 /// пересекает границу фонового сервиса.
 struct ExportJob: Sendable {
 
@@ -25,7 +35,7 @@ struct ExportJob: Sendable {
         /// Идентификатор, через который BookmarkResolver получает исходный URL.
         let trackID: UUID
 
-        /// Имя с сохранённой нумерацией текущего экспорта.
+        /// Итоговое имя файла, подготовленное для сервиса экспорта.
         let exportFileName: String
     }
 
@@ -38,18 +48,28 @@ struct ExportJob: Sendable {
     /// Имя дочерней папки, в которой должен храниться экспорт этого списка.
     let exportFolderName: String
 
-    /// Создаёт задание и сохраняет текущую нумерацию файлов проекта.
+    /// Создаёт задание и формирует имена файлов в выбранном режиме.
     init(
         tracks: [Track],
         destination: ExportDestination,
-        exportFolderName: String
+        exportFolderName: String,
+        fileNamingMode: ExportFileNamingMode
     ) {
         self.items = tracks.enumerated().map { index, track in
-            let prefix = String(format: "%02d", index + 1)
+            let exportFileName: String
+
+            switch fileNamingMode {
+            case .numbered:
+                let prefix = String(format: "%02d", index + 1)
+                exportFileName = "\(prefix) \(track.fileName)"
+            case .original:
+                exportFileName = track.fileName
+            }
+
             return Item(
                 index: index,
                 trackID: track.trackId,
-                exportFileName: "\(prefix) \(track.fileName)"
+                exportFileName: exportFileName
             )
         }
         self.destination = destination

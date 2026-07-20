@@ -42,8 +42,13 @@ struct LibraryScreen: View {
 
     /// Фабрика production action handler для корневого flow фонотеки.
     private let actionHandlerFactory = LibraryMasterActionHandlerFactory()
+    /// Фабрика обработчика экспорта общего списка треков.
+    private let allTracksActionHandlerFactory = LibraryAllTracksActionHandlerFactory()
+    /// Фабрика обработчика экспорта выбранного значения коллекции.
+    private let collectionTracksActionHandlerFactory = LibraryCollectionTracksActionHandlerFactory()
 
     let playerViewModel: PlayerViewModel
+    @ObservedObject var exportProgressViewModel: ExportProgressViewModel
 
     // MARK: - ViewModels
 
@@ -60,8 +65,12 @@ struct LibraryScreen: View {
 
     // MARK: - Init
 
-    init(playerViewModel: PlayerViewModel) {
+    init(
+        playerViewModel: PlayerViewModel,
+        exportProgressViewModel: ExportProgressViewModel
+    ) {
         self.playerViewModel = playerViewModel
+        self.exportProgressViewModel = exportProgressViewModel
         self._viewModel = StateObject(
             wrappedValue: LibraryScreenViewModelFactory.make()
         )
@@ -78,6 +87,23 @@ struct LibraryScreen: View {
             requestFolderPicker: {
                 isShowingFolderPicker = true
             }
+        )
+    }
+
+    /// Обработчик действий экрана всех треков фонотеки.
+    private var allTracksActionHandler: LibraryAllTracksActionHandler {
+        allTracksActionHandlerFactory.make(
+            exportProgressViewModel: exportProgressViewModel
+        )
+    }
+
+    /// Собирает обработчик экспорта текущего выбранного значения коллекции.
+    private func collectionTracksActionHandler(
+        for source: LibraryTrackListSource
+    ) -> LibraryCollectionTracksActionHandler {
+        collectionTracksActionHandlerFactory.make(
+            source: source,
+            exportProgressViewModel: exportProgressViewModel
         )
     }
 
@@ -214,7 +240,10 @@ struct LibraryScreen: View {
             LibraryCollectionTracksView(
                 source: .allLibraryTracks,
                 playerViewModel: playerViewModel,
-                selectionActionBarConfig: $selectionActionBarConfig
+                selectionActionBarConfig: $selectionActionBarConfig,
+                onAllTracksAction: { action in
+                    allTracksActionHandler.handle(action)
+                }
             )
                 .onAppear {
                     selectionActionBarConfig = nil
@@ -240,7 +269,17 @@ struct LibraryScreen: View {
                     artistKey: artistKey
                 ),
                 playerViewModel: playerViewModel,
-                selectionActionBarConfig: $selectionActionBarConfig
+                selectionActionBarConfig: $selectionActionBarConfig,
+                onCollectionTracksAction: { action in
+                    collectionTracksActionHandler(
+                        for: .collectionValue(
+                            category: category,
+                            rawValue: value,
+                            artistKey: artistKey
+                        )
+                    )
+                    .handle(action)
+                }
             )
                 .onAppear {
                     selectionActionBarConfig = nil
@@ -254,6 +293,7 @@ struct LibraryScreen: View {
                     viewModel.handle(.revealHandled(requestId))
                 },
                 playerViewModel: playerViewModel,
+                exportProgressViewModel: exportProgressViewModel,
                 selectionActionBarConfig: $selectionActionBarConfig
             )
 
