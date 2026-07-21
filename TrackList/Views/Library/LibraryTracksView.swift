@@ -102,6 +102,7 @@ struct LibraryTracksView: View {
             // Навигационный toolbar подключается снаружи списка, чтобы не влиять на строки.
             .navigationTitle(folder.name)
             .navigationBarTitleDisplayMode(.inline)
+            .navigationBarBackButtonHidden(isSelecting)
             .toolbar {
                 navigationToolbarContent
             }
@@ -142,35 +143,16 @@ struct LibraryTracksView: View {
             }
     }
 
-    // Контент справа отдаёт наружу только пользовательские намерения.
+    // Контент панели навигации отдаёт наружу только пользовательские намерения.
     @ToolbarContentBuilder
     private var navigationToolbarContent: some ToolbarContent {
         if isSelecting {
-
-            // Меню batch-действий в режиме выбора.
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button(action: handleToggleSelectAll) {
-                        Label(
-                            tracksViewModel.areAllVisibleTracksSelected ? "Снять все" : "Выбрать все",
-                            systemImage: tracksViewModel.areAllVisibleTracksSelected ? "circle" : "checkmark.circle"
-                        )
-                    }
-
-                    Divider()
-
-                    batchActionMenuItems
-                } label: {
-                    Image(systemName: "ellipsis")
-                }
-            }
-
-            /// Закрывает режим выбора и очищает текущий selection.
-            ToolbarItem(placement: .topBarTrailing) {
-                Button(action: handleTapCancel) {
-                    Image(systemName: "xmark")
-                }
-            }
+            LibraryBulkSelectionToolbar(
+                areAllVisibleTracksSelected: tracksViewModel.areAllVisibleTracksSelected,
+                onToggleSelectAll: handleToggleSelectAll,
+                onBatchActionSelection: handleBatchActionSelection,
+                onCancel: handleTapCancel
+            )
 
         } else {
 
@@ -185,39 +167,6 @@ struct LibraryTracksView: View {
                     onExport: handleTapExport,
                     isExportEnabled: allVisibleTracks.isEmpty == false
                 )
-            }
-        }
-    }
-
-    /// Общие пункты batch-действий без выполнения самих действий.
-    @ViewBuilder
-    private var batchActionMenuItems: some View {
-        // Системные секции меню выравнивают заголовки отдельно от пунктов с иконками.
-        Section("Добавить") {
-            Button {
-                handleBatchActionSelection(.addToPlayer)
-            } label: {
-                Label("В плеер", systemImage: "waveform")
-            }
-
-            Button {
-                handleBatchActionSelection(.addToTrackList)
-            } label: {
-                Label("В треклист", systemImage: "list.star")
-            }
-        }
-
-        Section("Изменить") {
-            Button {
-                handleBatchActionSelection(.renameFiles)
-            } label: {
-                Label("Имя файла", systemImage: "pencil")
-            }
-
-            Button {
-                handleBatchActionSelection(.editTags)
-            } label: {
-                Label("Теги", systemImage: "tag")
             }
         }
     }
