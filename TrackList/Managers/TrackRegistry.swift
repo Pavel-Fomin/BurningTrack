@@ -211,7 +211,9 @@ actor TrackRegistry {
         relativePath: String,
         folderId: UUID,
         rootFolderId: UUID,
-        fileDate: Date = Date()
+        fileDate: Date = Date(),
+        fileSize: Int64? = nil,
+        shouldUpdateFileSize: Bool = false
     ) {
         if isLibraryRelativePath(relativePath) {
             do {
@@ -221,7 +223,9 @@ actor TrackRegistry {
                     relativePath: relativePath,
                     folderId: folderId,
                     rootFolderId: rootFolderId,
-                    fileDate: fileDate
+                    fileDate: fileDate,
+                    fileSize: fileSize,
+                    shouldUpdateFileSize: shouldUpdateFileSize
                 )
             } catch {
                 rememberPersistenceError(error)
@@ -244,11 +248,14 @@ actor TrackRegistry {
         isAvailable: Bool = true
     ) {
         do {
+            let resolvedFileSize = fileURL.flatMap { LibraryFileSizeResolver.fileSize(for: $0) }
             try libraryStore().upsertImportedTrack(
                 id: id,
                 fileName: fileName,
                 fileURL: fileURL,
                 fileDate: fileDate,
+                fileSize: resolvedFileSize,
+                shouldUpdateFileSize: fileURL != nil,
                 isAvailable: isAvailable
             )
         } catch {

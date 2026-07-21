@@ -11,9 +11,13 @@ import Foundation
 struct LibraryFolderStateBuilder {
     // MARK: - Build
 
-    func build(folder: LibraryFolder) -> LibraryFolderScreenState {
+    func build(
+        folder: LibraryFolder,
+        summaryText: String? = nil
+    ) -> LibraryFolderScreenState {
         LibraryFolderScreenState(
             title: folder.name,
+            summaryText: summaryText,
             folder: folder,
             subfolders: folder.subfolders,
             displayMode: displayMode(for: folder)

@@ -37,6 +37,13 @@ final class NotificationTrackListEventProvider: TrackListEventProviding {
             .eraseToAnyPublisher()
     }
 
+    /// Событие завершения синхронизации фонотеки после записи file_size в SQLite.
+    var libraryDataDidChange: AnyPublisher<Void, Never> {
+        notificationCenter.publisher(for: .libraryDataDidChange)
+            .map { _ in () }
+            .eraseToAnyPublisher()
+    }
+
     /// Событие изменения списка/метаданных треклистов.
     var trackListsDidChange: AnyPublisher<Void, Never> {
         notificationCenter.publisher(for: .trackListsDidChange)

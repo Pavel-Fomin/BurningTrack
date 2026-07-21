@@ -67,6 +67,13 @@ struct TrackListScreen: View {
         .navigationTitle(viewModel.screenState?.title ?? viewModel.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .principal) {
+                ScreenToolbarTitleView(
+                    title: viewModel.screenState?.title ?? viewModel.name,
+                    subtitle: viewModel.screenState?.summaryText
+                )
+            }
+
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button {

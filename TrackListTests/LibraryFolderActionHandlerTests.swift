@@ -143,6 +143,8 @@ final class LibraryFolderActionHandlerTests: XCTestCase {
                 presenter: UIViewController()
             ),
             toastPresenter: toastPresenter,
+            summaryProvider: EmptyTrackCollectionSummaryProvider(),
+            eventProvider: NotificationLibraryTrackEventProvider(),
             clearSelectionActionBar: clearSelectionActionBar
         )
     }
@@ -188,6 +190,31 @@ final class LibraryFolderActionHandlerTests: XCTestCase {
         for _ in 0..<6 {
             await Task.yield()
         }
+    }
+}
+
+/// Не обращается к постоянной SQLite-базе в тестах действий папки.
+private final class EmptyTrackCollectionSummaryProvider: TrackCollectionSummaryProviding, @unchecked Sendable {
+    /// Возвращает пустую статистику, не влияющую на проверяемые действия экспорта.
+    func summaryForFolder(folderId: UUID) async throws -> TrackCollectionSummary {
+        TrackCollectionSummary(
+            trackCount: 0,
+            totalDuration: nil,
+            totalFileSize: nil,
+            unknownDurationCount: 0,
+            unknownFileSizeCount: 0
+        )
+    }
+
+    /// Возвращает пустую статистику, так как тестовая ViewModel открывает только папку.
+    func summaryForTrackList(trackListId: UUID) async throws -> TrackCollectionSummary {
+        TrackCollectionSummary(
+            trackCount: 0,
+            totalDuration: nil,
+            totalFileSize: nil,
+            unknownDurationCount: 0,
+            unknownFileSizeCount: 0
+        )
     }
 }
 

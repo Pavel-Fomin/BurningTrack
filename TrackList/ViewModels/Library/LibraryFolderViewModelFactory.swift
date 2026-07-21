@@ -25,6 +25,8 @@ enum LibraryFolderViewModelFactory {
             exportProgressViewModel: exportProgressViewModel,
             viewControllerProvider: ApplicationViewControllerProvider(),
             toastPresenter: ToastManager.shared,
+            summaryProvider: makeSummaryProvider(),
+            eventProvider: NotificationLibraryTrackEventProvider(),
             clearSelectionActionBar: clearSelectionActionBar
         )
     }
@@ -35,6 +37,8 @@ enum LibraryFolderViewModelFactory {
         exportProgressViewModel: ExportProgressViewModel,
         viewControllerProvider: any ViewControllerProviding,
         toastPresenter: any ToastPresenting,
+        summaryProvider: any TrackCollectionSummaryProviding,
+        eventProvider: any LibraryTrackEventProvider,
         clearSelectionActionBar: @escaping @MainActor () -> Void
     ) -> LibraryFolderViewModel {
         let stateBuilder = LibraryFolderStateBuilder()
@@ -49,7 +53,18 @@ enum LibraryFolderViewModelFactory {
         return LibraryFolderViewModel(
             folder: folder,
             stateBuilder: stateBuilder,
-            actionHandler: actionHandler
+            actionHandler: actionHandler,
+            summaryProvider: summaryProvider,
+            eventProvider: eventProvider
         )
+    }
+
+    /// Собирает единственный SQLite-компонент статистики для production-папки.
+    private static func makeSummaryProvider() -> any TrackCollectionSummaryProviding {
+        do {
+            return try SQLiteTrackCollectionSummaryProvider()
+        } catch {
+            preconditionFailure("Не удалось создать SQLite-провайдер статистики: \(error)")
+        }
     }
 }

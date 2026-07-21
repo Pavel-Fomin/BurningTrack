@@ -115,6 +115,8 @@ actor LibrarySyncModule {
                 fileValues?.contentModificationDate ??
                 fileValues?.creationDate ??
                 Date()
+            // Размер берётся только из файлового атрибута и не требует чтения аудиоданных.
+            let fileSize = LibraryFileSizeResolver.fileSize(for: fileURL)
             
             let rootPath = rootURL.standardizedFileURL.path.hasSuffix("/")
                 ? rootURL.standardizedFileURL.path
@@ -148,7 +150,9 @@ actor LibrarySyncModule {
                 relativePath: relativePath,
                 folderId: folderId,
                 rootFolderId: rootFolderId,
-                fileDate: fileDate
+                fileDate: fileDate,
+                fileSize: fileSize,
+                shouldUpdateFileSize: true
             )
 
             // Bookmark файла (может обновляться, это не идентичность)

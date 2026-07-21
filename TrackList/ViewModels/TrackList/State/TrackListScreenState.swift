@@ -20,6 +20,9 @@ struct TrackListScreenState {
     /// Название треклиста для заголовка.
     let title: String
 
+    /// Готовая строка статистики треклиста или nil при недоступных данных.
+    let summaryText: String?
+
     /// Строки треков.
     let rows: [TrackListRowState]
 

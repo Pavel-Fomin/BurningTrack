@@ -262,6 +262,8 @@ final class LibraryDatabaseStore {
         folderId: UUID,
         rootFolderId: UUID,
         fileDate: Date,
+        fileSize: Int64? = nil,
+        shouldUpdateFileSize: Bool = false,
         bookmarkBase64: String? = nil,
         isAvailable: Bool = true
     ) throws {
@@ -282,7 +284,8 @@ final class LibraryDatabaseStore {
             fileName: fileName,
             relativePath: relativePath,
             fileExtension: (fileName as NSString).pathExtension.lowercased(),
-            fileSize: existing?.fileSize,
+            // Обычное повторное сохранение не затирает размер, если файловый атрибут не запрашивался.
+            fileSize: shouldUpdateFileSize ? fileSize : existing?.fileSize,
             fileDate: fileDate,
             importedAt: existing?.importedAt ?? now,
             updatedAt: now,
@@ -301,6 +304,8 @@ final class LibraryDatabaseStore {
         fileName: String,
         fileURL: URL? = nil,
         fileDate: Date = Date(),
+        fileSize: Int64? = nil,
+        shouldUpdateFileSize: Bool = false,
         bookmarkBase64: String? = nil,
         isAvailable: Bool = true
     ) throws {
@@ -315,7 +320,8 @@ final class LibraryDatabaseStore {
             fileName: fileName,
             relativePath: nil,
             fileExtension: (fileName as NSString).pathExtension.lowercased(),
-            fileSize: existing?.fileSize,
+            // Обычное повторное сохранение не затирает размер, если файловый атрибут не запрашивался.
+            fileSize: shouldUpdateFileSize ? fileSize : existing?.fileSize,
             fileDate: fileDate,
             importedAt: existing?.importedAt ?? now,
             updatedAt: now,

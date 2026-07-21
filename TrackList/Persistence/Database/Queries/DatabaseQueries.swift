@@ -217,6 +217,39 @@ enum TrackDatabaseQueries {
     """
 }
 
+// SQL для агрегированной статистики папки фонотеки и треклиста.
+enum TrackCollectionSummaryDatabaseQueries {
+    /// Считает только активные треки, непосредственно сохранённые в указанной папке.
+    static let folder = """
+    SELECT COUNT(*),
+           SUM(track_metadata.duration),
+           SUM(tracks.file_size),
+           COALESCE(SUM(CASE WHEN track_metadata.duration IS NULL THEN 1 ELSE 0 END), 0),
+           COALESCE(SUM(CASE WHEN tracks.file_size IS NULL THEN 1 ELSE 0 END), 0)
+    FROM tracks
+    LEFT JOIN track_metadata ON track_metadata.track_id = tracks.id
+    WHERE tracks.folder_id = ?
+      AND tracks.source = 'library'
+      AND tracks.is_deleted = 0;
+    """
+
+    /// Считает строки треклиста, включая повторы, с приоритетом актуальной длительности metadata.
+    static let trackList = """
+    SELECT COUNT(*),
+           SUM(COALESCE(track_metadata.duration, tracklist_tracks.duration_snapshot)),
+           SUM(tracks.file_size),
+           COALESCE(SUM(CASE
+               WHEN COALESCE(track_metadata.duration, tracklist_tracks.duration_snapshot) IS NULL
+               THEN 1 ELSE 0
+           END), 0),
+           COALESCE(SUM(CASE WHEN tracks.file_size IS NULL THEN 1 ELSE 0 END), 0)
+    FROM tracklist_tracks
+    LEFT JOIN tracks ON tracks.id = tracklist_tracks.track_id
+    LEFT JOIN track_metadata ON track_metadata.track_id = tracklist_tracks.track_id
+    WHERE tracklist_tracks.tracklist_id = ?;
+    """
+}
+
 // SQL для таблицы track_metadata.
 enum TrackMetadataDatabaseQueries {
     static let fetch = """

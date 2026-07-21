@@ -45,8 +45,16 @@ final class TrackListViewModel: ObservableObject {
     private let runtimeSnapshotProvider: any TrackRuntimeSnapshotProviding
     /// Создаёт runtime snapshot треков.
     private let runtimeSnapshotBuilder: any TrackRuntimeSnapshotBuilding
+    /// Получает SQLite-статистику отдельно от массива отображаемых строк.
+    private let summaryProvider: any TrackCollectionSummaryProviding
     /// Собирает готовое состояние экрана одного треклиста.
     private let screenStateBuilder = TrackListScreenStateBuilder()
+    /// Готовый вторичный текст заголовка, не зависящий от runtime snapshot строк.
+    private var summaryText: String?
+    /// Незавершённый запрос статистики, который отменяется при следующем релевантном событии.
+    private var summaryTask: Task<Void, Never>?
+    /// Пропускает собственное событие сохранения перестановки, не меняющее итоговые суммы.
+    private var skipsNextTrackListTracksChangeAfterReorder = false
     /// Идентификатор текущего TrackDisplayable; для Track это id строки треклиста.
     private var currentTrackId: UUID?
     /// Контекст текущего воспроизведения.
@@ -70,7 +78,8 @@ final class TrackListViewModel: ObservableObject {
         eventProvider: any TrackListEventProviding,
         playbackStateProvider: any PlaybackStateProviding,
         runtimeSnapshotProvider: any TrackRuntimeSnapshotProviding,
-        runtimeSnapshotBuilder: any TrackRuntimeSnapshotBuilding
+        runtimeSnapshotBuilder: any TrackRuntimeSnapshotBuilding,
+        summaryProvider: any TrackCollectionSummaryProviding
     ) {
         self.fileRenamer = fileRenamer
         self.trackListManager = trackListManager
@@ -81,6 +90,7 @@ final class TrackListViewModel: ObservableObject {
         self.playbackStateProvider = playbackStateProvider
         self.runtimeSnapshotProvider = runtimeSnapshotProvider
         self.runtimeSnapshotBuilder = runtimeSnapshotBuilder
+        self.summaryProvider = summaryProvider
         self.currentListId = trackList.id
         self.name = trackList.name
         self.tracks = trackList.tracks
@@ -122,8 +132,25 @@ final class TrackListViewModel: ObservableObject {
                 
                 Task { @MainActor in
                     guard changedId == self.currentListId else { return }
-                    
+
+                    if self.skipsNextTrackListTracksChangeAfterReorder {
+                        self.skipsNextTrackListTracksChangeAfterReorder = false
+                        return
+                    }
+
                     self.loadTracks()
+                    self.reloadSummary()
+                }
+            }
+            .store(in: &cancellables)
+
+        eventProvider.libraryDataDidChange
+            .sink { [weak self] _ in
+                guard let self else { return }
+
+                Task { @MainActor in
+                    // Синхронизация может обновить file_size треков, уже входящих в этот треклист.
+                    self.reloadSummary()
                 }
             }
             .store(in: &cancellables)
@@ -137,6 +164,13 @@ final class TrackListViewModel: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+
+        reloadSummary()
+    }
+
+    deinit {
+        // Результат отменённого агрегирующего запроса не нужен после закрытия экрана.
+        summaryTask?.cancel()
     }
 
     // MARK: - Rename
@@ -235,6 +269,7 @@ final class TrackListViewModel: ObservableObject {
         screenState = screenStateBuilder.build(
             id: id,
             title: name,
+            summaryText: summaryText,
             tracks: tracks,
             snapshotsByTrackId: snapshotsByTrackId,
             currentTrackId: currentTrackId,
@@ -294,6 +329,51 @@ final class TrackListViewModel: ObservableObject {
     private func applyTrackUpdateEvent(_ updateEvent: TrackUpdateEvent) {
         snapshotsByTrackId[updateEvent.trackId] = updateEvent.snapshot
         rebuildScreenState()
+
+        // Runtime snapshot без новой длительности не меняет итоговую статистику треклиста.
+        guard updateEvent.changedFields.contains(.duration),
+              tracks.contains(where: { $0.trackId == updateEvent.trackId }) else {
+            return
+        }
+
+        reloadSummary()
+    }
+
+    // MARK: - Summary
+
+    /// Загружает статистику отдельно от строк и применяет только результат текущего треклиста.
+    private func reloadSummary() {
+        guard let trackListId = currentListId else { return }
+
+        summaryTask?.cancel()
+        let summaryProvider = summaryProvider
+
+        summaryTask = Task { [weak self] in
+            do {
+                let summary = try await summaryProvider.summaryForTrackList(trackListId: trackListId)
+                guard Task.isCancelled == false,
+                      let self,
+                      self.currentListId == trackListId else {
+                    return
+                }
+
+                self.summaryText = TrackCollectionSummaryFormatter.string(from: summary)
+                self.rebuildScreenState()
+            } catch is CancellationError {
+                // Отмена ожидаема при новом составе треклиста или закрытии экрана.
+            } catch {
+                guard Task.isCancelled == false,
+                      let self,
+                      self.currentListId == trackListId else {
+                    return
+                }
+
+                // Не показываем отдельный toast, чтобы ошибка статистики не блокировала экран треклиста.
+                PersistentLogger.log("TrackListViewModel: summary loading failed trackListId=\(trackListId) error=\(error)")
+                self.summaryText = nil
+                self.rebuildScreenState()
+            }
+        }
     }
 
     // MARK: - Reorder
@@ -302,7 +382,11 @@ final class TrackListViewModel: ObservableObject {
         let previousTracks = tracks
         tracks.move(fromOffsets: source, toOffset: destination)
         rebuildScreenState()
+
+        // saveTracks публикует общий event, но перестановка не меняет состав, длительность и размер.
+        skipsNextTrackListTracksChangeAfterReorder = true
         guard save() else {
+            skipsNextTrackListTracksChangeAfterReorder = false
             tracks = previousTracks
             rebuildScreenState()
             toastPresenter.handle(AppError.trackListSaveFailed)

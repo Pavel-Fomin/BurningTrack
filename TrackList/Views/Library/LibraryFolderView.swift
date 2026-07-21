@@ -40,6 +40,7 @@ struct LibraryFolderView: View {
             case .content:
                 LibraryTracksView(
                     folder: state.folder,
+                    summaryText: state.summaryText,
                     subfolders: state.subfolders,
                     onSubfolderTap: { subfolder in
                         onAction(.subfolderTapped(subfolder))

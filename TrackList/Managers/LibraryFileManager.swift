@@ -161,6 +161,8 @@ actor LibraryFileManager {
             fileURL: destinationURL,
             rootFolderURL: destinationRootFolderURL
         )
+        // После перемещения размер обновляется из атрибута уже нового файла.
+        let fileSize = LibraryFileSizeResolver.fileSize(for: destinationURL)
 
         // 11. Обновляем метаданные трека в реестре
         await TrackRegistry.shared.upsertTrack(
@@ -169,7 +171,9 @@ actor LibraryFileManager {
             relativePath: newRelativePath,
             folderId: destinationFolderId,
             rootFolderId: destinationRootFolderId,
-            fileDate: entry.fileDate
+            fileDate: entry.fileDate,
+            fileSize: fileSize,
+            shouldUpdateFileSize: true
         )
 
         // 12. Обновляем library identity:
@@ -280,6 +284,8 @@ actor LibraryFileManager {
                 fileURL: destinationURL,
                 rootFolderURL: rootFolderURL
             )
+            // После переименования размер обновляется из атрибута файла по новому URL.
+            let fileSize = LibraryFileSizeResolver.fileSize(for: destinationURL)
 
             // 7. Обновляем реестры фонотеки.
             await TrackRegistry.shared.upsertTrack(
@@ -288,7 +294,9 @@ actor LibraryFileManager {
                 relativePath: newRelativePath,
                 folderId: folderId,
                 rootFolderId: rootFolderId,
-                fileDate: entry.fileDate
+                fileDate: entry.fileDate,
+                fileSize: fileSize,
+                shouldUpdateFileSize: true
             )
 
             // 8. Обновляем library identity:

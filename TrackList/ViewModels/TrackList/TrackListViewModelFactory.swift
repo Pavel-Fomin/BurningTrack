@@ -33,7 +33,17 @@ struct TrackListViewModelFactory {
             eventProvider: NotificationTrackListEventProvider(),
             playbackStateProvider: playbackStateProvider,
             runtimeSnapshotProvider: TrackRuntimeStore.shared,
-            runtimeSnapshotBuilder: TrackRuntimeSnapshotBuilder.shared
+            runtimeSnapshotBuilder: TrackRuntimeSnapshotBuilder.shared,
+            summaryProvider: makeSummaryProvider()
         )
+    }
+
+    /// Собирает общий SQLite-компонент статистики для detail-экрана треклиста.
+    private func makeSummaryProvider() -> any TrackCollectionSummaryProviding {
+        do {
+            return try SQLiteTrackCollectionSummaryProvider()
+        } catch {
+            preconditionFailure("Не удалось создать SQLite-провайдер статистики: \(error)")
+        }
     }
 }
