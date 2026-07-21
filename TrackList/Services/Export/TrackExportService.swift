@@ -10,7 +10,7 @@
 import Foundation
 
 /// Ошибки инфраструктуры, которые нельзя отнести к одному отдельному треку.
-enum TrackExportServiceError: LocalizedError {
+enum TrackExportServiceError: Error {
     /// Другая операция экспорта уже использует сервис.
     case exportAlreadyRunning
 
@@ -26,20 +26,6 @@ enum TrackExportServiceError: LocalizedError {
     /// Не удалось определить размер исходного файла.
     case sourceSizeUnavailable
 
-    var errorDescription: String? {
-        switch self {
-        case .exportAlreadyRunning:
-            return "Другая операция экспорта уже выполняется."
-        case .destinationIsNotDirectory:
-            return "Выбранное назначение не является папкой."
-        case .exportFolderIsNotDirectory:
-            return "В папке назначения уже существует объект с именем треклиста."
-        case .exportFolderPreparationFailed(let underlying):
-            return "Не удалось подготовить папку треклиста: \(underlying.localizedDescription)"
-        case .sourceSizeUnavailable:
-            return "Не удалось определить размер исходного файла."
-        }
-    }
 }
 
 /// Потокобезопасный флаг отмены, доступный и actor, и вызывающему UI-коду.

@@ -102,8 +102,8 @@ private extension TrackSectionBuilder {
         calendar: Calendar,
         dateFormatter: DateFormatter
     ) -> String {
-        if calendar.isDateInToday(day) { return "Сегодня" }
-        if calendar.isDateInYesterday(day) { return "Вчера" }
+        if calendar.isDateInToday(day) { return String(localized: "Today") }
+        if calendar.isDateInYesterday(day) { return String(localized: "Yesterday") }
         return dateFormatter.string(from: day)
     }
 }
@@ -175,7 +175,7 @@ private extension TrackSectionBuilder {
 
     static func normalizedArtist(_ track: LibraryTrack) -> String {
         let artist = track.artist?.trimmingCharacters(in: .whitespacesAndNewlines)
-        return artist?.isEmpty == false ? artist! : "Неизвестный артист"
+        return artist?.isEmpty == false ? artist! : String(localized: "Unknown Artist")
     }
 
     static func normalizedTitle(_ track: LibraryTrack) -> String {

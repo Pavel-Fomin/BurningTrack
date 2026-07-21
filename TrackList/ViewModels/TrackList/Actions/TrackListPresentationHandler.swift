@@ -84,7 +84,7 @@ final class TrackListPresentationHandler {
             } catch {
                 toastPresenter.handle(
                     .operationFailed(
-                        message: "Не удалось добавить iTunes-трек в плеер"
+                        message: PlayerPresentationText.addPurchasedITunesTrackToPlayerFailedMessage
                     )
                 )
             }
@@ -124,7 +124,9 @@ final class TrackListPresentationHandler {
         }
 
         toastPresenter.handle(
-            .operationFailed(message: "Это действие недоступно для iTunes-трека")
+            .operationFailed(
+                message: PlayerPresentationText.purchasedITunesActionUnavailableMessage
+            )
         )
         return false
     }

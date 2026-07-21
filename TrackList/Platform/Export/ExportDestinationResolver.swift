@@ -12,21 +12,13 @@ import UIKit
 import UniformTypeIdentifiers
 
 /// Ошибки, возникающие до запуска копирования при выборе папки.
-enum ExportDestinationResolverError: LocalizedError {
+enum ExportDestinationResolverError: Error {
     /// Другой системный picker уже ожидает выбора пользователя.
     case pickerAlreadyPresented
 
     /// Системный picker вернул объект, который не является папкой.
     case selectedItemIsNotDirectory
 
-    var errorDescription: String? {
-        switch self {
-        case .pickerAlreadyPresented:
-            return "Выбор папки экспорта уже выполняется."
-        case .selectedItemIsNotDirectory:
-            return "Выбранный объект не является папкой."
-        }
-    }
 }
 
 /// Контракт системного выбора папки, отделённый от копирования файлов.

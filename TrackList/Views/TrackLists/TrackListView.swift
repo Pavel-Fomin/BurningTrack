@@ -32,50 +32,57 @@ struct TrackListView: View {
         ZStack {
             ScrollViewReader { proxy in
                 List {
-                    TrackListRowsView(
-                        rows: state.rows,
-                        onRequestSnapshot: onRequestSnapshot,
-                        onTap: { rowId in
-                            onAction(.rowTapped(rowId: rowId))
-                        },
-                        onDelete: { rowId in
-                            onAction(.deleteTrack(rowId: rowId))
-                        },
-                        onCopyTrack: { rowId in
-                            onAction(.copyTrack(rowId: rowId))
-                        },
-                        onAddToPlayer: { rowId in
-                            onAction(.addToPlayer(rowId: rowId))
-                        },
-                        onRenameTrack: { rowId, strategy in
-                            onAction(
-                                .renameFile(
-                                    rowId: rowId,
-                                    strategy: strategy
+                    if state.rows.isEmpty {
+                        ContentUnavailableView(
+                            "No Tracks",
+                            systemImage: "music.note"
+                        )
+                    } else {
+                        TrackListRowsView(
+                            rows: state.rows,
+                            onRequestSnapshot: onRequestSnapshot,
+                            onTap: { rowId in
+                                onAction(.rowTapped(rowId: rowId))
+                            },
+                            onDelete: { rowId in
+                                onAction(.deleteTrack(rowId: rowId))
+                            },
+                            onCopyTrack: { rowId in
+                                onAction(.copyTrack(rowId: rowId))
+                            },
+                            onAddToPlayer: { rowId in
+                                onAction(.addToPlayer(rowId: rowId))
+                            },
+                            onRenameTrack: { rowId, strategy in
+                                onAction(
+                                    .renameFile(
+                                        rowId: rowId,
+                                        strategy: strategy
+                                    )
                                 )
-                            )
-                        },
-                        onEditTags: { rowId in
-                            onAction(.editTags(rowId: rowId))
-                        },
-                        onArtworkTap: { rowId in
-                            onAction(.artworkTapped(rowId: rowId))
-                        },
-                        onShowInLibrary: { rowId in
-                            onAction(.showInLibrary(rowId: rowId))
-                        },
-                        onMoveToFolder: { rowId in
-                            onAction(.moveToFolder(rowId: rowId))
-                        },
-                        onMove: { source, destination in
-                            onAction(
-                                .moveTrack(
-                                    from: source,
-                                    to: destination
+                            },
+                            onEditTags: { rowId in
+                                onAction(.editTags(rowId: rowId))
+                            },
+                            onArtworkTap: { rowId in
+                                onAction(.artworkTapped(rowId: rowId))
+                            },
+                            onShowInLibrary: { rowId in
+                                onAction(.showInLibrary(rowId: rowId))
+                            },
+                            onMoveToFolder: { rowId in
+                                onAction(.moveToFolder(rowId: rowId))
+                            },
+                            onMove: { source, destination in
+                                onAction(
+                                    .moveTrack(
+                                        from: source,
+                                        to: destination
+                                    )
                                 )
-                            )
-                        }
-                    )
+                            }
+                        )
+                    }
                 }
                 
                 .listStyle(.plain)
@@ -182,7 +189,7 @@ struct TrackListView: View {
                                 Button(role: .destructive) {
                                     onDelete(row.id)
                                 } label: {
-                                    Label("Удалить", systemImage: "trash")
+                                    Label("Delete", systemImage: "trash")
                                 }
                             }
 
@@ -194,7 +201,7 @@ struct TrackListView: View {
                                 Button {
                                     onShowInLibrary(row.id)
                                 } label: {
-                                    Label("Показать", systemImage: "scope")
+                                    Label("Show in Library", systemImage: "scope")
                                 }
                                 .tint(.gray)
                             }
@@ -207,7 +214,7 @@ struct TrackListView: View {
                                 Button {
                                     onMoveToFolder(row.id)
                                 } label: {
-                                    Label("Переместить", systemImage: "arrow.forward.folder")
+                                    Label("Move", systemImage: "arrow.forward.folder")
                                 }
                                 .tint(.blue)
                             }

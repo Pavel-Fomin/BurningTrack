@@ -43,7 +43,7 @@ struct BatchTagEditSheet: View {
                 VStack(spacing: 12) {
                     ProgressView()
 
-                    Text("Читаю теги выбранных треков…")
+                    Text(BatchTagEditPresentationText.loadingSelectedTracksTitle)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -60,7 +60,7 @@ struct BatchTagEditSheet: View {
                 VStack(spacing: 12) {
                     ProgressView()
 
-                    Text("Обновляю теги выбранных треков…")
+                    Text(BatchTagEditPresentationText.savingSelectedTracksTitle)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -101,10 +101,12 @@ struct BatchTagEditSheet: View {
     private func fieldRow(for fieldState: BatchTagFieldEditState) -> some View {
         let fieldValue = valueBinding(for: fieldState)
         return EditableFieldRow(
-            title: fieldState.field.title,
+            title: TagEditorPresentationText.fieldTitle(for: fieldState.field),
             isMultiline: fieldState.field == .comment,
             keyboardType: keyboardType(for: fieldState.field),
             placeholder: placeholder(for: fieldState),
+            emphasizesPlaceholder: fieldState.summary == .mixed
+                && fieldState.action == .keep,
             value: fieldValue,
             showsClearButton: fieldState.summary == .mixed && fieldState.action == .keep,
             onForceClear: {
@@ -246,7 +248,7 @@ struct BatchTagEditSheet: View {
 
         switch fieldState.summary {
         case .mixed:
-            return "Смешанно"
+            return TagEditorPresentationText.mixedPlaceholder
         case .same, .empty:
             return ""
         }

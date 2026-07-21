@@ -9,19 +9,10 @@
 import Foundation
 
 // Ошибка восстановления папки результата поиска из сохранённой фонотеки.
-enum SearchServiceError: LocalizedError {
+enum SearchServiceError: Error {
     case missingFolderContext(trackId: UUID, fileName: String)
     case folderNotFound(trackId: UUID, fileName: String, folderId: UUID)
 
-    var errorDescription: String? {
-        switch self {
-        case .missingFolderContext(let trackId, let fileName):
-            return "Не удалось определить папку трека \(fileName) (\(trackId.uuidString))"
-
-        case .folderNotFound(let trackId, let fileName, let folderId):
-            return "В фонотеке нет папки \(folderId.uuidString) для трека \(fileName) (\(trackId.uuidString))"
-        }
-    }
 }
 
 // Контракт доменного сервиса поиска.

@@ -171,7 +171,7 @@ struct LibraryTrackRowContainer: View {
                             .addToPlayer(trackId: track.trackId)
                         )
                     } label: {
-                        Label("В плеер", systemImage: "waveform")
+                        Label("Add to Player", systemImage: "waveform")
                     }
                     .tint(.blue)
                 }
@@ -183,7 +183,7 @@ struct LibraryTrackRowContainer: View {
                             .addToTrackList(track: track)
                         )
                     } label: {
-                        Label("В треклист", systemImage: "list.star")
+                        Label("Add to Tracklist", systemImage: "list.star")
                     }
                     .tint(.green)
                 }
@@ -195,7 +195,7 @@ struct LibraryTrackRowContainer: View {
                             .moveToFolder(track: track)
                         )
                     } label: {
-                        Label("Переместить", systemImage: "arrow.forward.folder")
+                        Label("Move", systemImage: "arrow.forward.folder")
                     }
                     .tint(.gray)
                 }
@@ -207,6 +207,7 @@ struct LibraryTrackRowContainer: View {
     @ViewBuilder
     private var libraryActionMenuContent: some View {
         LibraryTrackActionMenuContent(
+            labels: LibraryPresentationText.trackActionMenuLabels,
             onDetails: {
                 commandHandler.handle(
                     .tapArtwork(track: track)
@@ -251,14 +252,14 @@ struct LibraryTrackRowContainer: View {
                 Image(systemName: "icloud.and.arrow.down")
                     .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(.secondary)
-                    .accessibilityLabel("Трек не загружен из iCloud")
+                    .accessibilityLabel("Track Not Downloaded from iCloud")
             )
 
         case .downloading:
             return AnyView(
                 ProgressView()
                     .controlSize(.small)
-                    .accessibilityLabel("Трек загружается из iCloud")
+                    .accessibilityLabel("Track Is Downloading from iCloud")
             )
 
         case .downloadFailed:
@@ -273,7 +274,7 @@ struct LibraryTrackRowContainer: View {
                         .foregroundStyle(.red)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Повторить загрузку трека из iCloud")
+                .accessibilityLabel("Retry iCloud Track Download")
             )
 
         case .local,

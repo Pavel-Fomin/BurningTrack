@@ -80,7 +80,7 @@ struct TrackListRowView: View {
             Button {
                 onArtworkTap()
             } label: {
-                Label("О треке", systemImage: "info.circle")
+                Label("Track Info", systemImage: "info.circle")
             }
         }
 
@@ -88,7 +88,7 @@ struct TrackListRowView: View {
             Button {
                 onCopyTrack()
             } label: {
-                Label("Копировать", systemImage: "doc.on.doc")
+                Label("Copy", systemImage: "doc.on.doc")
             }
         }
 
@@ -96,7 +96,7 @@ struct TrackListRowView: View {
             Button {
                 onAddToPlayer()
             } label: {
-                Label("В плеер", systemImage: "waveform")
+                Label("Add to Player", systemImage: "waveform")
             }
         }
 
@@ -104,7 +104,7 @@ struct TrackListRowView: View {
             Button {
                 onShowInLibrary()
             } label: {
-                Label("Показать в папке", systemImage: "scope")
+                Label("Show in Library", systemImage: "scope")
             }
         }
 
@@ -112,7 +112,7 @@ struct TrackListRowView: View {
             Button {
                 onMoveToFolder()
             } label: {
-                Label("Переместить", systemImage: "arrow.forward.folder")
+                Label("Move", systemImage: "arrow.forward.folder")
             }
         }
 
@@ -123,34 +123,46 @@ struct TrackListRowView: View {
                     Button {
                         onEditTags()
                     } label: {
-                        Label("Теги", systemImage: "tag")
+                        Label("Tags", systemImage: "tag")
                     }
                 }
 
                 if isMenuActionAvailable(.renameFile) {
                     // Системная секция делает "Название файла" подписью, а не пунктом меню.
-                    Section("Название файла") {
+                    Section("File Name") {
                         Button {
                             onRenameTrack(.artistTitle)
                         } label: {
-                            Text("Артист - Название")
+                            Text(
+                                FileRenamePresentationText.strategyTitle(
+                                    for: FileRenameStrategy.artistTitle
+                                )
+                            )
                         }
 
                         Button {
                             onRenameTrack(.titleArtist)
                         } label: {
-                            Text("Название - Артист")
+                            Text(
+                                FileRenamePresentationText.strategyTitle(
+                                    for: FileRenameStrategy.titleArtist
+                                )
+                            )
                         }
 
                         Button {
                             onRenameTrack(.manual)
                         } label: {
-                            Text("Вручную")
+                            Text(
+                                FileRenamePresentationText.strategyTitle(
+                                    for: FileRenameStrategy.manual
+                                )
+                            )
                         }
                     }
                 }
             } label: {
-                Label("Редактировать", systemImage: "square.and.pencil")
+                Label("Edit", systemImage: "square.and.pencil")
             }
         }
 
@@ -158,7 +170,7 @@ struct TrackListRowView: View {
             Button(role: .destructive) {
                 onDelete()
             } label: {
-                Label("Удалить из треклиста", systemImage: "trash")
+                Label("Remove from Tracklist", systemImage: "trash")
             }
         }
     }

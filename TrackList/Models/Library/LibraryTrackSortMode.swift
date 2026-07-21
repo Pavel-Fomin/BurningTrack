@@ -133,46 +133,6 @@ enum LibraryTrackSortMode: CaseIterable, Hashable, RawRepresentable {
         }
     }
 
-    /// Текст пункта меню сортировки.
-    var title: String {
-        switch self {
-        case .artistAsc:
-            return "Артист А–Я"
-        case .artistDesc:
-            return "Артист Я–А"
-        case .titleAsc:
-            return "Название А–Я"
-        case .titleDesc:
-            return "Название Я–А"
-        case .albumAsc:
-            return "Альбом А–Я"
-        case .albumDesc:
-            return "Альбом Я–А"
-        case .yearDesc:
-            return "Год сначала новые"
-        case .yearAsc:
-            return "Год сначала старые"
-        case .labelAsc:
-            return "Лейбл А–Я"
-        case .labelDesc:
-            return "Лейбл Я–А"
-        case .genreAsc:
-            return "Жанр А–Я"
-        case .genreDesc:
-            return "Жанр Я–А"
-        case .commentAsc:
-            return "Комментарий"
-        case .fileNameAsc:
-            return "Название файла А–Я"
-        case .fileNameDesc:
-            return "Название файла Я–А"
-        case .fileDateDesc:
-            return "Дата сначала новые"
-        case .fileDateAsc:
-            return "Дата сначала старые"
-        }
-    }
-
     /// Общий descriptor для TrackSorter.
     var descriptor: TrackSortDescriptor {
         switch self {

@@ -31,7 +31,7 @@ struct CreateTrackListSheet: View {
     
     var body: some View {
         NavigationBarHost(
-            title: "Новый треклист",
+            title: "New Tracklist",
             rightButtonImage: nil,
             isRightEnabled: .constant(false),
             onClose: {
@@ -50,7 +50,7 @@ struct CreateTrackListSheet: View {
             /// Поле ввода — оставляем как в SaveTrackListSheet
             Form {
                 Section {
-                    TextField("Название треклиста", text: $name)
+                    TextField("Tracklist Name", text: $name)
                         .clearable($name)
                         .focused($isNameFocused)
                         .textInputAutocapitalization(.never)
@@ -73,7 +73,7 @@ struct CreateTrackListSheet: View {
                     finishEditing()
                     onAddTracks()
                 } label: {
-                    Text("Добавить треки")
+                    Text("Add Tracks")
                         .frame(maxWidth: .infinity)
                 }
                 .primaryButtonStyle()
@@ -83,7 +83,7 @@ struct CreateTrackListSheet: View {
                     finishEditing()
                     onCreateEmpty()
                 } label: {
-                    Text("Добавить треки позже")
+                    Text("Add Tracks Later")
                         .frame(maxWidth: .infinity)
                 }
                 .secondaryButtonStyle()

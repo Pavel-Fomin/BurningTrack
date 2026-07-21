@@ -119,7 +119,7 @@ final class PlayerDatabaseStore {
             album: model.albumSnapshot,
             artworkData: nil,
             duration: model.durationSnapshot ?? 0,
-            fileName: model.fileNameSnapshot ?? "Unknown",
+            fileName: model.fileNameSnapshot ?? "",
             isAvailable: model.isAvailableSnapshot,
             source: TrackSourceDatabaseMapper.trackSource(from: model.sourceSnapshot),
             assetURL: model.assetURLSnapshot.flatMap(URL.init(string:))

@@ -19,11 +19,18 @@ struct TrackListsListView: View {
     var body: some View {
         ZStack {
             List {
-                ForEach(state.rows) { row in
-                    trackListRow(for: row)
-                }
-                .onMove { source, destination in
-                    onAction(.moveTrackList(source, destination))
+                if state.rows.isEmpty {
+                    ContentUnavailableView(
+                        "No Tracklists",
+                        systemImage: "music.note.list"
+                    )
+                } else {
+                    ForEach(state.rows) { row in
+                        trackListRow(for: row)
+                    }
+                    .onMove { source, destination in
+                        onAction(.moveTrackList(source, destination))
+                    }
                 }
             }
             .onAppear {
@@ -32,7 +39,7 @@ struct TrackListsListView: View {
             .listStyle(.insetGrouped)
         }
         .alert(
-            "Удалить треклист?",
+            "Delete Tracklist?",
             isPresented: Binding(
                 get: { state.isShowingDeleteConfirmation },
                 set: { isPresented in
@@ -42,16 +49,16 @@ struct TrackListsListView: View {
                 }
             )
         ) {
-            Button("Удалить", role: .destructive) {
+            Button("Delete", role: .destructive) {
                 if let id = state.pendingDeleteTrackListId {
                     onAction(.confirmDeleteTrackList(id))
                 }
             }
-            Button("Отмена", role: .cancel) {
+            Button("Cancel", role: .cancel) {
                 onAction(.cancelDeleteTrackList)
             }
         } message: {
-            Text("Треклист удалится безвозвратно")
+            Text("This tracklist will be permanently deleted.")
         }
     }
     
@@ -64,7 +71,7 @@ struct TrackListsListView: View {
             Button(role: .destructive) {
                 onAction(.requestDeleteTrackList(row.id))
             } label: {
-                Label("Удалить", systemImage: "trash")
+                Label("Delete", systemImage: "trash")
             }
         }
     }

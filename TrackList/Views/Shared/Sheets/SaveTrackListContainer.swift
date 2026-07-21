@@ -36,7 +36,7 @@ struct SaveTrackListContainer: View {
 
     var body: some View {
         NavigationBarHost(
-            title: "Название треклиста",
+            title: "Tracklist Name",
 
             /// Кнопка подтверждения (✓)
             rightButtonImage: "checkmark",

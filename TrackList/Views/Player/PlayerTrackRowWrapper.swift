@@ -64,7 +64,7 @@ struct PlayerTrackRowWrapper: View {
                 Button(role: .destructive) {
                     onDeleteTrack(row.id)
                 } label: {
-                    Label("Удалить", systemImage: "trash")
+                    Label("Remove from Player", systemImage: "trash")
                 }
             }
 
@@ -73,7 +73,7 @@ struct PlayerTrackRowWrapper: View {
                 Button {
                     onShowInLibrary(row.id)
                 } label: {
-                    Label("Показать", systemImage: "scope")
+                    Label("Show in Library", systemImage: "scope")
                 }
                 .tint(.gray)
             }
@@ -83,7 +83,7 @@ struct PlayerTrackRowWrapper: View {
                 Button {
                     onMoveToFolder(row.id)
                 } label: {
-                    Label("Переместить", systemImage: "arrow.forward.folder")
+                    Label("Move", systemImage: "arrow.forward.folder")
                 }
                 .tint(.blue)
             }
@@ -97,7 +97,7 @@ struct PlayerTrackRowWrapper: View {
             Button {
                 onArtworkTap(row.id)
             } label: {
-                Label("О треке", systemImage: "info.circle")
+                Label("Track Info", systemImage: "info.circle")
             }
         }
 
@@ -105,7 +105,7 @@ struct PlayerTrackRowWrapper: View {
             Button {
                 onCopyTrack(row.id)
             } label: {
-                Label("Копировать", systemImage: "doc.on.doc")
+                Label("Copy", systemImage: "doc.on.doc")
             }
         }
 
@@ -113,7 +113,7 @@ struct PlayerTrackRowWrapper: View {
             Button {
                 onShowInLibrary(row.id)
             } label: {
-                Label("Показать в папке", systemImage: "scope")
+                Label("Show in Library", systemImage: "scope")
             }
         }
 
@@ -122,7 +122,7 @@ struct PlayerTrackRowWrapper: View {
             Button {
                 onMoveToFolder(row.id)
             } label: {
-                Label("Переместить", systemImage: "arrow.forward.folder")
+                Label("Move", systemImage: "arrow.forward.folder")
             }
         }
 
@@ -130,7 +130,7 @@ struct PlayerTrackRowWrapper: View {
             Button {
                 onAddToTrackList(row.id)
             } label: {
-                Label("В треклист", systemImage: "list.star")
+                Label("Add to Tracklist", systemImage: "list.star")
             }
         }
 
@@ -141,34 +141,46 @@ struct PlayerTrackRowWrapper: View {
                     Button {
                         onEditTags(row.id)
                     } label: {
-                        Label("Теги", systemImage: "tag")
+                        Label("Tags", systemImage: "tag")
                     }
                 }
 
                 if isMenuActionAvailable(.renameFile) {
                     // Системная секция делает "Название файла" подписью, а не пунктом меню.
-                    Section("Название файла") {
+                    Section("File Name") {
                         Button {
                             onRenameTrack(row.id, .artistTitle)
                         } label: {
-                            Text("Артист - Название")
+                            Text(
+                                FileRenamePresentationText.strategyTitle(
+                                    for: FileRenameStrategy.artistTitle
+                                )
+                            )
                         }
 
                         Button {
                             onRenameTrack(row.id, .titleArtist)
                         } label: {
-                            Text("Название - Артист")
+                            Text(
+                                FileRenamePresentationText.strategyTitle(
+                                    for: FileRenameStrategy.titleArtist
+                                )
+                            )
                         }
 
                         Button {
                             onRenameTrack(row.id, .manual)
                         } label: {
-                            Text("Вручную")
+                            Text(
+                                FileRenamePresentationText.strategyTitle(
+                                    for: FileRenameStrategy.manual
+                                )
+                            )
                         }
                     }
                 }
             } label: {
-                Label("Редактировать", systemImage: "square.and.pencil")
+                Label("Edit", systemImage: "square.and.pencil")
             }
         }
 
@@ -176,7 +188,7 @@ struct PlayerTrackRowWrapper: View {
             Button(role: .destructive) {
                 onDeleteTrack(row.id)
             } label: {
-                Label("Удалить из плеера", systemImage: "trash")
+                Label("Remove from Player", systemImage: "trash")
             }
         }
     }

@@ -28,6 +28,7 @@ struct EditableFieldRow: View {
     let isMultiline: Bool            /// Режим ввода
     let keyboardType: UIKeyboardType /// Тип клавиатуры
     let placeholder: String          /// Подсказка поля ввода
+    let emphasizesPlaceholder: Bool  /// Нужно ли выделять placeholder основным цветом
     let showsClearButton: Bool       /// Показывать кнопку очистки значения
     let onForceClear: (() -> Void)?  /// Принудительная очистка поля, когда value уже пустой, но визуально есть mixed-placeholder.
     
@@ -41,6 +42,7 @@ struct EditableFieldRow: View {
         isMultiline: Bool,
         keyboardType: UIKeyboardType,
         placeholder: String = "",
+        emphasizesPlaceholder: Bool = false,
         value: Binding<String>,
         showsClearButton: Bool = false,
         onForceClear: (() -> Void)? = nil,
@@ -50,6 +52,7 @@ struct EditableFieldRow: View {
         self.isMultiline = isMultiline
         self.keyboardType = keyboardType
         self.placeholder = placeholder
+        self.emphasizesPlaceholder = emphasizesPlaceholder
         self.showsClearButton = showsClearButton
         self.onForceClear = onForceClear
         self._value = value
@@ -102,6 +105,7 @@ struct EditableFieldRow: View {
         }
         .buttonStyle(.plain)
         .contentShape(Rectangle())
+        .accessibilityLabel(SharedPresentationText.clearAccessibilityLabel)
     }
 
     // MARK: - Single line
@@ -133,8 +137,10 @@ struct EditableFieldRow: View {
             if let focusBinding {
                 TextField("", text: $value)
                     .focused(focusBinding)
+                    .accessibilityLabel(title)
             } else {
                 TextField("", text: $value)
+                    .accessibilityLabel(title)
             }
         }
     }
@@ -149,6 +155,7 @@ struct EditableFieldRow: View {
                 .frame(minHeight: 80)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .scrollContentBackground(.hidden)
+                .accessibilityLabel(title)
 
             clearButton
                 .padding(.top, 2)
@@ -169,6 +176,6 @@ struct EditableFieldRow: View {
 
     /// Цвет подсказки поля ввода.
     private var placeholderColor: Color {
-        placeholder == "Смешанно" ? .primary : .secondary
+        emphasizesPlaceholder ? .primary : .secondary
     }
 }

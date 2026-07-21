@@ -29,7 +29,9 @@ struct BatchTagArtworkEditSection: View {
 
     /// Текст ошибки сжатия обложек.
     private var compressionFailureText: String {
-        "Не удалось сжать \(artwork.compressionFailureCount) обложек"
+        BatchTagEditPresentationText.compressionFailureText(
+            for: artwork.compressionFailureCount
+        )
     }
 
     /// Горизонтальный список preview-карточек.

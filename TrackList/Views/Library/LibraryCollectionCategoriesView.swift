@@ -45,7 +45,7 @@ struct LibraryCollectionCategoryRowView: View {
                     .foregroundColor(.blue)
                     .frame(width: 24)
 
-                Text(category.title)
+                Text(LibraryPresentationText.collectionCategoryTitle(for: category))
                     .lineLimit(1)
 
                 Spacer()

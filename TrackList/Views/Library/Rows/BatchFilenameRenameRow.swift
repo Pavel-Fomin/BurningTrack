@@ -73,6 +73,7 @@ struct BatchFilenameRenameRow: View {
                     .frame(width: 28, height: 28)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(String(localized: "Remove"))
         }
         .contentShape(Rectangle())
     }

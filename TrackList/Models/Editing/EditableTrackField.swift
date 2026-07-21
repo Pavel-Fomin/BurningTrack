@@ -20,19 +20,6 @@ enum EditableTrackField: Hashable, CaseIterable {
     case publisher
     case comment
 
-    /// UI-заголовок поля
-    var title: String {
-        switch self {
-        case .title: return "Название трека"
-        case .artist: return "Исполнитель"
-        case .album: return "Альбом"
-        case .genre: return "Жанр"
-        case .year: return "Год выпуска"
-        case .publisher: return "Лейбл / издатель"
-        case .comment: return "Комментарий"
-        }
-    }
-
     /// Многострочное ли поле
     var isMultiline: Bool {
         self == .comment

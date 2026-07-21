@@ -39,24 +39,6 @@ struct TrackDetailEditForm: View {
     /// Фокус поля имени файла для показа toolbar над клавиатурой.
     @FocusState private var isFileNameFocused: Bool
 
-    // MARK: - Field configuration
-
-    private struct FieldConfig: Identifiable {
-        let id: EditableTrackField
-        let title: String
-        let isMultiline: Bool
-    }
-
-    private let fields: [FieldConfig] = [
-        .init(id: .title,     title: "Название трека",   isMultiline: false),
-        .init(id: .artist,    title: "Исполнитель",      isMultiline: false),
-        .init(id: .album,     title: "Альбом",           isMultiline: false),
-        .init(id: .genre,     title: "Жанр",             isMultiline: false),
-        .init(id: .year,      title: "Год выпуска",      isMultiline: false),
-        .init(id: .publisher, title: "Лейбл / издатель", isMultiline: false),
-        .init(id: .comment,   title: "Комментарий",      isMultiline: true)
-    ]
-
     // MARK: - Derived artwork UI
 
     /// Картинка, которую нужно показывать в форме прямо сейчас.
@@ -106,19 +88,19 @@ struct TrackDetailEditForm: View {
                 artworkBlock
 
                 EditableFieldRow(
-                    title: "Название файла",
+                    title: TagEditorPresentationText.fileNameTitle,
                     isMultiline: false,
                     keyboardType: .default,
                     value: $fileName,
                     focusBinding: $isFileNameFocused
                 )
 
-                ForEach(fields) { field in
+                ForEach(EditableTrackField.allCases, id: \.self) { field in
                     EditableFieldRow(
-                        title: field.title,
+                        title: TagEditorPresentationText.fieldTitle(for: field),
                         isMultiline: field.isMultiline,
-                        keyboardType: field.id == .year ? .numberPad : .default,
-                        value: binding(for: field.id)
+                        keyboardType: field == .year ? .numberPad : .default,
+                        value: binding(for: field)
                     )
                 }
             }
@@ -131,7 +113,11 @@ struct TrackDetailEditForm: View {
         .toolbar {
             if isFileNameFocused && canBuildFileNameFromTags {
                 ToolbarItemGroup(placement: .keyboard) {
-                    Button("Артист - Название") {
+                    Button(
+                        FileRenamePresentationText.strategyTitle(
+                            for: FileRenameStrategy.artistTitle
+                        )
+                    ) {
                         fileName = artistTitleFileName
                     }
 
@@ -139,7 +125,11 @@ struct TrackDetailEditForm: View {
                         .fill(Color.secondary.opacity(0.35))
                         .frame(width: 1, height: 18)
 
-                    Button("Название - Артист") {
+                    Button(
+                        FileRenamePresentationText.strategyTitle(
+                            for: FileRenameStrategy.titleArtist
+                        )
+                    ) {
                         fileName = titleArtistFileName
                     }
                 }
@@ -172,18 +162,23 @@ struct TrackDetailEditForm: View {
             }
 
             if artworkEditState.shouldShowRemoveButton {
-                Button("Удалить") {
+                Button(TagEditorPresentationText.removeArtworkTitle) {
                     artworkEditState.removeArtwork()
                 }
             }
 
             if artworkEditState.shouldShowAddButton {
                 PhotosPicker(selection: $selectedPhotoItem, matching: .images, photoLibrary: .shared()) {
-                    Text("Добавить")
+                    Text(TagEditorPresentationText.addArtworkTitle)
                 }
             }
         }
         .padding(.vertical, 20)
+        .accessibilityLabel(
+            TagEditorPresentationText.artworkAccessibilityLabel(
+                hasArtwork: previewArtworkUIImage != nil
+            )
+        )
     }
 
     // MARK: - Helpers

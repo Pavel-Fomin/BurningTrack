@@ -92,10 +92,16 @@ final class TrackFileRenameActionHandler {
 
         guard case .ready = proposal.status else {
             if case .skipped(let reason) = proposal.status {
-                toastManager.handle(.operationFailed(message: reason))
+                toastManager.handle(
+                    .operationFailed(
+                        message: FileRenamePresentationText.skippedMessage(for: reason)
+                    )
+                )
             } else {
                 toastManager.handle(
-                    .operationFailed(message: "Не удалось подготовить новое имя файла")
+                    .operationFailed(
+                        message: FileRenamePresentationText.preparationFailedMessage
+                    )
                 )
             }
             return
@@ -117,9 +123,12 @@ final class TrackFileRenameActionHandler {
                 toastManager.handle(appError)
             } catch {
                 toastManager.handle(
-                    .operationFailed(message: "Не удалось переименовать файл")
+                    .operationFailed(
+                        message: FileRenamePresentationText.fileRenameFailedMessage
+                    )
                 )
             }
         }
     }
+
 }

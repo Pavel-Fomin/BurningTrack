@@ -34,21 +34,8 @@ struct LibraryMasterScreenStateBuilder {
             folders: folders,
             showsPurchasedITunesSource: settings.visible.library.isPurchasedITunesSourceVisible,
             isEmpty: folders.isEmpty,
-            detachAlert: detachAlert(for: pendingDetachFolder),
-            selectedSortMode: selectedSortMode,
-            sortModeCaption: selectedSortMode?.caption
-        )
-    }
-
-    /// Собирает предупреждение только тогда, когда открепление требует остановить воспроизведение.
-    private func detachAlert(
-        for pendingDetachFolder: LibraryFolder?
-    ) -> LibraryMasterDetachAlertState? {
-        guard pendingDetachFolder != nil else { return nil }
-
-        return LibraryMasterDetachAlertState(
-            title: "Чтобы открепить папку, остановите воспроизведение",
-            message: "Сейчас воспроизводится трек из этой папки."
+            folderContainsPlayingTrack: pendingDetachFolder != nil,
+            selectedSortMode: selectedSortMode
         )
     }
 }

@@ -68,13 +68,13 @@ actor AppCommandExecutor {
         let folderName = await TrackRegistry.shared
             .allFolders()
             .first(where: { $0.id == folderId })?
-            .name ?? "папку"
+            .name
         
         // 5. ToastEvent строится из snapshot
         let snapshot = updateEvent?.snapshot
         
         let event = ToastEvent.trackMovedInLibrary(
-            title: snapshot?.title ?? snapshot?.fileName ?? "Трек",
+            title: snapshot?.title ?? snapshot?.fileName ?? "",
             artist: snapshot?.artist ?? "",
             artwork: snapshot.flatMap {
                 ArtworkProvider.shared.image(

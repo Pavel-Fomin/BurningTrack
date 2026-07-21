@@ -29,8 +29,8 @@ struct MiniPlayerStaticState: Equatable {
     /// Название трека (готовое для UI)
     let title: String
 
-    /// Исполнитель (готовое для UI)
-    let artist: String
+    /// Исполнитель из metadata; отсутствие значения обрабатывается presentation-слоем.
+    let artist: String?
 
     /// Обложка трека (runtime, не сериализуется)
     let artwork: UIImage?
@@ -77,5 +77,5 @@ enum MiniPlayerState: Equatable {
     case loading(staticState: MiniPlayerStaticState?)
 
     /// Произошла ошибка воспроизведения.
-    case error(message: String)
+    case error
 }

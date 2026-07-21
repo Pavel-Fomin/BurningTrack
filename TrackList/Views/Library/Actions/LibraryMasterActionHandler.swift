@@ -67,7 +67,9 @@ final class LibraryMasterActionHandler {
 
         case .folderPickFailed:
             toastPresenter.handle(
-                .operationFailed(message: "Не удалось выбрать папку")
+                .operationFailed(
+                    message: LibraryPresentationText.folderPickFailedMessage
+                )
             )
 
         case .openFolder(let folderId):
@@ -114,7 +116,9 @@ final class LibraryMasterActionHandler {
                 toastPresenter.handle(appError)
             } catch {
                 toastPresenter.handle(
-                    .operationFailed(message: "Не удалось добавить папку")
+                    .operationFailed(
+                        message: LibraryPresentationText.folderAddFailedMessage
+                    )
                 )
             }
         }
@@ -175,7 +179,9 @@ final class LibraryMasterActionHandler {
             toastPresenter.handle(appError)
         } catch {
             toastPresenter.handle(
-                .operationFailed(message: "Не удалось открепить папку")
+                .operationFailed(
+                    message: LibraryPresentationText.folderDetachFailedMessage
+                )
             )
         }
     }

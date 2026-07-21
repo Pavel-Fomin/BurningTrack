@@ -28,8 +28,7 @@ final class TrackListsViewModel: ObservableObject {
         rows: [],
         pendingDeleteTrackListId: nil,
         isShowingDeleteConfirmation: false,
-        selectedSortMode: nil,
-        sortModeCaption: nil
+        selectedSortMode: nil
     )
     /// Собирает состояние экрана из текущего списка треклистов.
     private let stateBuilder = TrackListsScreenStateBuilder()
@@ -82,8 +81,7 @@ final class TrackListsViewModel: ObservableObject {
             rows: baseState.rows,
             pendingDeleteTrackListId: pendingDeleteTrackListId,
             isShowingDeleteConfirmation: pendingDeleteTrackListId != nil,
-            selectedSortMode: baseState.selectedSortMode,
-            sortModeCaption: baseState.sortModeCaption
+            selectedSortMode: baseState.selectedSortMode
         )
     }
 

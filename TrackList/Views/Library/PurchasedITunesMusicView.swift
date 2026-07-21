@@ -28,7 +28,7 @@ struct PurchasedITunesMusicView: View {
         content
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemBackground))
-        .navigationTitle("Куплено в iTunes")
+        .navigationTitle("Purchased in iTunes")
         .navigationBarTitleDisplayMode(.inline)
         .task {
             await viewModel.load()
@@ -42,10 +42,10 @@ struct PurchasedITunesMusicView: View {
             loadingView
 
         case .denied:
-            messageView("Нет доступа к медиатеке")
+            messageView("Media Library Access Unavailable")
 
         case .empty:
-            messageView("Не найдено локальных треков iTunes, доступных для копирования.")
+            messageView("No local iTunes tracks available for copying.")
 
         case .loaded(let tracks):
             // Один раз собираем адаптеры для строки и контекста воспроизведения из одного списка медиатеки.
@@ -62,7 +62,7 @@ struct PurchasedITunesMusicView: View {
         VStack(spacing: 12) {
             ProgressView()
 
-            Text("Читаю медиатеку…")
+            Text("Reading Media Library…")
                 .font(.body)
                 .foregroundStyle(.secondary)
         }

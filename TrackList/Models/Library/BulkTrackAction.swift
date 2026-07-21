@@ -22,20 +22,6 @@ enum BulkTrackAction {
 }
 
 extension BulkTrackAction {
-    /// Название действия для отображения в toolbar и action bar.
-    var title: String {
-        switch self {
-        case .addToPlayer:
-            return "В плеер"
-        case .addToTrackList:
-            return "В треклист"
-        case .renameFiles:
-            return "Имя файла"
-        case .editTags:
-            return "Теги"
-        }
-    }
-
     /// Системная иконка действия для нижней панели подтверждения.
     var iconName: String {
         switch self {

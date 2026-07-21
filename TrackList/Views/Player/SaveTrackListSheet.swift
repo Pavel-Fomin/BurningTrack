@@ -31,7 +31,7 @@ struct SaveTrackListSheet: View {
     var body: some View {
         Form {
             Section {
-                TextField("Название", text: $name)
+                TextField("Tracklist Name", text: $name)
                     .clearable($name)
                     .focused(isNameFocused)
                     .textInputAutocapitalization(.never)

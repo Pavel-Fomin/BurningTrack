@@ -122,7 +122,9 @@ final class ExportProgressViewModel: ObservableObject {
             presenter: presenter
         ) else {
             toastPresenter.handle(
-                .operationFailed(message: "Экспорт уже выполняется")
+                .operationFailed(
+                    message: ExportPresentationText.alreadyRunningMessage
+                )
             )
             return
         }

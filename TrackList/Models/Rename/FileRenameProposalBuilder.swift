@@ -45,7 +45,7 @@ struct FileRenameProposalBuilder {
                 oldFileName: input.currentFileName,
                 newFileName: input.currentFileName,
                 strategy: strategy,
-                status: .skipped(reason: "Теги не заполнены")
+                status: .skipped(reason: .tagsMissing)
             )
         }
 
@@ -82,7 +82,7 @@ struct FileRenameProposalBuilder {
                 oldFileName: input.currentFileName,
                 newFileName: input.currentFileName,
                 strategy: .manual,
-                status: .skipped(reason: "Имя файла не заполнено")
+                status: .skipped(reason: .emptyFileName)
             )
         }
 
@@ -111,7 +111,7 @@ struct FileRenameProposalBuilder {
                 oldFileName: input.currentFileName,
                 newFileName: input.currentFileName,
                 strategy: strategy,
-                status: .skipped(reason: "Имя файла содержит недопустимые символы")
+                status: .skipped(reason: .invalidFileName)
             )
         }
 
@@ -121,7 +121,7 @@ struct FileRenameProposalBuilder {
                 oldFileName: input.currentFileName,
                 newFileName: newFileName,
                 strategy: strategy,
-                status: .skipped(reason: "Имя файла уже совпадает")
+                status: .skipped(reason: .unchangedFileName)
             )
         }
 

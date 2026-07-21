@@ -19,8 +19,6 @@ struct TrackListsScreenState {
     let isShowingDeleteConfirmation: Bool
     /// Сортировка, выбранная через меню; nil означает ручной порядок без галочки.
     let selectedSortMode: TrackListsSortMode?
-    /// Подпись сортировки для меню; nil означает, что caption не показывается.
-    let sortModeCaption: String?
 }
 
 struct TrackListsRowState: Identifiable {
@@ -30,8 +28,8 @@ struct TrackListsRowState: Identifiable {
     let trackList: TrackList
     /// Название треклиста.
     let title: String
-    /// Дата создания треклиста без времени.
-    let createdAtText: String
+    /// Дата создания треклиста.
+    let createdAt: Date
     /// Количество треков в треклисте.
-    let tracksCountText: String
+    let tracksCount: Int
 }

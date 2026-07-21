@@ -41,7 +41,7 @@ struct MainTabView: View {
 // MARK: - Плеер
             
             Tab(
-                "Плеер",
+                "Player",
                 systemImage: "waveform",
                 value: ScenePhaseHandler.Tab.player
             ) {
@@ -54,7 +54,7 @@ struct MainTabView: View {
 // MARK: - Фонотека
             
             Tab(
-                "Фонотека",
+                "Library",
                 systemImage: "play.square.stack",
                 value: ScenePhaseHandler.Tab.library
             ) {
@@ -67,7 +67,7 @@ struct MainTabView: View {
 // MARK: - Треклисты
             
             Tab(
-                "Треклисты",
+                "Tracklists",
                 systemImage: "list.star",
                 value: ScenePhaseHandler.Tab.tracklists
             ) {
@@ -81,7 +81,7 @@ struct MainTabView: View {
 // MARK: - Настройки
             
             Tab(
-                "Настройки",
+                "Settings",
                 systemImage: "gear",
                 value: ScenePhaseHandler.Tab.settings
             ) {
@@ -93,7 +93,7 @@ struct MainTabView: View {
 // MARK: - Поиск
 
             Tab(
-                "Поиск",
+                "Search",
                 systemImage: "magnifyingglass",
                 value: ScenePhaseHandler.Tab.search,
                 role: .search

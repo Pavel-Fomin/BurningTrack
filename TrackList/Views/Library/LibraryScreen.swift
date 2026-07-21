@@ -122,7 +122,7 @@ struct LibraryScreen: View {
     var body: some View {
         NavigationStack(path: libraryPathBinding) {
             rootContent
-                .navigationTitle("Фонотека")
+                .navigationTitle("Library")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color(.systemBackground))
                 .navigationDestination(for: NavigationCoordinator.LibraryRoute.self) { route in
@@ -137,7 +137,11 @@ struct LibraryScreen: View {
                         } label: {
                             Image(systemName: masterViewModel.rootDisplayMode.systemImage)
                         }
-                        .accessibilityLabel(masterViewModel.rootDisplayMode.title)
+                        .accessibilityLabel(
+                            LibraryPresentationText.rootDisplayModeTitle(
+                                for: masterViewModel.rootDisplayMode
+                            )
+                        )
                     }
 
                     ToolbarItem(placement: .topBarTrailing) {
@@ -226,7 +230,7 @@ struct LibraryScreen: View {
 
         case .root:
             rootContent
-                .navigationTitle("Фонотека")
+                .navigationTitle("Library")
 
         case .purchasedITunes:
             PurchasedITunesMusicView(
@@ -298,8 +302,8 @@ struct LibraryScreen: View {
             )
 
         case .missingFolder:
-            Text("Папка не найдена")
-                .navigationTitle("Ошибка")
+            Text("Folder Not Found")
+                .navigationTitle("Error")
                 .navigationBarTitleDisplayMode(.inline)
                 .onAppear {
                     viewModel.handle(.folderMissingAppeared)
@@ -322,7 +326,7 @@ private struct LibraryToolbarMenuButton: UIViewRepresentable {
         button.setImage(UIImage(systemName: "ellipsis"), for: .normal)
         button.showsMenuAsPrimaryAction = true
         button.changesSelectionAsPrimaryAction = false
-        button.accessibilityLabel = "Действия фонотеки"
+        button.accessibilityLabel = String(localized: "Library Actions")
         button.setContentHuggingPriority(.required, for: .horizontal)
         button.setContentCompressionResistancePriority(.required, for: .horizontal)
         button.menu = makeMenu()
@@ -364,26 +368,28 @@ private struct LibraryToolbarMenuButton: UIViewRepresentable {
     /// Собирает вложенное меню сортировки с системной подписью выбранного режима.
     private func makeSortMenu() -> UIMenu {
         let menu = UIMenu(
-            title: "Сортировка",
+            title: String(localized: "Sort"),
             image: UIImage(systemName: "arrow.up.arrow.down"),
             options: .singleSelection,
             children: LibraryFoldersSortMode.allCases.map { mode in
                 UIAction(
-                    title: mode.title,
+                    title: LibraryPresentationText.folderSortModeTitle(for: mode),
                     state: state.selectedSortMode == mode ? .on : .off
                 ) { _ in
                     onAction(.setSortMode(mode))
                 }
             }
         )
-        menu.subtitle = state.sortModeCaption
+        menu.subtitle = state.selectedSortMode.map {
+            LibraryPresentationText.folderSortModeCaption(for: $0)
+        }
         return menu
     }
 
     /// Собирает пункт добавления новой папки.
     private func makeAddFolderAction() -> UIAction {
         UIAction(
-            title: "Добавить папку",
+            title: String(localized: "Add Folder"),
             image: UIImage(systemName: "folder.fill.badge.plus")
         ) { _ in
             onAction(.addFolderTapped)

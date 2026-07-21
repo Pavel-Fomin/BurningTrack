@@ -44,15 +44,17 @@ struct RenameTrackFileContainer: View {
 
     var body: some View {
         NavigationBarHost(
-            title: "Переименовать файл",
+            title: FileRenamePresentationText.renameFileTitle,
             rightButtonImage: "checkmark",
             isRightEnabled: .constant(isFileNameValid),
             onClose: {
                 closeSheet()
             },
+            closeAccessibilityLabel: String(localized: "Cancel"),
             onRightTap: {
                 Task { await rename() }
-            }
+            },
+            rightButtonAccessibilityLabel: String(localized: "Rename")
         ) {
             RenameTrackFileSheet(
                 fileName: $fileName,
@@ -60,26 +62,26 @@ struct RenameTrackFileContainer: View {
             )
         }
         .alert(
-            "Трек сейчас воспроизводится",
+            FileRenamePresentationText.stopPlaybackTitle,
             isPresented: $showStopPlayerAlert
         ) {
-            Button("Отмена", role: .cancel) {}
+            Button(String(localized: "Cancel"), role: .cancel) {}
 
-            Button("Остановить и переименовать") {
+            Button(FileRenamePresentationText.stopAndRenameTitle) {
                 playerManager.pause()
                 playerManager.stopAccessingCurrentTrack()
                 Task { await rename() }
             }
         } message: {
-            Text("Чтобы переименовать файл, нужно остановить воспроизведение.")
+            Text(FileRenamePresentationText.stopPlaybackDescription)
         }
         .alert(
-            "Файл с таким именем уже существует",
+            FileRenamePresentationText.nameConflictTitle,
             isPresented: $showFileNameConflictAlert
         ) {
-            Button("Понятно", role: .cancel) {}
+            Button(String(localized: "Close"), role: .cancel) {}
         } message: {
-            Text("Выберите другое имя файла.")
+            Text(FileRenamePresentationText.nameConflictDescription)
         }
     }
 
@@ -108,7 +110,9 @@ struct RenameTrackFileContainer: View {
 
         guard case .ready = proposal.status else {
             ToastManager.shared.handle(
-                .operationFailed(message: "Не удалось подготовить новое имя файла")
+                .operationFailed(
+                    message: FileRenamePresentationText.preparationFailedMessage
+                )
             )
             return
         }
@@ -142,7 +146,9 @@ struct RenameTrackFileContainer: View {
         } catch {
             await MainActor.run {
                 ToastManager.shared.handle(
-                    .operationFailed(message: "Не удалось переименовать файл")
+                    .operationFailed(
+                        message: FileRenamePresentationText.fileRenameFailedMessage
+                    )
                 )
             }
         }

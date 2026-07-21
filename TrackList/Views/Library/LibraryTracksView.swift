@@ -271,7 +271,7 @@ struct LibraryTracksView: View {
         if tracksViewModel.isLoading && tracksViewModel.trackSections.isEmpty {
             VStack {
                 Spacer()
-                ProgressView("Загружаю треки")
+                ProgressView("Loading Tracks")
                     .progressViewStyle(.circular)
                     .font(.headline)
                     .padding()
@@ -478,7 +478,7 @@ struct LibraryTracksToolbarMenuButton: UIViewRepresentable {
         onBatchActionSelection: @escaping (BulkTrackAction) -> Void,
         onExport: (() -> Void)? = nil,
         isExportEnabled: Bool = false,
-        accessibilityLabel: String = "Действия папки фонотеки"
+        accessibilityLabel: String = String(localized: "Library Folder Actions")
     ) {
         self.selectedSortMode = selectedSortMode
         self.availableSortModes = availableSortModes
@@ -536,70 +536,70 @@ struct LibraryTracksToolbarMenuButton: UIViewRepresentable {
         // Каждый пункт добавляется только при наличии хотя бы одного разрешённого направления.
         let children: [UIMenuElement] = [
             makeDirectionalSortMenu(
-                title: "Артист",
-                firstTitle: "От А до Я",
+                title: String(localized: "Artist"),
+                firstTitle: String(localized: "A–Z"),
                 firstMode: .artistAsc,
-                secondTitle: "От Я до А",
+                secondTitle: String(localized: "Z–A"),
                 secondMode: .artistDesc
             ),
             makeDirectionalSortMenu(
-                title: "Название",
-                firstTitle: "От А до Я",
+                title: String(localized: "Title"),
+                firstTitle: String(localized: "A–Z"),
                 firstMode: .titleAsc,
-                secondTitle: "От Я до А",
+                secondTitle: String(localized: "Z–A"),
                 secondMode: .titleDesc
             ),
             makeDirectionalSortMenu(
-                title: "Альбом",
-                firstTitle: "От А до Я",
+                title: String(localized: "Album"),
+                firstTitle: String(localized: "A–Z"),
                 firstMode: .albumAsc,
-                secondTitle: "От Я до А",
+                secondTitle: String(localized: "Z–A"),
                 secondMode: .albumDesc
             ),
             makeDirectionalSortMenu(
-                title: "Год",
-                firstTitle: "Сначала новые",
+                title: String(localized: "Year"),
+                firstTitle: String(localized: "Newest First"),
                 firstMode: .yearDesc,
-                secondTitle: "Сначала старые",
+                secondTitle: String(localized: "Oldest First"),
                 secondMode: .yearAsc
             ),
             makeDirectionalSortMenu(
-                title: "Лейбл",
-                firstTitle: "От А до Я",
+                title: String(localized: "Label"),
+                firstTitle: String(localized: "A–Z"),
                 firstMode: .labelAsc,
-                secondTitle: "От Я до А",
+                secondTitle: String(localized: "Z–A"),
                 secondMode: .labelDesc
             ),
             makeDirectionalSortMenu(
-                title: "Жанр",
-                firstTitle: "От А до Я",
+                title: String(localized: "Genre"),
+                firstTitle: String(localized: "A–Z"),
                 firstMode: .genreAsc,
-                secondTitle: "От Я до А",
+                secondTitle: String(localized: "Z–A"),
                 secondMode: .genreDesc
             ),
-            makeSortAction(title: "Комментарий", mode: .commentAsc),
+            makeSortAction(title: String(localized: "Comment"), mode: .commentAsc),
             makeDirectionalSortMenu(
-                title: "Название файла",
-                firstTitle: "От А до Я",
+                title: String(localized: "File Name"),
+                firstTitle: String(localized: "A–Z"),
                 firstMode: .fileNameAsc,
-                secondTitle: "От Я до А",
+                secondTitle: String(localized: "Z–A"),
                 secondMode: .fileNameDesc
             ),
             makeDirectionalSortMenu(
-                title: "Дата",
-                firstTitle: "Сначала новые",
+                title: String(localized: "Date"),
+                firstTitle: String(localized: "Newest First"),
                 firstMode: .fileDateDesc,
-                secondTitle: "Сначала старые",
+                secondTitle: String(localized: "Oldest First"),
                 secondMode: .fileDateAsc
             )
         ].compactMap { $0 }
 
         let menu = UIMenu(
-            title: "Сортировка",
+            title: String(localized: "Sort"),
             image: UIImage(systemName: "arrow.up.arrow.down"),
             children: children
         )
-        menu.subtitle = selectedSortMode.title
+        menu.subtitle = LibraryPresentationText.trackSortModeTitle(for: selectedSortMode)
         return menu
     }
 
@@ -642,7 +642,7 @@ struct LibraryTracksToolbarMenuButton: UIViewRepresentable {
     /// Собирает пункт входа в режим выбора.
     private func makeSelectAction() -> UIAction {
         UIAction(
-            title: "Выбрать",
+            title: String(localized: "Select"),
             image: UIImage(systemName: "checkmark.circle")
         ) { _ in
             onSelect()
@@ -652,7 +652,7 @@ struct LibraryTracksToolbarMenuButton: UIViewRepresentable {
     /// Собирает пункт экспорта всех видимых треков текущей папки.
     private func makeExportAction(_ onExport: @escaping () -> Void) -> UIAction {
         UIAction(
-            title: "Экспорт",
+            title: String(localized: "Export"),
             image: UIImage(systemName: "externaldrive"),
             attributes: isExportEnabled ? [] : [.disabled]
         ) { _ in
@@ -663,7 +663,7 @@ struct LibraryTracksToolbarMenuButton: UIViewRepresentable {
     /// Собирает inline-группу добавления выбранных треков.
     private func makeAddMenu() -> UIMenu {
         UIMenu(
-            title: "Добавить",
+            title: String(localized: "Add"),
             options: .displayInline,
             children: [
                 makeBatchAction(.addToPlayer, imageName: "waveform"),
@@ -675,7 +675,7 @@ struct LibraryTracksToolbarMenuButton: UIViewRepresentable {
     /// Собирает inline-группу изменения выбранных треков.
     private func makeEditMenu() -> UIMenu {
         UIMenu(
-            title: "Изменить",
+            title: String(localized: "Edit"),
             options: .displayInline,
             children: [
                 makeBatchAction(.renameFiles, imageName: "pencil"),
@@ -690,7 +690,7 @@ struct LibraryTracksToolbarMenuButton: UIViewRepresentable {
         imageName: String
     ) -> UIAction {
         UIAction(
-            title: action.title,
+            title: LibraryPresentationText.bulkActionTitle(for: action),
             image: UIImage(systemName: imageName)
         ) { _ in
             onBatchActionSelection(action)

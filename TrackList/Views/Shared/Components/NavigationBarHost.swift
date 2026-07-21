@@ -41,8 +41,14 @@ struct NavigationBarHost<Content: View>: UIViewControllerRepresentable {
     /// Кнопка закрытия (×)
     let onClose: (() -> Void)?
 
+    /// Accessibility-подпись кнопки закрытия.
+    let closeAccessibilityLabel: String?
+
     /// Действие правой кнопки
     let onRightTap: (() -> Void)?
+
+    /// Accessibility-подпись универсальной правой кнопки.
+    let rightButtonAccessibilityLabel: String?
 
     /// Показывать правую кнопку только на корневом экране NavigationStack
     let showsRightButtonOnlyOnRoot: Bool
@@ -58,7 +64,9 @@ struct NavigationBarHost<Content: View>: UIViewControllerRepresentable {
         rightButtonImage: String?,
         isRightEnabled: Binding<Bool>,
         onClose: (() -> Void)? = nil,
+        closeAccessibilityLabel: String? = nil,
         onRightTap: (() -> Void)? = nil,
+        rightButtonAccessibilityLabel: String? = nil,
         showsRightButtonOnlyOnRoot: Bool = false,
         @ViewBuilder content: () -> Content
     ) {
@@ -67,7 +75,9 @@ struct NavigationBarHost<Content: View>: UIViewControllerRepresentable {
         self.rightButtonImage = rightButtonImage
         self.isRightEnabled = isRightEnabled
         self.onClose = onClose
+        self.closeAccessibilityLabel = closeAccessibilityLabel
         self.onRightTap = onRightTap
+        self.rightButtonAccessibilityLabel = rightButtonAccessibilityLabel
         self.showsRightButtonOnlyOnRoot = showsRightButtonOnlyOnRoot
         self.content = content()
     }
@@ -86,12 +96,14 @@ struct NavigationBarHost<Content: View>: UIViewControllerRepresentable {
 
         // Кнопка закрытия (×)
         if onClose != nil {
-            hosting.navigationItem.leftBarButtonItem = UIBarButtonItem(
+            let item = UIBarButtonItem(
                 image: UIImage(systemName: "xmark"),
                 style: .plain,
                 target: context.coordinator,
                 action: #selector(Coordinator.closeTapped)
             )
+            item.accessibilityLabel = resolvedCloseAccessibilityLabel
+            hosting.navigationItem.leftBarButtonItem = item
         }
 
         // Универсальная правая кнопка
@@ -107,6 +119,7 @@ struct NavigationBarHost<Content: View>: UIViewControllerRepresentable {
                 action: #selector(Coordinator.rightTapped)
             )
 
+            item.accessibilityLabel = resolvedRightButtonAccessibilityLabel
             hosting.navigationItem.rightBarButtonItem = item
             item.isEnabled = isRightEnabled.wrappedValue
         }
@@ -170,14 +183,15 @@ struct NavigationBarHost<Content: View>: UIViewControllerRepresentable {
                 action: #selector(Coordinator.rightTapped)
             )
 
+            item.accessibilityLabel = resolvedRightButtonAccessibilityLabel
             root.navigationItem.rightBarButtonItem = item
         }
 
-        // 1️⃣ enabled / disabled
+        // Обновляем доступность кнопки.
         root.navigationItem.rightBarButtonItem?.isEnabled =
             isRightEnabled.wrappedValue
 
-        // 2️⃣ обновляем IMAGE, если сменилась
+        // Обновляем изображение, если оно изменилось.
         let currentImageName =
             root.navigationItem.rightBarButtonItem?
                 .image?
@@ -189,12 +203,24 @@ struct NavigationBarHost<Content: View>: UIViewControllerRepresentable {
             root.navigationItem.rightBarButtonItem?.image = image
         }
 
-        // 3️⃣ ОБЯЗАТЕЛЬНО обновляем STYLE
+        // Обязательно обновляем стиль.
         root.navigationItem.rightBarButtonItem?.style =
             imageName == "checkmark" ? .prominent : .plain
+        root.navigationItem.rightBarButtonItem?.accessibilityLabel =
+            resolvedRightButtonAccessibilityLabel
     }
 
     func makeCoordinator() -> Coordinator {Coordinator()}
+
+    // MARK: - Accessibility
+
+    private var resolvedCloseAccessibilityLabel: String {
+        closeAccessibilityLabel ?? String(localized: "Close")
+    }
+
+    private var resolvedRightButtonAccessibilityLabel: String {
+        rightButtonAccessibilityLabel ?? String(localized: "Done")
+    }
 
     // MARK: - Title
 

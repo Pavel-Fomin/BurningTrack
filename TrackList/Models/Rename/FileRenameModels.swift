@@ -22,6 +22,14 @@ enum FileRenameStrategy: Equatable {
     case manual
 }
 
+/// Причина, по которой предложение переименования нельзя применить.
+enum FileRenameSkipReason: Equatable {
+    case tagsMissing
+    case emptyFileName
+    case invalidFileName
+    case unchangedFileName
+}
+
 /// Текущее состояние предложения по переименованию файла.
 enum FileRenameStatus: Equatable {
     /// Предложение создано, но еще не проверено.
@@ -30,11 +38,11 @@ enum FileRenameStatus: Equatable {
     /// Предложение готово к применению.
     case ready
 
-    /// Предложение пропущено с указанием причины.
-    case skipped(reason: String)
+    /// Предложение пропущено по semantic причине.
+    case skipped(reason: FileRenameSkipReason)
 
-    /// Переименование завершилось ошибкой с сообщением для диагностики.
-    case failed(message: String)
+    /// Переименование завершилось ошибкой.
+    case failed
 
     /// Переименование успешно применено.
     case applied

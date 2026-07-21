@@ -29,7 +29,7 @@ struct MiniPlayerExpandedContent: View {
         HStack {
             optionalActionButton(
                 systemName: "scope",
-                accessibilityLabel: "Показать в фонотеке",
+                accessibilityLabel: String(localized: "Show in Library"),
                 action: showInLibraryAction
             )
 
@@ -39,21 +39,21 @@ struct MiniPlayerExpandedContent: View {
             HStack(spacing: 20) {
                 optionalActionButton(
                     systemName: "shuffle",
-                    accessibilityLabel: "Перемешать",
+                    accessibilityLabel: String(localized: "Shuffle"),
                     action: shuffleAction,
                     isActive: isShuffleEnabled
                 )
 
                 optionalActionButton(
                     systemName: "repeat",
-                    accessibilityLabel: "Повтор",
+                    accessibilityLabel: String(localized: "Repeat"),
                     action: repeatAction,
                     isActive: isRepeatAllEnabled
                 )
 
                 optionalActionButton(
                     systemName: "repeat.1",
-                    accessibilityLabel: "Повтор одного трека",
+                    accessibilityLabel: String(localized: "Repeat One Track"),
                     action: repeatOneAction,
                     isActive: isRepeatOneEnabled
                 )

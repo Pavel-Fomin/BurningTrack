@@ -52,13 +52,13 @@ struct TrackDetailSheet: View {
                     },
                     fileName: editedFileName,
                     tags: [
-                        ("Название трека", editedValues[.title] ?? ""),
-                        ("Исполнитель", editedValues[.artist] ?? ""),
-                        ("Альбом", editedValues[.album] ?? ""),
-                        ("Жанр", editedValues[.genre] ?? ""),
-                        ("Год выпуска", editedValues[.year] ?? ""),
-                        ("Лейбл / издатель", editedValues[.publisher] ?? ""),
-                        ("Комментарий", editedValues[.comment] ?? "")
+                        (.title, editedValues[.title] ?? ""),
+                        (.artist, editedValues[.artist] ?? ""),
+                        (.album, editedValues[.album] ?? ""),
+                        (.genre, editedValues[.genre] ?? ""),
+                        (.year, editedValues[.year] ?? ""),
+                        (.publisher, editedValues[.publisher] ?? ""),
+                        (.comment, editedValues[.comment] ?? "")
                     ]
                 )
 

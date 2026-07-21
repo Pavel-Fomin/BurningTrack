@@ -78,7 +78,7 @@ private struct FilterChipButton: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(accessibilityLabel)
-        .accessibilityValue(isSelected ? "Выбрано" : "")
+        .accessibilityValue(isSelected ? "Selected" : "")
     }
 
     /// Объединяет основной и дополнительный текст для VoiceOver.

@@ -60,7 +60,7 @@ struct PurchasedITunesTrackRowContainer: View {
             isHighlighted: false,
             artwork: track.artwork,
             title: track.title,
-            artist: track.artist ?? "Неизвестный артист",
+            artist: track.artist ?? "Unknown Artist",
             duration: track.duration,
             onRowTap: play,
             showsFileFormat: false
@@ -73,7 +73,7 @@ struct PurchasedITunesTrackRowContainer: View {
                 Button {
                     actionHandler.handle(.copy(track: track))
                 } label: {
-                    Label("Копировать", systemImage: "doc.on.doc")
+                    Label("Copy", systemImage: "doc.on.doc")
                 }
                 .tint(.gray)
             }
@@ -83,7 +83,7 @@ struct PurchasedITunesTrackRowContainer: View {
                 Button {
                     actionHandler.handle(.addToTrackList(track: track))
                 } label: {
-                    Label("В треклист", systemImage: "list.star")
+                    Label("Add to Tracklist", systemImage: "list.star")
                 }
                 .tint(.green)
             }
@@ -93,7 +93,7 @@ struct PurchasedITunesTrackRowContainer: View {
                 Button {
                     actionHandler.handle(.addToPlayer(track: track))
                 } label: {
-                    Label("В плеер", systemImage: "waveform")
+                    Label("Add to Player", systemImage: "waveform")
                 }
                 .tint(.blue)
             }
@@ -108,7 +108,7 @@ struct PurchasedITunesTrackRowContainer: View {
             Button {
                 actionHandler.handle(.details(track: track))
             } label: {
-                Label("О треке", systemImage: "info.circle")
+                Label("Track Info", systemImage: "info.circle")
             }
         }
 
@@ -116,7 +116,7 @@ struct PurchasedITunesTrackRowContainer: View {
             Button {
                 actionHandler.handle(.copy(track: track))
             } label: {
-                Label("Копировать", systemImage: "doc.on.doc")
+                Label("Copy", systemImage: "doc.on.doc")
             }
         }
 
@@ -124,7 +124,7 @@ struct PurchasedITunesTrackRowContainer: View {
             Button {
                 actionHandler.handle(.addToTrackList(track: track))
             } label: {
-                Label("В треклист", systemImage: "list.star")
+                Label("Add to Tracklist", systemImage: "list.star")
             }
         }
 
@@ -132,7 +132,7 @@ struct PurchasedITunesTrackRowContainer: View {
             Button {
                 actionHandler.handle(.addToPlayer(track: track))
             } label: {
-                Label("В плеер", systemImage: "waveform")
+                Label("Add to Player", systemImage: "waveform")
             }
         }
     }

@@ -88,7 +88,7 @@ struct TrackDetailContainer: View {
     
     var body: some View {
         NavigationBarHost(
-            title: "О треке",
+            title: TrackDetailPresentationText.navigationTitle,
             rightButtonImage: mode == .view ? "pencil" : "checkmark",
             isRightEnabled: .constant(
                 mode == .view || hasChanges
@@ -103,6 +103,9 @@ struct TrackDetailContainer: View {
                     cancelEditing()
                 }
             },
+            closeAccessibilityLabel: mode == .view
+                ? TrackDetailPresentationText.closeAccessibilityLabel
+                : TrackDetailPresentationText.cancelAccessibilityLabel,
             
             onRightTap: {
                 switch mode {
@@ -112,7 +115,10 @@ struct TrackDetailContainer: View {
                 case .edit:
                     saveAndClose()
                 }
-            }
+            },
+            rightButtonAccessibilityLabel: mode == .view
+                ? TrackDetailPresentationText.editAccessibilityLabel
+                : TrackDetailPresentationText.saveAccessibilityLabel
         ) {
             TrackDetailSheet(
                 track: track,
@@ -124,27 +130,27 @@ struct TrackDetailContainer: View {
             )
         }
         .alert(
-            "Трек сейчас воспроизводится",
+            TrackDetailPresentationText.trackIsPlayingTitle,
             isPresented: $showStopPlayerAlert
         ) {
-            Button("Отмена", role: .cancel) {}
+            Button(TrackDetailPresentationText.cancelAccessibilityLabel, role: .cancel) {}
             
-            Button("Остановить и сохранить") {
+            Button(TrackDetailPresentationText.stopAndSaveTitle) {
                 playerManager.pause()
                 playerManager.stopAccessingCurrentTrack()
                 saveAndClose()
             }
         } message: {
-            Text("Чтобы переименовать файл, нужно остановить воспроизведение.")
+            Text(TrackDetailPresentationText.stopPlaybackDescription)
         }
         
         .alert(
-            "Файл с таким именем уже существует",
+            TrackDetailPresentationText.fileNameConflictTitle,
             isPresented: $showFileNameConflictAlert
         ) {
-            Button("Понятно", role: .cancel) {}
+            Button(TrackDetailPresentationText.acknowledgeTitle, role: .cancel) {}
         } message: {
-            Text("Выберите другое имя файла.")
+            Text(TrackDetailPresentationText.fileNameConflictDescription)
         }
         .onReceive(NotificationCenter.default.publisher(for: .trackDidUpdate)) { notification in
             guard let updateEvent = notification.object as? TrackUpdateEvent else { return }
@@ -227,7 +233,9 @@ struct TrackDetailContainer: View {
             } catch {
                 await MainActor.run {
                     ToastManager.shared.handle(
-                        .operationFailed(message: "Не удалось сохранить изменения")
+                        .operationFailed(
+                            message: TrackDetailPresentationText.saveFailedMessage
+                        )
                     )
                 }
             }

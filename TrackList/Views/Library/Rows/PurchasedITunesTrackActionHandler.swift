@@ -105,7 +105,7 @@ struct PurchasedITunesTrackActionHandler {
             } catch {
                 toastPresenter.handle(
                     .operationFailed(
-                        message: "Не удалось добавить iTunes-трек в плеер"
+                        message: PlayerPresentationText.addPurchasedITunesTrackToPlayerFailedMessage
                     )
                 )
             }

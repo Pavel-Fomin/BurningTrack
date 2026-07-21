@@ -13,17 +13,13 @@ import Foundation
 enum BatchTagArtworkSizeFormatter {
     /// Возвращает читаемый размер обложки.
     static func string(from bytes: Int) -> String {
-        guard bytes > 0 else { return "Нет обложки" }
-        let kilobyte = 1024.0
-        let megabyte = kilobyte * 1024.0
-        let gigabyte = megabyte * 1024.0
-        let value = Double(bytes)
-        if value < megabyte {
-            return "\(Int(ceil(value / kilobyte))) КБ"
+        guard bytes > 0 else {
+            return BatchTagEditPresentationText.noArtworkTitle
         }
-        if value < gigabyte {
-            return String(format: "%.1f МБ", value / megabyte)
-        }
-        return String(format: "%.1f ГБ", value / gigabyte)
+
+        return ByteCountFormatter.string(
+            fromByteCount: Int64(bytes),
+            countStyle: .file
+        )
     }
 }

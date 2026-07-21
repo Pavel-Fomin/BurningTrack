@@ -19,26 +19,6 @@ struct ExportProgressDetailsView: View {
 
     // MARK: - Presentation
 
-    /// Человеческое название текущей фазы экспорта.
-    private func statusTitle(for state: ExportState) -> String {
-        switch state {
-        case .idle:
-            return "Ожидание"
-        case .preparing:
-            return "Подготовка файлов"
-        case .copying:
-            return "Копирование файлов"
-        case .completed:
-            return "Экспорт завершён"
-        case .completedWithErrors:
-            return "Экспорт завершён с ошибками"
-        case .cancelled:
-            return "Экспорт отменён"
-        case .failed:
-            return "Экспорт завершился с ошибкой"
-        }
-    }
-
     /// Безопасно форматирует количество байтов для короткого пользовательского текста.
     private func byteCountText(_ value: Int64) -> String {
         ByteCountFormatter.string(
@@ -62,17 +42,17 @@ struct ExportProgressDetailsView: View {
                 progressContent(progress)
             } else {
                 ContentUnavailableView(
-                    "Нет данных экспорта",
+                    ExportPresentationText.noExportDataTitle,
                     systemImage: "arrow.up.doc",
-                    description: Text("Операция уже завершена или была закрыта.")
+                    description: Text(ExportPresentationText.noExportDataDescription)
                 )
             }
         }
-        .navigationTitle("Экспорт треков")
+        .navigationTitle(ExportPresentationText.detailsNavigationTitle)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
-                Button("Закрыть") {
+                Button(String(localized: "Close")) {
                     if exportProgressViewModel.isExportActive {
                         exportProgressViewModel.dismissDetails()
                     } else {
@@ -92,29 +72,39 @@ struct ExportProgressDetailsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(statusTitle(for: progress.state))
+                    Text(ExportPresentationText.statusTitle(for: progress.state))
                         .font(.title3.weight(.semibold))
 
-                    LabeledContent("Папка", value: progress.destination.displayName)
                     LabeledContent(
-                        "Назначение",
+                        ExportPresentationText.folderTitle,
+                        value: progress.destination.displayName
+                    )
+                    LabeledContent(
+                        ExportPresentationText.destinationTitle,
                         value: rootDestinationName(for: progress.destination)
                     )
                 }
 
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Файлы")
+                    Text(ExportPresentationText.filesTitle)
                         .font(.headline)
 
-                    Text("\(progress.completedFiles) из \(progress.totalFiles)")
+                    Text(
+                        ExportPresentationText.fileProgress(
+                            completedCount: progress.completedFiles,
+                            totalCount: progress.totalFiles
+                        )
+                    )
                         .font(.title2.monospacedDigit())
 
                     ProgressView(value: progressFraction(for: progress))
                         .tint(.accentColor)
 
                     Text(
-                        "\(byteCountText(progress.copiedBytes)) из "
-                            + "\(byteCountText(progress.totalBytes))"
+                        ExportPresentationText.byteProgress(
+                            copiedBytes: byteCountText(progress.copiedBytes),
+                            totalBytes: byteCountText(progress.totalBytes)
+                        )
                     )
                     .font(.subheadline.monospacedDigit())
                     .foregroundStyle(.secondary)
@@ -122,7 +112,7 @@ struct ExportProgressDetailsView: View {
 
                 if let currentFileName = progress.currentFileName {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Сейчас")
+                        Text(ExportPresentationText.currentFileTitle)
                             .font(.headline)
                         Text(currentFileName)
                             .font(.body)
@@ -132,7 +122,9 @@ struct ExportProgressDetailsView: View {
 
                 if !progress.failedFiles.isEmpty {
                     Label(
-                        "Ошибок: \(progress.failedFiles.count)",
+                        ExportPresentationText.failureCount(
+                            progress.failedFiles.count
+                        ),
                         systemImage: "exclamationmark.triangle"
                     )
                     .foregroundStyle(.orange)
@@ -144,7 +136,7 @@ struct ExportProgressDetailsView: View {
                     Button(role: .destructive) {
                         _ = exportProgressViewModel.cancelExport()
                     } label: {
-                        Text("Прервать копирование")
+                        Text(ExportPresentationText.cancelExportTitle)
                             .frame(maxWidth: .infinity)
                     }
                     // Primary-стиль сохраняет заливку кнопки, а destructive-роль

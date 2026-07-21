@@ -43,9 +43,9 @@ struct MusicLibraryView: View {
             onAction(.onAppear)
         }
         .alert(
-            state.detachAlert?.title ?? "",
+            "Stop Playback to Remove Folder",
             isPresented: Binding(
-                get: { state.detachAlert != nil },
+                get: { state.folderContainsPlayingTrack },
                 set: { isPresented in
                     if isPresented == false {
                         onAction(.cancelDetachFolder)
@@ -53,15 +53,15 @@ struct MusicLibraryView: View {
                 }
             )
         ) {
-            Button("Остановить и открепить", role: .destructive) {
+            Button("Stop and Remove", role: .destructive) {
                 onAction(.confirmStopAndDetachFolder)
             }
 
-            Button("Закрыть", role: .cancel) {
+            Button("Close", role: .cancel) {
                 onAction(.cancelDetachFolder)
             }
         } message: {
-            Text(state.detachAlert?.message ?? "")
+            Text("A track from this folder is currently playing.")
         }
     }
 
@@ -112,7 +112,7 @@ struct MusicLibraryView: View {
                     .foregroundColor(.blue)
                     .frame(width: 24)
 
-                Text("Куплено в iTunes")
+                Text("Purchased in iTunes")
                     .lineLimit(1)
 
                 Spacer()
@@ -130,9 +130,9 @@ struct MusicLibraryView: View {
                 .frame(width: 24)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("Нет добавленных папок")
+                Text("No Folders Added")
                     .foregroundColor(.primary)
-                Text("Добавьте папку с музыкой, чтобы видеть локальные файлы.")
+                Text("Add a music folder to view local files.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -172,7 +172,7 @@ struct MusicLibraryView: View {
                 Image(systemName: "folder.fill.badge.plus")
                     .foregroundColor(.blue)
                     .frame(width: 24)
-                Text("Добавить папку")
+                Text("Add Folder")
             }
             .padding(.vertical, 4)
         }

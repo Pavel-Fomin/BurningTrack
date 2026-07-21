@@ -49,7 +49,7 @@ struct SettingsScreen: View {
                 onAction: viewModel.handle
             )
                 // Системный заголовок даёт экрану нативный Navigation Bar.
-                .navigationTitle("Настройки")
+                .navigationTitle(SettingsPresentationText.navigationTitle)
         }
         .miniPlayerHost(
             playerViewModel: playerViewModel

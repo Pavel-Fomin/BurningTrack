@@ -19,8 +19,8 @@ struct TrackListsRowView: View {
         onTap: @escaping () -> Void
     ) {
         self.title = row.title
-        self.createdAtText = row.createdAtText
-        self.tracksCountText = row.tracksCountText
+        self.createdAtText = TrackListPresentationText.createdAt(row.createdAt)
+        self.tracksCountText = TrackListPresentationText.trackCount(row.tracksCount)
         self.onTap = onTap
     }
 

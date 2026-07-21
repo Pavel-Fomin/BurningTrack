@@ -39,11 +39,10 @@ final class MoveToFolderNavigationContext: ObservableObject {
 
     var canGoBack: Bool { stack.isEmpty == false }
 
-    var title: String {
-        if let id = currentFolderId, let folder = library.folder(for: id) {
-            return folder.name
-        }
-        return "Переместить"
+    /// Имя открытой папки; nil означает корневой уровень выбора назначения.
+    var currentFolderName: String? {
+        guard let currentFolderId else { return nil }
+        return library.folder(for: currentFolderId)?.name
     }
 
     var rows: [FolderRow] {

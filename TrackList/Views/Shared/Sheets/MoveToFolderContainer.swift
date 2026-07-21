@@ -64,14 +64,17 @@ struct MoveToFolderContainer: View {
             onClose: {
                 SheetManager.shared.closeActive()
             },
+            closeAccessibilityLabel: String(localized: "Cancel"),
 
             /// Подтверждение выбранной файловой операции
             onRightTap: {
                 Task { await performSelectedOperation() }
-            }
+            },
+            rightButtonAccessibilityLabel: navigationTitle
         ) {
             MoveToFolderSheet(
                 trackId: data.track.trackId,
+                rootNavigationTitle: navigationTitle,
                 selectedFolderId: $selectedFolderId,
                 trackCurrentFolderId: $trackCurrentFolderId
             )
@@ -83,12 +86,7 @@ struct MoveToFolderContainer: View {
 
     /// Заголовок sheet зависит от операции, но список папок остаётся тем же.
     private var navigationTitle: String {
-        switch data.operation {
-        case .move:
-            return "Переместить"
-        case .copyPurchasedITunes:
-            return "Копировать"
-        }
+        MoveToFolderPresentationText.title(for: data.operation)
     }
 
     // MARK: - Actions
@@ -145,7 +143,7 @@ struct MoveToFolderContainer: View {
         guard let track = data.track.asPurchasedITunesPlayableTrack() else {
             ToastManager.shared.handle(
                 .operationFailed(
-                    message: "Не удалось подготовить iTunes-трек к копированию"
+                    message: MoveToFolderPresentationText.purchasedITunesTrackPreparationFailedMessage
                 )
             )
             return
@@ -162,7 +160,7 @@ struct MoveToFolderContainer: View {
         } catch {
             ToastManager.shared.handle(
                 .operationFailed(
-                    message: "Не удалось скопировать iTunes-трек"
+                    message: MoveToFolderPresentationText.purchasedITunesTrackCopyFailedMessage
                 )
             )
         }

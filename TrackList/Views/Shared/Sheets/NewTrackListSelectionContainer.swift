@@ -26,8 +26,7 @@ struct NewTrackListSelectionContainer: View {
 
     var body: some View {
         let state = NewTrackListSelectionStateBuilder().build(
-            selectedCount: viewModel.selectedCount,
-            mode: data.mode
+            selectedCount: viewModel.selectedCount
         )
         let actionHandler = NewTrackListSelectionActionHandler(
             mode: data.mode,
@@ -38,7 +37,7 @@ struct NewTrackListSelectionContainer: View {
 
         ZStack(alignment: .bottom) {
             NavigationBarHost(
-                title: "Выберите треки",
+                title: "Select Tracks",
 
                 /// Кнопка подтверждения выбора треков.
                 rightButtonImage: "checkmark",
@@ -70,9 +69,11 @@ struct NewTrackListSelectionContainer: View {
 
             if state.canSubmit {
                 SelectionActionBar(
-                    title: "Выбрано",
-                    subtitle: "\(viewModel.selectedCount) треков",
-                    primaryTitle: state.buttonTitle,
+                    title: String(localized: "Selected"),
+                    subtitle: TrackListPresentationText.selectedTracksCount(
+                        viewModel.selectedCount
+                    ),
+                    primaryTitle: String(localized: "Add"),
                     iconName: "music.note",
                     isPrimaryEnabled: state.canSubmit,
                     onPrimaryTap: {

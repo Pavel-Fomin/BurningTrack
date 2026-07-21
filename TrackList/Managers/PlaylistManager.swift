@@ -87,10 +87,10 @@ final class PlaylistManager: ObservableObject {
             return PlayerTrack(
                 queueItemId: queueItemId,
                 trackId: trackId,
-                title: "Недоступно",
+                title: nil,
                 artist: nil,
                 duration: 0,
-                fileName: "Unknown",
+                fileName: "",
                 isAvailable: false
             )
         }

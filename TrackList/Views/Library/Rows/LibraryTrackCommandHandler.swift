@@ -58,7 +58,7 @@ struct LibraryTrackCommandHandler {
             } catch {
                 ToastManager.shared.handle(
                     .operationFailed(
-                        message: "Не удалось добавить трек в плеер"
+                        message: PlayerPresentationText.addTrackToPlayerFailedMessage
                     )
                 )
             }

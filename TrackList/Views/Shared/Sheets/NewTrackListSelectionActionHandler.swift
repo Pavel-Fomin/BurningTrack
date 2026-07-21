@@ -101,7 +101,7 @@ final class NewTrackListSelectionActionHandler {
             trackListName = try trackListsManager
                 .loadTrackListMetas()
                 .first { $0.id == trackListId }?
-                .name ?? "Треклист"
+                .name ?? TrackListPresentationText.defaultTrackListName
         } catch let appError as AppError {
             toastManager.handle(appError)
             return false

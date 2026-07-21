@@ -125,7 +125,7 @@ struct LibraryCollectionTracksView: View {
 
     var body: some View {
         contentView
-            .navigationTitle(source.navigationTitle ?? "Треки")
+            .navigationTitle(LibraryPresentationText.sourceNavigationTitle(for: source))
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden(isSelecting)
             .toolbar {
@@ -212,7 +212,7 @@ struct LibraryCollectionTracksView: View {
 
                 if tracksViewModel.isLoading == false && tracksViewModel.trackSections.isEmpty {
                     Section {
-                        Text("Нет треков")
+                        Text("No Tracks")
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -243,7 +243,7 @@ struct LibraryCollectionTracksView: View {
         if tracksViewModel.isLoading && tracksViewModel.trackSections.isEmpty {
             VStack {
                 Spacer()
-                ProgressView("Загружаю треки")
+                ProgressView("Loading Tracks")
                     .progressViewStyle(.circular)
                     .font(.headline)
                     .padding()

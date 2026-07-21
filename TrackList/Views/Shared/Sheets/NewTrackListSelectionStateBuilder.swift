@@ -12,21 +12,9 @@ import Foundation
 @MainActor
 struct NewTrackListSelectionStateBuilder {
     /// Собирает состояние выбора треков.
-    func build(
-        selectedCount: Int,
-        mode: NewTrackListSelectionMode
-    ) -> NewTrackListSelectionState {
-        let buttonTitle: String
-
-        switch mode {
-        case .create, .append:
-            // Текущий UI показывает одинаковый текст кнопки для обоих режимов.
-            buttonTitle = "Добавить"
-        }
-
+    func build(selectedCount: Int) -> NewTrackListSelectionState {
         return NewTrackListSelectionState(
-            canSubmit: selectedCount > 0,
-            buttonTitle: buttonTitle
+            canSubmit: selectedCount > 0
         )
     }
 }

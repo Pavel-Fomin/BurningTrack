@@ -14,8 +14,4 @@ struct BatchTagArtworkPreparationProgress: Equatable {
     let current: Int   /// Количество подготовленных обложек.
     let total: Int     /// Общее количество обложек для подготовки.
 
-    /// Заголовок с текущим прогрессом подготовки обложек.
-    var title: String {
-        "Декодирую обложки \(current) из \(total)"
-    }
 }

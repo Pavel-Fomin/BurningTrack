@@ -34,22 +34,6 @@ enum LibraryCollectionValueSortMode: String, CaseIterable, Identifiable, Hashabl
         self
     }
 
-    /// Текст пункта меню для выбранного направления сортировки.
-    var menuTitle: String {
-        switch self {
-        case .titleAscending,
-             .artistAscending:
-            return "А–Я"
-        case .titleDescending,
-             .artistDescending:
-            return "Я–А"
-        case .yearNewestFirst:
-            return "Сначала новые"
-        case .yearOldestFirst:
-            return "Сначала старые"
-        }
-    }
-
     /// Группа вложенного меню, в которой показывается режим.
     var menuGroup: MenuGroup {
         switch self {
@@ -79,16 +63,5 @@ enum LibraryCollectionValueSortMode: String, CaseIterable, Identifiable, Hashabl
             self
         }
 
-        /// Заголовок вложенного меню.
-        var title: String {
-            switch self {
-            case .title:
-                return "По названию"
-            case .year:
-                return "По году"
-            case .artist:
-                return "По артисту"
-            }
-        }
     }
 }

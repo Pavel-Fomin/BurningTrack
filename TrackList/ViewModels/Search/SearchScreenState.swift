@@ -17,12 +17,9 @@ enum SearchContentState: Equatable {
     case noResults
 }
 
-// Строка найденного треклиста хранит результат поиска и готовые подписи UI.
+// Строка найденного треклиста хранит семантический результат поиска.
 struct SearchTrackListRowState: Identifiable, Equatable {
     let result: SearchTrackListResult
-    let title: String
-    let createdAtText: String
-    let tracksCountText: String
 
     /// Идентификатор строки совпадает с id треклиста.
     var id: UUID {

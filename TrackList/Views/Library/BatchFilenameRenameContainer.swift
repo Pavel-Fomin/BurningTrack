@@ -36,18 +36,20 @@ struct BatchFilenameRenameContainer: View {
 
     var body: some View {
         NavigationBarHost(
-            title: "Изменение имени файла",
-            subtitle: "Из тегов",
+            title: FileRenamePresentationText.batchRenameTitle,
+            subtitle: FileRenamePresentationText.batchRenameSubtitle,
             rightButtonImage: "checkmark",
             isRightEnabled: .constant(!flow.isBusy),
             onClose: {
                 guard !flow.isBusy else { return }
                 onClose()
             },
+            closeAccessibilityLabel: String(localized: "Cancel"),
             onRightTap: {
                 guard !flow.isBusy else { return }
                 onClose()
-            }
+            },
+            rightButtonAccessibilityLabel: String(localized: "Done")
         ) {
             BatchFilenameRenameSheet(
                 flow: flow,

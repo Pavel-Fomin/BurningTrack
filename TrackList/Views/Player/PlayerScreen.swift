@@ -42,14 +42,14 @@ struct PlayerScreen: View {
                     )
                 }
             }
-            .navigationTitle("Плеер")
+            .navigationTitle("Player")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         Button {
                             screenViewModel.handle(.saveTrackList)
                         } label: {
-                            Label("Сохранить", systemImage: "text.badge.checkmark")
+                            Label("Save as Tracklist", systemImage: "text.badge.checkmark")
                         }
 
                         Button {
@@ -57,7 +57,7 @@ struct PlayerScreen: View {
                         } label: {
                             Label {
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text("Экспорт")
+                                    Text("Export")
                                 }
                             } icon: {
                                 Image(systemName: "externaldrive")
@@ -67,7 +67,7 @@ struct PlayerScreen: View {
                         Button(role: .destructive) {
                             screenViewModel.handle(.clearTrackList)
                         } label: {
-                            Label("Очистить плеер", systemImage: "paintbrush")
+                            Label("Clear Player", systemImage: "paintbrush")
                         }
                     } label: {
                         Image(systemName: "ellipsis")

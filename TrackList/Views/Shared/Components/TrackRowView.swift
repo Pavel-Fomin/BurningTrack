@@ -136,6 +136,13 @@ struct TrackRowView<ActionMenuContent: View>: View {
         return !artist.isEmpty && artist != "неизвестен"
     }
 
+    /// Возвращает локализованную замену, если в модели отсутствуют данные для заголовка.
+    private var displayTitle: String {
+        let value = (title ?? track.fileName)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? AppMessagePresentationText.unavailableValue : value
+    }
+
     /// Формат файла для правой колонки метаданных
     private var fileFormatLabel: String? {
         let extensionValue = (track.fileName as NSString).pathExtension
@@ -293,13 +300,17 @@ struct TrackRowView<ActionMenuContent: View>: View {
                     .lineLimit(1)
             }
 
-            Text(title ?? track.fileName)
+            Text(displayTitle)
                 .font(hasArtist ? .footnote : .subheadline)
                 .foregroundColor(hasArtist ? .secondary : .primary)
                 .lineLimit(1)
 
             if let trackListNames, !trackListNames.isEmpty {
-                Text("уже в: \(trackListNames.joined(separator: ", "))")
+                Text(
+                    SharedPresentationText.tracklistMembership(
+                        trackListNames.joined(separator: ", ")
+                    )
+                )
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .lineLimit(4)

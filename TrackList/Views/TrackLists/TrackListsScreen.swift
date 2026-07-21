@@ -38,7 +38,7 @@ struct TrackListsScreen: View {
                 }
             )
             .background(Color(.systemGroupedBackground))
-            .navigationTitle("Треклисты")
+            .navigationTitle("Tracklists")
             .navigationDestination(for: UUID.self) { id in
                 // Detail-экран строится по route id, чтобы строка списка оставалась обычной Button-строкой без шеврона.
                 if let trackList = trackListsViewModel.trackList(for: id) {
@@ -96,7 +96,7 @@ private struct TrackListsToolbarMenuButton: UIViewRepresentable {
         button.setImage(UIImage(systemName: "ellipsis"), for: .normal)
         button.showsMenuAsPrimaryAction = true
         button.changesSelectionAsPrimaryAction = false
-        button.accessibilityLabel = "Действия треклистов"
+        button.accessibilityLabel = String(localized: "Tracklist Actions")
         button.setContentHuggingPriority(.required, for: .horizontal)
         button.setContentCompressionResistancePriority(.required, for: .horizontal)
         button.menu = makeMenu()
@@ -127,26 +127,28 @@ private struct TrackListsToolbarMenuButton: UIViewRepresentable {
     /// Собирает вложенное меню сортировки с системной подписью выбранного режима.
     private func makeSortMenu() -> UIMenu {
         let menu = UIMenu(
-            title: "Сортировка",
+            title: String(localized: "Sort"),
             image: UIImage(systemName: "arrow.up.arrow.down"),
             options: .singleSelection,
             children: TrackListsSortMode.allCases.map { mode in
                 UIAction(
-                    title: mode.title,
+                    title: TrackListPresentationText.sortTitle(for: mode),
                     state: state.selectedSortMode == mode ? .on : .off
                 ) { _ in
                     onAction(.setSortMode(mode))
                 }
             }
         )
-        menu.subtitle = state.sortModeCaption
+        menu.subtitle = state.selectedSortMode.map(
+            TrackListPresentationText.sortCaption(for:)
+        )
         return menu
     }
 
     /// Собирает пункт создания нового треклиста.
     private func makeCreateTrackListAction() -> UIAction {
         UIAction(
-            title: "Новый треклист",
+            title: String(localized: "Create Tracklist"),
             image: UIImage(systemName: "text.badge.plus")
         ) { _ in
             onAction(.createTrackList)

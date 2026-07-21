@@ -43,7 +43,7 @@ final class LibraryBatchPlayerHandler {
             } catch {
                 toastManager.handle(
                     .operationFailed(
-                        message: "Не удалось добавить треки в плеер"
+                        message: PlayerPresentationText.addTracksToPlayerFailedMessage
                     )
                 )
             }

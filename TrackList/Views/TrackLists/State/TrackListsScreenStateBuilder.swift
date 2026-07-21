@@ -10,15 +10,6 @@
 import Foundation
 
 struct TrackListsScreenStateBuilder {
-
-    /// Форматирует дату создания треклиста без времени.
-    private let createdAtFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .none
-        return formatter
-    }()
-
     func build(
         trackLists: [TrackList],
         selectedSortMode: TrackListsSortMode?
@@ -29,8 +20,8 @@ struct TrackListsScreenStateBuilder {
                 id: trackList.id,
                 trackList: trackList,
                 title: trackList.name,
-                createdAtText: createdAtFormatter.string(from: trackList.createdAt),
-                tracksCountText: "\(trackList.tracks.count) треков"
+                createdAt: trackList.createdAt,
+                tracksCount: trackList.tracks.count
             )
         }
 
@@ -38,8 +29,7 @@ struct TrackListsScreenStateBuilder {
             rows: rows,
             pendingDeleteTrackListId: nil,
             isShowingDeleteConfirmation: false,
-            selectedSortMode: selectedSortMode,
-            sortModeCaption: selectedSortMode?.caption
+            selectedSortMode: selectedSortMode
         )
     }
 }

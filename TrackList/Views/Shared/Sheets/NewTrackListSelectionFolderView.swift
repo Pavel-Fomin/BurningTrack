@@ -110,7 +110,7 @@ struct NewTrackListSelectionFolderView: View {
                     && tracksViewModel.trackSections.isEmpty
                     && folder.subfolders.isEmpty {
                     Section {
-                        Text("В этой папке нет треков")
+                        Text("No Tracks in This Folder")
                             .foregroundColor(.secondary)
                     }
                 }
@@ -120,7 +120,7 @@ struct NewTrackListSelectionFolderView: View {
                 VStack {
                     Spacer()
 
-                    ProgressView("Загружаю треки")
+                    ProgressView("Loading Tracks")
                         .progressViewStyle(.circular)
                         .font(.headline)
                         .padding()
@@ -137,8 +137,8 @@ struct NewTrackListSelectionFolderView: View {
                 if !currentTracks.isEmpty {
                     Button(
                         selectionViewModel.areAllSelected(currentTracks)
-                            ? "Снять выбор"
-                            : "Выбрать все"
+                            ? String(localized: "Deselect All")
+                            : String(localized: "Select All")
                     ) {
                         if selectionViewModel.areAllSelected(currentTracks) {
                             selectionViewModel.deselectAll(currentTracks)

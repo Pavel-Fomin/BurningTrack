@@ -12,6 +12,4 @@ import Foundation
 struct NewTrackListSelectionState {
     /// Можно ли применить текущий выбор треков.
     var canSubmit: Bool
-    /// Текст основной кнопки применения выбора.
-    var buttonTitle: String
 }

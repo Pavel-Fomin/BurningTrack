@@ -30,15 +30,17 @@ struct BatchTagEditContainer: View {
 
     var body: some View {
         NavigationBarHost(
-            title: "Редактирование тегов",
+            title: BatchTagEditPresentationText.navigationTitle,
             rightButtonImage: "checkmark",
             isRightEnabled: .constant(flow.canSave && !isSaving),
             onClose: onClose,
+            closeAccessibilityLabel: String(localized: "Cancel"),
             onRightTap: {
                 Task {
                     await save()
                 }
-            }
+            },
+            rightButtonAccessibilityLabel: String(localized: "Save")
         ) {
             BatchTagEditSheet(flow: $flow)
         }

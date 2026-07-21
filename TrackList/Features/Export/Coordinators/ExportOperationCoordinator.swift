@@ -354,8 +354,10 @@ final class ExportOperationCoordinator {
             liveActivityOperationID = operationID
             liveActivityManager.start(
                 operationID: operationID,
-                operationTitle: "Экспортирую",
-                subjectTitle: subjectTitle,
+                operationTitle: ExportPresentationText.exportingTitle,
+                subjectTitle: ExportPresentationText.displaySourceName(
+                    for: subjectTitle
+                ),
                 progress: progress
             )
         }

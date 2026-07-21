@@ -36,16 +36,6 @@ enum LibraryCollectionRootItem: Identifiable, Hashable {
         }
     }
 
-    // Название строки корневого экрана.
-    var title: String {
-        switch self {
-        case .allTracks:
-            return "Треки"
-        case .category(let category):
-            return category.title
-        }
-    }
-
     // Системная иконка строки корневого экрана.
     var systemImage: String {
         switch self {

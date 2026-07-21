@@ -67,6 +67,8 @@ struct MiniPlayerHeaderView: View {
             .layoutPriority(1)
         }
         .frame(minHeight: 40)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Now Playing")
     }
 
     // MARK: - Artwork

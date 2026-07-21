@@ -42,6 +42,19 @@ struct BatchTagArtworkSummaryCard: View {
             onSelect()
         }
         .batchTagArtworkSelection(isSelected)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            BatchTagEditPresentationText.allSelectedTracksAccessibilityLabel
+        )
+        .accessibilityValue(
+            BatchTagEditPresentationText.selectedTracksAccessibilityValue(
+                for: summary.selectedCount
+            )
+        )
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction {
+            onSelect()
+        }
     }
 
     /// Форматированный общий размер preview-обложек.

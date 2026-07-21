@@ -73,7 +73,7 @@ final class PlayerQueueActionHandler {
             } catch {
                 toastManager.handle(
                     .operationFailed(
-                        message: "Не удалось удалить трек из плеера"
+                        message: PlayerPresentationText.removeTrackFromPlayerFailedMessage
                     )
                 )
             }

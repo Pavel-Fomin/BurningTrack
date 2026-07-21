@@ -30,8 +30,4 @@ enum BatchArtworkCompressionOption: CaseIterable, Equatable, Hashable {
         }
     }
 
-    /// Название для пользовательского меню.
-    var title: String {
-        "\(maxPixelSize)×\(maxPixelSize)"
-    }
 }

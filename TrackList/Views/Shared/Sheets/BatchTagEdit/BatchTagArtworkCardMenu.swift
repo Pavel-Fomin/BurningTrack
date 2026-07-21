@@ -16,15 +16,17 @@ struct BatchTagArtworkCardMenu: View {
 
     var body: some View {
         Menu {
-            Button("Удалить") {
+            Button(String(localized: "Delete")) {
                 onAction(.remove)
             }
-            Button("Заменить") {
+            Button(String(localized: "Replace")) {
                 onAction(.replace)
             }
-            Menu("Сжать") {
+            Menu(BatchTagEditPresentationText.compressArtworkTitle) {
                 ForEach(BatchArtworkCompressionOption.allCases, id: \.self) { option in
-                    Button(option.title) {
+                    Button(
+                        BatchTagEditPresentationText.compressionOptionTitle(for: option)
+                    ) {
                         onAction(.compress(option))
                     }
                 }
@@ -37,5 +39,6 @@ struct BatchTagArtworkCardMenu: View {
                 .background(.ultraThinMaterial)
                 .clipShape(Circle())
         }
+        .accessibilityLabel(BatchTagEditPresentationText.artworkActionsAccessibilityLabel)
     }
 }

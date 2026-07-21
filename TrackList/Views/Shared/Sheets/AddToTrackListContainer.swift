@@ -62,7 +62,7 @@ struct AddToTrackListContainer: View {
 
     var body: some View {
         NavigationBarHost(
-            title: "Добавить в треклист",
+            title: "Add to Tracklist",
 
             /// Кнопка подтверждения (✓)
             rightButtonImage: "checkmark",
@@ -173,7 +173,8 @@ struct AddToTrackListContainer: View {
 
     /// Возвращает имя треклиста для итогового toast.
     private func trackListName(for trackListId: UUID) -> String {
-        trackLists.first { $0.id == trackListId }?.name ?? "Треклист"
+        trackLists.first { $0.id == trackListId }?.name ??
+            TrackListPresentationText.defaultTrackListName
     }
 
     /// Показывает один итоговый toast для batch-добавления.

@@ -58,10 +58,14 @@ struct TrackFileRenameMenuModifier: ViewModifier {
         if isEnabled {
             content
                 .contextMenu {
-                    Text("Изменить название файла")
+                    Text(FileRenamePresentationText.renameFileTitle)
 
                     if hasUsableTagsForRename {
-                        Button("Артист - Название") {
+                        Button(
+                            FileRenamePresentationText.strategyTitle(
+                                for: FileRenameStrategy.artistTitle
+                            )
+                        ) {
                             onRename(.artistTitle)
                         }
 
@@ -70,20 +74,24 @@ struct TrackFileRenameMenuModifier: ViewModifier {
 
                         Divider()
 
-                        Button("Название - Артист") {
+                        Button(
+                            FileRenamePresentationText.strategyTitle(
+                                for: FileRenameStrategy.titleArtist
+                            )
+                        ) {
                             onRename(.titleArtist)
                         }
 
                         Text(titleArtistPreview)
                             .disabled(true)
                     } else {
-                        Button("Теги не заполнены") {}
+                        Button(FileRenamePresentationText.tagsAreMissingTitle) {}
                             .disabled(true)
                     }
 
                     Divider()
 
-                    Button("Исправить вручную") {
+                    Button(FileRenamePresentationText.editManuallyTitle) {
                         onRename(.manual)
                     }
                 }

@@ -54,7 +54,7 @@ struct SearchView: View {
             FilterChipsView(
                 items: state.trackFilterChips,
                 selectedItem: selectedTrackFilterChip,
-                title: { $0.title },
+                title: { SearchPresentationText.filterTitle(for: $0.field) },
                 detail: { "\($0.count)" },
                 onSelect: { chip in
                     onAction(.selectTrackFilter(chip.field))
@@ -67,7 +67,7 @@ struct SearchView: View {
         }
 
         if state.folders.isEmpty == false {
-            Section(header: sectionHeader("Папки")) {
+            Section(header: sectionHeader(String(localized: "Folders"))) {
                 ForEach(state.folders) { folder in
                     SearchFolderRowView(
                         result: folder,
@@ -80,7 +80,7 @@ struct SearchView: View {
         }
 
         if state.trackLists.isEmpty == false {
-            Section(header: sectionHeader("Треклисты")) {
+            Section(header: sectionHeader(String(localized: "Tracklists"))) {
                 ForEach(state.trackLists) { row in
                     SearchTrackListRowView(
                         row: row,
@@ -93,7 +93,7 @@ struct SearchView: View {
         }
 
         if state.tracks.isEmpty == false {
-            Section(header: sectionHeader("Треки")) {
+            Section(header: sectionHeader(String(localized: "Tracks"))) {
                 ForEach(state.tracks) { row in
                     SearchTrackRowView(
                         row: row,
@@ -109,7 +109,10 @@ struct SearchView: View {
     private var stateOverlay: some View {
         switch state.contentState {
         case .emptyQuery:
-            SearchMessageView(text: "Введите запрос")
+            SearchMessageView(
+                title: String(localized: "Start Searching"),
+                description: nil
+            )
 
         case .loading:
             ProgressView()
@@ -119,7 +122,10 @@ struct SearchView: View {
             EmptyView()
 
         case .noResults:
-            SearchMessageView(text: "Ничего не найдено")
+            SearchMessageView(
+                title: String(localized: "No Results"),
+                description: String(localized: "Try a Different Search")
+            )
         }
     }
 
@@ -140,15 +146,22 @@ struct SearchView: View {
 // MARK: - Empty State
 
 private struct SearchMessageView: View {
-    let text: String
+    let title: String
+    let description: String?
 
     var body: some View {
         VStack {
             Spacer()
 
-            Text(text)
+            Text(title)
                 .font(.body)
                 .foregroundStyle(.secondary)
+
+            if let description {
+                Text(description)
+                    .font(.subheadline)
+                    .foregroundStyle(.tertiary)
+            }
 
             Spacer()
         }
@@ -199,9 +212,13 @@ private struct SearchTrackListRowView: View {
     /// Треклист поиска отображается тем же компонентом, что и список треклистов.
     var body: some View {
         TrackListsRowView(
-            title: row.title,
-            createdAtText: row.createdAtText,
-            tracksCountText: row.tracksCountText
+            title: row.result.trackList.name,
+            createdAtText: TrackListPresentationText.createdAt(
+                row.result.trackList.createdAt
+            ),
+            tracksCountText: TrackListPresentationText.trackCount(
+                row.result.trackList.tracks.count
+            )
         ) {
             onAction(.openTrackList(row.result))
         }
@@ -252,6 +269,7 @@ private struct SearchTrackRowView: View {
     @ViewBuilder
     private var searchActionMenuContent: some View {
         LibraryTrackActionMenuContent(
+            labels: SearchPresentationText.trackActionLabels,
             onDetails: {
                 onAction(.showDetails(row.result))
             },

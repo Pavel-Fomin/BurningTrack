@@ -115,7 +115,7 @@ struct MiniPlayerView: View {
         case .empty:
             return DisplayContent(
                 artwork: nil,
-                title: "Ничего не воспроизводится",
+                title: "Nothing Playing",
                 artist: "",
                 currentTime: 0,
                 duration: 0,
@@ -127,7 +127,7 @@ struct MiniPlayerView: View {
             return DisplayContent(
                 artwork: staticState.artwork,
                 title: staticState.title,
-                artist: staticState.artist,
+                artist: PlayerPresentationText.miniPlayerArtist(for: staticState.artist),
                 currentTime: progressState.currentTime,
                 duration: progressState.duration,
                 isPlaying: progressState.isPlaying
@@ -136,17 +136,19 @@ struct MiniPlayerView: View {
         case let .loading(staticState):
             return DisplayContent(
                 artwork: staticState?.artwork,
-                title: staticState?.title ?? "Загрузка...",
-                artist: staticState?.artist ?? "",
+                title: staticState?.title ?? "Loading Track",
+                artist: staticState.map {
+                    PlayerPresentationText.miniPlayerArtist(for: $0.artist)
+                } ?? "",
                 currentTime: 0,
                 duration: 0,
                 isPlaying: false
             )
 
-        case let .error(message):
+        case .error:
             return DisplayContent(
                 artwork: nil,
-                title: message,
+                title: "Playback Error",
                 artist: "",
                 currentTime: 0,
                 duration: 0,

@@ -25,7 +25,7 @@ extension View {
                             .padding(.trailing, 6)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Очистить текст")
+                    .accessibilityLabel("Clear Text")
                 }
             }
     }

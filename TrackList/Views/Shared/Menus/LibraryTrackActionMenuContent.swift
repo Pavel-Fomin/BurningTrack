@@ -10,6 +10,7 @@ import SwiftUI
 
 /// Единый состав ellipsis-меню для одиночного трека фонотеки.
 struct LibraryTrackActionMenuContent: View {
+    let labels: TrackActionMenuLabels
     let onDetails: () -> Void
     let onMoveToFolder: () -> Void
     let onAddToPlayer: () -> Void
@@ -22,7 +23,7 @@ struct LibraryTrackActionMenuContent: View {
             Button {
                 onDetails()
             } label: {
-                Label("О треке", systemImage: "info.circle")
+                Label(labels.trackInfo, systemImage: "info.circle")
             }
         }
 
@@ -30,7 +31,7 @@ struct LibraryTrackActionMenuContent: View {
             Button {
                 onMoveToFolder()
             } label: {
-                Label("Переместить", systemImage: "arrow.forward.folder")
+                Label(labels.move, systemImage: "arrow.forward.folder")
             }
         }
 
@@ -38,7 +39,7 @@ struct LibraryTrackActionMenuContent: View {
             Button {
                 onAddToPlayer()
             } label: {
-                Label("В плеер", systemImage: "waveform")
+                Label(labels.addToPlayer, systemImage: "waveform")
             }
         }
 
@@ -46,7 +47,7 @@ struct LibraryTrackActionMenuContent: View {
             Button {
                 onAddToTrackList()
             } label: {
-                Label("В треклист", systemImage: "list.star")
+                Label(labels.addToTracklist, systemImage: "list.star")
             }
         }
 
@@ -57,34 +58,46 @@ struct LibraryTrackActionMenuContent: View {
                     Button {
                         onEditTags()
                     } label: {
-                        Label("Теги", systemImage: "tag")
+                        Label(labels.tags, systemImage: "tag")
                     }
                 }
 
                 if isMenuActionAvailable(.renameFile) {
                     // Системная секция делает "Название файла" подписью, а не пунктом меню.
-                    Section("Название файла") {
+                    Section(labels.fileName) {
                         Button {
                             onRenameFile(.artistTitle)
                         } label: {
-                            Text("Артист - Название")
+                            Text(
+                                FileRenamePresentationText.strategyTitle(
+                                    for: FileRenameStrategy.artistTitle
+                                )
+                            )
                         }
 
                         Button {
                             onRenameFile(.titleArtist)
                         } label: {
-                            Text("Название - Артист")
+                            Text(
+                                FileRenamePresentationText.strategyTitle(
+                                    for: FileRenameStrategy.titleArtist
+                                )
+                            )
                         }
 
                         Button {
                             onRenameFile(.manual)
                         } label: {
-                            Text("Вручную")
+                            Text(
+                                FileRenamePresentationText.strategyTitle(
+                                    for: FileRenameStrategy.manual
+                                )
+                            )
                         }
                     }
                 }
             } label: {
-                Label("Редактировать", systemImage: "square.and.pencil")
+                Label(labels.edit, systemImage: "square.and.pencil")
             }
         }
     }
@@ -97,4 +110,16 @@ struct LibraryTrackActionMenuContent: View {
             context: .library
         )
     }
+}
+
+/// Подписи контекстного меню передаются вызывающим presentation-слоем.
+struct TrackActionMenuLabels {
+    let trackInfo: String
+    let move: String
+    let addToPlayer: String
+    let addToTracklist: String
+    let tags: String
+    let fileName: String
+    let edit: String
+
 }

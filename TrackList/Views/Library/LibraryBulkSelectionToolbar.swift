@@ -25,7 +25,7 @@ struct LibraryBulkSelectionToolbar: ToolbarContent {
         // Кнопка заменяет системный возврат только в активном режиме выбора.
         ToolbarItem(placement: .topBarLeading) {
             Button(
-                areAllVisibleTracksSelected ? "Снять все" : "Выбрать все",
+                areAllVisibleTracksSelected ? "Deselect All" : "Select All",
                 action: onToggleSelectAll
             )
         }
@@ -51,31 +51,31 @@ struct LibraryBulkSelectionToolbar: ToolbarContent {
     @ViewBuilder
     private var batchActionMenuItems: some View {
         // Системные секции меню выравнивают заголовки отдельно от пунктов с иконками.
-        Section("Добавить") {
+        Section("Add") {
             Button {
                 onBatchActionSelection(.addToPlayer)
             } label: {
-                Label("В плеер", systemImage: "waveform")
+                Label("Add to Player", systemImage: "waveform")
             }
 
             Button {
                 onBatchActionSelection(.addToTrackList)
             } label: {
-                Label("В треклист", systemImage: "list.star")
+                Label("Add to Tracklist", systemImage: "list.star")
             }
         }
 
-        Section("Изменить") {
+        Section("Edit") {
             Button {
                 onBatchActionSelection(.renameFiles)
             } label: {
-                Label("Имя файла", systemImage: "pencil")
+                Label("File Name", systemImage: "pencil")
             }
 
             Button {
                 onBatchActionSelection(.editTags)
             } label: {
-                Label("Теги", systemImage: "tag")
+                Label("Tags", systemImage: "tag")
             }
         }
     }

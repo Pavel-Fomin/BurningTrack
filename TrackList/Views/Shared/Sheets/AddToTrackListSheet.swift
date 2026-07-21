@@ -34,7 +34,21 @@ struct AddToTrackListSheet: View {
     // MARK: - UI
     
     var body: some View {
-        List(trackLists) { meta in
+        List {
+            if trackLists.isEmpty {
+                ContentUnavailableView(
+                    "No Tracklists",
+                    systemImage: "music.note.list"
+                )
+            } else {
+                trackListRows
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var trackListRows: some View {
+        ForEach(trackLists) { meta in
             Button {
                 guard meta.id != currentTrackListId else { return }
                 
@@ -54,6 +68,7 @@ struct AddToTrackListSheet: View {
                             .font(.title3)
                             .foregroundStyle(.green)
                             .frame(width: 28, height: 28)
+                            .accessibilityHidden(true)
                     } else {
                         Image(
                             systemName:
@@ -64,12 +79,27 @@ struct AddToTrackListSheet: View {
                         .font(.title3)
                         .foregroundColor(.secondary)
                         .frame(width: 28, height: 28)
+                        .accessibilityHidden(true)
                     }
                 }
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .listRowBackground(Color(.tertiarySystemBackground))
+            .accessibilityValue(accessibilityValue(for: meta))
         }
+    }
+
+    /// Возвращает VoiceOver-статус строки без изменения данных выбора.
+    private func accessibilityValue(for trackList: TrackListMeta) -> String {
+        if trackList.id == currentTrackListId {
+            return String(localized: "Current Tracklist")
+        }
+
+        if trackList.id == selectedTrackListId {
+            return String(localized: "Selected")
+        }
+
+        return ""
     }
 }

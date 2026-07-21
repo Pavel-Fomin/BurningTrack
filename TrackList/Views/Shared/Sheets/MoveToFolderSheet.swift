@@ -29,6 +29,9 @@ struct MoveToFolderSheet: View {
     /// Используется ТОЛЬКО для определения текущей папки (бейдж "Текущая").
     let trackId: UUID
 
+    /// Локализованный заголовок корневого уровня выбора destination.
+    let rootNavigationTitle: String
+
     /// Выбранная папка назначения.
     /// Источник истины находится в контейнере.
     @Binding var selectedFolderId: UUID?
@@ -106,6 +109,11 @@ struct MoveToFolderSheet: View {
                     }
                 }
                 .buttonStyle(.plain)
+                .accessibilityValue(
+                    row.id == trackCurrentFolderId
+                    ? MoveToFolderPresentationText.currentFolderAccessibilityValue
+                    : ""
+                )
 
                 // Правая зона — выбор папки назначения (radio)
                 // Показывается для любой папки, кроме текущей папки трека.
@@ -126,6 +134,14 @@ struct MoveToFolderSheet: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(
+                        MoveToFolderPresentationText.selectFolderAccessibilityLabel(
+                            for: row.name
+                        )
+                    )
+                    .accessibilityValue(
+                        selectedFolderId == row.id ? String(localized: "Selected") : ""
+                    )
                 } else {
                     // Пустое место под radio, чтобы не ломать layout
                     Spacer()
@@ -144,7 +160,12 @@ struct MoveToFolderSheet: View {
             }
             .listRowBackground(Color(.tertiarySystemBackground))
         }
-        .navigationTitle(nav.title)
+        .navigationTitle(
+            MoveToFolderPresentationText.navigationTitle(
+                rootTitle: rootNavigationTitle,
+                currentFolderName: nav.currentFolderName
+            )
+        )
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             // Кнопка "Назад" появляется только если мы реально углубились

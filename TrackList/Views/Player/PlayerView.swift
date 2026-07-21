@@ -28,20 +28,28 @@ struct PlayerView: View {
     var body: some View {
         ScrollViewReader { proxy in
             List {
-                PlayerRowsView(
-                    rows: rows,
-                    onTrackTap: onTrackTap,
-                    onMoveTracks: onMoveTracks,
-                    onDeleteTrack: onDeleteTrack,
-                    onShowInLibrary: onShowInLibrary,
-                    onMoveToFolder: onMoveToFolder,
-                    onAddToTrackList: onAddToTrackList,
-                    onCopyTrack: onCopyTrack,
-                    onEditTags: onEditTags,
-                    onArtworkTap: onArtworkTap,
-                    onRequestSnapshot: onRequestSnapshot,
-                    onRenameTrack: onRenameTrack
-                )
+                if rows.isEmpty {
+                    ContentUnavailableView(
+                        "Queue Is Empty",
+                        systemImage: "music.note.list",
+                        description: Text("No Tracks")
+                    )
+                } else {
+                    PlayerRowsView(
+                        rows: rows,
+                        onTrackTap: onTrackTap,
+                        onMoveTracks: onMoveTracks,
+                        onDeleteTrack: onDeleteTrack,
+                        onShowInLibrary: onShowInLibrary,
+                        onMoveToFolder: onMoveToFolder,
+                        onAddToTrackList: onAddToTrackList,
+                        onCopyTrack: onCopyTrack,
+                        onEditTags: onEditTags,
+                        onArtworkTap: onArtworkTap,
+                        onRequestSnapshot: onRequestSnapshot,
+                        onRenameTrack: onRenameTrack
+                    )
+                }
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)

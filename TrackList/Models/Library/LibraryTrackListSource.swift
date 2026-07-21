@@ -32,18 +32,6 @@ enum LibraryTrackListSource: Hashable, Identifiable {
         }
     }
 
-    /// Заголовок экрана, если источник сам владеет отображаемым названием.
-    var navigationTitle: String? {
-        switch self {
-        case .folder:
-            return nil
-        case .allLibraryTracks:
-            return "Треки"
-        case .collectionValue(_, let rawValue, _):
-            return rawValue
-        }
-    }
-
     /// Раздел коллекции, если источник открыт из артиста, альбома, жанра, лейбла или года.
     var collectionCategory: LibraryCollectionCategory? {
         switch self {

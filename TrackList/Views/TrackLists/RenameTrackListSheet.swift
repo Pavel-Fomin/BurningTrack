@@ -45,7 +45,7 @@ struct RenameTrackListSheet: View {
     var body: some View {
         NavigationBarHost(
             /// Заголовок шита
-            title: "Переименовать треклист",
+            title: "Rename Tracklist",
 
             /// Кнопка подтверждения (✓)
             rightButtonImage: "checkmark",
@@ -73,7 +73,7 @@ struct RenameTrackListSheet: View {
     private var form: some View {
         Form {
             Section {
-                TextField("Новое название", text: $name)
+                TextField("Tracklist Name", text: $name)
                     .clearable($name)
                     .focused($isNameFocused)
                     .textInputAutocapitalization(.never)

@@ -137,30 +137,6 @@ extension BatchFilenameRenameItem {
         }
     }
 
-    /// Текст статуса элемента плана.
-    var statusDescription: String? {
-        switch status {
-        case .ready:
-            return nil
-        case .renamed:
-            return "Переименовано"
-        case .missingArtist:
-            return "Не заполнен артист"
-        case .missingTitle:
-            return "Не заполнено название"
-        case .missingArtistAndTitle:
-            return "Не заполнены артист и название"
-        case .invalidTargetName:
-            return "Некорректное имя файла"
-        case .applyFailed:
-            return "Не удалось переименовать файл"
-        case .trackIsPlaying:
-            return "Файл сейчас используется плеером"
-        case .fileAccessDenied:
-            return "Нет доступа к файлу"
-        }
-    }
-
     /// Является ли текущий статус ошибкой.
     var isErrorStatus: Bool {
         switch status {

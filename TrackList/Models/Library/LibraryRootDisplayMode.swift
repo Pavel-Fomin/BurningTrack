@@ -22,16 +22,6 @@ enum LibraryRootDisplayMode: String, CaseIterable, Hashable, Identifiable {
         self
     }
 
-    /// Название режима в сегментированном переключателе.
-    var title: String {
-        switch self {
-        case .folders:
-            return "Папки"
-        case .tracks:
-            return "Треки"
-        }
-    }
-
     /// Иконка toolbar-кнопки для текущего режима корня.
     var systemImage: String {
         switch self {

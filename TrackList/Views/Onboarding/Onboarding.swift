@@ -30,14 +30,14 @@ struct OnboardingView: View {
             Spacer()
 
             HStack {
-                Button("Пропустить") {
+                Button("Skip") {
                     isPresented = false
                 }
                 .padding()
 
                 Spacer()
 
-                Button(currentStepIndex < steps.count - 1 ? "Дальше" : "Готово") {
+                Button(currentStepIndex < steps.count - 1 ? "Next" : "Done") {
                     if currentStepIndex < steps.count - 1 {
                         currentStepIndex += 1
                     } else {

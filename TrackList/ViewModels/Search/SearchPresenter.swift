@@ -18,7 +18,6 @@ struct SearchTrackDisplaySettings {
 
 // Собирает UI-состояние из запроса и результатов доменного сервиса.
 struct SearchPresenter {
-    private let trackListsStateBuilder = TrackListsScreenStateBuilder()
     /// Считает совпавшие поля и чипы фильтрации для треков.
     private let trackSearchFilterBuilder = TrackSearchFilterBuilder()
 
@@ -122,28 +121,7 @@ struct SearchPresenter {
     private func makeTrackListRows(
         from results: [SearchTrackListResult]
     ) -> [SearchTrackListRowState] {
-        let screenState = trackListsStateBuilder.build(
-            trackLists: results.map(\.trackList),
-            selectedSortMode: nil
-        )
-        let rowsById = Dictionary(
-            uniqueKeysWithValues: screenState.rows.map { row in
-                (row.id, row)
-            }
-        )
-
-        return results.compactMap { result in
-            guard let row = rowsById[result.id] else {
-                return nil
-            }
-
-            return SearchTrackListRowState(
-                result: result,
-                title: row.title,
-                createdAtText: row.createdAtText,
-                tracksCountText: row.tracksCountText
-            )
-        }
+        results.map(SearchTrackListRowState.init)
     }
 
     /// Форматирует найденные треки тем же runtime pipeline, что строки фонотеки.

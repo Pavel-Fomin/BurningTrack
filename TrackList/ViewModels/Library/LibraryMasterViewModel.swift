@@ -21,9 +21,8 @@ final class LibraryMasterViewModel: ObservableObject, LibraryMasterActionOutput 
         folders: [],
         showsPurchasedITunesSource: AppSettings.defaultValue.visible.library.isPurchasedITunesSourceVisible,
         isEmpty: true,
-        detachAlert: nil,
-        selectedSortMode: nil,
-        sortModeCaption: nil
+        folderContainsPlayingTrack: false,
+        selectedSortMode: nil
     )
     /// Последняя сортировка, выбранная через меню; nil означает ручной порядок.
     @Published private(set) var sortMode: LibraryFoldersSortMode?
@@ -97,7 +96,9 @@ final class LibraryMasterViewModel: ObservableObject, LibraryMasterActionOutput 
         } catch {
             rootDisplayMode = previousMode
             toastPresenter.handle(
-                .operationFailed(message: "Не удалось сохранить режим отображения фонотеки")
+                .operationFailed(
+                    message: LibraryPresentationText.displayModeSaveFailedMessage
+                )
             )
         }
     }
@@ -117,7 +118,9 @@ final class LibraryMasterViewModel: ObservableObject, LibraryMasterActionOutput 
             } catch {
                 try? settingsManager.setLibraryFoldersSortMode(previousSortMode)
                 toastPresenter.handle(
-                    .operationFailed(message: "Не удалось сохранить порядок папок")
+                    .operationFailed(
+                        message: LibraryPresentationText.folderOrderSaveFailedMessage
+                    )
                 )
                 refreshState()
             }
@@ -140,7 +143,9 @@ final class LibraryMasterViewModel: ObservableObject, LibraryMasterActionOutput 
             } catch {
                 try? settingsManager.setLibraryFoldersSortMode(previousSortMode)
                 toastPresenter.handle(
-                    .operationFailed(message: "Не удалось сохранить порядок папок")
+                    .operationFailed(
+                        message: LibraryPresentationText.folderOrderSaveFailedMessage
+                    )
                 )
                 refreshState()
             }

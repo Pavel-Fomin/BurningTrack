@@ -73,13 +73,13 @@ struct SearchScreen: View {
                     actionHandler.handle(action)
                 }
             )
-            .navigationTitle("Поиск")
+            .navigationTitle("Search")
             .toolbar {
                 searchToolbarContent
             }
             .searchable(
                 text: searchTextBinding,
-                prompt: "Поиск"
+                prompt: "Search"
             )
             .background(Color(.systemGroupedBackground))
             .onAppear {
@@ -123,18 +123,18 @@ struct SearchScreen: View {
                        let mode = group.modes.first {
                         searchSortButton(
                             mode: mode,
-                            title: group.title
+                            title: SearchPresentationText.sortGroupTitle(for: group)
                         )
                     } else {
                         Menu {
                             ForEach(group.modes) { mode in
                                 searchSortButton(
                                     mode: mode,
-                                    title: mode.groupedTitle
+                                    title: SearchPresentationText.groupedSortTitle(for: mode)
                                 )
                             }
                         } label: {
-                            Text(group.title)
+                            Text(SearchPresentationText.sortGroupTitle(for: group))
                         }
                     }
                 }
@@ -142,14 +142,14 @@ struct SearchScreen: View {
                 ForEach(viewModel.state.availableSortModes) { mode in
                     searchSortButton(
                         mode: mode,
-                        title: mode.title
+                        title: SearchPresentationText.sortTitle(for: mode)
                     )
                 }
             }
         } label: {
             Image(systemName: "arrow.up.arrow.down")
         }
-        .accessibilityLabel("Сортировка поиска")
+        .accessibilityLabel(String(localized: "Search Sorting"))
     }
 
     /// Для чипа "Все" показываем вложенные категории, для конкретного чипа — простой список.

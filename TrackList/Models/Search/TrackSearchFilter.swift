@@ -18,21 +18,11 @@ enum TrackSearchMatchField: Hashable {
         EditableTrackField.tagFields.map(TrackSearchMatchField.tag) + [.fileName]
     }
 
-    /// Короткий заголовок чипа без технических названий моделей.
-    var title: String {
-        switch self {
-        case .tag(let field):
-            return field.searchChipTitle
-        case .fileName:
-            return "Файл"
-        }
-    }
 }
 
 // Чип фильтра поиска: nil в field означает общий чип "Все".
 struct TrackSearchFilterChip: Identifiable, Equatable {
     let field: TrackSearchMatchField?
-    let title: String
     let count: Int
 
     /// Стабильный id не зависит от счётчика, чтобы выбор не пересоздавал все чипы.
@@ -89,7 +79,6 @@ struct TrackSearchFilterBuilder {
 
             return TrackSearchFilterChip(
                 field: field,
-                title: field.title,
                 count: count
             )
         }
@@ -97,7 +86,6 @@ struct TrackSearchFilterBuilder {
         return [
             TrackSearchFilterChip(
                 field: nil,
-                title: "Все",
                 count: results.count
             )
         ] + fieldChips
@@ -234,28 +222,6 @@ private extension TrackSearchMatchField {
             return "tag-\(field)"
         case .fileName:
             return "fileName"
-        }
-    }
-}
-
-private extension EditableTrackField {
-    /// В чипах нужны короткие подписи, потому что они стоят в плотной строке над выдачей.
-    var searchChipTitle: String {
-        switch self {
-        case .title:
-            return "Название"
-        case .artist:
-            return "Артист"
-        case .album:
-            return "Альбом"
-        case .genre:
-            return "Жанр"
-        case .year:
-            return "Год"
-        case .publisher:
-            return "Лейбл"
-        case .comment:
-            return "Комментарий"
         }
     }
 }

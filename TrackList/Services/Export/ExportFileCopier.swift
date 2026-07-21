@@ -10,7 +10,7 @@
 import Foundation
 
 /// Ошибки низкоуровневого копирования одного файла.
-enum ExportFileCopierError: LocalizedError {
+enum ExportFileCopierError: Error {
     /// Источник не существует или не является обычным файлом.
     case sourceIsNotRegularFile
 
@@ -23,18 +23,6 @@ enum ExportFileCopierError: LocalizedError {
     /// Размер источника изменился во время копирования.
     case sourceSizeChanged
 
-    var errorDescription: String? {
-        switch self {
-        case .sourceIsNotRegularFile:
-            return "Исходный объект не является доступным файлом."
-        case .destinationAlreadyExists:
-            return "Файл с таким именем уже существует в папке назначения."
-        case .temporaryFileCreationFailed:
-            return "Не удалось создать временный файл в папке назначения."
-        case .sourceSizeChanged:
-            return "Размер исходного файла изменился во время копирования."
-        }
-    }
 }
 
 /// Копирует один файл кусками, не удерживая весь аудиофайл в памяти.

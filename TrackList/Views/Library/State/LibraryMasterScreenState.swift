@@ -19,10 +19,8 @@ struct LibraryMasterScreenState {
     let showsPurchasedITunesSource: Bool
     /// Нужно ли показывать пустое состояние.
     let isEmpty: Bool
-    /// Состояние предупреждения перед откреплением папки.
-    let detachAlert: LibraryMasterDetachAlertState?
+    /// Нужно ли показать предупреждение перед откреплением папки с активным треком.
+    let folderContainsPlayingTrack: Bool
     /// Сортировка, выбранная через меню; nil означает ручной порядок без галочки.
     let selectedSortMode: LibraryFoldersSortMode?
-    /// Подпись сортировки для меню; nil означает, что caption не показывается.
-    let sortModeCaption: String?
 }

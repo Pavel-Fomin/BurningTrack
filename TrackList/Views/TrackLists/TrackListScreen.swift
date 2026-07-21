@@ -79,19 +79,19 @@ struct TrackListScreen: View {
                     Button {
                         actionHandler.handle(.addTrack)
                     } label: {
-                        Label("Добавить трек", systemImage: "plus.app")
+                        Label("Add Tracks", systemImage: "plus.app")
                     }
 
                     Button {
                         actionHandler.handle(.export)
                     } label: {
-                        Label("Экспорт", systemImage: "externaldrive")
+                        Label("Export", systemImage: "externaldrive")
                     }
 
                     Button {
                         actionHandler.handle(.renameTrackList)
                     } label: {
-                        Label("Переименовать", systemImage: "textformat")
+                        Label("Rename", systemImage: "textformat")
                     }
                 } label: {
                     Image(systemName: "ellipsis")

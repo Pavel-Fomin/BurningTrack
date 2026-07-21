@@ -17,9 +17,9 @@ struct SettingsView: View {
 
     var body: some View {
         List {
-            Section("Список треков") {
+            Section(SettingsPresentationText.trackListSectionTitle) {
                 Toggle(
-                    "Отображать метаданные",
+                    SettingsPresentationText.showMetadataTitle,
                     isOn: Binding(
                         get: {
                             state.isTagReadingEnabled
@@ -31,7 +31,7 @@ struct SettingsView: View {
                 )
 
                 Toggle(
-                    "Показывать «уже в…»",
+                    SettingsPresentationText.showTrackListMembershipTitle,
                     isOn: Binding(
                         get: {
                             state.isTrackListMembershipVisible
@@ -43,7 +43,7 @@ struct SettingsView: View {
                 )
 
                 Toggle(
-                    "Показывать формат",
+                    SettingsPresentationText.showFileFormatTitle,
                     isOn: Binding(
                         get: {
                             state.isFileFormatVisible
@@ -55,9 +55,9 @@ struct SettingsView: View {
                 )
             }
 
-            Section("Фонотека") {
+            Section(SettingsPresentationText.librarySectionTitle) {
                 Toggle(
-                    "Показывать купленное в iTunes",
+                    SettingsPresentationText.showITunesPurchasesTitle,
                     isOn: Binding(
                         get: {
                             state.isPurchasedITunesSourceVisible
@@ -68,7 +68,7 @@ struct SettingsView: View {
                     )
                 )
 
-                Text("Отображает раздел с локальными iTunes-треками в фонотеке.")
+                Text(SettingsPresentationText.iTunesPurchasesFooter)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }

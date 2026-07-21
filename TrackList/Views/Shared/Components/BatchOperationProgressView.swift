@@ -29,7 +29,10 @@ struct BatchOperationProgressView: View {
     }
 
     private var progressText: String {
-        "\(processedCount) из \(totalCount)"
+        SharedPresentationText.operationProgress(
+            processedCount: processedCount,
+            totalCount: totalCount
+        )
     }
 
     var body: some View {

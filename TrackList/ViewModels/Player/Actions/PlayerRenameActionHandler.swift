@@ -82,7 +82,9 @@ final class PlayerRenameActionHandler {
         }
 
         toastPresenter.handle(
-            .operationFailed(message: "Это действие недоступно для iTunes-трека")
+            .operationFailed(
+                message: PlayerPresentationText.purchasedITunesActionUnavailableMessage
+            )
         )
         return false
     }

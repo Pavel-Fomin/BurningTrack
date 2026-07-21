@@ -28,39 +28,19 @@ enum TrackCollectionSummaryFormatter {
         return parts.joined(separator: " • ")
     }
 
-    /// Склоняет слово «трек» по правилам русского языка.
+    /// Форматирует количество треков через plural-варианты String Catalog.
     private static func trackCountText(for count: Int) -> String {
-        let remainderHundred = count % 100
-        let remainderTen = count % 10
-
-        let noun: String
-        if (11...14).contains(remainderHundred) {
-            noun = "треков"
-        } else {
-            switch remainderTen {
-            case 1:
-                noun = "трек"
-            case 2...4:
-                noun = "трека"
-            default:
-                noun = "треков"
-            }
-        }
-
-        return "\(count) \(noun)"
+        let format = String(localized: "library.trackCount")
+        return String.localizedStringWithFormat(format, count)
     }
 
     /// Форматирует итоговую длительность в минутах либо часах и минутах.
     private static func durationText(for duration: TimeInterval) -> String {
-        let totalMinutes = max(0, Int(duration) / 60)
-        let hours = totalMinutes / 60
-        let minutes = totalMinutes % 60
-
-        guard hours > 0 else {
-            return "\(minutes) мин"
-        }
-
-        return "\(hours) ч \(String(format: "%02d", minutes)) мин"
+        let formatter = DateComponentsFormatter()
+        formatter.allowedUnits = [.hour, .minute]
+        formatter.unitsStyle = .abbreviated
+        formatter.zeroFormattingBehavior = .dropLeading
+        return formatter.string(from: max(0, duration)) ?? ""
     }
 
     /// Использует системный форматтер размера файлов и локаль устройства.

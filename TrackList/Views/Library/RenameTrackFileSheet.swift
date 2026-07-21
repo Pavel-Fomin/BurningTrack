@@ -27,7 +27,7 @@ struct RenameTrackFileSheet: View {
     var body: some View {
         Form {
             Section {
-                TextField("Название файла", text: $fileName)
+                TextField(String(localized: "File Name"), text: $fileName)
                     .clearable($fileName)
                     .focused(isFileNameFocused)
                     .textInputAutocapitalization(.never)

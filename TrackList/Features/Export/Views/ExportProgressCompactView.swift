@@ -54,22 +54,22 @@ struct ExportProgressCompactView: View {
 
     /// Формирует короткий итоговый текст успешного копирования.
     private var completedTitle: String {
-        "Копирование завершено"
+        ExportPresentationText.statusTitle(for: .completed)
     }
 
     /// Формирует короткий итоговый текст отменённого копирования.
     private var cancelledTitle: String {
-        "Копирование отменено"
+        ExportPresentationText.statusTitle(for: .cancelled)
     }
 
     /// Формирует короткий итоговый текст частично завершённого копирования.
     private var completedWithErrorsTitle: String {
-        "Копирование завершено с ошибками"
+        ExportPresentationText.statusTitle(for: .completedWithErrors)
     }
 
     /// Формирует короткий итоговый текст копирования с инфраструктурной ошибкой.
     private var failedTitle: String {
-        "Копирование завершилось с ошибкой"
+        ExportPresentationText.statusTitle(for: .failed)
     }
 
     /// Возвращает текст компактной панели для терминального результата.
@@ -84,7 +84,7 @@ struct ExportProgressCompactView: View {
         case .failed:
             return failedTitle
         case .idle, .preparing, .copying:
-            return "Экспортирую"
+            return ExportPresentationText.exportingTitle
         }
     }
 
@@ -127,11 +127,15 @@ struct ExportProgressCompactView: View {
                             .lineLimit(1)
                     } else {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Экспортирую")
+                            Text(ExportPresentationText.exportingTitle)
                                 .font(.subheadline)
                                 .lineLimit(1)
 
-                            Text(progress.sourceName)
+                            Text(
+                                ExportPresentationText.displaySourceName(
+                                    for: progress.sourceName
+                                )
+                            )
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
@@ -169,7 +173,7 @@ struct ExportProgressCompactView: View {
                 .buttonStyle(.plain)
                 // Область кнопки равна высоте верхней строки, поэтому крестик
                 // центрируется рядом с текстом и не меняет ширину содержимого панели.
-                .accessibilityLabel("Закрыть результат копирования")
+                .accessibilityLabel(ExportPresentationText.closeResultAccessibilityLabel)
                 .zIndex(1)
             }
         }
@@ -188,12 +192,16 @@ struct ExportProgressCompactView: View {
         // Повторяем горизонтальные отступы мини-плеера: 16 у стекла и 8 у общего хоста.
         .padding(.horizontal, 16)
         .accessibilityLabel(
-            isDismissibleResult ? resultTitle : "Прогресс экспорта"
+            isDismissibleResult
+            ? resultTitle
+            : ExportPresentationText.progressAccessibilityLabel
         )
         .accessibilityValue(
             isDismissibleResult
                 ? resultTitle
-                : "\(progressPercentageText), Экспортирую"
+                : ExportPresentationText.progressAccessibilityValue(
+                    percentage: Int((progressFraction * 100).rounded())
+                )
         )
     }
 }
@@ -232,7 +240,7 @@ private struct ExportProgressRingView: View {
                 .minimumScaleFactor(0.65)
         }
         .frame(width: 40, height: 40)
-        .accessibilityLabel("Прогресс экспорта")
+        .accessibilityLabel(ExportPresentationText.progressAccessibilityLabel)
         .accessibilityValue(percentageText)
     }
 

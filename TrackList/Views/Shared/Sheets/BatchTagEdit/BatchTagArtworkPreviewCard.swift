@@ -34,6 +34,20 @@ struct BatchTagArtworkPreviewCard: View {
                 onSelect()
             }
             .batchTagArtworkSelection(isSelected)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(
+                BatchTagEditPresentationText.artworkPreviewAccessibilityLabel(
+                    title: item.title,
+                    hasArtwork: hasArtworkForAccessibility
+                )
+            )
+            .accessibilityValue(
+                isSelected ? String(localized: "Selected") : ""
+            )
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction {
+                onSelect()
+            }
             .task(id: previewTaskId) {
                 await loadArtworkIfNeeded()
             }
@@ -98,6 +112,18 @@ struct BatchTagArtworkPreviewCard: View {
     /// Форматированный размер preview-обложки.
     private var formattedArtworkSize: String {
         BatchTagArtworkSizeFormatter.string(from: artworkSizeBytesForPreview)
+    }
+
+    /// Учитывает несохранённую замену или удаление при формировании VoiceOver-подписи.
+    private var hasArtworkForAccessibility: Bool {
+        switch artworkAction {
+        case .keep:
+            return hasArtworkForPreview
+        case .remove:
+            return false
+        case .replace:
+            return true
+        }
     }
 
     /// Подпись с размером обложки внутри карточки.

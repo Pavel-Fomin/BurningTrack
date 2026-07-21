@@ -62,16 +62,18 @@ final class ExportActionHandler {
         } catch let serviceError as TrackExportServiceError {
             if case .exportAlreadyRunning = serviceError {
                 toastPresenter.handle(
-                    .operationFailed(message: "Экспорт уже выполняется")
+                    .operationFailed(
+                        message: ExportPresentationText.alreadyRunningMessage
+                    )
                 )
             } else {
                 toastPresenter.handle(.exportFailed)
             }
             return nil
-        } catch let resolverError as ExportDestinationResolverError {
+        } catch is ExportDestinationResolverError {
             toastPresenter.handle(
                 .operationFailed(
-                    message: resolverError.localizedDescription
+                    message: ExportPresentationText.destinationSelectionFailedMessage
                 )
             )
             return nil

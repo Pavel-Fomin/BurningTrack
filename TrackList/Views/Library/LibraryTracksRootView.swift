@@ -29,7 +29,7 @@ struct LibraryTracksRootView: View {
                         .foregroundColor(.blue)
                         .frame(width: 24)
 
-                    Text(itemState.item.title)
+                    Text(LibraryPresentationText.collectionRootItemTitle(for: itemState.item))
                         .lineLimit(1)
 
                     Spacer()

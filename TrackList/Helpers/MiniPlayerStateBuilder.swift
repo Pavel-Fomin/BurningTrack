@@ -49,15 +49,15 @@ final class MiniPlayerStateBuilder {
         }()
 
         // Исполнителя берём из snapshot, если он есть.
-        // Если в тегах пусто — показываем fallback.
-        let artist: String = {
-            if !shouldShowTags { return "" }
+        // Если в тегах пусто — передаём отсутствие metadata в presentation-слой.
+        let artist: String? = {
+            if !shouldShowTags { return nil }
 
             if snapshot?.artist?.isEmpty == false {
-                return snapshot?.artist ?? ""
+                return snapshot?.artist
             }
 
-            return "Неизвестный артист"
+            return nil
         }()
 
         // Обложку строим из artworkData внутри snapshot.
@@ -92,12 +92,12 @@ final class MiniPlayerStateBuilder {
             return track.fileName
         }()
 
-        let artist: String = {
+        let artist: String? = {
             if track.artist?.isEmpty == false {
-                return track.artist ?? ""
+                return track.artist
             }
 
-            return "Неизвестный артист"
+            return nil
         }()
 
         // Для iTunes-трека не читаем файл и не используем TrackMetadataCacheManager.

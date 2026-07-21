@@ -27,22 +27,6 @@ enum LibraryCollectionCategory: String, CaseIterable, Hashable, Identifiable {
         self
     }
 
-    /// Название строки в списке разделов коллекции.
-    var title: String {
-        switch self {
-        case .artists:
-            return "Артисты"
-        case .albums:
-            return "Альбомы"
-        case .genres:
-            return "Жанры"
-        case .labels:
-            return "Лейблы"
-        case .years:
-            return "Годы"
-        }
-    }
-
     /// Системная иконка строки раздела.
     var systemImage: String {
         switch self {
@@ -57,11 +41,6 @@ enum LibraryCollectionCategory: String, CaseIterable, Hashable, Identifiable {
         case .years:
             return "calendar"
         }
-    }
-
-    /// Заголовок destination-экрана выбранного раздела.
-    var navigationTitle: String {
-        title
     }
 
     /// Поля события обновления, которые могут изменить принадлежность трека к разделу.

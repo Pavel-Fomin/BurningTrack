@@ -78,7 +78,7 @@ extension TrackRuntimeSnapshot {
     init(
         purchasedITunesTrack track: PurchasedITunesPlayableTrack
     ) {
-        let fallbackFileName = track.title ?? "iTunes-трек"
+        let fallbackFileName = track.title ?? track.fileName
 
         self.init(
             trackId: track.trackId,

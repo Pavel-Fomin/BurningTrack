@@ -39,7 +39,11 @@ struct LibraryCollectionValuesView: View {
 
     var body: some View {
         content
-            .navigationTitle(viewModel.state.category.navigationTitle)
+            .navigationTitle(
+                LibraryPresentationText.collectionCategoryTitle(
+                    for: viewModel.state.category
+                )
+            )
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -62,7 +66,7 @@ struct LibraryCollectionValuesView: View {
         } label: {
             Image(systemName: "arrow.up.arrow.down")
         }
-        .accessibilityLabel("Сортировка значений коллекции")
+        .accessibilityLabel("Collection Value Sorting")
     }
 
     /// Строит группу меню из тех режимов, которые разрешены для выбранного раздела.
@@ -83,7 +87,7 @@ struct LibraryCollectionValuesView: View {
                     valueSortButton(mode)
                 }
             } label: {
-                Text(group.title)
+                Text(LibraryPresentationText.collectionValueSortMenuGroupTitle(for: group))
             }
         }
     }
@@ -96,7 +100,7 @@ struct LibraryCollectionValuesView: View {
             viewModel.setSortMode(mode)
         } label: {
             Label {
-                Text(mode.menuTitle)
+                Text(LibraryPresentationText.collectionValueSortModeTitle(for: mode))
             } icon: {
                 if viewModel.sortMode == mode {
                     Image(systemName: "checkmark")
@@ -121,7 +125,7 @@ struct LibraryCollectionValuesView: View {
         VStack(spacing: 12) {
             ProgressView()
 
-            Text("Загружаю значения")
+            Text("Loading Values")
                 .font(.body)
                 .foregroundStyle(.secondary)
         }
@@ -130,7 +134,7 @@ struct LibraryCollectionValuesView: View {
 
     /// Показывает пустое состояние, если в сохранённых metadata нет значений раздела.
     private var emptyView: some View {
-        Text("Нет значений")
+        Text("No Values")
             .font(.body)
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, maxHeight: .infinity)

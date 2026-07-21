@@ -189,20 +189,12 @@ final class SearchViewModel: ObservableObject {
                     results: .empty
                 )
                 toastPresenter.handle(
-                    .operationFailed(message: Self.errorMessage(from: error))
+                    .operationFailed(
+                        message: SearchPresentationText.searchFailedMessage
+                    )
                 )
             }
         }
-    }
-
-    /// Показывает конкретную ошибку доменного слоя, если она содержит текст.
-    private static func errorMessage(from error: Error) -> String {
-        if let localizedError = error as? LocalizedError,
-           let description = localizedError.errorDescription {
-            return description
-        }
-
-        return "Не удалось выполнить поиск"
     }
 
     /// Пересобирает state, если snapshot относится к текущей выдаче.

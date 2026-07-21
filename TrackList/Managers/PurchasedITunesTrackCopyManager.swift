@@ -11,27 +11,13 @@ import Foundation
 @preconcurrency import AVFoundation
 
 /// Ошибки копирования iTunes-трека на уровне файлового слоя.
-enum PurchasedITunesTrackCopyError: LocalizedError {
+enum PurchasedITunesTrackCopyError: Error {
     case sourceUnavailable
     case destinationFolderUnavailable
     case exportSessionUnavailable
     case exportFailed(underlying: Error?)
     case copyFailed(underlying: Error)
 
-    var errorDescription: String? {
-        switch self {
-        case .sourceUnavailable:
-            return "Исходный iTunes-трек недоступен."
-        case .destinationFolderUnavailable:
-            return "Папка назначения недоступна."
-        case .exportSessionUnavailable:
-            return "Не удалось подготовить экспорт iTunes-трека."
-        case .exportFailed(let underlying):
-            return "Не удалось экспортировать iTunes-трек: \(underlying?.localizedDescription ?? "неизвестная ошибка")"
-        case .copyFailed(let underlying):
-            return "Не удалось скопировать iTunes-трек: \(underlying.localizedDescription)"
-        }
-    }
 }
 
 /// Результат копирования iTunes-трека в фонотеку.

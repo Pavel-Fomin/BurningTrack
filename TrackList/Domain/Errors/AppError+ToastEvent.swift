@@ -8,7 +8,7 @@
 //  - хранит единый маппинг AppError -> ToastEvent;
 //  - не показывает Toast самостоятельно;
 //  - не содержит бизнес-логики.
-//  - используется только как слой преобразования между ошибкой и пользовательским сообщением.
+//  - использует presentation-слой для формирования пользовательского сообщения.
 //
 //  Created by Pavel Fomin on 04.05.2026.
 //
@@ -24,16 +24,24 @@ extension AppError {
         // MARK: - Файлы
 
         case .fileNotFound:
-            return .operationFailed(message: "Файл не найден")
+            return .operationFailed(
+                message: AppMessagePresentationText.fileNotFoundMessage
+            )
 
         case .fileAccessDenied:
-            return .operationFailed(message: "Нет доступа к файлу")
+            return .operationFailed(
+                message: AppMessagePresentationText.fileAccessDeniedMessage
+            )
 
         case .fileNotPlayable:
-            return .operationFailed(message: "Файл нельзя воспроизвести")
+            return .operationFailed(
+                message: PlayerPresentationText.trackNotPlayableMessage
+            )
 
         case .fileAlreadyExists:
-            return .operationFailed(message: "Файл уже существует")
+            return .operationFailed(
+                message: FileRenamePresentationText.nameConflictTitle
+            )
 
         case .fileMoveFailed:
             return .fileMoveFailed
@@ -42,62 +50,90 @@ extension AppError {
             return .fileRenameFailed
 
         case .purchasedITunesCopyFailed:
-            return .operationFailed(message: "Не удалось скопировать iTunes-трек")
+            return .operationFailed(
+                message: MoveToFolderPresentationText.purchasedITunesTrackCopyFailedMessage
+            )
 
         // MARK: - Закладки доступа
 
         case .bookmarkMissing:
-            return .operationFailed(message: "Доступ к файлу не найден")
+            return .operationFailed(
+                message: AppMessagePresentationText.bookmarkMissingMessage
+            )
 
         case .bookmarkStale:
-            return .operationFailed(message: "Доступ к файлу устарел")
+            return .operationFailed(
+                message: AppMessagePresentationText.bookmarkStaleMessage
+            )
 
         case .bookmarkResolveFailed:
-            return .operationFailed(message: "Не удалось восстановить доступ к файлу")
+            return .operationFailed(
+                message: AppMessagePresentationText.bookmarkResolveFailedMessage
+            )
 
         case .bookmarkCreateFailed:
-            return .operationFailed(message: "Не удалось сохранить доступ к файлу")
+            return .operationFailed(
+                message: AppMessagePresentationText.bookmarkCreateFailedMessage
+            )
 
         // MARK: - Фонотека
 
         case .libraryFolderAccessDenied:
-            return .operationFailed(message: "Нет доступа к папке")
+            return .operationFailed(
+                message: LibraryPresentationText.libraryAccessDeniedMessage
+            )
 
         case .libraryFolderUnavailable:
-            return .operationFailed(message: "Папка фонотеки недоступна")
+            return .operationFailed(
+                message: LibraryPresentationText.libraryFolderUnavailableMessage
+            )
 
         case .libraryRestoreFailed:
-            return .operationFailed(message: "Не удалось восстановить доступ к фонотеке")
+            return .operationFailed(
+                message: LibraryPresentationText.libraryRestoreFailedMessage
+            )
 
         case .librarySyncFailed:
-            return .operationFailed(message: "Не удалось обновить фонотеку")
+            return .operationFailed(
+                message: LibraryPresentationText.librarySyncFailedMessage
+            )
 
         // MARK: - Треки
 
         case .trackUnavailable:
-            return .trackUnavailable(title: "Трек")
+            return .trackUnavailable(title: nil)
 
         case .trackNotFound:
-            return .operationFailed(message: "Трек не найден")
+            return .operationFailed(
+                message: AppMessagePresentationText.trackNotFoundMessage
+            )
 
         // MARK: - Треклисты
 
         case .trackListNotFound:
-            return .operationFailed(message: "Треклист не найден")
+            return .operationFailed(
+                message: TrackListPresentationText.notFoundMessage
+            )
 
         case .trackListLoadFailed:
-            return .operationFailed(message: "Не удалось загрузить треклист")
+            return .operationFailed(
+                message: TrackListPresentationText.loadFailedMessage
+            )
 
         case .trackListSaveFailed:
             return .trackListSaveFailed
 
         case .trackListNameInvalid:
-            return .operationFailed(message: "Некорректное имя треклиста")
+            return .operationFailed(
+                message: TrackListPresentationText.invalidNameMessage
+            )
 
         // MARK: - Плеер
 
         case .playlistLoadFailed:
-            return .operationFailed(message: "Не удалось загрузить плеер")
+            return .operationFailed(
+                message: PlayerPresentationText.playlistLoadFailedMessage
+            )
 
         case .playlistSaveFailed:
             return .playlistSaveFailed
@@ -108,7 +144,9 @@ extension AppError {
             return .importFailed
 
         case .importPartiallyFailed:
-            return .operationFailed(message: "Импорт выполнен частично")
+            return .operationFailed(
+                message: LibraryPresentationText.importPartiallyFailedMessage
+            )
 
         // MARK: - Экспорт
 
@@ -116,7 +154,9 @@ extension AppError {
             return .noTracksToExport
 
         case .exportNoFilesPrepared:
-            return .operationFailed(message: "Нет файлов для экспорта")
+            return .operationFailed(
+                message: ExportPresentationText.noFilesPreparedMessage
+            )
 
         case .exportFailed:
             return .exportFailed
@@ -124,15 +164,17 @@ extension AppError {
         // MARK: - Воспроизведение
 
         case .playbackFailed:
-            return .playbackFailed(title: "Трек")
+            return .playbackFailed(title: nil)
 
         case .audioSessionFailed:
-            return .operationFailed(message: "Не удалось подготовить звук")
+            return .audioSessionFailed
 
         // MARK: - Метаданные
 
         case .metadataReadFailed:
-            return .operationFailed(message: "Не удалось прочитать данные трека")
+            return .operationFailed(
+                message: TrackDetailPresentationText.metadataReadFailedMessage
+            )
 
         case .tagWriteFailed:
             return .tagWriteFailed
@@ -151,7 +193,9 @@ extension AppError {
         // MARK: - Неизвестная ошибка
 
         case .unknown:
-            return .operationFailed(message: "Неизвестная ошибка")
+            return .operationFailed(
+                message: AppMessagePresentationText.unknownErrorMessage
+            )
         }
     }
 }

@@ -111,7 +111,9 @@ final class SearchActionHandler {
                 ToastManager.shared.handle(appError)
             } catch {
                 ToastManager.shared.handle(
-                    .operationFailed(message: "Не удалось добавить трек в плеер")
+                    .operationFailed(
+                        message: PlayerPresentationText.addTrackToPlayerFailedMessage
+                    )
                 )
             }
         }

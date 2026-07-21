@@ -26,7 +26,7 @@ struct TrackDetailReadOnlyView: View {
     let artworkUIImage: UIImage?
     let filePath: String?
     let fileName: String?
-    let tags: [(key: String, value: String)]
+    let tags: [(field: EditableTrackField, value: String)]
     
     // MARK: - UI
     
@@ -44,21 +44,23 @@ struct TrackDetailReadOnlyView: View {
             Section {
                 
                 ListRow(
-                    title: "Путь к файлу",
-                    value: filePath ?? "—",
+                    title: TrackDetailPresentationText.filePathTitle,
+                    value: filePath ?? TrackDetailPresentationText.unavailableTechnicalValue,
                     isMonospaced: true,
                     isSecondary: true
                 )
                 
                 ListRow(
-                    title: "Название файла",
-                    value: fileName ?? "—"
+                    title: TagEditorPresentationText.fileNameTitle,
+                    value: fileName ?? TrackDetailPresentationText.unavailableTechnicalValue
                 )
                 
-                ForEach(tags, id: \.key) { item in
+                ForEach(tags, id: \.field) { item in
                     ListRow(
-                        title: item.key,
-                        value: item.value.isEmpty ? "—" : item.value
+                        title: TagEditorPresentationText.fieldTitle(for: item.field),
+                        value: item.value.isEmpty
+                            ? TrackDetailPresentationText.missingMetadataValue
+                            : item.value
                     )
                 }
             }
@@ -91,6 +93,11 @@ struct TrackDetailReadOnlyView: View {
         }
         .frame(maxWidth: .infinity)
         .background(Color.clear)
+        .accessibilityLabel(
+            TagEditorPresentationText.artworkAccessibilityLabel(
+                hasArtwork: artworkUIImage != nil
+            )
+        )
     }
     
     // MARK: - ListRow

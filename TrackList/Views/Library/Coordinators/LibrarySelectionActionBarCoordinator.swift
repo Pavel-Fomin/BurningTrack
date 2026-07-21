@@ -21,9 +21,9 @@ struct LibrarySelectionActionBarCoordinator {
         guard let pendingAction else { return nil }
 
         return SelectionActionBarConfig(
-            title: pendingAction.title,
-            subtitle: "Выбрано: \(selectedCount)",
-            primaryTitle: "Применить",
+            title: LibraryPresentationText.bulkActionTitle(for: pendingAction),
+            subtitle: LibraryPresentationText.selectedTrackCountText(for: selectedCount),
+            primaryTitle: "Apply",
             iconName: pendingAction.iconName,
             isPrimaryEnabled: hasSelection,
             onPrimaryTap: onPrimaryTap

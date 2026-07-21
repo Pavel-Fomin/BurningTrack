@@ -24,19 +24,21 @@ struct MiniPlayerTransportControlsView: View {
         HStack(spacing: 0) {
             controlButton(
                 systemName: "backward.end.fill",
-                accessibilityLabel: "Предыдущий трек",
+                accessibilityLabel: String(localized: "Previous Track"),
                 action: onPrevious
             )
 
             controlButton(
                 systemName: isPlaying ? "pause.fill" : "play.fill",
-                accessibilityLabel: isPlaying ? "Пауза" : "Воспроизвести",
+                accessibilityLabel: isPlaying
+                    ? String(localized: "Pause")
+                    : String(localized: "Play"),
                 action: onPlayPause
             )
 
             controlButton(
                 systemName: "forward.end.fill",
-                accessibilityLabel: "Следующий трек",
+                accessibilityLabel: String(localized: "Next Track"),
                 action: onNext
             )
         }

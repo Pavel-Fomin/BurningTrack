@@ -24,7 +24,9 @@ struct TrackListLiveActivity: Widget {
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
                     Image(systemName: "arrow.up.circle.fill")
-                        .accessibilityLabel("Операция выполняется")
+                        .accessibilityLabel(
+                            ProgressLiveActivityPresentationText.operationInProgressAccessibilityLabel
+                        )
                 }
 
                 DynamicIslandExpandedRegion(.trailing) {
@@ -143,7 +145,9 @@ private struct ProgressLiveActivityProgressRingView: View {
             width: ProgressLiveActivityStyle.progressSide,
             height: ProgressLiveActivityStyle.progressSide
         )
-        .accessibilityLabel("Прогресс операции")
+        .accessibilityLabel(
+            ProgressLiveActivityPresentationText.progressAccessibilityLabel
+        )
     }
 }
 
@@ -248,7 +252,12 @@ private struct ProgressLiveActivityTitleView: View {
 
     /// Показывает название операции и объекта без полного пути.
     var body: some View {
-        Text("\(attributes.operationTitle) «\(attributes.subjectTitle)»")
+        Text(
+            ProgressLiveActivityPresentationText.operationTitle(
+                operationTitle: attributes.operationTitle,
+                subjectTitle: attributes.subjectTitle
+            )
+        )
             .font(.headline)
             .lineLimit(1)
             .minimumScaleFactor(0.65)
@@ -263,7 +272,12 @@ private struct ProgressLiveActivityCountView: View {
 
     /// Отображает счётчик без добавления технических пояснений.
     var body: some View {
-        Text("\(state.completedUnits) из \(state.totalUnits)")
+        Text(
+            ProgressLiveActivityPresentationText.progressCount(
+                completedUnits: state.completedUnits,
+                totalUnits: state.totalUnits
+            )
+        )
             .font(.title3.weight(.semibold))
             .monospacedDigit()
             .lineLimit(1)
@@ -301,5 +315,38 @@ private extension ProgressActivityAttributes.ContentState {
     /// Процент выполнения для подписей в Live Activity.
     var percentageText: String {
         "\(Int((fractionCompleted * 100).rounded()))%"
+    }
+}
+
+/// Формирует локализованные подписи интерфейса Live Activity.
+private enum ProgressLiveActivityPresentationText {
+    static var operationInProgressAccessibilityLabel: String {
+        String(localized: "Operation in Progress")
+    }
+
+    static var progressAccessibilityLabel: String {
+        String(localized: "Operation Progress")
+    }
+
+    static func operationTitle(
+        operationTitle: String,
+        subjectTitle: String
+    ) -> String {
+        String.localizedStringWithFormat(
+            String(localized: "%1$@ “%2$@”"),
+            operationTitle,
+            subjectTitle
+        )
+    }
+
+    static func progressCount(
+        completedUnits: Int,
+        totalUnits: Int
+    ) -> String {
+        String.localizedStringWithFormat(
+            String(localized: "%1$lld of %2$lld"),
+            completedUnits,
+            totalUnits
+        )
     }
 }

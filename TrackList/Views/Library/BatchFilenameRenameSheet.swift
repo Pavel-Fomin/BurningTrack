@@ -51,7 +51,7 @@ struct BatchFilenameRenameSheet: View {
 
     private var preparingProgressView: some View {
         BatchOperationProgressView(
-            title: "Читаю теги…",
+            title: FileRenamePresentationText.readingTagsTitle,
             processedCount: flow.preparedRenameCount,
             totalCount: flow.totalPrepareCount
         )
@@ -59,7 +59,7 @@ struct BatchFilenameRenameSheet: View {
 
     private var applyingProgressView: some View {
         BatchOperationProgressView(
-            title: "Переименовываю файлы…",
+            title: FileRenamePresentationText.renamingFilesTitle,
             processedCount: flow.processedRenameCount,
             totalCount: flow.totalRenameCount
         )
@@ -69,9 +69,9 @@ struct BatchFilenameRenameSheet: View {
     private var listContent: some View {
         if rows.isEmpty {
             ContentUnavailableView(
-                "Нет файлов",
+                FileRenamePresentationText.noFilesTitle,
                 systemImage: "music.note.list",
-                description: Text("Все треки исключены из операции.")
+                description: Text(FileRenamePresentationText.noFilesDescription)
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
@@ -96,7 +96,7 @@ struct BatchFilenameRenameSheet: View {
             Button {
                 onRename()
             } label: {
-                Text("Переименовать")
+                Text(String(localized: "Rename"))
                     .frame(maxWidth: .infinity)
             }
             .primaryButtonStyle()
@@ -110,7 +110,7 @@ struct BatchFilenameRenameSheet: View {
 
     private var strategyPickerRow: some View {
         HStack(spacing: 12) {
-            Text("Как переименовать")
+            Text(FileRenamePresentationText.howToRenameTitle)
                 .font(.body)
                 .foregroundStyle(.primary)
                 .lineLimit(1)
@@ -123,9 +123,18 @@ struct BatchFilenameRenameSheet: View {
                     onSelectStrategy(.artistTitle)
                 } label: {
                     if flow.strategy == .artistTitle {
-                        Label("Артист - Название", systemImage: "checkmark")
+                        Label(
+                            FileRenamePresentationText.strategyTitle(
+                                for: FilenameRenameStrategy.artistTitle
+                            ),
+                            systemImage: "checkmark"
+                        )
                     } else {
-                        Text("Артист - Название")
+                        Text(
+                            FileRenamePresentationText.strategyTitle(
+                                for: FilenameRenameStrategy.artistTitle
+                            )
+                        )
                     }
                 }
 
@@ -133,9 +142,18 @@ struct BatchFilenameRenameSheet: View {
                     onSelectStrategy(.titleArtist)
                 } label: {
                     if flow.strategy == .titleArtist {
-                        Label("Название - Артист", systemImage: "checkmark")
+                        Label(
+                            FileRenamePresentationText.strategyTitle(
+                                for: FilenameRenameStrategy.titleArtist
+                            ),
+                            systemImage: "checkmark"
+                        )
                     } else {
-                        Text("Название - Артист")
+                        Text(
+                            FileRenamePresentationText.strategyTitle(
+                                for: FilenameRenameStrategy.titleArtist
+                            )
+                        )
                     }
                 }
             } label: {
@@ -166,11 +184,15 @@ struct BatchFilenameRenameSheet: View {
     private var selectedStrategyTitle: String {
         switch flow.strategy {
         case .artistTitle:
-            return "Артист - Название"
+            return FileRenamePresentationText.strategyTitle(
+                for: FilenameRenameStrategy.artistTitle
+            )
         case .titleArtist:
-            return "Название - Артист"
+            return FileRenamePresentationText.strategyTitle(
+                for: FilenameRenameStrategy.titleArtist
+            )
         case nil:
-            return "Выберите"
+            return FileRenamePresentationText.chooseStrategyTitle
         }
     }
 
@@ -192,7 +214,9 @@ struct BatchFilenameRenameSheet: View {
             BatchFilenameRenameDisplayRow(
                 trackId: item.trackId,
                 fileName: item.displayedFileName,
-                statusDescription: item.statusDescription,
+                statusDescription: FileRenamePresentationText.statusDescription(
+                    for: item.status
+                ),
                 statusStyle: statusStyle(
                     isError: item.isErrorStatus,
                     isSuccess: item.isSuccessStatus

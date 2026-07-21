@@ -18,7 +18,7 @@
 import Foundation
 
 /// Ошибки файловых операций с треками.
-enum LibraryFileError: LocalizedError {
+enum LibraryFileError: Error {
     case trackIsPlaying
     case trackNotFound
     case sourceURLUnavailable
@@ -28,26 +28,6 @@ enum LibraryFileError: LocalizedError {
     case bookmarkCreationFailed
     case relativePathFailed
 
-    var errorDescription: String? {
-        switch self {
-        case .trackIsPlaying:
-            return "Трек сейчас воспроизводится. Остановите плеер, чтобы переместить или переименовать файл."
-        case .trackNotFound:
-            return "Трек не найден в реестре."
-        case .sourceURLUnavailable:
-            return "Не удалось получить исходный URL файла."
-        case .destinationFolderUnavailable:
-            return "Не удалось получить URL целевой папки."
-        case .destinationAlreadyExists:
-            return "В целевой папке уже существует файл с таким именем."
-        case .moveFailed(let underlying):
-            return "Не удалось выполнить файловую операцию: \(underlying.localizedDescription)"
-        case .bookmarkCreationFailed:
-            return "Не удалось создать новый bookmark для файла."
-        case .relativePathFailed:
-            return "Не удалось обновить путь файла в фонотеке."
-        }
-    }
 }
 
 /// Менеджер, отвечающий за операции с физическими файлами треков.
