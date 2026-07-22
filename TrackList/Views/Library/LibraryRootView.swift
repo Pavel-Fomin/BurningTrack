@@ -25,30 +25,44 @@ struct LibraryRootView: View {
 
     var body: some View {
         List {
-            Section("Collection") {
+            // Категории коллекции образуют самостоятельный компактный блок без заголовка секции.
+            Section {
                 LibraryTracksRootView(
                     rootItems: collectionRootItems,
                     onRootItemSelected: onCollectionRootItemSelected
                 )
-
-                if folderState.showsPurchasedITunesSource {
-                    purchasedITunesRow
-                }
+                // Сетка начинается у границ inset grouped-контейнера без второго внутреннего отступа строки.
+                .listRowInsets(
+                    EdgeInsets(
+                        top: 0,
+                        leading: 0,
+                        bottom: 0,
+                        trailing: 0
+                    )
+                )
+                // Сетка сама рисует системные карточки, поэтому фон строки списка остаётся прозрачным.
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
             }
 
             Section("Folders") {
-                // Секция папок остаётся самостоятельным компонентом и не смешивает свои строки с коллекцией.
+                // Виртуальный источник отображается первой строкой, но не входит в массив реальных папок.
+                if folderState.showsPurchasedITunesSource {
+                    purchasedITunesRow
+                }
+
+                // Секция папок остаётся самостоятельным компонентом и не смешивает свои строки с виртуальным источником.
                 MusicLibraryView(
                     state: folderState,
                     onAction: onFolderAction
                 )
             }
         }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
+        // Нативный inset grouped-стиль объединяет iTunes, реальные папки и добавление папки в одну секцию.
+        .listStyle(.insetGrouped)
     }
 
-    /// Строит строку виртуального источника iTunes в секции коллекции отдельно от реальных папок.
+    /// Строит строку виртуального источника iTunes в секции папок отдельно от реальных папок.
     private var purchasedITunesRow: some View {
         Button {
             onFolderAction(.openPurchasedITunes)
