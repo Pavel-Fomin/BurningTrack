@@ -31,6 +31,7 @@ struct TrackListViewModelFactory {
             toastPresenter: ToastManager.shared,
             commandExecutor: AppCommandExecutor.shared,
             eventProvider: NotificationTrackListEventProvider(),
+            settingsManager: AppSettingsManager.shared,
             playbackStateProvider: playbackStateProvider,
             runtimeSnapshotProvider: TrackRuntimeStore.shared,
             runtimeSnapshotBuilder: TrackRuntimeSnapshotBuilder.shared,

@@ -79,7 +79,7 @@ final class PlayerScreenViewModel: ObservableObject {
         observePlaylist()
         observePlaybackState()
         observeSnapshots()
-        observeMetadataChanges()
+        observeDisplaySettings()
         observeHighlightedRow()
     }
 
@@ -161,11 +161,13 @@ final class PlayerScreenViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 
-    /// Наблюдает за изменениями настроек отображения.
-    private func observeMetadataChanges() {
-        NotificationCenter.default.publisher(
-            for: .appSettingsDidChange
-        )
+    /// Обновляет строки плеера только при изменении отображаемых в них полей.
+    private func observeDisplaySettings() {
+        appSettingsManager.settingsPublisher
+        .removeDuplicates { previous, current in
+            previous.visible.metadata.isTagReadingEnabled == current.visible.metadata.isTagReadingEnabled &&
+            previous.visible.library.isFileFormatVisible == current.visible.library.isFileFormatVisible
+        }
         .receive(on: DispatchQueue.main)
         .sink { [weak self] _ in
             guard let self else { return }

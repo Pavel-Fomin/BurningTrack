@@ -35,7 +35,7 @@ struct TrackListRowStateBuilder {
             isCurrent: isCurrent,
             isPlaying: isPlaying,
             isHighlighted: isHighlighted,
-            settingsManager: .shared
+            settings: AppSettingsManager.shared.settings
         )
     }
 
@@ -47,7 +47,7 @@ struct TrackListRowStateBuilder {
     ///   - isCurrent: Является ли строка текущим треком.
     ///   - isPlaying: Воспроизводится ли текущая строка.
     ///   - isHighlighted: Нужно ли подсветить строку.
-    ///   - settingsManager: Менеджер настроек отображения.
+    ///   - settings: Снимок настроек отображения на момент сборки состояния.
     /// - Returns: Готовое состояние строки для UI.
     func build(
         track: Track,
@@ -55,10 +55,10 @@ struct TrackListRowStateBuilder {
         isCurrent: Bool,
         isPlaying: Bool,
         isHighlighted: Bool,
-        settingsManager: AppSettingsManager
+        settings: AppSettings
     ) -> TrackListRowState {
-        let shouldShowTags = settingsManager.settings.visible.metadata.isTagReadingEnabled
-        let shouldShowFileFormat = settingsManager.settings.visible.library.isFileFormatVisible
+        let shouldShowTags = settings.visible.metadata.isTagReadingEnabled
+        let shouldShowFileFormat = settings.visible.library.isFileFormatVisible
         if track.isPurchasedITunesRuntimeTrack {
             return TrackListRowState(
                 id: track.id,

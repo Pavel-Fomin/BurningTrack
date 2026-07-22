@@ -113,7 +113,7 @@ final class AppSettingsManager: ObservableObject, SettingsManaging, PlaybackMode
         settings.visible.library.isTrackListMembershipVisible = value
         save()
 
-        NotificationCenter.default.post(name: .appSettingsDidChange, object: nil)
+        // Видимость бейджа относится только к presentation state строк фонотеки и поиска.
     }
 
     func setFileFormatVisible(_ value: Bool) {
@@ -122,7 +122,7 @@ final class AppSettingsManager: ObservableObject, SettingsManaging, PlaybackMode
         settings.visible.library.isFileFormatVisible = value
         save()
 
-        NotificationCenter.default.post(name: .appSettingsDidChange, object: nil)
+        // Формат файла не меняет metadata трека и не требует пересборки runtime snapshot-ов плеера.
     }
 
     func setPurchasedITunesSourceVisible(_ value: Bool) {
@@ -131,7 +131,7 @@ final class AppSettingsManager: ObservableObject, SettingsManaging, PlaybackMode
         settings.visible.library.isPurchasedITunesSourceVisible = value
         save()
 
-        NotificationCenter.default.post(name: .appSettingsDidChange, object: nil)
+        // Видимость источника обновляется корневым экраном фонотеки через settingsPublisher.
     }
 
     /// Сохраняет состояние раскрытия мини-плеера среди общих настроек интерфейса.
@@ -174,7 +174,7 @@ final class AppSettingsManager: ObservableObject, SettingsManaging, PlaybackMode
             throw error
         }
 
-        NotificationCenter.default.post(name: .appSettingsDidChange, object: nil)
+        // Сортировка уже применяется инициировавшей LibraryTracksViewModel и не касается плеера.
     }
 
     func setTrackListsSortMode(_ mode: TrackListsSortMode?) throws {
@@ -190,7 +190,7 @@ final class AppSettingsManager: ObservableObject, SettingsManaging, PlaybackMode
             throw error
         }
 
-        NotificationCenter.default.post(name: .appSettingsDidChange, object: nil)
+        // Сортировка уже применяется инициировавшей TrackListsViewModel и не касается плеера.
     }
 
 }

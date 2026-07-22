@@ -56,9 +56,14 @@ final class LibraryMasterViewModel: ObservableObject, LibraryMasterActionOutput 
 
     /// Пересобирает состояние экрана из актуального состояния MusicLibraryManager.
     func refreshState() {
+        refreshState(using: settingsManager.settings)
+    }
+
+    /// Использует полученный снимок настроек, чтобы состояние не зависело от порядка публикации @Published.
+    private func refreshState(using settings: AppSettings) {
         screenState = stateBuilder.build(
             manager: manager,
-            settings: settingsManager.settings,
+            settings: settings,
             pendingDetachFolder: pendingDetachFolder
         )
     }
@@ -109,13 +114,15 @@ final class LibraryMasterViewModel: ObservableObject, LibraryMasterActionOutput 
             .store(in: &cancellables)
     }
 
-    /// Подписывается на настройки, чтобы корень фонотеки скрывал или показывал iTunes row без перезапуска.
+    /// Подписывается только на настройку, которая меняет строки корня фонотеки.
     private func observeSettings() {
         settingsManager.settingsPublisher
-            .sink { [weak self] _ in
-                Task { @MainActor in
-                    self?.refreshState()
-                }
+            .removeDuplicates { previous, current in
+                previous.visible.library.isPurchasedITunesSourceVisible == current.visible.library.isPurchasedITunesSourceVisible
+            }
+            .sink { [weak self] settings in
+                // Используем payload Publisher, чтобы не прочитать предыдущее значение @Published.
+                self?.refreshState(using: settings)
             }
             .store(in: &cancellables)
     }

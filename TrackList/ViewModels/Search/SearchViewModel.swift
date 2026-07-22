@@ -6,6 +6,7 @@
 //  Created by Pavel Fomin on 07.07.2026.
 //
 
+import Combine
 import Foundation
 
 @MainActor
@@ -38,6 +39,8 @@ final class SearchViewModel: ObservableObject {
     private var selectedTrackFilterField: TrackSearchMatchField?
     /// Выбранная сортировка поиска применяется только к отображаемой выдаче.
     private var selectedSortMode: SearchSortMode = .titleAsc
+    /// Удерживает подписку на изменения presentation-настроек результатов поиска.
+    private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Init
 
@@ -54,6 +57,7 @@ final class SearchViewModel: ObservableObject {
         self.toastPresenter = toastPresenter
         self.presenter = presenter
         self.state = presenter.empty()
+        observeDisplaySettings()
     }
 
     deinit {
@@ -209,6 +213,36 @@ final class SearchViewModel: ObservableObject {
         )
     }
 
+    /// Обновляет только уже показанные результаты при изменении их presentation-настроек.
+    private func observeDisplaySettings() {
+        settingsManager.settingsPublisher
+            .removeDuplicates { previous, current in
+                previous.visible.metadata.isTagReadingEnabled == current.visible.metadata.isTagReadingEnabled &&
+                previous.visible.library.isTrackListMembershipVisible == current.visible.library.isTrackListMembershipVisible &&
+                previous.visible.library.isFileFormatVisible == current.visible.library.isFileFormatVisible
+            }
+            .sink { [weak self] settings in
+                // Используем payload Publisher, чтобы не прочитать предыдущее значение @Published.
+                self?.refreshDisplayedResults(using: settings)
+            }
+            .store(in: &cancellables)
+    }
+
+    /// Не запускает новый поиск, если настройка влияет только на отображение уже полученных строк.
+    private func refreshDisplayedResults(using settings: AppSettings) {
+        switch state.contentState {
+        case .results, .noResults:
+            state = makeResultsState(
+                query: state.query,
+                results: currentResults,
+                settings: settings
+            )
+
+        case .emptyQuery, .loading:
+            break
+        }
+    }
+
     /// Сбрасывает выбранный чип, если новое состояние поиска больше его не содержит.
     private func clearUnavailableSelectedFilterIfNeeded(
         query: String,
@@ -268,9 +302,10 @@ final class SearchViewModel: ObservableObject {
     /// Собирает состояние с текущими runtime snapshot и настройками отображения фонотеки.
     private func makeResultsState(
         query: String,
-        results: SearchResults
+        results: SearchResults,
+        settings: AppSettings? = nil
     ) -> SearchScreenState {
-        let visibleSettings = settingsManager.settings.visible
+        let visibleSettings = settings?.visible ?? settingsManager.settings.visible
         let displaySettings = SearchTrackDisplaySettings(
             shouldShowTags: visibleSettings.metadata.isTagReadingEnabled,
             shouldShowTrackListMembership: visibleSettings.library.isTrackListMembershipVisible,

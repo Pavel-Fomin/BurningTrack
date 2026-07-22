@@ -14,7 +14,7 @@ extension Notification.Name {
     
     // MARK: - Settings
     
-    static let appSettingsDidChange = Notification.Name("appSettingsDidChange")     /// Изменились настройки приложения
+    static let appSettingsDidChange = Notification.Name("appSettingsDidChange")     /// Изменились настройки чтения metadata треков
     
     // MARK: - TrackList
     

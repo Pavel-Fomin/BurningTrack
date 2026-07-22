@@ -39,6 +39,8 @@ final class TrackListViewModel: ObservableObject {
     private let commandExecutor: any TrackListCommandExecuting
     /// Предоставляет события, влияющие на экран одного треклиста.
     private let eventProvider: any TrackListEventProviding
+    /// Даёт snapshot настроек, влияющих на отображение строк треклиста.
+    private let settingsManager: any SettingsManaging
     /// Предоставляет playback-состояние без прямой подписки View на PlayerViewModel.
     private let playbackStateProvider: any PlaybackStateProviding
     /// Предоставляет сохранённые runtime snapshot треков.
@@ -63,6 +65,12 @@ final class TrackListViewModel: ObservableObject {
     private var isPlaybackActive: Bool = false
     /// Идентификатор подсвеченной строки треклиста.
     private var highlightedRowId: UUID?
+    /// Последнее значение настройки чтения тегов, ожидающее metadata-сигнал после очистки кэшей.
+    private var lastTagReadingEnabled: Bool
+    /// Последнее значение настройки отображения формата файла.
+    private var lastFileFormatVisible: Bool
+    /// Снимок настроек для консистентной сборки presentation state строк.
+    private var rowPresentationSettings: AppSettings
 
     private var cancellables = Set<AnyCancellable>()
 
@@ -76,6 +84,7 @@ final class TrackListViewModel: ObservableObject {
         toastPresenter: any ToastPresenting,
         commandExecutor: any TrackListCommandExecuting,
         eventProvider: any TrackListEventProviding,
+        settingsManager: any SettingsManaging,
         playbackStateProvider: any PlaybackStateProviding,
         runtimeSnapshotProvider: any TrackRuntimeSnapshotProviding,
         runtimeSnapshotBuilder: any TrackRuntimeSnapshotBuilding,
@@ -87,10 +96,14 @@ final class TrackListViewModel: ObservableObject {
         self.toastPresenter = toastPresenter
         self.commandExecutor = commandExecutor
         self.eventProvider = eventProvider
+        self.settingsManager = settingsManager
         self.playbackStateProvider = playbackStateProvider
         self.runtimeSnapshotProvider = runtimeSnapshotProvider
         self.runtimeSnapshotBuilder = runtimeSnapshotBuilder
         self.summaryProvider = summaryProvider
+        self.lastTagReadingEnabled = settingsManager.settings.visible.metadata.isTagReadingEnabled
+        self.lastFileFormatVisible = settingsManager.settings.visible.library.isFileFormatVisible
+        self.rowPresentationSettings = settingsManager.settings
         self.currentListId = trackList.id
         self.name = trackList.name
         self.tracks = trackList.tracks
@@ -121,7 +134,16 @@ final class TrackListViewModel: ObservableObject {
                 guard let self else { return }
                 
                 Task { @MainActor in
-                    self.reloadSnapshotsAfterSettingsChange()
+                    self.handleMetadataSettingsDidChange()
+                }
+            }
+            .store(in: &cancellables)
+
+        // Лёгкое изменение формата файла пересобирает только presentation state текущего треклиста.
+        settingsManager.settingsPublisher
+            .sink { [weak self] settings in
+                Task { @MainActor in
+                    self?.handleRowPresentationSettingsChange(settings)
                 }
             }
             .store(in: &cancellables)
@@ -277,7 +299,8 @@ final class TrackListViewModel: ObservableObject {
             currentTrackId: currentTrackId,
             currentContext: currentContext,
             isPlaying: isPlaybackActive,
-            highlightedRowId: highlightedRowId
+            highlightedRowId: highlightedRowId,
+            settings: rowPresentationSettings
         )
     }
     
@@ -320,9 +343,33 @@ final class TrackListViewModel: ObservableObject {
     /// Пересобирает runtime snapshot загруженных треков после изменения настроек приложения.
     private func reloadSnapshotsAfterSettingsChange() {
         snapshotsByTrackId.removeAll()
+        rebuildScreenState()
         for track in tracks {
             requestSnapshotIfNeeded(for: track.trackId)
         }
+    }
+
+    /// Реагирует на единственное общее событие, которое означает изменение runtime metadata трека.
+    private func handleMetadataSettingsDidChange() {
+        let settings = settingsManager.settings
+        let isTagReadingEnabled = settings.visible.metadata.isTagReadingEnabled
+        guard lastTagReadingEnabled != isTagReadingEnabled else { return }
+
+        lastTagReadingEnabled = isTagReadingEnabled
+        // Metadata-сигнал приходит после очистки кэшей, поэтому фиксируем согласованный snapshot для строк.
+        rowPresentationSettings = settings
+        reloadSnapshotsAfterSettingsChange()
+    }
+
+    /// Применяет только настройку, меняющую готовые строки без чтения metadata и artwork.
+    private func handleRowPresentationSettingsChange(_ settings: AppSettings) {
+        rowPresentationSettings = settings
+
+        let isFileFormatVisible = settings.visible.library.isFileFormatVisible
+        guard lastFileFormatVisible != isFileFormatVisible else { return }
+
+        lastFileFormatVisible = isFileFormatVisible
+        rebuildScreenState()
     }
 
     /// Применяет единое событие обновления трека к состоянию треклиста.
