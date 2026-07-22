@@ -2,7 +2,7 @@
 //  LibraryRootView.swift
 //  TrackList
 //
-//  Контейнер корня фонотеки с переключением режимов.
+//  Единый корневой экран фонотеки.
 //
 //  Created by Pavel Fomin on 09.07.2026.
 //
@@ -12,38 +12,59 @@ import SwiftUI
 struct LibraryRootView: View {
     // MARK: - Входные данные
 
-    /// Готовое состояние старого режима папок.
+    /// Готовое состояние секции прикреплённых папок.
     let folderState: LibraryMasterScreenState
-    /// Выбранный режим корня фонотеки, которым владеет контейнер с toolbar.
-    let displayMode: LibraryRootDisplayMode
-    /// Строки корневого списка режима "Треки" в явном порядке.
+    /// Строки секции коллекции в явном порядке.
     let collectionRootItems: [LibraryCollectionRootItemState]
-    /// Передаёт действия режима папок в существующий обработчик.
+    /// Передаёт действия секции папок и системных источников в существующий обработчик.
     let onFolderAction: (LibraryMasterAction) -> Void
-    /// Передаёт выбор строки режима "Треки" в контейнер фонотеки.
+    /// Передаёт выбор строки коллекции в контейнер фонотеки.
     let onCollectionRootItemSelected: (LibraryCollectionRootItem) -> Void
 
     // MARK: - UI
 
     var body: some View {
-        content
+        List {
+            Section("Collection") {
+                LibraryTracksRootView(
+                    rootItems: collectionRootItems,
+                    onRootItemSelected: onCollectionRootItemSelected
+                )
+
+                if folderState.showsPurchasedITunesSource {
+                    purchasedITunesRow
+                }
+            }
+
+            Section("Folders") {
+                // Секция папок остаётся самостоятельным компонентом и не смешивает свои строки с коллекцией.
+                MusicLibraryView(
+                    state: folderState,
+                    onAction: onFolderAction
+                )
+            }
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
     }
 
-    /// Показывает выбранный режим, не смешивая его логику с экраном папок.
-    @ViewBuilder
-    private var content: some View {
-        switch displayMode {
-        case .folders:
-            MusicLibraryView(
-                state: folderState,
-                onAction: onFolderAction
-            )
+    /// Строит строку виртуального источника iTunes в секции коллекции отдельно от реальных папок.
+    private var purchasedITunesRow: some View {
+        Button {
+            onFolderAction(.openPurchasedITunes)
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "music.note.list")
+                    .foregroundColor(.blue)
+                    .frame(width: 24)
 
-        case .tracks:
-            LibraryTracksRootView(
-                rootItems: collectionRootItems,
-                onRootItemSelected: onCollectionRootItemSelected
-            )
+                Text("Purchased in iTunes")
+                    .lineLimit(1)
+
+                Spacer()
+            }
+            .padding(.vertical, 4)
         }
+        .buttonStyle(.plain)
     }
 }

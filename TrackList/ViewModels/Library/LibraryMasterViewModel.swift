@@ -21,13 +21,8 @@ final class LibraryMasterViewModel: ObservableObject, LibraryMasterActionOutput 
         folders: [],
         showsPurchasedITunesSource: AppSettings.defaultValue.visible.library.isPurchasedITunesSourceVisible,
         isEmpty: true,
-        folderContainsPlayingTrack: false,
-        selectedSortMode: nil
+        folderContainsPlayingTrack: false
     )
-    /// Последняя сортировка, выбранная через меню; nil означает ручной порядок.
-    @Published private(set) var sortMode: LibraryFoldersSortMode?
-    /// Последний выбранный режим корня фонотеки.
-    @Published private(set) var rootDisplayMode: LibraryRootDisplayMode
 
     /// Папка, ожидающая подтверждения открепления.
     private(set) var pendingDetachFolder: LibraryFolder?
@@ -53,8 +48,6 @@ final class LibraryMasterViewModel: ObservableObject, LibraryMasterActionOutput 
         self.settingsManager = settingsManager
         self.toastPresenter = toastPresenter
         self.stateBuilder = stateBuilder
-        self.sortMode = settingsManager.settings.internalSettings.libraryFoldersSortMode
-        self.rootDisplayMode = settingsManager.settings.internalSettings.libraryRootDisplayMode
 
         observeManager()
         observeSettings()
@@ -66,8 +59,7 @@ final class LibraryMasterViewModel: ObservableObject, LibraryMasterActionOutput 
         screenState = stateBuilder.build(
             manager: manager,
             settings: settingsManager.settings,
-            pendingDetachFolder: pendingDetachFolder,
-            selectedSortMode: sortMode
+            pendingDetachFolder: pendingDetachFolder
         )
     }
 
@@ -85,63 +77,17 @@ final class LibraryMasterViewModel: ObservableObject, LibraryMasterActionOutput 
         refreshState()
     }
 
-    /// Переключает режим корня и сохраняет новое значение через SettingsManaging.
-    func toggleDisplayMode() {
-        let previousMode = rootDisplayMode
-        let newMode = previousMode.toggled
-        rootDisplayMode = newMode
-
-        do {
-            try settingsManager.setLibraryRootDisplayMode(newMode)
-        } catch {
-            rootDisplayMode = previousMode
-            toastPresenter.handle(
-                .operationFailed(
-                    message: LibraryPresentationText.displayModeSaveFailedMessage
-                )
-            )
-        }
-    }
-
-    /// Сортирует прикреплённые папки, сохраняет новый фактический порядок в SQLite и показывает caption режима.
-    func setSortMode(_ mode: LibraryFoldersSortMode) {
-        Task { @MainActor in
-            let previousSortMode = sortMode
-            let updatedFolders = await manager.sortedAttachedFolders(by: mode)
-
-            do {
-                try settingsManager.setLibraryFoldersSortMode(mode)
-                try await manager.saveAttachedFoldersOrder(updatedFolders.map(\.id))
-                manager.replaceAttachedFolders(with: updatedFolders)
-                sortMode = mode
-                refreshState()
-            } catch {
-                try? settingsManager.setLibraryFoldersSortMode(previousSortMode)
-                toastPresenter.handle(
-                    .operationFailed(
-                        message: LibraryPresentationText.folderOrderSaveFailedMessage
-                    )
-                )
-                refreshState()
-            }
-        }
-    }
-
     /// Сохраняет новый ручной порядок прикреплённых папок в SQLite и обновляет состояние экрана.
     func moveFolder(from source: IndexSet, to destination: Int) {
         Task { @MainActor in
-            let previousSortMode = sortMode
             var updatedFolders = manager.attachedFolders
             updatedFolders.move(fromOffsets: source, toOffset: destination)
 
             do {
-                try settingsManager.setLibraryFoldersSortMode(nil)
                 try await manager.saveAttachedFoldersOrder(updatedFolders.map(\.id))
                 manager.replaceAttachedFolders(with: updatedFolders)
-                sortMode = nil
                 refreshState()
             } catch {
-                try? settingsManager.setLibraryFoldersSortMode(previousSortMode)
                 toastPresenter.handle(
                     .operationFailed(
                         message: LibraryPresentationText.folderOrderSaveFailedMessage
@@ -166,9 +112,8 @@ final class LibraryMasterViewModel: ObservableObject, LibraryMasterActionOutput 
     /// Подписывается на настройки, чтобы корень фонотеки скрывал или показывал iTunes row без перезапуска.
     private func observeSettings() {
         settingsManager.settingsPublisher
-            .sink { [weak self] settings in
+            .sink { [weak self] _ in
                 Task { @MainActor in
-                    self?.sortMode = settings.internalSettings.libraryFoldersSortMode
                     self?.refreshState()
                 }
             }

@@ -2,12 +2,10 @@
 //  MusicLibraryView.swift
 //  TrackList
 //
-//  Экран режима "Папки" в корне фонотеки:
-//  — показывает виртуальный источник купленных треков iTunes,
+//  Секция папок в корне фонотеки:
 //  — показывает прикреплённые папки,
 //  — по нажатию переходит в LibraryFolderView,
-//  — не содержит логики переключения режимов корня,
-//  — не использует старый route.
+//  — не содержит собственный List и не смешивает папки с коллекцией.
 //
 //  Created by Pavel Fomin on 22.06.2025.
 //
@@ -24,21 +22,7 @@ struct MusicLibraryView: View {
     let onAction: (LibraryMasterAction) -> Void
 
     var body: some View {
-        Group {
-            // MARK: - Загрузка при первом запуске
-            if state.accessState == .booting {
-                loadingView
-
-            // MARK: - Нет прикреплённых папок
-            } else if state.isEmpty {
-                // В пустой фонотеке показываем доступные источники и состояние отсутствия папок.
-                libraryRootList
-
-            // MARK: - Папки есть → показываем корневой список
-            } else {
-                libraryRootList
-            }
-        }
+        folderSectionContent
         .onAppear {
             onAction(.onAppear)
         }
@@ -67,59 +51,27 @@ struct MusicLibraryView: View {
 
     // MARK: - Загрузка
 
-    private var loadingView: some View {
-        VStack(spacing: 0) {
+    @ViewBuilder
+    private var folderSectionContent: some View {
+        if state.accessState == .booting {
             LibraryFoldersSkeletonView()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
 
-    // MARK: - Корневой список фонотеки
-
-    private var libraryRootList: some View {
-        List {
-            if state.showsPurchasedITunesSource {
-                Section {
-                    purchasedITunesRow
+        } else {
+            if state.isEmpty {
+                emptyFoldersRow
+            } else {
+                ForEach(state.folders) { folder in
+                    folderRow(folder)
+                }
+                // Ручное перемещение разрешено только для реальных прикреплённых папок.
+                .onMove { source, destination in
+                    onAction(.moveFolder(source, destination))
                 }
             }
 
-            Section {
-                if state.isEmpty {
-                    emptyFoldersRow
-                } else {
-                    ForEach(state.folders) { folder in
-                        folderRow(folder)
-                    }
-                    // Ручное перемещение разрешено только для реальных прикреплённых папок.
-                    .onMove { source, destination in
-                        onAction(.moveFolder(source, destination))
-                    }
-                }
-
-                addFolderRow
-            }
+            // Строка добавления всегда остаётся после списка реальных папок.
+            addFolderRow
         }
-    }
-
-    /// Строит строку виртуального источника iTunes отдельно от реальных папок.
-    private var purchasedITunesRow: some View {
-        Button {
-            onAction(.openPurchasedITunes)
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "music.note.list")
-                    .foregroundColor(.blue)
-                    .frame(width: 24)
-
-                Text("Purchased in iTunes")
-                    .lineLimit(1)
-
-                Spacer()
-            }
-            .padding(.vertical, 4)
-        }
-        .buttonStyle(.plain)
     }
 
     /// Показывает пустое состояние только для списка папок, не затрагивая виртуальные источники.

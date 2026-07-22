@@ -2,7 +2,7 @@
 //  LibraryTracksRootView.swift
 //  TrackList
 //
-//  Корневой экран режима "Треки" со строками навигации.
+//  Строки секции коллекции корневого экрана фонотеки.
 //
 //  Created by Pavel Fomin on 10.07.2026.
 //
@@ -12,7 +12,7 @@ import SwiftUI
 struct LibraryTracksRootView: View {
     // MARK: - Входные данные
 
-    /// Строки корневого списка в явном порядке.
+    /// Строки секции коллекции в явном порядке.
     let rootItems: [LibraryCollectionRootItemState]
     /// Передаёт выбор строки корневого списка контейнеру фонотеки.
     let onRootItemSelected: (LibraryCollectionRootItem) -> Void
@@ -20,7 +20,7 @@ struct LibraryTracksRootView: View {
     // MARK: - UI
 
     var body: some View {
-        List(rootItems) { itemState in
+        ForEach(rootItems) { itemState in
             Button {
                 onRootItemSelected(itemState.item)
             } label: {
@@ -58,7 +58,5 @@ struct LibraryTracksRootView: View {
                 edges: .bottom
             )
         }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
     }
 }

@@ -21,6 +21,4 @@ struct LibraryMasterScreenState {
     let isEmpty: Bool
     /// Нужно ли показать предупреждение перед откреплением папки с активным треком.
     let folderContainsPlayingTrack: Bool
-    /// Сортировка, выбранная через меню; nil означает ручной порядок без галочки.
-    let selectedSortMode: LibraryFoldersSortMode?
 }

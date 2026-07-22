@@ -631,7 +631,7 @@ enum AppSettingsDatabaseQueries {
 // SQL для таблицы library_view_settings.
 enum LibraryViewSettingsDatabaseQueries {
     static let fetch = """
-    SELECT id, sort_mode, tracklists_sort_mode, library_folders_sort_mode, group_mode,
+    SELECT id, sort_mode, tracklists_sort_mode, group_mode,
            show_tracklist_badges, show_unavailable_tracks, show_file_format,
            show_purchased_itunes_source, library_root_display_mode,
            last_opened_folder_id, updated_at
@@ -641,33 +641,32 @@ enum LibraryViewSettingsDatabaseQueries {
 
     static let insert = """
     INSERT INTO library_view_settings (
-        id, sort_mode, tracklists_sort_mode, library_folders_sort_mode, group_mode,
+        id, sort_mode, tracklists_sort_mode, group_mode,
         show_tracklist_badges, show_unavailable_tracks, show_file_format,
         show_purchased_itunes_source, library_root_display_mode,
         last_opened_folder_id, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
     """
 
     static let update = """
     UPDATE library_view_settings
-    SET sort_mode = ?, tracklists_sort_mode = ?, library_folders_sort_mode = ?,
-        group_mode = ?, show_tracklist_badges = ?, show_unavailable_tracks = ?,
-        show_file_format = ?, show_purchased_itunes_source = ?,
-        library_root_display_mode = ?, last_opened_folder_id = ?, updated_at = ?
+    SET sort_mode = ?, tracklists_sort_mode = ?, group_mode = ?,
+        show_tracklist_badges = ?, show_unavailable_tracks = ?, show_file_format = ?,
+        show_purchased_itunes_source = ?, library_root_display_mode = ?,
+        last_opened_folder_id = ?, updated_at = ?
     WHERE id = ?;
     """
 
     static let upsert = """
     INSERT INTO library_view_settings (
-        id, sort_mode, tracklists_sort_mode, library_folders_sort_mode, group_mode,
+        id, sort_mode, tracklists_sort_mode, group_mode,
         show_tracklist_badges, show_unavailable_tracks, show_file_format,
         show_purchased_itunes_source, library_root_display_mode,
         last_opened_folder_id, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
         sort_mode = excluded.sort_mode,
         tracklists_sort_mode = excluded.tracklists_sort_mode,
-        library_folders_sort_mode = excluded.library_folders_sort_mode,
         group_mode = excluded.group_mode,
         show_tracklist_badges = excluded.show_tracklist_badges,
         show_unavailable_tracks = excluded.show_unavailable_tracks,

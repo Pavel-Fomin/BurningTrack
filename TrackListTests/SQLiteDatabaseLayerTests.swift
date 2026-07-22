@@ -744,6 +744,45 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
         XCTAssertEqual(try folderStore.fetch(id: firstId)?.sortOrder, 0)
         XCTAssertEqual(try folderStore.fetch(id: thirdId)?.sortOrder, 1)
         XCTAssertEqual(try folderStore.fetch(id: secondId)?.sortOrder, 2)
+
+        let reloadedStore = LibraryDatabaseStore(executor: executor)
+        XCTAssertEqual(
+            try reloadedStore.fetchRootFolders().map(\.id),
+            [firstId, thirdId, secondId]
+        )
+
+        let fourthId = UUID()
+        try reloadedStore.upsertRootFolder(
+            id: fourthId,
+            name: "Fourth"
+        )
+
+        // Добавление новой папки не меняет сохранённую относительную последовательность существующих папок.
+        XCTAssertEqual(
+            try reloadedStore.fetchRootFolders().map(\.id),
+            [fourthId, firstId, thirdId, secondId]
+        )
+    }
+
+    func testLibraryTrackSortModePersistsSeparatelyFromRootFolderOrder() throws {
+        let database = try makeDatabase()
+        let store = try LibraryDatabaseStore(database: database)
+        let folderId = UUID()
+
+        try store.upsertRootFolder(
+            id: folderId,
+            name: "Music"
+        )
+        try store.updateLibraryTrackSortMode(
+            .titleAsc,
+            forFolderId: folderId
+        )
+
+        let reloadedStore = try LibraryDatabaseStore(database: database)
+        XCTAssertEqual(
+            try reloadedStore.libraryTrackSortMode(forFolderId: folderId),
+            .titleAsc
+        )
     }
 
     func testFetchRootFoldersFallsBackToCreatedAtWhenSortOrderIsNil() throws {
@@ -977,7 +1016,6 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
         settings.visible.library.isPurchasedITunesSourceVisible = false
         settings.internalSettings.libraryRootDisplayMode = .tracks
         settings.internalSettings.trackListsSortMode = .name
-        settings.internalSettings.libraryFoldersSortMode = .createdAt
 
         try store.saveSettings(settings)
 
@@ -991,7 +1029,6 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
         XCTAssertFalse(reloadedSettings.visible.library.isPurchasedITunesSourceVisible)
         XCTAssertEqual(reloadedSettings.internalSettings.libraryRootDisplayMode, .tracks)
         XCTAssertEqual(reloadedSettings.internalSettings.trackListsSortMode, .name)
-        XCTAssertEqual(reloadedSettings.internalSettings.libraryFoldersSortMode, .createdAt)
 
         var foldersSettings = reloadedSettings
         foldersSettings.internalSettings.libraryRootDisplayMode = .folders

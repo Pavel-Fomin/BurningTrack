@@ -4,7 +4,7 @@
 //
 //  Вкладка “Фонотека”.
 //  Управляет только отображением содержимого фонотеки:
-//  — корневые режимы папок и разделов коллекции,
+//  — единый корень с папками и разделами коллекции,
 //  — содержимое конкретной папки.
 //
 //  Навигация между вкладками → ScenePhaseHandler.
@@ -131,23 +131,8 @@ struct LibraryScreen: View {
                     )
                 }
                 .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button {
-                            actionHandler.handle(.toggleDisplayMode)
-                        } label: {
-                            Image(systemName: masterViewModel.rootDisplayMode.systemImage)
-                        }
-                        .accessibilityLabel(
-                            LibraryPresentationText.rootDisplayModeTitle(
-                                for: masterViewModel.rootDisplayMode
-                            )
-                        )
-                    }
-
                     ToolbarItem(placement: .topBarTrailing) {
                         LibraryToolbarMenuButton(
-                            state: masterViewModel.screenState,
-                            displayMode: masterViewModel.rootDisplayMode,
                             onAction: { action in
                                 actionHandler.handle(action)
                             }
@@ -174,11 +159,6 @@ struct LibraryScreen: View {
         .onAppear {
             viewModel.handle(.appeared)
         }
-        .onChange(of: masterViewModel.rootDisplayMode) { _, newMode in
-            // При смене режима обновляем видимость корневого списка и читаем данные только при необходимости.
-            guard viewModel.screenState.libraryPath.isEmpty else { return }
-            viewModel.setCollectionRootVisibility(newMode == .tracks)
-        }
         // Выбор папки
         .fileImporter(
             isPresented: $isShowingFolderPicker,
@@ -204,7 +184,6 @@ struct LibraryScreen: View {
     private var rootContent: some View {
         LibraryRootView(
             folderState: masterViewModel.screenState,
-            displayMode: masterViewModel.rootDisplayMode,
             collectionRootItems: viewModel.collectionRootItems,
             onFolderAction: { action in
                 actionHandler.handle(action)
@@ -215,7 +194,8 @@ struct LibraryScreen: View {
         )
         .onAppear {
             selectionActionBarConfig = nil
-            viewModel.setCollectionRootVisibility(masterViewModel.rootDisplayMode == .tracks)
+            // Коллекция всегда видна в едином корне, поэтому её счётчики загружаются при появлении.
+            viewModel.setCollectionRootVisibility(true)
         }
         .onDisappear {
             viewModel.setCollectionRootVisibility(false)
@@ -312,12 +292,8 @@ struct LibraryScreen: View {
     }
 }
 
-/// Нативная кнопка toolbar-меню с поддержкой subtitle у вложенного пункта UIMenu.
+/// Нативная кнопка toolbar-меню корневого экрана фонотеки.
 private struct LibraryToolbarMenuButton: UIViewRepresentable {
-    /// Готовое состояние корневого экрана фонотеки.
-    let state: LibraryMasterScreenState
-    /// Текущий режим корня определяет набор доступных действий.
-    let displayMode: LibraryRootDisplayMode
     /// Передаёт пользовательские действия обработчику экрана.
     let onAction: (LibraryMasterAction) -> Void
 
@@ -337,53 +313,11 @@ private struct LibraryToolbarMenuButton: UIViewRepresentable {
         button.menu = makeMenu()
     }
 
-    /// Собирает системное меню, где subtitle и checkmark рисуются UIKit.
+    /// Собирает системное меню доступных действий с корневыми папками.
     private func makeMenu() -> UIMenu {
-        let children: [UIMenuElement]
-
-        switch displayMode {
-        case .folders:
-            children = [
-                makeAddFolderAction(),
-                makeSortMenu()
-            ]
-        case .tracks:
-            children = [
-                makeAddFolderAction()
-            ]
-        }
-
-        let menu = UIMenu(
-            children: children
+        UIMenu(
+            children: [makeAddFolderAction()]
         )
-
-        // Разрешает системе показать title и subtitle для пункта "Сортировка" в режиме папок.
-        let displayPreferences = UIMenuDisplayPreferences()
-        displayPreferences.maximumNumberOfTitleLines = 2
-        menu.displayPreferences = displayPreferences
-
-        return menu
-    }
-
-    /// Собирает вложенное меню сортировки с системной подписью выбранного режима.
-    private func makeSortMenu() -> UIMenu {
-        let menu = UIMenu(
-            title: String(localized: "Sort"),
-            image: UIImage(systemName: "arrow.up.arrow.down"),
-            options: .singleSelection,
-            children: LibraryFoldersSortMode.allCases.map { mode in
-                UIAction(
-                    title: LibraryPresentationText.folderSortModeTitle(for: mode),
-                    state: state.selectedSortMode == mode ? .on : .off
-                ) { _ in
-                    onAction(.setSortMode(mode))
-                }
-            }
-        )
-        menu.subtitle = state.selectedSortMode.map {
-            LibraryPresentationText.folderSortModeCaption(for: $0)
-        }
-        return menu
     }
 
     /// Собирает пункт добавления новой папки.

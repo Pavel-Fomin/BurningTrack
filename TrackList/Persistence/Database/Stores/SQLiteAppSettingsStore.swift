@@ -230,7 +230,6 @@ final class SettingsDatabaseStore {
         libraryModel.libraryRootDisplayMode = settings.internalSettings.libraryRootDisplayMode.rawValue
         libraryModel.sortMode = settings.internalSettings.libraryTrackSortMode.rawValue
         libraryModel.trackListsSortMode = settings.internalSettings.trackListsSortMode?.rawValue
-        libraryModel.libraryFoldersSortMode = settings.internalSettings.libraryFoldersSortMode?.rawValue
         libraryModel.updatedAt = now
 
         try executor.transaction { _ in
@@ -259,7 +258,6 @@ final class SettingsDatabaseStore {
             internalSettings: AppSettings.InternalSettings(
                 libraryTrackSortMode: LibraryTrackSortMode(rawValue: libraryModel.sortMode) ?? .fileDateDesc,
                 trackListsSortMode: libraryModel.trackListsSortMode.flatMap(TrackListsSortMode.init(rawValue:)),
-                libraryFoldersSortMode: libraryModel.libraryFoldersSortMode.flatMap(LibraryFoldersSortMode.init(rawValue:)),
                 libraryRootDisplayMode: LibraryRootDisplayMode(
                     rawValue: libraryModel.libraryRootDisplayMode ?? ""
                 ) ?? .folders,
@@ -294,7 +292,6 @@ final class SettingsDatabaseStore {
             id: 1,
             sortMode: settings.internalSettings.libraryTrackSortMode.rawValue,
             trackListsSortMode: settings.internalSettings.trackListsSortMode?.rawValue,
-            libraryFoldersSortMode: settings.internalSettings.libraryFoldersSortMode?.rawValue,
             groupMode: "date",
             showTrackListBadges: settings.visible.library.isTrackListMembershipVisible,
             showUnavailableTracks: true,

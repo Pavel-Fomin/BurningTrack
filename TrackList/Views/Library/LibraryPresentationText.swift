@@ -44,24 +44,6 @@ enum LibraryPresentationText {
         }
     }
 
-    static func folderSortModeTitle(for mode: LibraryFoldersSortMode) -> String {
-        switch mode {
-        case .createdAt:
-            return String(localized: "By Date")
-        case .name:
-            return String(localized: "By Name")
-        }
-    }
-
-    static func folderSortModeCaption(for mode: LibraryFoldersSortMode) -> String {
-        switch mode {
-        case .createdAt:
-            return String(localized: "by date")
-        case .name:
-            return String(localized: "by name")
-        }
-    }
-
     static func trackSortModeTitle(for mode: LibraryTrackSortMode) -> String {
         switch mode {
         case .artistAsc:

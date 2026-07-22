@@ -21,5 +21,4 @@ protocol SettingsManaging: AnyObject {
     func setLibraryRootDisplayMode(_ mode: LibraryRootDisplayMode) throws
     func setLibraryTrackSortMode(_ mode: LibraryTrackSortMode) throws
     func setTrackListsSortMode(_ mode: TrackListsSortMode?) throws
-    func setLibraryFoldersSortMode(_ mode: LibraryFoldersSortMode?) throws
 }
