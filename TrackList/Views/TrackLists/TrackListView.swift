@@ -86,6 +86,7 @@ struct TrackListView: View {
                 }
                 
                 .listStyle(.plain)
+                .globalBottomScrollReserve()
                 .scrollContentBackground(.hidden)
                 .onAppear {
                     scrollToCurrentTrackIfNeeded(using: proxy, animated: false)

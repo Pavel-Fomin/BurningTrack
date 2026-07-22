@@ -103,6 +103,7 @@ struct PurchasedITunesMusicView: View {
                 }
             }
             .listStyle(.plain)
+            .globalBottomScrollReserve()
             .scrollContentBackground(.hidden)
             .onAppear {
                 scrollToCurrentTrackIfNeeded(

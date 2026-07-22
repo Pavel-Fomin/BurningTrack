@@ -31,6 +31,19 @@ struct MainTabView: View {
 
     /// ViewModel master-flow списка треклистов.
     @StateObject private var trackListsVM = Self.trackListsViewModelFactory.make()
+
+    /// Состояние системного поиска управляет только глобальной нижней геометрией.
+    @State private var isSearchActive = false
+
+    /// Высокий MiniPlayer скрывается только в активном интерфейсе Search-вкладки.
+    private var showsMiniPlayer: Bool {
+        scene.activeTab != .search || isSearchActive == false
+    }
+
+    /// Передаёт экранам единый резерв только на время показа высокого MiniPlayer.
+    private var globalBottomScrollReserve: CGFloat {
+        showsMiniPlayer ? GlobalBottomGeometry.miniPlayerScrollReserve : 0
+    }
     
     
 // MARK: - UI
@@ -49,6 +62,11 @@ struct MainTabView: View {
                     playerViewModel: playerViewModel,
                     exportProgressViewModel: exportProgressViewModel
                 )
+                .globalBottomPanelsHost(
+                    playerViewModel: playerViewModel,
+                    exportProgressViewModel: exportProgressViewModel,
+                    showsMiniPlayer: showsMiniPlayer
+                )
             }
 
 // MARK: - Фонотека
@@ -61,6 +79,11 @@ struct MainTabView: View {
                 LibraryScreen(
                     playerViewModel: playerViewModel,
                     exportProgressViewModel: exportProgressViewModel
+                )
+                .globalBottomPanelsHost(
+                    playerViewModel: playerViewModel,
+                    exportProgressViewModel: exportProgressViewModel,
+                    showsMiniPlayer: showsMiniPlayer
                 )
             }
 
@@ -76,6 +99,11 @@ struct MainTabView: View {
                     playerViewModel: playerViewModel,
                     exportProgressViewModel: exportProgressViewModel
                 )
+                .globalBottomPanelsHost(
+                    playerViewModel: playerViewModel,
+                    exportProgressViewModel: exportProgressViewModel,
+                    showsMiniPlayer: showsMiniPlayer
+                )
             }
 
 // MARK: - Настройки
@@ -88,6 +116,11 @@ struct MainTabView: View {
                 SettingsScreen(
                     playerViewModel: playerViewModel
                 )
+                .globalBottomPanelsHost(
+                    playerViewModel: playerViewModel,
+                    exportProgressViewModel: exportProgressViewModel,
+                    showsMiniPlayer: showsMiniPlayer
+                )
             }
 
 // MARK: - Поиск
@@ -99,9 +132,24 @@ struct MainTabView: View {
                 role: .search
             ) {
                 SearchScreen(
-                    playerViewModel: playerViewModel
+                    playerViewModel: playerViewModel,
+                    isSearchActive: $isSearchActive
+                )
+                .globalBottomPanelsHost(
+                    playerViewModel: playerViewModel,
+                    exportProgressViewModel: exportProgressViewModel,
+                    showsMiniPlayer: showsMiniPlayer
                 )
             }
         }
+        // Единственный владелец сообщает всем вкладкам размер глобальной перекрывающей зоны.
+        .environment(
+            \.globalBottomScrollReserve,
+            globalBottomScrollReserve
+        )
+        .animation(
+            .easeOut(duration: 0.25),
+            value: showsMiniPlayer
+        )
     }
 }

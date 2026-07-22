@@ -238,6 +238,7 @@ struct LibraryCollectionTracksView: View {
                 }
             }
             .listStyle(.plain)
+            .globalBottomScrollReserve()
             .scrollContentBackground(.hidden)
             .onAppear {
                 handleTracksListAppear()

@@ -37,6 +37,7 @@ struct TrackListsListView: View {
                 onAction(.onAppear)
             }
             .listStyle(.insetGrouped)
+            .globalBottomScrollReserve()
         }
         .alert(
             "Delete Tracklist?",

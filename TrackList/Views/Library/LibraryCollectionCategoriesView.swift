@@ -26,6 +26,7 @@ struct LibraryCollectionCategoriesView: View {
                 onCategorySelected: onCategorySelected
             )
         }
+        .globalBottomScrollReserve()
     }
 }
 

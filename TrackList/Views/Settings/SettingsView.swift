@@ -74,5 +74,6 @@ struct SettingsView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .globalBottomScrollReserve()
     }
 }

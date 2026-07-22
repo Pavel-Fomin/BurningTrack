@@ -240,6 +240,7 @@ struct LibraryTracksView: View {
                 )
             }
             .listStyle(.plain)
+            .globalBottomScrollReserve()
             .scrollContentBackground(.hidden)
 
             .onAppear {

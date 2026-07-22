@@ -45,6 +45,7 @@ struct SearchView: View {
             }
         }
         .listStyle(.plain)
+        .globalBottomScrollReserve()
         .scrollDismissesKeyboard(.interactively)
     }
 

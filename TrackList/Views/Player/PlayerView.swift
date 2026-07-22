@@ -52,6 +52,7 @@ struct PlayerView: View {
                 }
             }
             .listStyle(.plain)
+            .globalBottomScrollReserve()
             .scrollContentBackground(.hidden)
             .background(Color(.systemBackground))
             .onAppear {

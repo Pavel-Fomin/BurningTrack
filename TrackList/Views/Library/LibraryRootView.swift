@@ -60,6 +60,7 @@ struct LibraryRootView: View {
         }
         // Нативный inset grouped-стиль объединяет iTunes, реальные папки и добавление папки в одну секцию.
         .listStyle(.insetGrouped)
+        .globalBottomScrollReserve()
     }
 
     /// Строит строку виртуального источника iTunes в секции папок отдельно от реальных папок.

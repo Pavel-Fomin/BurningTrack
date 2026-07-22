@@ -141,7 +141,6 @@ struct LibraryScreen: View {
                 }
         }
         .bottomPanelsHost(
-            playerViewModel: playerViewModel,
             showsTopPanel: selectionActionBarConfig != nil
         ) {
             if let config = selectionActionBarConfig {

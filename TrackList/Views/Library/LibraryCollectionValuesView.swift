@@ -148,6 +148,7 @@ struct LibraryCollectionValuesView: View {
             collectionRow(value)
         }
         .listStyle(.plain)
+        .globalBottomScrollReserve()
         .scrollContentBackground(.hidden)
     }
 

@@ -2,12 +2,12 @@
 //  BottomPanelsHostModifier.swift
 //  TrackList
 //
-//  Модификатор единого нижнего контейнера панелей.
+//  Модификаторы глобальных и локальных нижних панелей.
 //
 //  Роль:
-//  - резервирует место под реальные нижние панели через safeAreaInset;
-//  - размещает верхнюю панель над мини-плеером;
-//  - не выполняет действий плеера или мультиселекта;
+//  - размещает глобальные панели внутри safe area конкретной вкладки;
+//  - резервирует собственное место SelectionActionBar локального экрана;
+//  - не выполняет действий плеера или выбора;
 //  - не хранит состояние панелей.
 //
 //  Created by Pavel Fomin on 20.05.2026.
@@ -15,31 +15,32 @@
 
 import SwiftUI
 
-struct BottomPanelsHostModifier<TopPanel: View>: ViewModifier {
+struct GlobalBottomPanelsHostModifier: ViewModifier {
 
     // MARK: - Input
 
+    /// Использует общую ViewModel плеера, созданную в composition root приложения.
     @ObservedObject var playerViewModel: PlayerViewModel
-    /// Читает единое состояние экспорта, не создавая локальную копию на экране.
-    @EnvironmentObject private var exportProgressViewModel: ExportProgressViewModel
-    let showsTopPanel: Bool
-    let showsBottomPanel: Bool
-    let topPanel: () -> TopPanel
+    /// Использует общее состояние экспорта без создания локальной операции.
+    @ObservedObject var exportProgressViewModel: ExportProgressViewModel
+    /// Управляет только присутствием высокого MiniPlayer в общем контейнере.
+    let showsMiniPlayer: Bool
 
     // MARK: - Body
 
     func body(content: Content) -> some View {
         let exportProgress = exportProgressViewModel.progress
         let showsExportPanel = exportProgress != nil
+        let showsGlobalPanels = showsMiniPlayer || showsExportPanel
 
         return content
+            // Inset применяется внутри ветки TabView и учитывает системное меню вкладок.
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                BottomPanelsHost(
-                    // Оставляем панель экспорта отделённой от мини-плеера в одном layout-потоке.
-                    spacing: showsExportPanel && showsBottomPanel ? 8 : 0,
-                    showsTopPanel: showsTopPanel || showsExportPanel
-                ) {
-                    VStack(spacing: 8) {
+                if showsGlobalPanels {
+                    BottomPanelsHost(
+                        spacing: showsExportPanel && showsMiniPlayer ? 8 : 0,
+                        showsTopPanel: showsExportPanel
+                    ) {
                         if let exportProgress {
                             ExportProgressCompactView(
                                 progress: exportProgress,
@@ -56,29 +57,51 @@ struct BottomPanelsHostModifier<TopPanel: View>: ViewModifier {
                                     .combined(with: .opacity)
                             )
                         }
-
-                        if showsTopPanel {
-                            topPanel()
-                                .padding(.horizontal, 8)
+                    } bottomPanel: {
+                        if showsMiniPlayer {
+                            MiniPlayerWrapperView(
+                                playerViewModel: playerViewModel
+                            )
                         }
                     }
-                } bottomPanel: {
-                    if showsBottomPanel {
-                        MiniPlayerWrapperView(
-                            playerViewModel: playerViewModel
-                        )
-                    }
+                    .animation(
+                        .easeOut(duration: 0.25),
+                        value: showsExportPanel
+                    )
+                    .animation(
+                        .easeOut(duration: 0.25),
+                        value: showsMiniPlayer
+                    )
+                    .animation(
+                        .easeOut(duration: 0.25),
+                        value: playerViewModel.currentTrackDisplayable?.id
+                    )
                 }
-                .animation(
-                    .easeOut(duration: 0.25),
-                    value: showsExportPanel
-                )
-                .animation(.easeOut(duration: 0.25), value: showsTopPanel)
-                .animation(
-                    .easeOut(duration: 0.25),
-                    value: playerViewModel.currentTrackDisplayable?.id
-                )
             }
+    }
+}
+
+struct BottomPanelsHostModifier<TopPanel: View>: ViewModifier {
+
+    // MARK: - Input
+
+    let showsTopPanel: Bool
+    let topPanel: () -> TopPanel
+
+    // MARK: - Body
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if showsTopPanel {
+            content
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    topPanel()
+                        .padding(.horizontal, 8)
+                        .animation(.easeOut(duration: 0.25), value: showsTopPanel)
+                }
+        } else {
+            content
+        }
     }
 }
 
@@ -86,18 +109,29 @@ struct BottomPanelsHostModifier<TopPanel: View>: ViewModifier {
 
 extension View {
 
-    /// Подключает единый нижний контейнер панелей к экрану.
-    func bottomPanelsHost<TopPanel: View>(
+    /// Подключает общие панели к корню конкретной вкладки.
+    func globalBottomPanelsHost(
         playerViewModel: PlayerViewModel,
+        exportProgressViewModel: ExportProgressViewModel,
+        showsMiniPlayer: Bool
+    ) -> some View {
+        modifier(
+            GlobalBottomPanelsHostModifier(
+                playerViewModel: playerViewModel,
+                exportProgressViewModel: exportProgressViewModel,
+                showsMiniPlayer: showsMiniPlayer
+            )
+        )
+    }
+
+    /// Подключает локальную панель конкретного экрана.
+    func bottomPanelsHost<TopPanel: View>(
         showsTopPanel: Bool = true,
-        showsBottomPanel: Bool = true,
         @ViewBuilder topPanel: @escaping () -> TopPanel
     ) -> some View {
         modifier(
             BottomPanelsHostModifier(
-                playerViewModel: playerViewModel,
                 showsTopPanel: showsTopPanel,
-                showsBottomPanel: showsBottomPanel,
                 topPanel: topPanel
             )
         )

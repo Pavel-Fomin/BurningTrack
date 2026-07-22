@@ -21,7 +21,7 @@ struct MiniPlayerWrapperView: View {
         MiniPlayerView(
             playerViewModel: playerViewModel
         )
-        // Сохраняем прежний внешний визуальный отступ мини-плеера.
+        // Сохраняем горизонтальный внешний отступ мини-плеера от краёв интерфейса.
         .padding(.horizontal, 8)
         .padding(.bottom, 8)
         .transition(.move(edge: .bottom).combined(with: .opacity))

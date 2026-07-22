@@ -75,8 +75,5 @@ struct PlayerScreen: View {
                 }
             }
         }
-        .miniPlayerHost(
-            playerViewModel: playerViewModel
-        )
     }
 }

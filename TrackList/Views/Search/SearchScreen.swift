@@ -13,17 +13,21 @@ struct SearchScreen: View {
     // MARK: - Dependencies
 
     @ObservedObject var playerViewModel: PlayerViewModel
+    /// MainTabView использует состояние для синхронного скрытия MiniPlayer и резерва.
+    @Binding private var isSearchActive: Bool
 
     // MARK: - ViewModel
 
     @StateObject private var viewModel: SearchViewModel
-    /// Системная активность нативного поиска нужна, чтобы не перекрывать search UI мини-плеером.
-    @State private var isSearchActive = false
 
     // MARK: - Init
 
-    init(playerViewModel: PlayerViewModel) {
+    init(
+        playerViewModel: PlayerViewModel,
+        isSearchActive: Binding<Bool>
+    ) {
         self.playerViewModel = playerViewModel
+        self._isSearchActive = isSearchActive
         self._viewModel = StateObject(
             wrappedValue: SearchViewModelFactory.make()
         )
@@ -90,10 +94,6 @@ struct SearchScreen: View {
         .searchToolbarBehavior(.minimize)
         // Search-tab presentation не должен забирать верхний navigation bar у экрана поиска.
         .searchPresentationToolbarBehavior(.avoidHidingContent)
-        .miniPlayerHost(
-            playerViewModel: playerViewModel,
-            isVisible: isSearchActive == false
-        )
     }
 
     // MARK: - Toolbar

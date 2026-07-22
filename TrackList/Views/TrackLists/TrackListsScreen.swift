@@ -66,9 +66,6 @@ struct TrackListsScreen: View {
         .onChange(of: navigationCoordinator.pendingTrackListOpenRequest) { _, _ in
             handlePendingTrackListOpenRequest()
         }
-        .miniPlayerHost(
-            playerViewModel: playerViewModel
-        )
     }
 
     /// Потребляет внешний запрос навигации и открывает треклист штатным master-detail flow.
