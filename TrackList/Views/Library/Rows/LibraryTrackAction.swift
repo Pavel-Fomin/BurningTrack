@@ -12,7 +12,7 @@ enum LibraryTrackAction {
     case rename(trackId: UUID, strategy: FileRenameStrategy)
     case toggleSelection
     case requestSnapshot(trackId: UUID)
-    case beginCloudAvailabilityObservation(trackId: UUID)
-    case stopCloudAvailabilityObservation(trackId: UUID)
+    case trackDidAppear(trackId: UUID)
+    case trackDidDisappear(trackId: UUID)
     case retryCloudDownload(trackId: UUID)
 }

@@ -44,6 +44,11 @@ actor CloudTrackAvailabilityManager: CloudTrackAvailabilityManaging {
         statesByTrackId.reserveCapacity(trackIds.count)
 
         for trackId in trackIds {
+            // Отмена экрана не должна продолжать файловые проверки уже неактуального списка.
+            guard Task.isCancelled == false else {
+                return statesByTrackId
+            }
+
             guard let state = await availabilityState(for: trackId) else {
                 continue
             }

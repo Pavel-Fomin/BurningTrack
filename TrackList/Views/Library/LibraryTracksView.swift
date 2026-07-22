@@ -26,12 +26,13 @@ struct LibraryTracksView: View {
     let onRevealHandled: (UUID) -> Void
     @Binding var selectionActionBarConfig: SelectionActionBarConfig?
 
-    @ObservedObject var playerViewModel: PlayerViewModel
+    let playerViewModel: PlayerViewModel
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject var sheetManager: SheetManager
     @StateObject private var tracksViewModel: LibraryTracksViewModel
-    @StateObject private var cloudAvailabilityController = CloudTrackAvailabilityController()
-    @StateObject private var scrollSpeed = ScrollSpeedModel(thresholdPtPerSec: 1500,debounceMs: 180)
+    @State private var cloudAvailabilityController = LibraryCloudAvailabilityScreenController()
+    @ObservedObject private var settingsManager = AppSettingsManager.shared
+    @StateObject private var playbackStateController: LibraryTrackPlaybackStateController
     @StateObject private var revealCoordinator: LibraryTrackRevealCoordinator
     private let selectionActionBarCoordinator = LibrarySelectionActionBarCoordinator()
     private let sheetCoordinator = LibraryTracksSheetCoordinator()
@@ -57,6 +58,13 @@ struct LibraryTracksView: View {
     private var allVisibleTracks: [LibraryTrack] {
         tracksViewModel.trackSections.flatMap(\.tracks)
     }
+
+    /// Обрабатывает iCloud-действия на уровне экрана, а не жизненного цикла каждой строки.
+    private var cloudAvailabilityActionHandler: LibraryCloudAvailabilityActionHandler {
+        LibraryCloudAvailabilityActionHandler(
+            controller: cloudAvailabilityController
+        )
+    }
     
     // MARK: - Init
     
@@ -80,6 +88,11 @@ struct LibraryTracksView: View {
         self.onRevealHandled = onRevealHandled
         self.playerViewModel = playerViewModel
         self._selectionActionBarConfig = selectionActionBarConfig
+        self._playbackStateController = StateObject(
+            wrappedValue: LibraryTrackPlaybackStateController(
+                playerViewModel: playerViewModel
+            )
+        )
         self._revealCoordinator = StateObject(
             wrappedValue: LibraryTrackRevealCoordinator(
                 initialRequest: revealRequest
@@ -152,6 +165,7 @@ struct LibraryTracksView: View {
                 handleBatchFilenameRenameFlowActivityChange(isActive)
             }
             .onDisappear {
+                cloudAvailabilityActionHandler.handle(.screenDidDisappear)
                 selectionActionBarConfig = nil
             }
     }
@@ -205,16 +219,22 @@ struct LibraryTracksView: View {
                     playbackSource: .libraryFolder(id: folder.id),
                     trackListNamesById: tracksViewModel.trackListNamesById,
                     metadataProvider: tracksViewModel,
-                    cloudAvailabilityController: cloudAvailabilityController,
+                    cloudAvailabilityStateStore: cloudAvailabilityController.stateStore(for:),
+                    cloudAvailabilityActionHandler: cloudAvailabilityActionHandler,
                     playerViewModel: playerViewModel,
-                    isScrollingFast: scrollSpeed.isFast,
+                    playbackStateController: playbackStateController,
+                    sheetManager: sheetManager,
                     revealedTrackID: revealCoordinator.revealedTrackID,
+                    highlightedTrackID: sheetManager.highlightedRowID,
                     onRenameTrack: { trackId, strategy in
                         tracksViewModel.renameTrack(
                             trackId: trackId,
                             strategy: strategy
                         )
                     },
+                    shouldShowTags: settingsManager.settings.visible.metadata.isTagReadingEnabled,
+                    shouldShowTrackListMembership: settingsManager.settings.visible.library.isTrackListMembershipVisible,
+                    shouldShowFileFormat: settingsManager.settings.visible.library.isFileFormatVisible,
                     isSelecting: isSelecting,
                     selection: selectionBinding
                 )
@@ -238,7 +258,10 @@ struct LibraryTracksView: View {
                     )
                 )
             }
-            .onChange(of: playerViewModel.currentTrackDisplayable?.id) { _, _ in
+            .onChange(of: playbackStateController.currentTrackId) { _, _ in
+                requestActiveTrackScrollIfNeeded()
+            }
+            .onChange(of: playbackStateController.currentContext) { _, _ in
                 requestActiveTrackScrollIfNeeded()
             }
             .onChange(of: scenePhase) { _, newPhase in
@@ -286,6 +309,7 @@ struct LibraryTracksView: View {
 
     /// Синхронизирует состояние при появлении списка.
     private func handleTracksListAppear() {
+        cloudAvailabilityActionHandler.handle(.screenDidAppear)
         requestActiveTrackScrollIfNeeded()
         updateSelectionActionBarConfig()
     }

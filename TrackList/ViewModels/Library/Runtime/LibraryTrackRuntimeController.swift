@@ -26,6 +26,10 @@ final class LibraryTrackRuntimeController: ObservableObject {
     // MARK: - State
 
     @Published private(set) var snapshotsByTrackId: [UUID: TrackRuntimeSnapshot] = [:]
+    /// Идентификаторы snapshot, которые уже читаются из runtime pipeline.
+    private var loadingTrackIds = Set<UUID>()
+    /// Ожидающие получают результат единственной уже запущенной загрузки того же трека.
+    private var snapshotWaitersByTrackId: [UUID: [CheckedContinuation<TrackRuntimeSnapshot?, Never>]] = [:]
 
     // MARK: - Init
 
@@ -46,6 +50,11 @@ final class LibraryTrackRuntimeController: ObservableObject {
     ///
     /// - Parameter trackId: Идентификатор трека
     func requestSnapshotIfNeeded(for trackId: UUID) {
+        guard snapshotsByTrackId[trackId] == nil,
+              loadingTrackIds.contains(trackId) == false else {
+            return
+        }
+
         Task { [weak self] in
             guard let self else { return }
 
@@ -65,6 +74,14 @@ final class LibraryTrackRuntimeController: ObservableObject {
             return existingSnapshot
         }
 
+        if loadingTrackIds.contains(trackId) {
+            return await withCheckedContinuation { continuation in
+                snapshotWaitersByTrackId[trackId, default: []].append(continuation)
+            }
+        }
+
+        loadingTrackIds.insert(trackId)
+
         let snapshot: TrackRuntimeSnapshot?
 
         // Сначала используем общий runtime store как быстрый источник уже собранного snapshot.
@@ -79,13 +96,29 @@ final class LibraryTrackRuntimeController: ObservableObject {
             }
         }
 
-        guard let snapshot else {
-            return nil
+        if let snapshot {
+            snapshotsByTrackId[trackId] = snapshot
         }
 
-        snapshotsByTrackId[trackId] = snapshot
+        completeSnapshotLoading(
+            for: trackId,
+            snapshot: snapshot
+        )
 
         return snapshot
+    }
+
+    /// Завершает единственную загрузку и отдаёт её результат всем ожидающим сценариям.
+    private func completeSnapshotLoading(
+        for trackId: UUID,
+        snapshot: TrackRuntimeSnapshot?
+    ) {
+        loadingTrackIds.remove(trackId)
+
+        let waiters = snapshotWaitersByTrackId.removeValue(forKey: trackId) ?? []
+        for waiter in waiters {
+            waiter.resume(returning: snapshot)
+        }
     }
 
     /// Применяет готовые события обновления треков к локальному состоянию snapshot-ов.

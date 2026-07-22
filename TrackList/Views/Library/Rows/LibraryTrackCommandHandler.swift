@@ -6,7 +6,7 @@ struct LibraryTrackCommandHandler {
     let sheetManager: SheetManager
     let playbackHandler: LibraryTrackPlaybackHandler
     let presentationHandler: LibraryTrackPresentationHandler
-    let cloudAvailabilityController: CloudTrackAvailabilityController
+    let cloudAvailabilityActionHandler: LibraryCloudAvailabilityActionHandler
     let onToggleSelection: () -> Void
     let onRenameTrack: (UUID, FileRenameStrategy) -> Void
 
@@ -35,14 +35,18 @@ struct LibraryTrackCommandHandler {
             onToggleSelection()
         case .requestSnapshot(let trackId):
             presentationHandler.requestSnapshotIfNeeded(for: trackId)
-        case .beginCloudAvailabilityObservation(let trackId):
-            cloudAvailabilityController.beginObserving(trackId: trackId)
-        case .stopCloudAvailabilityObservation(let trackId):
-            cloudAvailabilityController.stopObserving(trackId: trackId)
+        case .trackDidAppear(let trackId):
+            cloudAvailabilityActionHandler.handle(
+                .visibleTrackDidAppear(trackId: trackId)
+            )
+        case .trackDidDisappear(let trackId):
+            cloudAvailabilityActionHandler.handle(
+                .visibleTrackDidDisappear(trackId: trackId)
+            )
         case .retryCloudDownload(let trackId):
-            Task {
-                await cloudAvailabilityController.retryDownloading(trackId: trackId)
-            }
+            cloudAvailabilityActionHandler.handle(
+                .retryDownload(trackId: trackId)
+            )
         }
     }
 
@@ -61,6 +65,41 @@ struct LibraryTrackCommandHandler {
                         message: PlayerPresentationText.addTrackToPlayerFailedMessage
                     )
                 )
+            }
+        }
+    }
+}
+
+/// Действия экранного наблюдения за iCloud-файлами фонотеки.
+enum LibraryCloudAvailabilityAction {
+    case screenDidAppear
+    case visibleTrackDidAppear(trackId: UUID)
+    case visibleTrackDidDisappear(trackId: UUID)
+    case screenDidDisappear
+    case retryDownload(trackId: UUID)
+}
+
+/// Передаёт намерения View контроллеру общего iCloud-наблюдения текущего экрана.
+@MainActor
+struct LibraryCloudAvailabilityActionHandler {
+    let controller: LibraryCloudAvailabilityScreenController
+
+    /// Выполняет действие iCloud-наблюдения без доступа View к файловому менеджеру.
+    func handle(
+        _ action: LibraryCloudAvailabilityAction
+    ) {
+        switch action {
+        case .screenDidAppear:
+            controller.screenDidAppear()
+        case .visibleTrackDidAppear(let trackId):
+            controller.rowDidAppear(trackId: trackId)
+        case .visibleTrackDidDisappear(let trackId):
+            controller.rowDidDisappear(trackId: trackId)
+        case .screenDidDisappear:
+            controller.screenDidDisappear()
+        case .retryDownload(let trackId):
+            Task {
+                await controller.retryDownloading(trackId: trackId)
             }
         }
     }

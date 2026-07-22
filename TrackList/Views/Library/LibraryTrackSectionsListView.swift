@@ -20,13 +20,19 @@ struct LibraryTrackSectionsListView: View {
     let trackListNamesById: [UUID: [String]]
     
     let metadataProvider: TrackMetadataProviding
-    let cloudAvailabilityController: CloudTrackAvailabilityController
+    let cloudAvailabilityStateStore: (UUID) -> CloudTrackAvailabilityRowStateStore
+    let cloudAvailabilityActionHandler: LibraryCloudAvailabilityActionHandler
     
     let playerViewModel: PlayerViewModel
+    let playbackStateController: LibraryTrackPlaybackStateController
+    let sheetManager: SheetManager
     
-    let isScrollingFast: Bool
     let revealedTrackID: UUID?
+    let highlightedTrackID: UUID?
     let onRenameTrack: (UUID, FileRenameStrategy) -> Void
+    let shouldShowTags: Bool
+    let shouldShowTrackListMembership: Bool
+    let shouldShowFileFormat: Bool
     
     let isSelecting: Bool
     
@@ -44,10 +50,16 @@ struct LibraryTrackSectionsListView: View {
                 trackListNamesById: trackListNamesById,
                 playerViewModel: playerViewModel,
                 metadataProvider: metadataProvider,
-                cloudAvailabilityController: cloudAvailabilityController,
-                isScrollingFast: isScrollingFast,
+                cloudAvailabilityStateStore: cloudAvailabilityStateStore,
+                cloudAvailabilityActionHandler: cloudAvailabilityActionHandler,
+                sheetManager: sheetManager,
+                playbackStateController: playbackStateController,
                 revealedTrackID: revealedTrackID,
+                highlightedTrackID: highlightedTrackID,
                 onRenameTrack: onRenameTrack,
+                shouldShowTags: shouldShowTags,
+                shouldShowTrackListMembership: shouldShowTrackListMembership,
+                shouldShowFileFormat: shouldShowFileFormat,
                 isSelecting: isSelecting,
                 selection: $selection
                

@@ -10,92 +10,22 @@
 //  Created by Pavel Fomin on 20.06.2026.
 //
 import SwiftUI
-import UIKit
 
 struct LibraryTrackRowContainer: View {
 
     // MARK: - Input
 
-    let track: LibraryTrack                       /// Текущий трек строки
+    let state: LibraryTrackRowState               /// Готовое состояние строки без iCloud runtime-состояния
     let allTracks: [LibraryTrack]                 /// Контекст всех треков (для переключения)
-    let playbackSource: PlaybackContextSource?   /// Постоянный источник списка, переданный экраном
-    let trackListNamesById: [UUID: [String]]      /// Названия треклистов, в которые входит трек
-    let metadataProvider: TrackMetadataProviding  /// Провайдер runtime snapshot
-    @ObservedObject var cloudAvailabilityController: CloudTrackAvailabilityController /// Контроллер runtime-состояний iCloud
-    let isScrollingFast: Bool                     /// Флаг быстрого скролла (для оптимизации загрузки)
-    let isRevealed: Bool                          /// Состояние раскрытия (для свайпов)
-    let showsSelection: Bool                      /// Включён ли режим выбора
-    let isSelected: Bool                          /// Выбран ли текущий трек
-    let onToggleSelection: () -> Void             /// Обработчик выбора
-    let onRenameTrack: (UUID, FileRenameStrategy) -> Void /// Обработчик переименования трека
-    @ObservedObject var playerViewModel: PlayerViewModel   /// ViewModel плеера
-    @ObservedObject private var settingsManager = AppSettingsManager.shared /// Менеджер настроек отображения
-    @EnvironmentObject var sheetManager: SheetManager      /// Менеджер шитов
-
-    // MARK: - Handlers
-
-    /// Обработчик воспроизведения строки.
-    private var playbackHandler: LibraryTrackPlaybackHandler {
-        LibraryTrackPlaybackHandler(
-            playerViewModel: playerViewModel,
-            source: playbackSource
-        )
-    }
-
-    /// Обработчик подготовки данных отображения строки.
-    private var presentationHandler: LibraryTrackPresentationHandler {
-        LibraryTrackPresentationHandler(
-            metadataProvider: metadataProvider
-        )
-    }
-
-    /// Обработчик команд строки.
-    private var commandHandler: LibraryTrackCommandHandler {
-        LibraryTrackCommandHandler(
-            sheetManager: sheetManager,
-            playbackHandler: playbackHandler,
-            presentationHandler: presentationHandler,
-            cloudAvailabilityController: cloudAvailabilityController,
-            onToggleSelection: onToggleSelection,
-            onRenameTrack: onRenameTrack
-        )
-    }
+    let commandHandler: LibraryTrackCommandHandler /// Обработчик намерений строки
+    @ObservedObject var cloudAvailabilityStateStore: CloudTrackAvailabilityRowStateStore /// Точечное runtime-состояние iCloud
 
     // MARK: - State
 
-    /// Runtime snapshot трека (единый источник метаданных).
-    private var snapshot: TrackRuntimeSnapshot? {
-        presentationHandler.snapshot(for: track.trackId)
-    }
-
-    /// Названия треклистов, в которых находится трек.
-    private var trackListNames: [String] {
-        trackListNamesById[track.trackId] ?? []
-    }
-
-    /// Подсветка строки при возврате из sheet.
-    private var isSheetHighlighted: Bool {
-        sheetManager.highlightedRowID == track.id
-    }
-
-    /// Готовое состояние строки для TrackRowView.
+    /// Добавляет к готовому состоянию только обновление iCloud текущей строки.
     private var rowState: LibraryTrackRowState {
-        let shouldShowTags = settingsManager.settings.visible.metadata.isTagReadingEnabled
-        let shouldShowTrackListMembership = settingsManager.settings.visible.library.isTrackListMembershipVisible
-        let shouldShowFileFormat = settingsManager.settings.visible.library.isFileFormatVisible
-        return presentationHandler.makeState(
-            track: track,
-            snapshot: snapshot,
-            isCurrent: playbackHandler.isCurrent(track),
-            isPlaying: playbackHandler.isPlaying(track),
-            isHighlighted: isRevealed || isSheetHighlighted,
-            trackListNames: trackListNames,
-            showsSelection: showsSelection,
-            isSelected: isSelected,
-            shouldShowTags: shouldShowTags,
-            shouldShowTrackListMembership: shouldShowTrackListMembership,
-            shouldShowFileFormat: shouldShowFileFormat,
-            cloudAvailabilityState: cloudAvailabilityController.state(for: track.trackId)
+        state.replacingCloudAvailabilityState(
+            cloudAvailabilityStateStore.state
         )
     }
 
@@ -126,7 +56,7 @@ struct LibraryTrackRowContainer: View {
             onRowTap: {
                 commandHandler.handle(
                     .tapRow(
-                        track: track,
+                        track: rowState.track,
                         context: allTracks
                     )
                 )
@@ -144,31 +74,30 @@ struct LibraryTrackRowContainer: View {
         ) {
             libraryActionMenuContent
         }
-        // Загружаем snapshot при появлении строки.
-        // Быстрый скролл остаётся частью id, чтобы сохранить прежнее поведение обновления task.
-        .task(id: track.trackId.uuidString + "|" + (isScrollingFast ? "1" : "0")) {
+        // Запрашиваем snapshot только при смене физического трека, а не скорости прокрутки.
+        .task(id: rowState.track.trackId) {
             commandHandler.handle(
-                .requestSnapshot(trackId: track.trackId)
+                .requestSnapshot(trackId: rowState.track.trackId)
             )
         }
-        // Состояние iCloud запрашивается через Action → ActionHandler, а не напрямую из View.
-        .task(id: track.trackId) {
+        // Строка сообщает только видимость; файловая проверка выполняется общей очередью экрана.
+        .onAppear {
             commandHandler.handle(
-                .beginCloudAvailabilityObservation(trackId: track.trackId)
+                .trackDidAppear(trackId: rowState.track.trackId)
             )
         }
         .onDisappear {
             commandHandler.handle(
-                .stopCloudAvailabilityObservation(trackId: track.trackId)
+                .trackDidDisappear(trackId: rowState.track.trackId)
             )
         }
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            if !showsSelection && rowState.isContentAvailable {
+            if !rowState.showsSelection && rowState.isContentAvailable {
                 // Добавить в плеер
                 if isMenuActionAvailable(.addToPlayer) {
                     Button {
                         commandHandler.handle(
-                            .addToPlayer(trackId: track.trackId)
+                            .addToPlayer(trackId: rowState.track.trackId)
                         )
                     } label: {
                         Label("Add to Player", systemImage: "waveform")
@@ -180,7 +109,7 @@ struct LibraryTrackRowContainer: View {
                 if isMenuActionAvailable(.addToTrackList) {
                     Button {
                         commandHandler.handle(
-                            .addToTrackList(track: track)
+                            .addToTrackList(track: rowState.track)
                         )
                     } label: {
                         Label("Add to Tracklist", systemImage: "list.star")
@@ -192,7 +121,7 @@ struct LibraryTrackRowContainer: View {
                 if isMenuActionAvailable(.moveToFolder) {
                     Button {
                         commandHandler.handle(
-                            .moveToFolder(track: track)
+                            .moveToFolder(track: rowState.track)
                         )
                     } label: {
                         Label("Move", systemImage: "arrow.forward.folder")
@@ -210,33 +139,33 @@ struct LibraryTrackRowContainer: View {
             labels: LibraryPresentationText.trackActionMenuLabels,
             onDetails: {
                 commandHandler.handle(
-                    .tapArtwork(track: track)
+                    .tapArtwork(track: rowState.track)
                 )
             },
             onMoveToFolder: {
                 commandHandler.handle(
-                    .moveToFolder(track: track)
+                    .moveToFolder(track: rowState.track)
                 )
             },
             onAddToPlayer: {
                 commandHandler.handle(
-                    .addToPlayer(trackId: track.trackId)
+                    .addToPlayer(trackId: rowState.track.trackId)
                 )
             },
             onAddToTrackList: {
                 commandHandler.handle(
-                    .addToTrackList(track: track)
+                    .addToTrackList(track: rowState.track)
                 )
             },
             onEditTags: {
                 commandHandler.handle(
-                    .editTags(track: track)
+                    .editTags(track: rowState.track)
                 )
             },
             onRenameFile: { strategy in
                 commandHandler.handle(
                     .rename(
-                        trackId: track.trackId,
+                        trackId: rowState.track.trackId,
                         strategy: strategy
                     )
                 )
@@ -266,7 +195,7 @@ struct LibraryTrackRowContainer: View {
             return AnyView(
                 Button {
                     commandHandler.handle(
-                        .retryCloudDownload(trackId: track.trackId)
+                        .retryCloudDownload(trackId: rowState.track.trackId)
                     )
                 } label: {
                     Image(systemName: "exclamationmark.icloud")

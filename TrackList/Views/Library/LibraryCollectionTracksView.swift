@@ -16,7 +16,7 @@ struct LibraryCollectionTracksView: View {
     /// Источник списка, соответствующий выбранному значению коллекции.
     let source: LibraryTrackListSource
     /// ViewModel плеера для воспроизведения и текущего состояния строки.
-    @ObservedObject var playerViewModel: PlayerViewModel
+    let playerViewModel: PlayerViewModel
     /// Конфигурация нижней панели массового выбора в общем host фонотеки.
     @Binding var selectionActionBarConfig: SelectionActionBarConfig?
     /// Передаёт действия общего списка в отдельный обработчик экспорта.
@@ -32,8 +32,9 @@ struct LibraryCollectionTracksView: View {
     // MARK: - ViewModel
 
     @StateObject private var tracksViewModel: LibraryTracksViewModel
-    @StateObject private var cloudAvailabilityController = CloudTrackAvailabilityController()
-    @StateObject private var scrollSpeed = ScrollSpeedModel(thresholdPtPerSec: 1500, debounceMs: 180)
+    @State private var cloudAvailabilityController = LibraryCloudAvailabilityScreenController()
+    @ObservedObject private var settingsManager = AppSettingsManager.shared
+    @StateObject private var playbackStateController: LibraryTrackPlaybackStateController
 
     // MARK: - Coordinators
 
@@ -59,6 +60,11 @@ struct LibraryCollectionTracksView: View {
         self._selectionActionBarConfig = selectionActionBarConfig
         self.onAllTracksAction = onAllTracksAction
         self.onCollectionTracksAction = onCollectionTracksAction
+        self._playbackStateController = StateObject(
+            wrappedValue: LibraryTrackPlaybackStateController(
+                playerViewModel: playerViewModel
+            )
+        )
         self._tracksViewModel = StateObject(
             wrappedValue: LibraryTracksViewModel(
                 source: source,
@@ -91,6 +97,13 @@ struct LibraryCollectionTracksView: View {
     /// Все видимые треки текущих секций для передачи в строки списком контекста.
     private var allVisibleTracks: [LibraryTrack] {
         tracksViewModel.trackSections.flatMap(\.tracks)
+    }
+
+    /// Обрабатывает iCloud-действия на уровне экрана, а не жизненного цикла каждой строки.
+    private var cloudAvailabilityActionHandler: LibraryCloudAvailabilityActionHandler {
+        LibraryCloudAvailabilityActionHandler(
+            controller: cloudAvailabilityController
+        )
     }
 
     /// Показывает экспорт внутри общего меню только для общего списка фонотеки.
@@ -147,6 +160,7 @@ struct LibraryCollectionTracksView: View {
                 handleBatchFilenameRenameFlowActivityChange(isActive)
             }
             .onDisappear {
+                cloudAvailabilityActionHandler.handle(.screenDidDisappear)
                 selectionActionBarConfig = nil
             }
     }
@@ -196,16 +210,22 @@ struct LibraryCollectionTracksView: View {
                     playbackSource: playbackSource,
                     trackListNamesById: tracksViewModel.trackListNamesById,
                     metadataProvider: tracksViewModel,
-                    cloudAvailabilityController: cloudAvailabilityController,
+                    cloudAvailabilityStateStore: cloudAvailabilityController.stateStore(for:),
+                    cloudAvailabilityActionHandler: cloudAvailabilityActionHandler,
                     playerViewModel: playerViewModel,
-                    isScrollingFast: scrollSpeed.isFast,
+                    playbackStateController: playbackStateController,
+                    sheetManager: sheetManager,
                     revealedTrackID: nil,
+                    highlightedTrackID: sheetManager.highlightedRowID,
                     onRenameTrack: { trackId, strategy in
                         tracksViewModel.renameTrack(
                             trackId: trackId,
                             strategy: strategy
                         )
                     },
+                    shouldShowTags: settingsManager.settings.visible.metadata.isTagReadingEnabled,
+                    shouldShowTrackListMembership: settingsManager.settings.visible.library.isTrackListMembershipVisible,
+                    shouldShowFileFormat: settingsManager.settings.visible.library.isFileFormatVisible,
                     isSelecting: isSelecting,
                     selection: selectionBinding
                 )
@@ -228,7 +248,10 @@ struct LibraryCollectionTracksView: View {
             .onChange(of: tracksViewModel.trackSections) { _, _ in
                 requestActiveTrackScrollIfNeeded()
             }
-            .onChange(of: playerViewModel.currentTrackDisplayable?.id) { _, _ in
+            .onChange(of: playbackStateController.currentTrackId) { _, _ in
+                requestActiveTrackScrollIfNeeded()
+            }
+            .onChange(of: playbackStateController.currentContext) { _, _ in
                 requestActiveTrackScrollIfNeeded()
             }
             .onChange(of: scenePhase) { _, newPhase in
@@ -258,6 +281,7 @@ struct LibraryCollectionTracksView: View {
 
     /// Синхронизирует состояние при появлении списка.
     private func handleTracksListAppear() {
+        cloudAvailabilityActionHandler.handle(.screenDidAppear)
         requestActiveTrackScrollIfNeeded()
         updateSelectionActionBarConfig()
     }

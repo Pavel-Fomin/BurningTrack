@@ -17,4 +17,26 @@ struct LibraryTrackRowState {
     let trackListNames: [String]?
     let cloudAvailabilityState: CloudTrackAvailabilityState?
     let isContentAvailable: Bool
+
+    /// Возвращает состояние с точечным iCloud-обновлением без повторной сборки artwork и metadata.
+    func replacingCloudAvailabilityState(
+        _ cloudAvailabilityState: CloudTrackAvailabilityState?
+    ) -> LibraryTrackRowState {
+        LibraryTrackRowState(
+            track: track,
+            isCurrent: isCurrent,
+            isPlaying: isPlaying,
+            isHighlighted: isHighlighted,
+            artwork: artwork,
+            title: title,
+            artist: artist,
+            duration: duration,
+            showsSelection: showsSelection,
+            isSelected: isSelected,
+            showsFileFormat: showsFileFormat,
+            trackListNames: trackListNames,
+            cloudAvailabilityState: cloudAvailabilityState,
+            isContentAvailable: cloudAvailabilityState?.isContentAvailable ?? track.isAvailable
+        )
+    }
 }

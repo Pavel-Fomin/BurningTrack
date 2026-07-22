@@ -151,32 +151,27 @@ struct TrackRowView<ActionMenuContent: View>: View {
         return extensionValue
     }
 
-    /// Есть ли расширенный контент, который делает строку выше обложки
-    private var hasExtendedContent: Bool {
-        guard let trackListNames else { return false }
-        return !trackListNames.isEmpty
-    }
-
-    /// Вертикальное выравнивание строки: короткие строки центрируются, расширенные прижимаются к верху
-    private var rowContentAlignment: VerticalAlignment {
-        hasExtendedContent ? .top : .center
-    }
-
     var body: some View {
-        HStack(alignment: rowContentAlignment, spacing: 12) {
+        HStack(alignment: .top, spacing: 12) {
 
             // Radio (только в режиме выбора)
             if showsSelection && selectionPlacement == .leading {
                 selectionButton
+                    // Центруем область выбора относительно обложки, а не дополнительной строки «уже в».
+                    .padding(.top, 2)
             }
 
             rowTapContent
 
             // Экран может нейтрально заменить меню совместимым содержимым правой части строки.
             trailingArea
+                // Центруем меню относительно обложки, а не дополнительной строки «уже в».
+                .padding(.top, 2)
 
             if showsSelection && selectionPlacement == .trailing {
                 selectionButton
+                    // Центруем область выбора относительно обложки, а не дополнительной строки «уже в».
+                    .padding(.top, 2)
             }
         }
         .padding(.vertical, 0)
@@ -187,11 +182,18 @@ struct TrackRowView<ActionMenuContent: View>: View {
 
     /// Единая область тапа для обложки и текстовой части строки.
     private var rowTapContent: some View {
-        HStack(alignment: rowContentAlignment, spacing: 12) {
-            artworkView
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .center, spacing: 12) {
+                artworkView
 
-            trackInfoView
+                trackInfoView
+            }
+
+            trackListMembershipView
+                // Дополнительная строка начинается под текстом, не сдвигая основной блок.
+                .padding(.leading, 60)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
         .onTapGesture {
             handleRowTap()
@@ -281,7 +283,7 @@ struct TrackRowView<ActionMenuContent: View>: View {
     // MARK: - Информация о треке
 
     private var trackInfoView: some View {
-        HStack(alignment: rowContentAlignment, spacing: 8) {
+        HStack(alignment: .center, spacing: 8) {
             leftTextColumn
                 .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -293,29 +295,33 @@ struct TrackRowView<ActionMenuContent: View>: View {
     /// Левая колонка с основным текстом трека
     private var leftTextColumn: some View {
         VStack(alignment: .leading, spacing: hasArtist ? 2 : 0) {
-            if hasArtist, let artistText = artist {
-                Text(artistText)
-                    .font(.subheadline)
-                    .foregroundColor(.primary)
-                    .lineLimit(1)
-            }
-
             Text(displayTitle)
-                .font(hasArtist ? .footnote : .subheadline)
-                .foregroundColor(hasArtist ? .secondary : .primary)
+                .font(.subheadline)
+                .foregroundColor(.primary)
                 .lineLimit(1)
 
-            if let trackListNames, !trackListNames.isEmpty {
-                Text(
-                    SharedPresentationText.tracklistMembership(
-                        trackListNames.joined(separator: ", ")
-                    )
-                )
-                    .font(.caption)
+            if hasArtist, let artistText = artist {
+                Text(artistText)
+                    // Исполнитель находится в одной строке со временем.
+                    .font(.footnote)
                     .foregroundColor(.secondary)
-                    .lineLimit(4)
-                    .padding(.top, 4)
+                    .lineLimit(1)
             }
+        }
+    }
+
+    /// Дополнительная строка с треклистами, в которых уже есть трек.
+    @ViewBuilder
+    private var trackListMembershipView: some View {
+        if let trackListNames, !trackListNames.isEmpty {
+            Text(
+                SharedPresentationText.tracklistMembership(
+                    trackListNames.joined(separator: ", ")
+                )
+            )
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .lineLimit(4)
         }
     }
 

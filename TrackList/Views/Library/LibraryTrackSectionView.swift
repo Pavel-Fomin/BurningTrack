@@ -26,11 +26,17 @@ struct LibraryTrackSectionView: View {
     let playerViewModel: PlayerViewModel
     
     let metadataProvider: TrackMetadataProviding
-    let cloudAvailabilityController: CloudTrackAvailabilityController
+    let cloudAvailabilityStateStore: (UUID) -> CloudTrackAvailabilityRowStateStore
+    let cloudAvailabilityActionHandler: LibraryCloudAvailabilityActionHandler
+    let sheetManager: SheetManager
+    let playbackStateController: LibraryTrackPlaybackStateController
 
-    let isScrollingFast: Bool
     let revealedTrackID: UUID?
+    let highlightedTrackID: UUID?
     let onRenameTrack: (UUID, FileRenameStrategy) -> Void
+    let shouldShowTags: Bool
+    let shouldShowTrackListMembership: Bool
+    let shouldShowFileFormat: Bool
     
     let isSelecting: Bool
     @Binding var selection: OrderedSelection<UUID>
@@ -71,21 +77,42 @@ struct LibraryTrackSectionView: View {
         let onToggleSelection: () -> Void = {
             selection.toggle(rowId)
         }
-
-        return LibraryTrackRowContainer(
+        let playbackHandler = LibraryTrackPlaybackHandler(
+            playerViewModel: playerViewModel,
+            source: playbackSource
+        )
+        let presentationHandler = LibraryTrackPresentationHandler(
+            metadataProvider: metadataProvider
+        )
+        let rowState = presentationHandler.makeState(
             track: track,
-            allTracks: allTracks,
-            playbackSource: playbackSource,
-            trackListNamesById: trackListNamesById,
-            metadataProvider: metadataProvider,
-            cloudAvailabilityController: cloudAvailabilityController,
-            isScrollingFast: isScrollingFast,
-            isRevealed: isRevealed,
+            snapshot: presentationHandler.snapshot(for: track.trackId),
+            isCurrent: playbackStateController.isCurrent(track),
+            isPlaying: playbackStateController.isPlaying(track),
+            isHighlighted: isRevealed || rowId == highlightedTrackID,
+            trackListNames: trackListNamesById[track.trackId] ?? [],
             showsSelection: isSelecting,
             isSelected: isSelected,
+            shouldShowTags: shouldShowTags,
+            shouldShowTrackListMembership: shouldShowTrackListMembership,
+            shouldShowFileFormat: shouldShowFileFormat,
+            // iCloud-состояние приходит точечно в контейнер строки.
+            cloudAvailabilityState: nil
+        )
+        let commandHandler = LibraryTrackCommandHandler(
+            sheetManager: sheetManager,
+            playbackHandler: playbackHandler,
+            presentationHandler: presentationHandler,
+            cloudAvailabilityActionHandler: cloudAvailabilityActionHandler,
             onToggleSelection: onToggleSelection,
-            onRenameTrack: onRenameTrack,
-            playerViewModel: playerViewModel
+            onRenameTrack: onRenameTrack
+        )
+
+        return LibraryTrackRowContainer(
+            state: rowState,
+            allTracks: allTracks,
+            commandHandler: commandHandler,
+            cloudAvailabilityStateStore: cloudAvailabilityStateStore(track.trackId)
         )
         .id(rowId)
     }

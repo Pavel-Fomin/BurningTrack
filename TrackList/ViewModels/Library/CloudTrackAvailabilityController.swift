@@ -10,14 +10,41 @@
 import Combine
 import Foundation
 
+/// Хранит состояние iCloud одной строки без подписки на состояние всего списка.
+@MainActor
+final class CloudTrackAvailabilityRowStateStore: ObservableObject {
+
+    /// Последнее достоверно определённое состояние iCloud-файла.
+    @Published private(set) var state: CloudTrackAvailabilityState?
+
+    init(
+        state: CloudTrackAvailabilityState?
+    ) {
+        self.state = state
+    }
+
+    /// Публикует изменение только для строки, чьё состояние действительно поменялось.
+    func apply(
+        _ state: CloudTrackAvailabilityState?
+    ) {
+        guard self.state != state else {
+            return
+        }
+
+        self.state = state
+    }
+}
+
 /// Хранит состояния видимых строк и обновляет iCloud-файлы одной общей задачей.
 @MainActor
-final class CloudTrackAvailabilityController: ObservableObject {
+final class CloudTrackAvailabilityController {
 
     // MARK: - Состояние
 
     /// Последнее достоверно определённое iCloud-состояние по идентификатору трека.
-    @Published private(set) var statesByTrackId: [UUID: CloudTrackAvailabilityState] = [:]
+    private var statesByTrackId: [UUID: CloudTrackAvailabilityState] = [:]
+    /// Observable-состояния создаются только для строк, созданных List.
+    private var stateStoresByTrackId: [UUID: CloudTrackAvailabilityRowStateStore] = [:]
 
     // MARK: - Зависимости
 
@@ -26,17 +53,17 @@ final class CloudTrackAvailabilityController: ObservableObject {
 
     // MARK: - Наблюдение
 
-    /// Идентификаторы строк, которые сейчас находятся на экране и нуждаются в актуальном состоянии.
-    private var observedTrackIds = Set<UUID>()
-    /// Строки, для которых уже выполнялась первоначальная проверка resource values.
+    /// Идентификаторы треков, видимых на текущем экране фонотеки.
+    private var trackedTrackIds = Set<UUID>()
+    /// Треки, для которых уже выполнялась первоначальная проверка resource values.
     private var initiallyCheckedTrackIds = Set<UUID>()
-    /// Единственная задача, которая обновляет все наблюдаемые iCloud-файлы.
+    /// Единственная задача, которая обновляет все iCloud-файлы видимой области.
     private var observationTask: Task<Void, Never>?
     /// Идентификатор актуального запуска общей задачи наблюдения.
     private var observationToken: UUID?
     /// Показывает, что общая задача ожидает следующего периодического обновления.
     private var isWaitingForNextRefresh = false
-    /// Запрашивает немедленный повторный проход, если видимая строка появилась во время обновления.
+    /// Запрашивает немедленный повторный проход, если набор треков изменился во время обновления.
     private var needsImmediateRefresh = false
 
     // MARK: - Init
@@ -53,38 +80,51 @@ final class CloudTrackAvailabilityController: ObservableObject {
 
     // MARK: - Публичный API
 
-    /// Возвращает последнее определённое состояние iCloud-файла для построения строки.
-    func state(
+    /// Возвращает точечное observable-состояние конкретной строки.
+    func stateStore(
         for trackId: UUID
-    ) -> CloudTrackAvailabilityState? {
-        statesByTrackId[trackId]
+    ) -> CloudTrackAvailabilityRowStateStore {
+        if let existingStore = stateStoresByTrackId[trackId] {
+            return existingStore
+        }
+
+        let stateStore = CloudTrackAvailabilityRowStateStore(
+            state: statesByTrackId[trackId]
+        )
+        stateStoresByTrackId[trackId] = stateStore
+        return stateStore
     }
 
-    /// Начинает наблюдение за строкой при её появлении без дублирования параллельных задач.
-    func beginObserving(
-        trackId: UUID
+    /// Синхронизирует набор видимых треков, подготовленный экранным контроллером.
+    func updateTrackedTrackIds(
+        _ trackIds: [UUID]
     ) {
-        guard observedTrackIds.insert(trackId).inserted else {
+        let updatedTrackIds = Set(trackIds)
+        guard trackedTrackIds != updatedTrackIds else {
+            return
+        }
+
+        trackedTrackIds = updatedTrackIds
+
+        guard trackedTrackIds.isEmpty == false else {
+            cancelObservation()
             return
         }
 
         requestImmediateRefresh()
     }
 
-    /// Прекращает наблюдение за строкой при её исчезновении.
-    func stopObserving(
-        trackId: UUID
-    ) {
-        guard observedTrackIds.remove(trackId) != nil else {
-            return
+    /// Сбрасывает экранное наблюдение при уходе с экрана фонотеки.
+    func stopTracking() {
+        for stateStore in stateStoresByTrackId.values {
+            stateStore.apply(nil)
         }
 
-        statesByTrackId.removeValue(forKey: trackId)
-        initiallyCheckedTrackIds.remove(trackId)
-
-        if observedTrackIds.isEmpty {
-            cancelObservation()
-        }
+        trackedTrackIds.removeAll()
+        initiallyCheckedTrackIds.removeAll()
+        statesByTrackId.removeAll()
+        stateStoresByTrackId.removeAll()
+        cancelObservation()
     }
 
     /// Повторно запрашивает загрузку iCloud-файла после нажатия кнопки ошибки.
@@ -93,15 +133,11 @@ final class CloudTrackAvailabilityController: ObservableObject {
     ) async {
         let state = await manager.retryDownloading(trackId: trackId)
 
-        guard observedTrackIds.contains(trackId) else {
+        guard trackedTrackIds.contains(trackId) else {
             return
         }
 
-        if let state {
-            statesByTrackId[trackId] = state
-        } else {
-            statesByTrackId.removeValue(forKey: trackId)
-        }
+        apply(state: state, for: trackId)
 
         requestImmediateRefresh()
     }
@@ -110,7 +146,7 @@ final class CloudTrackAvailabilityController: ObservableObject {
 
     /// Запускает или ускоряет общий проход проверки без таймеров на уровне строк.
     private func requestImmediateRefresh() {
-        guard observedTrackIds.isEmpty == false else {
+        guard trackedTrackIds.isEmpty == false else {
             return
         }
 
@@ -203,34 +239,165 @@ final class CloudTrackAvailabilityController: ObservableObject {
         }
     }
 
-    /// Применяет только результаты треков, которые остались видимыми к моменту завершения проверки.
+    /// Применяет только результаты треков, оставшихся видимыми к моменту завершения проверки.
     private func apply(
         refreshedStates: [UUID: CloudTrackAvailabilityState],
         for trackIds: [UUID]
     ) {
-        for trackId in trackIds where observedTrackIds.contains(trackId) {
+        for trackId in trackIds where trackedTrackIds.contains(trackId) {
             initiallyCheckedTrackIds.insert(trackId)
-
-            if let state = refreshedStates[trackId] {
-                statesByTrackId[trackId] = state
-            } else {
-                statesByTrackId.removeValue(forKey: trackId)
-            }
+            apply(state: refreshedStates[trackId], for: trackId)
         }
+    }
+
+    /// Сохраняет состояние и публикует его только созданной строке этого трека.
+    private func apply(
+        state: CloudTrackAvailabilityState?,
+        for trackId: UUID
+    ) {
+        let currentState = statesByTrackId[trackId]
+        guard currentState != state else {
+            return
+        }
+
+        if let state {
+            statesByTrackId[trackId] = state
+        } else {
+            statesByTrackId.removeValue(forKey: trackId)
+        }
+
+        stateStoresByTrackId[trackId]?.apply(state)
     }
 
     /// Проверяет, остался ли хотя бы один видимый iCloud-файл, состояние которого нужно обновлять.
     private var requiresPeriodicRefresh: Bool {
-        observedTrackIds.contains { trackId in
+        trackedTrackIds.contains { trackId in
             statesByTrackId[trackId]?.requiresPeriodicRefresh == true
         }
     }
 
     /// Возвращает новые строки и только те iCloud-файлы, которые ещё не стали локальными.
     private var trackIdsForRefresh: [UUID] {
-        observedTrackIds.filter { trackId in
+        trackedTrackIds.filter { trackId in
             initiallyCheckedTrackIds.contains(trackId) == false ||
             statesByTrackId[trackId]?.requiresPeriodicRefresh == true
+        }
+    }
+}
+
+/// Собирает видимые строки экрана и передаёт их одной пакетной проверке iCloud.
+@MainActor
+final class LibraryCloudAvailabilityScreenController {
+
+    // MARK: - Зависимости
+
+    /// Общий контроллер проверки iCloud-состояний только для видимой области.
+    private let availabilityController: CloudTrackAvailabilityController
+
+    // MARK: - Состояние
+
+    /// Треки, видимость которых уже сообщила строка List.
+    private var visibleTrackIds = Set<UUID>()
+    /// Единственная короткая задержка собирает всплеск onAppear/onDisappear в один пакет.
+    private var visibilityRefreshTask: Task<Void, Never>?
+    /// Не принимает запоздалые события строк после ухода экрана.
+    private var isScreenVisible = false
+
+    // MARK: - Init
+
+    init() {
+        availabilityController = CloudTrackAvailabilityController()
+    }
+
+    init(
+        availabilityController: CloudTrackAvailabilityController
+    ) {
+        self.availabilityController = availabilityController
+    }
+
+    deinit {
+        visibilityRefreshTask?.cancel()
+    }
+
+    // MARK: - Публичный API
+
+    /// Возвращает точечное observable-состояние строки.
+    func stateStore(
+        for trackId: UUID
+    ) -> CloudTrackAvailabilityRowStateStore {
+        availabilityController.stateStore(for: trackId)
+    }
+
+    /// Включает передачу видимых строк при появлении экрана.
+    func screenDidAppear() {
+        isScreenVisible = true
+        scheduleVisibleTracksRefresh()
+    }
+
+    /// Добавляет строку к видимой области без обращения к файловой системе из View.
+    func rowDidAppear(
+        trackId: UUID
+    ) {
+        guard visibleTrackIds.insert(trackId).inserted else {
+            return
+        }
+
+        scheduleVisibleTracksRefresh()
+    }
+
+    /// Убирает строку из видимой области без сброса уже определённого состояния трека.
+    func rowDidDisappear(
+        trackId: UUID
+    ) {
+        guard visibleTrackIds.remove(trackId) != nil else {
+            return
+        }
+
+        scheduleVisibleTracksRefresh()
+    }
+
+    /// Передаёт повторную загрузку в общий контроллер iCloud.
+    func retryDownloading(
+        trackId: UUID
+    ) async {
+        await availabilityController.retryDownloading(trackId: trackId)
+    }
+
+    /// Останавливает экранное наблюдение и освобождает состояния ушедшего списка.
+    func screenDidDisappear() {
+        isScreenVisible = false
+        visibleTrackIds.removeAll()
+        visibilityRefreshTask?.cancel()
+        visibilityRefreshTask = nil
+        availabilityController.stopTracking()
+    }
+
+    // MARK: - Пакетирование видимости
+
+    /// Планирует один короткий проход после серии изменений видимости при прокрутке.
+    private func scheduleVisibleTracksRefresh() {
+        guard isScreenVisible,
+              visibilityRefreshTask == nil else {
+            return
+        }
+
+        visibilityRefreshTask = Task { [weak self] in
+            do {
+                try await Task.sleep(nanoseconds: 80_000_000)
+            } catch {
+                self?.visibilityRefreshTask = nil
+                return
+            }
+
+            guard let self,
+                  Task.isCancelled == false else {
+                return
+            }
+
+            self.visibilityRefreshTask = nil
+            self.availabilityController.updateTrackedTrackIds(
+                Array(self.visibleTrackIds)
+            )
         }
     }
 }
