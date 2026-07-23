@@ -17,15 +17,19 @@ enum ArtworkPreparationService {
     static func prepare(
         _ request: ArtworkPreparationRequest
     ) async throws -> Data {
-        try await Task.detached(priority: .userInitiated) {
+        try await ArtworkProcessingQueue.shared.perform {
             try prepareInBackground(request)
-        }.value
+        }
     }
 
     /// Подготавливает изображение через ImageIO вне главного потока.
     private static func prepareInBackground(
         _ request: ArtworkPreparationRequest
     ) throws -> Data {
+        guard request.maxPixelSize > 0 else {
+            throw ArtworkPreparationError.invalidTargetSize
+        }
+
         guard let source = CGImageSourceCreateWithData(request.imageData as CFData, nil) else {
             throw ArtworkPreparationError.invalidImageData
         }
@@ -40,7 +44,7 @@ enum ArtworkPreparationService {
             source,
             0,
             thumbnailOptions as CFDictionary
-        ) else {
+        ), image.width > 0, image.height > 0 else {
             throw ArtworkPreparationError.invalidImageData
         }
 
@@ -71,6 +75,8 @@ enum ArtworkPreparationService {
 
 /// Ошибка общего сервиса подготовки обложек.
 enum ArtworkPreparationError: Error {
+    /// Размер подготовки не допускает безопасного вызова ImageIO.
+    case invalidTargetSize
     /// Данные не удалось открыть как изображение.
     case invalidImageData
     /// Не удалось перекодировать изображение в JPEG.

@@ -6,7 +6,7 @@
 //
 //  Created by Pavel Fomin on 05.07.2025.
 //
-import UIKit
+import Foundation
 // MARK: -  Протокол
 protocol TrackDisplayable: Identifiable {
     var id: UUID { get }
@@ -17,7 +17,6 @@ protocol TrackDisplayable: Identifiable {
     var title: String? { get }
     var artist: String? { get }
     var duration: Double { get }
-    var artwork: UIImage? { get }
     // Флаг доступности
     var isAvailable: Bool { get }
 }

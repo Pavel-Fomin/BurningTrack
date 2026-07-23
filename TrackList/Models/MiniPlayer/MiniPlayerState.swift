@@ -17,7 +17,6 @@
 //
 
 import Foundation
-import UIKit
 
 // MARK: - MiniPlayerStaticState
 
@@ -32,8 +31,8 @@ struct MiniPlayerStaticState: Equatable {
     /// Исполнитель из metadata; отсутствие значения обрабатывается presentation-слоем.
     let artist: String?
 
-    /// Обложка трека (runtime, не сериализуется)
-    let artwork: UIImage?
+    /// Лёгкий запрос обложки трека (runtime, не сериализуется).
+    let artworkRequest: ArtworkRequest?
 }
 
 // MARK: - MiniPlayerProgressState

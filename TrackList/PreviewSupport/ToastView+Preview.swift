@@ -31,7 +31,7 @@ private struct ToastViewPreviewContainer: View {
                 title: "Midnight Drive",
                 artist: "Neon Coast"
             ),
-            artworkImage: Image(systemName: "music.note"),
+            artworkRequest: nil,
             message: "Добавлен в треклист"
         )
     )
@@ -41,7 +41,7 @@ private struct ToastViewPreviewContainer: View {
     ToastViewPreviewContainer(
         data: ToastData(
             style: .trackList(name: "Дорожная музыка"),
-            artworkImage: nil,
+            artworkRequest: nil,
             message: "Некоторые треки недоступны"
         )
     )
@@ -51,7 +51,7 @@ private struct ToastViewPreviewContainer: View {
     ToastViewPreviewContainer(
         data: ToastData(
             style: .trackList(name: "Не удалось сохранить"),
-            artworkImage: nil,
+            artworkRequest: nil,
             message: "Операция завершилась с ошибкой"
         )
     )
@@ -64,7 +64,7 @@ private struct ToastViewPreviewContainer: View {
                 title: "Очень длинное название трека для проверки ограничения ширины текста",
                 artist: "Исполнитель с очень длинным названием"
             ),
-            artworkImage: Image(systemName: "music.note.list"),
+            artworkRequest: nil,
             message: "Добавлен в треклист с очень длинным названием"
         )
     )
@@ -77,7 +77,7 @@ private struct ToastViewPreviewContainer: View {
                 title: "Northern Lights",
                 artist: "Glass Harbor"
             ),
-            artworkImage: Image(systemName: "music.note"),
+            artworkRequest: nil,
             message: "Добавлен в плеер"
         )
     )

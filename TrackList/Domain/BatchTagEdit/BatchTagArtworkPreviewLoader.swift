@@ -29,7 +29,12 @@ actor BatchTagArtworkPreviewLoader {
 
         if let snapshot = await TrackRuntimeStore.shared.snapshot(forTrackId: trackId) {
             guard Task.isCancelled == false else { return nil }
-            return makePreviewImage(trackId: trackId, artworkData: snapshot.artworkData)
+            return await makePreviewImage(
+                trackId: trackId,
+                artworkData: snapshot.artworkData,
+                sourceIdentifier: snapshot.artworkSourceIdentifier,
+                revision: snapshot.updatedAt
+            )
         }
 
         guard Task.isCancelled == false else { return nil }
@@ -53,25 +58,41 @@ actor BatchTagArtworkPreviewLoader {
 
         guard Task.isCancelled == false else { return nil }
 
-        return makePreviewImage(trackId: trackId, artworkData: metadata.artworkData)
+        return await makePreviewImage(
+            trackId: trackId,
+            artworkData: metadata.artworkData,
+            sourceIdentifier: metadata.artworkSourceIdentifier,
+            revision: nil
+        )
     }
 
     /// Сбрасывает подготовленную обложку одного трека во внутреннем ArtworkProvider.
-    func invalidate(trackId: UUID) {
-        ArtworkProvider.shared.invalidate(trackId: trackId)
+    func invalidate(trackId: UUID) async {
+        await ArtworkProvider.shared.invalidate(trackId: trackId)
     }
 
     /// Полностью очищает кэш подготовленных preview-обложек.
-    func removeAll() {
-        ArtworkProvider.shared.removeAll()
+    func removeAll() async {
+        await ArtworkProvider.shared.removeAll()
     }
 
     /// Создаёт downsampled preview-изображение через общий ArtworkProvider.
-    private func makePreviewImage(trackId: UUID, artworkData: Data?) -> UIImage? {
-        ArtworkProvider.shared.image(
-            trackId: trackId,
-            artworkData: artworkData,
-            purpose: .batchTagPreview
+    private func makePreviewImage(
+        trackId: UUID,
+        artworkData: Data?,
+        sourceIdentifier: ArtworkSourceIdentifier?,
+        revision: Date?
+    ) async -> UIImage? {
+        guard let sourceIdentifier else { return nil }
+
+        return await ArtworkProvider.shared.image(
+            for: ArtworkRequest(
+                trackId: trackId,
+                artworkData: artworkData,
+                purpose: .batchTagPreview,
+                sourceIdentifier: sourceIdentifier,
+                revision: revision
+            )
         )
     }
 }

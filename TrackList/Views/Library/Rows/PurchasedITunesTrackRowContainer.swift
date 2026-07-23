@@ -58,7 +58,12 @@ struct PurchasedITunesTrackRowContainer: View {
             isCurrent: isCurrent,
             isPlaying: isPlaying,
             isHighlighted: false,
-            artwork: track.artwork,
+            artworkRequest: ArtworkRequest(
+                trackId: track.trackId,
+                artworkData: track.artworkData,
+                purpose: .trackList,
+                sourceIdentifier: .mediaLibrary(trackId: track.trackId)
+            ),
             title: track.title,
             artist: track.artist ?? "Unknown Artist",
             duration: track.duration,

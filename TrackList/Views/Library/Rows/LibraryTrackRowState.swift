@@ -1,4 +1,4 @@
-import UIKit
+import Foundation
 
 /// Готовое состояние строки фонотеки для отображения.
 /// Не содержит команд и не знает про ViewModel, SheetManager или загрузку metadata.
@@ -7,7 +7,7 @@ struct LibraryTrackRowState {
     let isCurrent: Bool
     let isPlaying: Bool
     let isHighlighted: Bool
-    let artwork: UIImage?
+    let artworkRequest: ArtworkRequest?
     let title: String?
     let artist: String?
     let duration: Double?
@@ -27,7 +27,7 @@ struct LibraryTrackRowState {
             isCurrent: isCurrent,
             isPlaying: isPlaying,
             isHighlighted: isHighlighted,
-            artwork: artwork,
+            artworkRequest: artworkRequest,
             title: title,
             artist: artist,
             duration: duration,

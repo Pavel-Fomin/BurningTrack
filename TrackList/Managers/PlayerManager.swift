@@ -270,7 +270,9 @@ final class PlayerManager {
             info[MPMediaItemPropertyAlbumTitle] = album
         }
         
-        if let artwork = snapshot.artwork {
+        if let artwork = snapshot.artwork,
+           artwork.width > 0,
+           artwork.height > 0 {
             info[MPMediaItemPropertyArtwork] =
                 MPMediaItemArtwork(boundsSize: CGSize(width: artwork.width, height: artwork.height)) { _ in
                     UIImage(cgImage: artwork)

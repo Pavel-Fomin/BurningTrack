@@ -24,13 +24,17 @@ struct ToastView: View {
             // Left block (50%)
             HStack(spacing: 12) {
                 
-                if let artworkImage = data.artworkImage {
-                    
-                    artworkImage
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 32, height: 32)
-                        .clipShape(RoundedRectangle(cornerRadius: 64, style: .continuous))
+                if data.artworkRequest != nil {
+                    ArtworkPreparationView(request: data.artworkRequest) { image in
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                    } placeholder: {
+                        RoundedRectangle(cornerRadius: 64, style: .continuous)
+                            .fill(Color.gray.opacity(0.3))
+                    }
+                    .frame(width: 32, height: 32)
+                    .clipShape(RoundedRectangle(cornerRadius: 64, style: .continuous))
                     
                     VStack(alignment: .leading, spacing: 2) {
                         Text(artistText)
@@ -63,7 +67,7 @@ struct ToastView: View {
                     .font(.title3)
                     .foregroundColor(.green)
                 
-                if data.artworkImage != nil {
+                if data.artworkRequest != nil {
                     Text(data.message)
                         .font(.caption2)
                         .foregroundColor(.green)

@@ -8,15 +8,14 @@
 //
 
 import SwiftUI
-import UIKit
 
 struct LibraryAlbumValueRowView: View {
     // MARK: - Входные данные
 
     /// Значение альбома с данными, собранными из SQLite metadata.
     let value: LibraryCollectionValue
-    /// Обложка representative track, если runtime snapshot уже загружен.
-    let artwork: UIImage?
+    /// Запрос обложки representative track, если runtime snapshot уже загружен.
+    let artworkRequest: ArtworkRequest?
     /// Показывает, что текущий трек плеера входит в этот альбом.
     let isCurrent: Bool
     /// Показывает, что текущий трек альбома сейчас воспроизводится.
@@ -41,11 +40,11 @@ struct LibraryAlbumValueRowView: View {
     /// Левая квадратная зона обложки или системной заглушки.
     private var artworkView: some View {
         ZStack {
-            if let artwork {
-                Image(uiImage: artwork)
+            ArtworkPreparationView(request: artworkRequest) { image in
+                Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
-            } else {
+            } placeholder: {
                 placeholderArtworkView
             }
 

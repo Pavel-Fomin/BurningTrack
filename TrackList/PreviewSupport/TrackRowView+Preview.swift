@@ -9,14 +9,12 @@
 
 #if DEBUG
 import SwiftUI
-import UIKit
 
 /// Создаёт изолированную строку для Xcode Preview из рабочей модели `Track`.
 private func makeTrackRowPreview(
     track: Track,
     isCurrent: Bool = false,
-    isPlaying: Bool = false,
-    artwork: UIImage? = nil
+    isPlaying: Bool = false
 ) -> some View {
     List {
         TrackRowView(
@@ -24,7 +22,7 @@ private func makeTrackRowPreview(
             isCurrent: isCurrent,
             isPlaying: isPlaying,
             isHighlighted: false,
-            artwork: artwork,
+            artworkRequest: nil,
             title: track.title,
             artist: track.artist,
             duration: track.duration,
@@ -37,10 +35,7 @@ private func makeTrackRowPreview(
 #Preview("Обычное состояние") {
     let track = PreviewDataFactory.makeTracks()[0]
 
-    makeTrackRowPreview(
-        track: track,
-        artwork: UIImage(systemName: "music.note")
-    )
+    makeTrackRowPreview(track: track)
 }
 
 #Preview("Без обложки и метаданных") {
@@ -50,10 +45,7 @@ private func makeTrackRowPreview(
 }
 
 #Preview("Длинный текст") {
-    makeTrackRowPreview(
-        track: PreviewDataFactory.makeLongTextTrack(),
-        artwork: UIImage(systemName: "music.note.list")
-    )
+    makeTrackRowPreview(track: PreviewDataFactory.makeLongTextTrack())
 }
 
 #Preview("Текущий трек играет") {

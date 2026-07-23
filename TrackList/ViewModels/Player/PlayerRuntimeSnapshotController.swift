@@ -64,16 +64,6 @@ final class PlayerRuntimeSnapshotController {
 
         snapshotsByTrackId[trackId] = snapshot
 
-        // 2. Большой artwork для Lock Screen / Control Center (512px)
-        // Берём СЫРЫЕ данные из snapshot и строим CGImage через ImageDownsampler.
-        if let data = snapshot.artworkData,
-           let nowPlayingCGImage = makeThumbnail(
-            from: data,
-            maxPixel: ArtworkPurposeSizes.maxPixel(for: .nowPlaying)
-           ) {
-            nowPlayingArtworkByTrackId[trackId] = nowPlayingCGImage
-        }
-
         return trackId
     }
 
@@ -88,15 +78,37 @@ final class PlayerRuntimeSnapshotController {
         // 2. Сбрасываем старую now playing обложку.
         nowPlayingArtworkByTrackId[trackId] = nil
 
-        // 3. Пересобираем now playing artwork из нового snapshot.
-        if let data = updateEvent.snapshot.artworkData,
-           let cgImage = makeThumbnail(
-            from: data,
-            maxPixel: ArtworkPurposeSizes.maxPixel(for: .nowPlaying)
-           ) {
-            nowPlayingArtworkByTrackId[trackId] = cgImage
+        return trackId
+    }
+
+    /// Асинхронно запрашивает большую обложку через общую подсистему подготовки.
+    func requestNowPlayingArtworkIfNeeded(
+        for trackId: UUID,
+        artworkData: Data?,
+        sourceIdentifier: ArtworkSourceIdentifier?,
+        revision: Date?
+    ) async -> UUID? {
+        guard nowPlayingArtworkByTrackId[trackId] == nil else { return nil }
+        guard let sourceIdentifier else { return nil }
+
+        let image = await ArtworkProvider.shared.image(
+            for: ArtworkRequest(
+                trackId: trackId,
+                artworkData: artworkData,
+                purpose: .nowPlaying,
+                sourceIdentifier: sourceIdentifier,
+                revision: revision
+            )
+        )
+        guard !Task.isCancelled, let cgImage = image?.cgImage else { return nil }
+
+        // Snapshot мог обновиться, пока общая очередь готовила прежнюю ревизию.
+        if let revision,
+           snapshotsByTrackId[trackId]?.updatedAt != revision {
+            return nil
         }
 
+        nowPlayingArtworkByTrackId[trackId] = cgImage
         return trackId
     }
 

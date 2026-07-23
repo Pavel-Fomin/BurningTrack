@@ -110,9 +110,8 @@ final class PurchasedITunesMusicProvider {
                 return nil
             }
 
-            // Берём размер Now Playing, а список и мини-плеер даунсемплят эти данные под свои цели.
-            let maxPixel = CGFloat(ArtworkPurposeSizes.maxPixel(for: .nowPlaying))
-            let targetSize = CGSize(width: maxPixel, height: maxPixel)
+            // Берём канонический large-размер, а компактные экраны готовят собственный small-thumbnail.
+            let targetSize = ArtworkSizeClass.large.pixelSize
 
             guard let image = artwork.image(at: targetSize) else {
                 return nil

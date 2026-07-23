@@ -7,7 +7,6 @@
 //  Created by Pavel Fomin on 05.07.2025.
 //
 import Foundation
-import UIKit
 struct LibraryTrack: Identifiable, TrackDisplayable {
     // MARK: - Identity
     let id: UUID              // trackId в TrackRegistry
@@ -45,7 +44,6 @@ struct LibraryTrack: Identifiable, TrackDisplayable {
     var fileName: String {
         fileURL.lastPathComponent
     }
-    var artwork: UIImage? { nil }
     /// Универсальный URL для плеера
     var url: URL {
         fileURL

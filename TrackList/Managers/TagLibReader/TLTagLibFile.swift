@@ -83,6 +83,7 @@ public class TLTagLibFile {
                 title: nil,
                 album: nil,
                 artworkData: nil,
+                artworkSourceIdentifier: nil,
                 duration: duration,
                 isCustomFormat: true
             )
@@ -94,6 +95,7 @@ public class TLTagLibFile {
             title: parsed.title,
             album: parsed.album,
             artworkData: parsed.artworkData,
+            artworkSourceIdentifier: nil,
             duration: duration,
             isCustomFormat: true
         )

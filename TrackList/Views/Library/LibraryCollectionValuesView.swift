@@ -8,7 +8,6 @@
 //
 
 import SwiftUI
-import UIKit
 
 struct LibraryCollectionValuesView: View {
     // MARK: - ViewModel
@@ -192,7 +191,7 @@ struct LibraryCollectionValuesView: View {
         } label: {
             LibraryAlbumValueRowView(
                 value: value,
-                artwork: albumArtwork(for: value),
+                artworkRequest: albumArtworkRequest(for: value),
                 isCurrent: isCurrent,
                 isPlaying: isCurrent && playerViewModel.isPlaying
             )
@@ -204,16 +203,17 @@ struct LibraryCollectionValuesView: View {
         }
     }
 
-    /// Собирает обложку из runtime snapshot representative track, если он уже загружен.
-    private func albumArtwork(for value: LibraryCollectionValue) -> UIImage? {
+    /// Собирает лёгкий запрос из runtime snapshot representative track, если он уже загружен.
+    private func albumArtworkRequest(for value: LibraryCollectionValue) -> ArtworkRequest? {
         guard let representativeTrackId = value.representativeTrackId,
-              let artworkData = playerViewModel.snapshot(for: representativeTrackId)?.artworkData else {
+              let snapshot = playerViewModel.snapshot(for: representativeTrackId),
+              snapshot.artworkData != nil else {
             return nil
         }
 
-        return ArtworkProvider.shared.image(
+        return ArtworkRequest(
             trackId: representativeTrackId,
-            artworkData: artworkData,
+            snapshot: snapshot,
             purpose: .trackList
         )
     }

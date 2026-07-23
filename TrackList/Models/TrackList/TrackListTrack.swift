@@ -7,7 +7,6 @@
 //  Created by Pavel Fomin on 01.05.2025.
 //
 import Foundation
-import UIKit
 // MARK: - Основная модель трека
 struct Track: Identifiable, TrackDisplayable {
     
@@ -32,16 +31,6 @@ struct Track: Identifiable, TrackDisplayable {
     // MARK: - Availability
     let isAvailable: Bool
     
-    // MARK: - Artwork
-    var artwork: UIImage? {
-        guard source == .purchasedITunes else { return nil }
-
-        return ArtworkProvider.shared.image(
-            trackId: trackId,
-            artworkData: artworkData,
-            purpose: .trackList
-        )
-    }
     // MARK: - Init
     init(
         listItemId: UUID = UUID(),

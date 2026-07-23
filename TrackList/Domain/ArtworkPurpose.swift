@@ -14,7 +14,7 @@
 
 import Foundation
 
-enum ArtworkPurpose {
+enum ArtworkPurpose: Hashable, CaseIterable {
 
     // Обложка для списков треков
     /// - фонотека
@@ -38,4 +38,26 @@ enum ArtworkPurpose {
     /// - Lock Screen
     /// - Control Center
     case nowPlaying
+
+    /// Полный набор назначений нужен для проверки распределения канонических классов размера.
+    static var allCases: [ArtworkPurpose] {
+        [
+            .trackList,
+            .miniPlayer,
+            .trackInfoSheet,
+            .batchTagPreview,
+            .toast,
+            .nowPlaying
+        ]
+    }
+
+    /// Относит назначение к одному из двух канонических подготовленных изображений.
+    var sizeClass: ArtworkSizeClass {
+        switch self {
+        case .trackList, .miniPlayer, .batchTagPreview, .toast:
+            .small
+        case .trackInfoSheet, .nowPlaying:
+            .large
+        }
+    }
 }

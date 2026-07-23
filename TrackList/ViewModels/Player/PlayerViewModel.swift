@@ -742,6 +742,7 @@ final class PlayerViewModel: ObservableObject {
                 playerManager.applyNowPlaying(
                     snapshot: makeNowPlayingSnapshot(for: current)
                 )
+                requestNowPlayingArtworkIfNeeded(for: current)
             }
         }
     }
@@ -751,11 +752,14 @@ final class PlayerViewModel: ObservableObject {
         for track: any TrackDisplayable
     ) {
         guard !track.isPurchasedITunesRuntimeTrack else {
-            // iTunes-трек уже содержит assetURL из MediaPlayer; snapshot-builder пошёл бы в BookmarkResolver без нужды.
+            // iTunes-трек уже содержит данные обложки и не должен попадать в BookmarkResolver.
+            requestNowPlayingArtworkIfNeeded(for: track)
             return
         }
 
         requestSnapshotIfNeeded(for: track.trackId)
+        // Если snapshot уже был загружен строкой списка, отдельно запускаем только Now Playing artwork.
+        requestNowPlayingArtworkIfNeeded(for: track)
     }
 
     /// Пересобирает runtime snapshot известных плееру треков после изменения настроек приложения.
@@ -782,6 +786,7 @@ final class PlayerViewModel: ObservableObject {
             playerManager.applyNowPlaying(
                 snapshot: makeNowPlayingSnapshot(for: current)
             )
+            requestNowPlayingArtworkIfNeeded(for: current)
         }
     }
     
@@ -796,6 +801,51 @@ final class PlayerViewModel: ObservableObject {
         if let current = currentTrackDisplayable,
            current.trackId == changedTrackId {
             updateMiniPlayerStaticState(for: current)
+            playerManager.applyNowPlaying(
+                snapshot: makeNowPlayingSnapshot(for: current)
+            )
+            requestNowPlayingArtworkIfNeeded(for: current)
+        }
+    }
+
+    /// Подписывает системный Now Playing на готовую обложку общей подсистемы.
+    private func requestNowPlayingArtworkIfNeeded(
+        for track: any TrackDisplayable
+    ) {
+        let artworkData: Data?
+        let sourceIdentifier: ArtworkSourceIdentifier?
+        let revision: Date?
+
+        if let purchasedTrack = track as? (
+            any TrackDisplayable & PurchasedITunesTrackRepresentable
+        ), purchasedTrack.isPurchasedITunesRuntimeTrack {
+            artworkData = purchasedTrack.artworkData
+            sourceIdentifier = ArtworkSourceIdentifier.mediaLibrary(
+                trackId: track.trackId
+            )
+            revision = nil
+        } else {
+            let snapshot = runtimeSnapshotController.snapshot(for: track.trackId)
+            artworkData = snapshot?.artworkData
+            sourceIdentifier = snapshot?.artworkSourceIdentifier
+            revision = snapshot?.updatedAt
+        }
+
+        guard artworkData != nil, sourceIdentifier != nil else { return }
+
+        Task {
+            let changedTrackId = await runtimeSnapshotController.requestNowPlayingArtworkIfNeeded(
+                for: track.trackId,
+                artworkData: artworkData,
+                sourceIdentifier: sourceIdentifier,
+                revision: revision
+            )
+            guard changedTrackId != nil,
+                  let current = currentTrackDisplayable,
+                  current.trackId == track.trackId else {
+                return
+            }
+
             playerManager.applyNowPlaying(
                 snapshot: makeNowPlayingSnapshot(for: current)
             )

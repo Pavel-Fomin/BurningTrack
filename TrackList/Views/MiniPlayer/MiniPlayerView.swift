@@ -101,7 +101,7 @@ struct MiniPlayerView: View {
 
     /// Данные для общей разметки мини-плеера, вычисленные из единого состояния.
     private struct DisplayContent {
-        let artwork: UIImage?
+        let artworkRequest: ArtworkRequest?
         let title: String
         let artist: String
         let currentTime: TimeInterval
@@ -114,7 +114,7 @@ struct MiniPlayerView: View {
         switch playerViewModel.miniPlayerState {
         case .empty:
             return DisplayContent(
-                artwork: nil,
+                artworkRequest: nil,
                 title: "Nothing Playing",
                 artist: "",
                 currentTime: 0,
@@ -125,7 +125,7 @@ struct MiniPlayerView: View {
         case let .playing(staticState, progressState),
              let .paused(staticState, progressState):
             return DisplayContent(
-                artwork: staticState.artwork,
+                artworkRequest: staticState.artworkRequest,
                 title: staticState.title,
                 artist: PlayerPresentationText.miniPlayerArtist(for: staticState.artist),
                 currentTime: progressState.currentTime,
@@ -135,7 +135,7 @@ struct MiniPlayerView: View {
 
         case let .loading(staticState):
             return DisplayContent(
-                artwork: staticState?.artwork,
+                artworkRequest: staticState?.artworkRequest,
                 title: staticState?.title ?? "Loading Track",
                 artist: staticState.map {
                     PlayerPresentationText.miniPlayerArtist(for: $0.artist)
@@ -147,7 +147,7 @@ struct MiniPlayerView: View {
 
         case .error:
             return DisplayContent(
-                artwork: nil,
+                artworkRequest: nil,
                 title: "Playback Error",
                 artist: "",
                 currentTime: 0,
@@ -166,7 +166,7 @@ struct MiniPlayerView: View {
             dragIndicator
 
             MiniPlayerHeaderView(
-                artwork: content.artwork,
+                artworkRequest: content.artworkRequest,
                 title: content.title,
                 artist: content.artist,
                 isPlaying: content.isPlaying,

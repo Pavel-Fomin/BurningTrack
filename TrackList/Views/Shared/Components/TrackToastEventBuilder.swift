@@ -15,7 +15,7 @@
 //  Created by Pavel Fomin on 05.05.2026.
 //
 
-import SwiftUI
+import Foundation
 
 enum TrackToastEventBuilder {
     /// Создаёт track-style Toast для добавления одного трека в треклист.
@@ -31,17 +31,11 @@ enum TrackToastEventBuilder {
             snapshot = try? await TrackRuntimeSnapshotBuilder.shared.buildSnapshot(forTrackId: track.trackId)
         }
 
-        let artwork: Image?
-        if let data = snapshot?.artworkData,
-           let uiImage = ArtworkProvider.shared.image(
-               trackId: track.trackId,
-               artworkData: data,
-               purpose: .toast
-           ) {
-            artwork = Image(uiImage: uiImage)
-        } else {
-            artwork = nil
-        }
+        let artwork = ArtworkRequest(
+            trackId: track.trackId,
+            snapshot: snapshot,
+            purpose: .toast
+        )
 
         return .trackAddedToTrackList(
             title: snapshot?.title ?? track.title ?? track.fileName,

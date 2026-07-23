@@ -8,7 +8,6 @@
 //
 
 import Foundation
-import UIKit
 
 /// Хранит готовое состояние высокоуровневого экрана плеера без выполнения действий.
 struct PlayerScreenState {
@@ -50,8 +49,8 @@ struct PlayerTrackRowState: Identifiable {
     /// Определяет, должна ли строка отображаться выделенной.
     let isHighlighted: Bool
 
-    /// Подготовленное изображение обложки трека.
-    let artwork: UIImage?
+    /// Лёгкий запрос обложки трека для общей асинхронной подсистемы.
+    let artworkRequest: ArtworkRequest?
 
     /// Подготовленный заголовок строки.
     let title: String

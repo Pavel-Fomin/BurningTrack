@@ -23,7 +23,7 @@ struct TrackRowView<ActionMenuContent: View>: View {
     let isCurrent: Bool
     let isPlaying: Bool
     let isHighlighted: Bool
-    let artwork: UIImage?
+    let artworkRequest: ArtworkRequest?
     let title: String?
     let artist: String?
     let duration: Double?
@@ -48,7 +48,7 @@ struct TrackRowView<ActionMenuContent: View>: View {
         isCurrent: Bool,
         isPlaying: Bool,
         isHighlighted: Bool,
-        artwork: UIImage?,
+        artworkRequest: ArtworkRequest?,
         title: String?,
         artist: String?,
         duration: Double?,
@@ -69,7 +69,7 @@ struct TrackRowView<ActionMenuContent: View>: View {
             isCurrent: isCurrent,
             isPlaying: isPlaying,
             isHighlighted: isHighlighted,
-            artwork: artwork,
+            artworkRequest: artworkRequest,
             title: title,
             artist: artist,
             duration: duration,
@@ -92,7 +92,7 @@ struct TrackRowView<ActionMenuContent: View>: View {
         isCurrent: Bool,
         isPlaying: Bool,
         isHighlighted: Bool,
-        artwork: UIImage?,
+        artworkRequest: ArtworkRequest?,
         title: String?,
         artist: String?,
         duration: Double?,
@@ -112,7 +112,7 @@ struct TrackRowView<ActionMenuContent: View>: View {
         self.isCurrent = isCurrent
         self.isPlaying = isPlaying
         self.isHighlighted = isHighlighted
-        self.artwork = artwork
+        self.artworkRequest = artworkRequest
         self.title = title
         self.artist = artist
         self.duration = duration
@@ -263,11 +263,11 @@ struct TrackRowView<ActionMenuContent: View>: View {
     /// Статичная круглая обложка трека с индикатором текущего воспроизведения.
     private var artworkView: some View {
         ZStack {
-            if let artwork {
-                Image(uiImage: artwork)
+            ArtworkPreparationView(request: artworkRequest) { image in
+                Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
-            } else {
+            } placeholder: {
                 Circle()
                     .fill(Color.gray.opacity(0.3))
             }
@@ -364,7 +364,7 @@ extension TrackRowView where ActionMenuContent == EmptyView {
         isCurrent: Bool,
         isPlaying: Bool,
         isHighlighted: Bool,
-        artwork: UIImage?,
+        artworkRequest: ArtworkRequest?,
         title: String?,
         artist: String?,
         duration: Double?,
@@ -383,7 +383,7 @@ extension TrackRowView where ActionMenuContent == EmptyView {
             isCurrent: isCurrent,
             isPlaying: isPlaying,
             isHighlighted: isHighlighted,
-            artwork: artwork,
+            artworkRequest: artworkRequest,
             title: title,
             artist: artist,
             duration: duration,

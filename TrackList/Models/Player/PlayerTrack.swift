@@ -12,7 +12,6 @@
 //  Created by Pavel Fomin on 07.08.2025.
 //
 import Foundation
-import UIKit
 struct PlayerTrack: Identifiable, TrackDisplayable, Equatable {
     // MARK: - Identity
     /// Идентифицирует конкретное вхождение трека в очереди, включая дубликаты.
@@ -34,16 +33,6 @@ struct PlayerTrack: Identifiable, TrackDisplayable, Equatable {
     let assetURL: URL?
     // MARK: - Availability
     let isAvailable: Bool
-    // MARK: - Artwork
-    var artwork: UIImage? {
-        guard source == .purchasedITunes else { return nil }
-
-        return ArtworkProvider.shared.image(
-            trackId: trackId,
-            artworkData: artworkData,
-            purpose: .trackList
-        )
-    }
     // MARK: - Init
     init(
         queueItemId: UUID = UUID(),

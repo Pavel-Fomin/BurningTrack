@@ -9,7 +9,6 @@
 //
 
 import Foundation
-import UIKit
 
 struct PurchasedITunesPlayableTrack: Identifiable, TrackDisplayable, Hashable {
     // MARK: - Идентификация
@@ -27,17 +26,6 @@ struct PurchasedITunesPlayableTrack: Identifiable, TrackDisplayable, Hashable {
     let fileName: String
     let assetURL: URL
     let isAvailable: Bool
-
-    // MARK: - Обложка
-
-    var artwork: UIImage? {
-        // Для списка используем runtime-данные MediaPlayer, не обращаясь к файловому metadata cache.
-        ArtworkProvider.shared.image(
-            trackId: trackId,
-            artworkData: artworkData,
-            purpose: .trackList
-        )
-    }
 
     // MARK: - Инициализация
 

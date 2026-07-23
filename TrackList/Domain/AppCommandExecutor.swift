@@ -15,7 +15,6 @@
 //  Created by Pavel Fomin on 20.12.2025.
 //
 
-import SwiftUI
 import Foundation
 import UIKit
 
@@ -77,11 +76,10 @@ actor AppCommandExecutor {
             title: snapshot?.title ?? snapshot?.fileName ?? "",
             artist: snapshot?.artist ?? "",
             artwork: snapshot.flatMap {
-                ArtworkProvider.shared.image(
+                toastArtworkRequest(
                     trackId: trackId,
-                    artworkData: $0.artworkData,
-                    purpose: .toast
-                ).map { Image(uiImage: $0) }
+                    snapshot: $0
+                )
             },
             folderName: folderName
         )
@@ -322,11 +320,10 @@ actor AppCommandExecutor {
             title: snapshot?.title ?? imported.fileName,
             artist: snapshot?.artist ?? "",
             artwork: snapshot.flatMap {
-                ArtworkProvider.shared.image(
+                toastArtworkRequest(
                     trackId: trackId,
-                    artworkData: $0.artworkData,
-                    purpose: .toast
-                ).map { Image(uiImage: $0) }
+                    snapshot: $0
+                )
             },
             trackListName: list.name
         )
@@ -510,11 +507,10 @@ actor AppCommandExecutor {
                 title: snapshot?.title ?? removedTrack.fileName,
                 artist: snapshot?.artist ?? "",
                 artwork: snapshot.flatMap {
-                    ArtworkProvider.shared.image(
+                    toastArtworkRequest(
                         trackId: trackId,
-                        artworkData: $0.artworkData,
-                        purpose: .toast
-                    ).map { Image(uiImage: $0) }
+                        snapshot: $0
+                    )
                 }
             )
         }
@@ -655,11 +651,10 @@ actor AppCommandExecutor {
                 title: snapshot?.title ?? snapshot?.fileName ?? removedTrack.fileName,
                 artist: snapshot?.artist ?? "",
                 artwork: snapshot.flatMap {
-                    ArtworkProvider.shared.image(
+                    toastArtworkRequest(
                         trackId: trackId,
-                        artworkData: $0.artworkData,
-                        purpose: .toast
-                    ).map { Image(uiImage: $0) }
+                        snapshot: $0
+                    )
                 }
             )
         }
@@ -785,11 +780,10 @@ actor AppCommandExecutor {
                 title: snapshot?.title ?? snapshot?.fileName ?? newFileName,
                 artist: snapshot?.artist ?? "",
                 artwork: snapshot.flatMap {
-                    ArtworkProvider.shared.image(
+                    toastArtworkRequest(
                         trackId: trackId,
-                        artworkData: $0.artworkData,
-                        purpose: .toast
-                    ).map { Image(uiImage: $0) }
+                        snapshot: $0
+                    )
                 }
             )
         } else {
@@ -866,11 +860,10 @@ actor AppCommandExecutor {
             title: snapshot?.title ?? url.lastPathComponent,
             artist: snapshot?.artist ?? "",
             artwork: snapshot.flatMap {
-                ArtworkProvider.shared.image(
+                toastArtworkRequest(
                     trackId: trackId,
-                    artworkData: $0.artworkData,
-                    purpose: .toast
-                ).map { Image(uiImage: $0) }
+                    snapshot: $0
+                )
             }
         )
 
@@ -932,11 +925,10 @@ private func trackAddedToPlayerEvent(for item: PlayerTrackImportItem) -> ToastEv
         title: snapshot?.title ?? item.track.fileName,
         artist: snapshot?.artist ?? "",
         artwork: snapshot.flatMap {
-            ArtworkProvider.shared.image(
-                trackId: item.track.trackId,
-                artworkData: $0.artworkData,
-                purpose: .toast
-            ).map { Image(uiImage: $0) }
+                toastArtworkRequest(
+                    trackId: item.track.trackId,
+                    snapshot: $0
+            )
         }
     )
 }
@@ -1003,12 +995,40 @@ private func trackRemovedFromTrackListEvent(
 /// Готовит обложку iTunes-трека для toast без файлового metadata cache.
 private func toastArtwork(
     for track: any TrackDisplayable & PurchasedITunesTrackRepresentable
-) -> Image? {
-    ArtworkProvider.shared.image(
+) -> ArtworkRequest? {
+    toastArtworkRequest(
         trackId: track.trackId,
         artworkData: track.artworkData,
+        sourceIdentifier: .mediaLibrary(trackId: track.trackId)
+    )
+}
+
+/// Создаёт лёгкий запрос обложки для toast только при наличии исходных данных.
+private func toastArtworkRequest(
+    trackId: UUID,
+    artworkData: Data?,
+    sourceIdentifier: ArtworkSourceIdentifier
+) -> ArtworkRequest? {
+    guard let artworkData else { return nil }
+
+    return ArtworkRequest(
+        trackId: trackId,
+        artworkData: artworkData,
+        purpose: .toast,
+        sourceIdentifier: sourceIdentifier
+    )
+}
+
+/// Создаёт запрос toast из каноничного snapshot с идентичностью исходных байтов.
+private func toastArtworkRequest(
+    trackId: UUID,
+    snapshot: TrackRuntimeSnapshot
+) -> ArtworkRequest? {
+    ArtworkRequest(
+        trackId: trackId,
+        snapshot: snapshot,
         purpose: .toast
-    ).map { Image(uiImage: $0) }
+    )
 }
 
 /// Преобразует файловую ошибку фонотеки в ошибку пользовательского уровня.

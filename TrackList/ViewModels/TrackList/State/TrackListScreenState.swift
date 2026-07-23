@@ -8,7 +8,6 @@
 //
 
 import Foundation
-import UIKit
 
 /// Состояние экрана одного треклиста.
 /// View получает готовое состояние и не должна сама читать менеджеры или ViewModel.
@@ -67,8 +66,8 @@ struct TrackListRowState: Identifiable {
     /// Нужно ли подсветить строку.
     let isHighlighted: Bool
 
-    /// Обложка для отображения.
-    let artwork: UIImage?
+    /// Лёгкий запрос обложки для асинхронного отображения.
+    let artworkRequest: ArtworkRequest?
 
     /// Показывать ли формат файла.
     let showsFileFormat: Bool

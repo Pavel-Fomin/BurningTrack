@@ -8,7 +8,6 @@
 //
 
 import Foundation
-import UIKit
 
 /// Применяет к фонотеке тот же стабильный порядок, который использует список треков.
 enum LibraryTrackOrdering {
@@ -85,10 +84,6 @@ struct LibraryTrackSortAdapter: TrackDisplayable, TrackSortDateProviding, TrackS
 
     var duration: Double {
         track.duration
-    }
-
-    var artwork: UIImage? {
-        track.artwork
     }
 
     var isAvailable: Bool {

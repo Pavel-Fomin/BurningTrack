@@ -7,7 +7,6 @@
 //
 
 import Foundation
-import UIKit
 
 // Тип контента, который должен показать экран поиска.
 enum SearchContentState: Equatable {
@@ -30,7 +29,7 @@ struct SearchTrackListRowState: Identifiable, Equatable {
 // Строка найденного трека хранит готовые данные отображения из SQLite и runtime snapshot.
 struct SearchTrackRowState: Identifiable {
     let result: SearchTrackResult
-    let artwork: UIImage?
+    let artworkRequest: ArtworkRequest?
     let title: String?
     let artist: String?
     let duration: Double?

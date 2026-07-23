@@ -7,7 +7,7 @@
 //  Created by Pavel Fomin on 21.07.2026.
 //
 
-import SwiftUI
+import Foundation
 
 /// Собирает готовые данные toast из семантических событий без управления их жизненным циклом.
 enum ToastPresentation {
@@ -264,12 +264,12 @@ enum ToastPresentation {
     private static func trackToast(
         title: String,
         artist: String,
-        artwork: Image?,
+        artwork: ArtworkRequest?,
         message: String
     ) -> ToastData {
         ToastData(
             style: .track(title: title, artist: artist),
-            artworkImage: artwork,
+            artworkRequest: artwork,
             message: message
         )
     }
@@ -291,7 +291,7 @@ enum ToastPresentation {
     ) -> ToastData {
         ToastData(
             style: .trackList(name: name),
-            artworkImage: nil,
+            artworkRequest: nil,
             message: message
         )
     }

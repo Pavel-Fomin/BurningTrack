@@ -69,6 +69,7 @@ struct TrackRuntimeSnapshot: Equatable {
 
     let duration: Double?  /// Длительность трека в секундах
     let artworkData: Data? /// Обложка в сыром виде, как прочитано из файла
+    let artworkSourceIdentifier: ArtworkSourceIdentifier? /// Стабильная идентичность исходных байтов обложки
     let updatedAt: Date    /// Время последней сборки snapshot
 
 }
@@ -109,6 +110,9 @@ extension TrackRuntimeSnapshot {
             isrc: nil,
             duration: track.duration,
             artworkData: track.artworkData,
+            artworkSourceIdentifier: track.artworkData.map {
+                _ in ArtworkSourceIdentifier.mediaLibrary(trackId: track.trackId)
+            },
             updatedAt: Date()
         )
     }

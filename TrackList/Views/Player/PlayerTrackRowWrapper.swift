@@ -42,7 +42,7 @@ struct PlayerTrackRowWrapper: View {
             isCurrent: row.isCurrent,
             isPlaying: row.isPlaying,
             isHighlighted: row.isHighlighted,
-            artwork: row.artwork,
+            artworkRequest: row.artworkRequest,
             title: row.title,
             artist: row.artist,
             duration: row.duration,

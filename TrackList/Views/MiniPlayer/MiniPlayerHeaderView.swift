@@ -17,7 +17,7 @@ struct MiniPlayerHeaderView: View {
 
     // MARK: - Input
 
-    let artwork: UIImage?
+    let artworkRequest: ArtworkRequest?
     let title: String
     let artist: String
     let isPlaying: Bool
@@ -76,16 +76,16 @@ struct MiniPlayerHeaderView: View {
     /// Показывает вращающуюся обложку текущего трека или статичную круглую заглушку.
     @ViewBuilder
     private var artworkView: some View {
-        if let artwork {
+        ArtworkPreparationView(request: artworkRequest) { image in
             RotatingArtworkView(
-                image: artwork,
+                image: image,
                 isActive: true,
                 isPlaying: isPlaying,
                 size: 40,
                 rpm: 10
             )
             .frame(width: 40, height: 40)
-        } else {
+        } placeholder: {
             Circle()
                 .fill(Color.gray.opacity(0.3))
                 .frame(width: 40, height: 40)

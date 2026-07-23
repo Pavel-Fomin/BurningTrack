@@ -119,7 +119,8 @@ final class TrackUpdateCoordinator {
         await invalidateRuntimeCaches(
             forTrackId: trackId,
             url: url,
-            previousURL: previousURL
+            previousURL: previousURL,
+            changedFields: changedFields
         )
 
         // Пересобираем каноничный snapshot трека.
@@ -146,10 +147,12 @@ final class TrackUpdateCoordinator {
     ///   - trackId: Идентификатор трека
     ///   - url: Актуальный URL трека
     ///   - previousURL: Предыдущий URL трека, если файл был перемещён или переименован
+    ///   - changedFields: Поля, реально изменённые операцией записи
     private func invalidateRuntimeCaches(
         forTrackId trackId: UUID,
         url: URL,
-        previousURL: URL?
+        previousURL: URL?,
+        changedFields: Set<TrackChangedField>
     ) async {
 
         // Сбрасываем raw metadata cache по актуальному URL.
@@ -160,8 +163,11 @@ final class TrackUpdateCoordinator {
             await TrackMetadataCacheManager.shared.invalidate(url: previousURL)
         }
 
-        // Сбрасываем производный image-cache artwork.
-        ArtworkProvider.shared.invalidate(trackId: trackId)
+        // Производный image-cache сбрасываем только после фактического изменения обложки.
+        // Переименование и изменение текстовых тегов не должны повторно декодировать повреждённый artwork.
+        if changedFields.contains(.artworkData) {
+            await ArtworkProvider.shared.invalidate(trackId: trackId)
+        }
 
         // Удаляем старый snapshot из централизованного runtime store.
         await TrackRuntimeStore.shared.removeSnapshot(forTrackId: trackId)

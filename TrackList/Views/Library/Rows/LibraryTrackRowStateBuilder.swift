@@ -1,4 +1,3 @@
-import UIKit
 
 /// Собирает состояние строки фонотеки из модели трека, runtime snapshot и флагов отображения.
 struct LibraryTrackRowStateBuilder {
@@ -32,7 +31,7 @@ struct LibraryTrackRowStateBuilder {
         cloudAvailabilityState: CloudTrackAvailabilityState?
     ) -> LibraryTrackRowState {
         let displayFileName = snapshot?.fileName ?? track.fileName
-        let artwork = makeArtwork(
+        let artworkRequest = makeArtworkRequest(
             trackId: track.trackId,
             snapshot: snapshot,
             shouldShowTags: shouldShowTags
@@ -43,7 +42,7 @@ struct LibraryTrackRowStateBuilder {
             isCurrent: isCurrent,
             isPlaying: isPlaying,
             isHighlighted: isHighlighted,
-            artwork: artwork,
+            artworkRequest: artworkRequest,
             title: shouldShowTags ? (snapshot?.title ?? track.title ?? displayFileName) : displayFileName,
             artist: shouldShowTags ? (snapshot?.artist ?? track.artist ?? "") : "",
             duration: snapshot?.duration ?? track.duration,
@@ -57,17 +56,16 @@ struct LibraryTrackRowStateBuilder {
         )
     }
 
-    /// Собирает обложку строки из runtime snapshot.
-    private func makeArtwork(
+    /// Собирает лёгкий запрос обложки строки из runtime snapshot.
+    private func makeArtworkRequest(
         trackId: UUID,
         snapshot: TrackRuntimeSnapshot?,
         shouldShowTags: Bool
-    ) -> UIImage? {
+    ) -> ArtworkRequest? {
         guard shouldShowTags else { return nil }
-        guard let data = snapshot?.artworkData else { return nil }
-        return ArtworkProvider.shared.image(
+        return ArtworkRequest(
             trackId: trackId,
-            artworkData: data,
+            snapshot: snapshot,
             purpose: .trackList
         )
     }

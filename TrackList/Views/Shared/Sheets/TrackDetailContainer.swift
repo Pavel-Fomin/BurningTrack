@@ -126,7 +126,8 @@ struct TrackDetailContainer: View {
                 editedValues: $editedValues,
                 editedFileName: $editedFileName,
                 artworkUIImage: $artworkUIImage,
-                artworkEditState: $artworkEditState
+                artworkEditState: $artworkEditState,
+                initialArtworkEditState: $initialArtworkEditState
             )
         }
         .alert(
@@ -156,7 +157,9 @@ struct TrackDetailContainer: View {
             guard let updateEvent = notification.object as? TrackUpdateEvent else { return }
             guard updateEvent.trackId == track.trackId else { return }
 
-            applySnapshotToSheetState(updateEvent.snapshot)
+            Task {
+                await applySnapshotToSheetState(updateEvent.snapshot)
+            }
         }
     }
     
@@ -207,11 +210,15 @@ struct TrackDetailContainer: View {
                     using: playerManager
                 )
 
-                await MainActor.run {
-                    if let snapshot = TrackRuntimeStore.shared.snapshot(forTrackId: track.trackId) {
-                        applySnapshotToSheetState(snapshot)
+                if let snapshot = await MainActor.run(
+                    body: {
+                        TrackRuntimeStore.shared.snapshot(forTrackId: track.trackId)
                     }
+                ) {
+                    await applySnapshotToSheetState(snapshot)
+                }
 
+                await MainActor.run {
                     mode = .view
                 }
 
@@ -346,7 +353,8 @@ struct TrackDetailContainer: View {
     /// Не читает файл напрямую и не обращается к TagLib.
     ///
     /// - Parameter snapshot: Актуальный runtime snapshot трека
-    private func applySnapshotToSheetState(_ snapshot: TrackRuntimeSnapshot) {
+    @MainActor
+    private func applySnapshotToSheetState(_ snapshot: TrackRuntimeSnapshot) async {
         
         // Имя файла храним в поле редактирования без расширения.
         let fileNameWithoutExtension = makeFileNameWithoutExtension(snapshot.fileName)
@@ -362,13 +370,6 @@ struct TrackDetailContainer: View {
             .comment: snapshot.comment ?? ""
         ]
         
-        // Обложку строим из artworkData внутри snapshot.
-        let image = ArtworkProvider.shared.image(
-            trackId: track.trackId,
-            artworkData: snapshot.artworkData,
-            purpose: .trackInfoSheet
-        )
-        
         editedFileName = fileNameWithoutExtension
         initialFileName = fileNameWithoutExtension
         initialFullFileName = snapshot.fileName
@@ -377,9 +378,31 @@ struct TrackDetailContainer: View {
         editedValues = newValues
         initialValues = newValues
         
+        let loadingArtworkState = ArtworkEditState(hadOriginalArtwork: false)
+        artworkUIImage = nil
+        artworkEditState = loadingArtworkState
+        initialArtworkEditState = loadingArtworkState
+
+        // View уже показывает placeholder, пока actor ожидает общую фоновую подготовку.
+        let image: UIImage?
+        if let artworkRequest = ArtworkRequest(
+            trackId: track.trackId,
+            snapshot: snapshot,
+            purpose: .trackInfoSheet
+        ) {
+            image = await ArtworkProvider.shared.image(for: artworkRequest)
+        } else {
+            image = nil
+        }
+        guard !Task.isCancelled else { return }
+
+        let resolvedArtworkState = ArtworkEditState(hadOriginalArtwork: image != nil)
         artworkUIImage = image
-        artworkEditState = ArtworkEditState(hadOriginalArtwork: image != nil)
-        initialArtworkEditState = artworkEditState
+        initialArtworkEditState = resolvedArtworkState
+        // Несохранённое действие пользователя важнее завершившейся фоновой загрузки оригинала.
+        if artworkEditState == loadingArtworkState {
+            artworkEditState = resolvedArtworkState
+        }
     }
 
     /// Возвращает имя файла без расширения.

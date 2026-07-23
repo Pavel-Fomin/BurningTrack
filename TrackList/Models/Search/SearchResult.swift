@@ -7,7 +7,6 @@
 //
 
 import Foundation
-import UIKit
 
 // Набор результатов поиска по основным сущностям приложения.
 struct SearchResults: Equatable {
@@ -52,11 +51,6 @@ struct SearchTrackResult: Identifiable, Equatable, TrackDisplayable {
     /// Физический идентификатор трека совпадает с id результата поиска.
     var trackId: UUID {
         id
-    }
-
-    /// Поиск не читает и не строит обложку, чтобы не запускать runtime metadata.
-    var artwork: UIImage? {
-        nil
     }
 
     /// Отображаемое название: тег title имеет приоритет над именем файла.

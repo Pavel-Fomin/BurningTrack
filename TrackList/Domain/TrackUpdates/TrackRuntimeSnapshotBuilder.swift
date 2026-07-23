@@ -104,6 +104,7 @@ final class TrackRuntimeSnapshotBuilder {
 
             duration: cachedMetadata?.duration,       /// Длительность трека
             artworkData: cachedMetadata?.artworkData, /// Обложка в raw data
+            artworkSourceIdentifier: cachedMetadata?.artworkSourceIdentifier, /// Стабильная identity обложки
             updatedAt: Date()                         /// Время сборки snapshot
         )
 

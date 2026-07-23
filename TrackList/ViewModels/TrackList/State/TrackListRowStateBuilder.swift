@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import UIKit
 
 /// Собирает состояние строки трека в одном треклисте.
 /// Builder изолирует вычисления отображения от SwiftUI View.
@@ -72,7 +71,12 @@ struct TrackListRowStateBuilder {
                 isCurrent: isCurrent,
                 isPlaying: isPlaying,
                 isHighlighted: isHighlighted,
-                artwork: track.artwork,
+                artworkRequest: ArtworkRequest(
+                    trackId: track.trackId,
+                    artworkData: track.artworkData,
+                    purpose: .trackList,
+                    sourceIdentifier: .mediaLibrary(trackId: track.trackId)
+                ),
                 showsFileFormat: false,
                 renameArtist: nil,
                 renameTitle: nil
@@ -82,16 +86,16 @@ struct TrackListRowStateBuilder {
         let displayFileName = snapshot?.fileName ?? track.fileName
         let title = shouldShowTags ? (snapshot?.title ?? displayFileName) : displayFileName
         let artist = shouldShowTags ? (snapshot?.artist ?? "") : ""
-        let artwork: UIImage?
+        let artworkRequest: ArtworkRequest?
 
-        if shouldShowTags, let artworkData = snapshot?.artworkData {
-            artwork = ArtworkProvider.shared.image(
+        if shouldShowTags {
+            artworkRequest = ArtworkRequest(
                 trackId: track.trackId,
-                artworkData: artworkData,
+                snapshot: snapshot,
                 purpose: .trackList
             )
         } else {
-            artwork = nil
+            artworkRequest = nil
         }
 
         return TrackListRowState(
@@ -106,7 +110,7 @@ struct TrackListRowStateBuilder {
             isCurrent: isCurrent,
             isPlaying: isPlaying,
             isHighlighted: isHighlighted,
-            artwork: artwork,
+            artworkRequest: artworkRequest,
             showsFileFormat: shouldShowFileFormat,
             renameArtist: snapshot?.artist,
             renameTitle: snapshot?.title

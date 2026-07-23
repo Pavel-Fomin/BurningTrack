@@ -96,7 +96,10 @@ final class TrackMetadataCacheManager: ObservableObject, @unchecked Sendable {
             title: metadata.title,
             artist: metadata.artist,
             duration: metadata.duration,
-            artworkData: cachedArtworkData
+            artworkData: cachedArtworkData,
+            artworkSourceIdentifier: includeArtwork
+                ? metadata.artworkSourceIdentifier
+                : nil
         )
         
         // Стоимость считаем по размеру реально сохранённых данных, если они есть
@@ -121,17 +124,21 @@ final class TrackMetadataCacheManager: ObservableObject, @unchecked Sendable {
         /// - не даунсемплится здесь
         /// - используется при сборке TrackRuntimeSnapshot и ArtworkProvider'ом
         let artworkData: Data?
+        /// Стабильная идентичность raw-обложки, рассчитанная до передачи в UI.
+        let artworkSourceIdentifier: ArtworkSourceIdentifier?
         
         init(
             title: String?,
             artist: String?,
             duration: Double?,
-            artworkData: Data?
+            artworkData: Data?,
+            artworkSourceIdentifier: ArtworkSourceIdentifier?
         ) {
             self.title = title
             self.artist = artist
             self.duration = duration
             self.artworkData = artworkData
+            self.artworkSourceIdentifier = artworkSourceIdentifier
         }
     }
     

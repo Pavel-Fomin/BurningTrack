@@ -19,9 +19,7 @@ struct PlayerScreenViewModelFactory {
         playerViewModel: PlayerViewModel,
         exportProgressViewModel: ExportProgressViewModel
     ) -> PlayerScreenViewModel {
-        let rowStateBuilder = PlayerTrackRowStateBuilder(
-            artworkProvider: ArtworkProvider.shared
-        )
+        let rowStateBuilder = PlayerTrackRowStateBuilder()
 
         return PlayerScreenViewModel(
             playerViewModel: playerViewModel,

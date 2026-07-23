@@ -34,6 +34,7 @@ final class NowPlayingSnapshotBuilder: NowPlayingSnapshotBuilding {
            purchasedTrack.isPurchasedITunesRuntimeTrack {
             return makePurchasedITunesSnapshot(
                 track: purchasedTrack,
+                artwork: artwork,
                 currentTime: currentTime,
                 fallbackDuration: fallbackDuration,
                 isPlaying: isPlaying
@@ -56,6 +57,7 @@ final class NowPlayingSnapshotBuilder: NowPlayingSnapshotBuilding {
     /// Собирает Now Playing snapshot для iTunes-трека из runtime-данных MediaPlayer.
     private func makePurchasedITunesSnapshot(
         track: any TrackDisplayable & PurchasedITunesTrackRepresentable,
+        artwork: CGImage?,
         currentTime: TimeInterval,
         fallbackDuration: TimeInterval,
         isPlaying: Bool
@@ -75,14 +77,6 @@ final class NowPlayingSnapshotBuilder: NowPlayingSnapshotBuilding {
 
             return ""
         }()
-
-        // Для экрана блокировки строим отдельный CGImage нужного размера из runtime-данных MediaPlayer.
-        let artwork = track.artworkData.flatMap { data in
-            makeThumbnail(
-                from: data,
-                maxPixel: ArtworkPurposeSizes.maxPixel(for: .nowPlaying)
-            )
-        }
 
         return NowPlayingSnapshot(
             title: title,

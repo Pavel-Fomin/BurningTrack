@@ -243,7 +243,7 @@ private struct SearchTrackRowView: View {
             isCurrent: isCurrent,
             isPlaying: isCurrent && playerViewModel.isPlaying,
             isHighlighted: false,
-            artwork: row.artwork,
+            artworkRequest: row.artworkRequest,
             title: row.title,
             artist: row.artist,
             duration: row.duration,

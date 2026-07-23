@@ -11,7 +11,7 @@
 //  Created by Pavel Fomin on 2026.
 //
 
-import SwiftUI
+import Foundation
 
 enum ToastEvent: Equatable {
 
@@ -23,13 +23,13 @@ enum ToastEvent: Equatable {
     case trackMovedToPlayer(
         title: String,
         artist: String,
-        artwork: Image?)
+        artwork: ArtworkRequest?)
     
     /// Удалить из плеера
     case trackRemovedFromPlayer(
         title: String,
         artist: String,
-        artwork: Image?)
+        artwork: ArtworkRequest?)
 
     /// Очистить плеер
     case playerCleared
@@ -55,7 +55,7 @@ enum ToastEvent: Equatable {
     case trackAddedToPlayer(
         title: String,
         artist: String,
-        artwork: Image?)
+        artwork: ArtworkRequest?)
 
     /// Несколько треков добавлены в плеер
     case tracksAddedToPlayer(count: Int)
@@ -64,21 +64,21 @@ enum ToastEvent: Equatable {
     case trackAddedToTrackList(
         title: String,
         artist: String,
-        artwork: Image?,
+        artwork: ArtworkRequest?,
         trackListName: String)
 
     /// Перемещен
     case trackMovedInLibrary(
         title: String,
         artist: String,
-        artwork: Image?,
+        artwork: ArtworkRequest?,
         folderName: String?)
 
     /// Скопирован из iTunes в фонотеку
     case trackCopiedFromITunes(
         title: String,
         artist: String,
-        artwork: Image?,
+        artwork: ArtworkRequest?,
         folderName: String?)
 
     case folderAdded(name: String)
@@ -92,7 +92,7 @@ enum ToastEvent: Equatable {
     case trackRemovedFromTrackList(
         title: String,
         artist: String,
-        artwork: Image?)
+        artwork: ArtworkRequest?)
 
     /// Треклист переименован
     case trackListRenamed(newName: String)
@@ -103,7 +103,7 @@ enum ToastEvent: Equatable {
     case tagsUpdated(
         title: String,
         artist: String,
-        artwork: Image?
+        artwork: ArtworkRequest?
     )
 
     /// Массовое обновление тегов завершено успешно.
@@ -122,7 +122,7 @@ enum ToastEvent: Equatable {
     case fileAndTagsUpdated(
         title: String,
         artist: String,
-        artwork: Image?
+        artwork: ArtworkRequest?
     )
 
     // MARK: - Warning

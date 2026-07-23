@@ -30,11 +30,14 @@ struct TrackDetailEditForm: View {
 
     // MARK: - Artwork
 
+    let trackId: UUID
     let artworkUIImage: UIImage?
 
     @Binding var artworkEditState: ArtworkEditState
 
     @State private var selectedPhotoItem: PhotosPickerItem?
+    /// Подготовленное preview новой пользовательской обложки не создаётся внутри body.
+    @State private var replacementArtworkUIImage: UIImage?
 
     /// Фокус поля имени файла для показа toolbar над клавиатурой.
     @FocusState private var isFileNameFocused: Bool
@@ -48,9 +51,8 @@ struct TrackDetailEditForm: View {
     /// 2. исходная обложка трека
     /// 3. отсутствие обложки
     private var previewArtworkUIImage: UIImage? {
-        if let data = artworkEditState.newArtworkData,
-           let image = UIImage(data: data) {
-            return image
+        if artworkEditState.newArtworkData != nil {
+            return replacementArtworkUIImage
         }
 
         if artworkEditState.hasArtworkForPreview == false {return nil}
@@ -109,6 +111,9 @@ struct TrackDetailEditForm: View {
         }
         .task(id: selectedPhotoItem) {
             await loadSelectedArtwork()
+        }
+        .task(id: artworkEditState.newArtworkRevision) {
+            await loadReplacementArtworkIfNeeded()
         }
         .toolbar {
             if isFileNameFocused && canBuildFileNameFromTags {
@@ -195,10 +200,42 @@ struct TrackDetailEditForm: View {
     private func loadSelectedArtwork() async {
         guard let selectedPhotoItem else {return}
         guard let data = try? await selectedPhotoItem.loadTransferable(type: Data.self) else {return}
-        guard UIImage(data: data) != nil else {return}
-
-        await MainActor.run {
-            artworkEditState.setNewArtwork(data: data)
+        let revision = UUID()
+        // Ревизию сохраняем до декодирования: повторное построение формы присоединится к той же задаче.
+        artworkEditState.setNewArtwork(data: data, revision: revision)
+        let image = await ArtworkProvider.shared.image(
+            for: ArtworkRequest(
+                trackId: trackId,
+                artworkData: data,
+                purpose: .trackInfoSheet,
+                sourceIdentifier: .transient(revision: revision)
+            )
+        )
+        guard !Task.isCancelled,
+              artworkEditState.newArtworkRevision == revision else {
+            return
         }
+
+        replacementArtworkUIImage = image
+    }
+
+    /// Восстанавливает preview после пересоздания формы без декодирования на главном потоке.
+    private func loadReplacementArtworkIfNeeded() async {
+        replacementArtworkUIImage = nil
+        guard let data = artworkEditState.newArtworkData,
+              let revision = artworkEditState.newArtworkRevision else {
+            return
+        }
+
+        let image = await ArtworkProvider.shared.image(
+            for: ArtworkRequest(
+                trackId: trackId,
+                artworkData: data,
+                purpose: .trackInfoSheet,
+                sourceIdentifier: .transient(revision: revision)
+            )
+        )
+        guard !Task.isCancelled else { return }
+        replacementArtworkUIImage = image
     }
 }

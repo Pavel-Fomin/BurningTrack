@@ -8,7 +8,6 @@
 //
 
 import Foundation
-import UIKit
 
 /// Собирает состояние строк плейлиста плеера.
 ///
@@ -18,16 +17,9 @@ import UIKit
 @MainActor
 final class PlayerTrackRowStateBuilder {
 
-    // MARK: - Dependencies
-
-    /// Провайдер обложек треков.
-    private let artworkProvider: ArtworkProvider
-
     // MARK: - Инициализация
 
-    init(artworkProvider: ArtworkProvider) {
-        self.artworkProvider = artworkProvider
-    }
+    init() {}
 
     // MARK: - Public API
 
@@ -52,7 +44,7 @@ final class PlayerTrackRowStateBuilder {
                 isCurrent: isCurrent,
                 isPlaying: isCurrent && isPlaying,
                 isHighlighted: highlightedRowId == track.id,
-                artwork: makeArtwork(
+                artworkRequest: makeArtworkRequest(
                     track: track,
                     trackId: track.trackId,
                     snapshot: snapshot,
@@ -79,23 +71,26 @@ final class PlayerTrackRowStateBuilder {
 
     // MARK: - Private
 
-    /// Формирует обложку строки плеера из runtime snapshot.
-    private func makeArtwork(
+    /// Формирует лёгкий запрос обложки строки плеера из runtime snapshot.
+    private func makeArtworkRequest(
         track: PlayerTrack,
         trackId: UUID,
         snapshot: TrackRuntimeSnapshot?,
         shouldShowTags: Bool
-    ) -> UIImage? {
+    ) -> ArtworkRequest? {
         if track.isPurchasedITunesRuntimeTrack {
-            return track.artwork
+            return ArtworkRequest(
+                trackId: trackId,
+                artworkData: track.artworkData,
+                purpose: .trackList,
+                sourceIdentifier: .mediaLibrary(trackId: trackId)
+            )
         }
 
         guard shouldShowTags else { return nil }
-        guard let data = snapshot?.artworkData else { return nil }
-
-        return artworkProvider.image(
+        return ArtworkRequest(
             trackId: trackId,
-            artworkData: data,
+            snapshot: snapshot,
             purpose: .trackList
         )
     }

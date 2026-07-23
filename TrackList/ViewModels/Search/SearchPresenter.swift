@@ -136,7 +136,7 @@ struct SearchPresenter {
 
             return SearchTrackRowState(
                 result: result,
-                artwork: makeArtwork(
+                artworkRequest: makeArtworkRequest(
                     result: result,
                     snapshot: snapshot,
                     shouldShowTags: displaySettings.shouldShowTags
@@ -156,17 +156,17 @@ struct SearchPresenter {
         }
     }
 
-    /// Собирает UIImage через общий ArtworkProvider без чтения файла в SearchView.
-    private func makeArtwork(
+    /// Собирает лёгкий запрос общей подсистемы без чтения файла в SearchView.
+    private func makeArtworkRequest(
         result: SearchTrackResult,
         snapshot: TrackRuntimeSnapshot?,
         shouldShowTags: Bool
-    ) -> UIImage? {
+    ) -> ArtworkRequest? {
         guard shouldShowTags else { return nil }
 
-        return ArtworkProvider.shared.image(
+        return ArtworkRequest(
             trackId: result.trackId,
-            artworkData: snapshot?.artworkData,
+            snapshot: snapshot,
             purpose: .trackList
         )
     }

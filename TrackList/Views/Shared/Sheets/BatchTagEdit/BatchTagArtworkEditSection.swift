@@ -54,6 +54,9 @@ struct BatchTagArtworkEditSection: View {
                     BatchTagArtworkPreviewCard(
                         item: item,
                         artworkAction: artworkAction,
+                        replacementPreviewIdentifier: artwork.replacementPreviewIdentifier(
+                            for: item.trackId
+                        ),
                         hasArtworkForPreview: hasArtworkForPreview,
                         artworkSizeBytesForPreview: artworkSizeBytesForPreview,
                         isSelected: artwork.selectedTarget == .track(item.trackId),

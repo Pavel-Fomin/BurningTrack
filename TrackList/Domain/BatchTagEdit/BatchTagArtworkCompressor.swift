@@ -30,6 +30,8 @@ enum BatchTagArtworkCompressor {
             return try await ArtworkPreparationService.prepare(request)
         } catch let error as ArtworkPreparationError {
             switch error {
+            case .invalidTargetSize:
+                throw BatchTagArtworkCompressionError.invalidImageData
             case .invalidImageData:
                 throw BatchTagArtworkCompressionError.invalidImageData
             case .failedToEncodeJPEG:

@@ -7,17 +7,16 @@
 //  Роль:
 //  - собирает MiniPlayerStaticState из трека и каноничного runtime snapshot
 //  - формирует title / artist
-//  - создаёт artwork UIImage для мини-плеера
+//  - создаёт лёгкий ArtworkRequest для мини-плеера
 //
 //  ВАЖНО:
-//  - вся тяжёлая логика сборки обложки должна быть только здесь
-//  - MiniPlayerView не должен знать про metadata cache и ArtworkProvider
+//  - тяжёлая подготовка выполняется общей подсистемой после подписки View
+//  - MiniPlayerView не должен знать про metadata cache и ImageIO
 //
 //  Created by Pavel Fomin on 08.02.2026.
 //
 
 import Foundation
-import UIKit
 
 final class MiniPlayerStateBuilder {
 
@@ -60,14 +59,12 @@ final class MiniPlayerStateBuilder {
             return nil
         }()
 
-        // Обложку строим из artworkData внутри snapshot.
-        let artwork: UIImage? = {
+        // Запрос обложки строим из artworkData внутри snapshot без декодирования.
+        let artworkRequest: ArtworkRequest? = {
             guard shouldShowTags else { return nil }
-            guard let data = snapshot?.artworkData else { return nil }
-
-            return ArtworkProvider.shared.image(
+            return ArtworkRequest(
                 trackId: track.trackId,
-                artworkData: data,
+                snapshot: snapshot,
                 purpose: .miniPlayer
             )
         }()
@@ -76,7 +73,7 @@ final class MiniPlayerStateBuilder {
             trackId: track.trackId,
             title: title,
             artist: artist,
-            artwork: artwork
+            artworkRequest: artworkRequest
         )
     }
 
@@ -101,17 +98,18 @@ final class MiniPlayerStateBuilder {
         }()
 
         // Для iTunes-трека не читаем файл и не используем TrackMetadataCacheManager.
-        let artwork = ArtworkProvider.shared.image(
+        let artworkRequest = ArtworkRequest(
             trackId: track.trackId,
             artworkData: track.artworkData,
-            purpose: .miniPlayer
+            purpose: .miniPlayer,
+            sourceIdentifier: .mediaLibrary(trackId: track.trackId)
         )
 
         return MiniPlayerStaticState(
             trackId: track.trackId,
             title: title,
             artist: artist,
-            artwork: artwork
+            artworkRequest: artworkRequest
         )
     }
 }

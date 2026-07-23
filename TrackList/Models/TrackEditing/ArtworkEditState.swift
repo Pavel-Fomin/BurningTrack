@@ -35,6 +35,9 @@ struct ArtworkEditState: Equatable {
     /// Новая обложка, выбранная пользователем в форме.
     private(set) var newArtworkData: Data?
 
+    /// Идентификатор выбранных данных используется только для асинхронного preview.
+    private(set) var newArtworkRevision: UUID?
+
     /// Флаг локального удаления обложки в форме.
     private(set) var isMarkedForRemoval: Bool
 
@@ -43,6 +46,7 @@ struct ArtworkEditState: Equatable {
     init(hadOriginalArtwork: Bool) {
         self.hadOriginalArtwork = hadOriginalArtwork
         self.newArtworkData = nil
+        self.newArtworkRevision = nil
         self.isMarkedForRemoval = false
     }
 
@@ -74,8 +78,9 @@ struct ArtworkEditState: Equatable {
 
     /// Пользователь выбрал новую обложку.
     /// С этого момента она становится текущим локальным превью.
-    mutating func setNewArtwork(data: Data) {
+    mutating func setNewArtwork(data: Data, revision: UUID = UUID()) {
         newArtworkData = data
+        newArtworkRevision = revision
         isMarkedForRemoval = false
     }
 
@@ -83,6 +88,7 @@ struct ArtworkEditState: Equatable {
     /// Удаление пока только локальное, до нажатия "Сохранить".
     mutating func removeArtwork() {
         newArtworkData = nil
+        newArtworkRevision = nil
         isMarkedForRemoval = true
     }
 
@@ -90,6 +96,7 @@ struct ArtworkEditState: Equatable {
     /// Возвращает форму к исходному состоянию.
     mutating func reset() {
         newArtworkData = nil
+        newArtworkRevision = nil
         isMarkedForRemoval = false
     }
 

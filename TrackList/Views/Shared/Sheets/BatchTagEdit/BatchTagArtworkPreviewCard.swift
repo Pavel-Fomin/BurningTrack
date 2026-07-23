@@ -18,6 +18,8 @@ struct BatchTagArtworkPreviewCard: View {
     let item: BatchTagArtworkPreviewItem
     /// Несохранённое действие с обложкой для этой карточки.
     let artworkAction: BatchTagArtworkEditAction
+    /// Идентификатор несохранённой замены исключает сравнение Data и объединяет preview-запросы.
+    let replacementPreviewIdentifier: UUID?
     /// Должна ли карточка показывать обложку с учётом несохранённых изменений.
     let hasArtworkForPreview: Bool
     /// Размер preview-обложки в байтах с учётом несохранённых изменений.
@@ -74,9 +76,9 @@ struct BatchTagArtworkPreviewCard: View {
     @ViewBuilder
     private var artworkContent: some View {
         switch artworkAction {
-        case .replace(let data):
-            if let replacementImage = UIImage(data: data) {
-                Image(uiImage: replacementImage)
+        case .replace:
+            if let image {
+                Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
                     .frame(width: 150, height: 150)
@@ -98,14 +100,20 @@ struct BatchTagArtworkPreviewCard: View {
     }
 
     /// Идентификатор перезагрузки preview при изменении локального состояния обложки.
-    private var previewTaskId: String {
+    private var previewTaskId: PreviewTaskIdentifier {
         switch artworkAction {
         case .keep:
-            return "\(item.trackId.uuidString)-keep-\(hasArtworkForPreview)"
+            return .original(
+                trackId: item.trackId,
+                hasArtwork: hasArtworkForPreview,
+                revision: item.artworkRevision
+            )
         case .remove:
-            return "\(item.trackId.uuidString)-remove-\(hasArtworkForPreview)"
-        case .replace(let data):
-            return "\(item.trackId.uuidString)-replace-\(data.count)"
+            return .removed(trackId: item.trackId)
+        case .replace:
+            return .replacement(
+                replacementPreviewIdentifier ?? item.trackId
+            )
         }
     }
 
@@ -165,7 +173,21 @@ struct BatchTagArtworkPreviewCard: View {
     /// Лениво загружает preview-изображение обложки.
     private func loadArtworkIfNeeded() async {
         image = nil
-        if case .replace = artworkAction {
+
+        if case .replace(let data) = artworkAction {
+            guard let replacementPreviewIdentifier else { return }
+            let loadedImage = await ArtworkProvider.shared.image(
+                for: ArtworkRequest(
+                    trackId: item.trackId,
+                    artworkData: data,
+                    purpose: .batchTagPreview,
+                    sourceIdentifier: .transient(
+                        revision: replacementPreviewIdentifier
+                    )
+                )
+            )
+            guard !Task.isCancelled else { return }
+            image = loadedImage
             return
         }
         guard hasArtworkForPreview else { return }
@@ -176,4 +198,11 @@ struct BatchTagArtworkPreviewCard: View {
         guard !Task.isCancelled else { return }
         image = loadedImage
     }
+}
+
+/// Лёгкая идентичность preview-задачи без сравнения бинарных данных в SwiftUI body.
+private enum PreviewTaskIdentifier: Equatable {
+    case original(trackId: UUID, hasArtwork: Bool, revision: Date?)
+    case removed(trackId: UUID)
+    case replacement(UUID)
 }

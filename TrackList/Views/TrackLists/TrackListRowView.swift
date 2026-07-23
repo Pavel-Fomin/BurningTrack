@@ -56,7 +56,7 @@ struct TrackListRowView: View {
             isCurrent: state.isCurrent,
             isPlaying: state.isPlaying,
             isHighlighted: state.isHighlighted, /// Подсветка управляется wrapper'ом
-            artwork: state.artwork,
+            artworkRequest: state.artworkRequest,
             title: state.title,
             artist: state.artist,
             duration: state.duration,

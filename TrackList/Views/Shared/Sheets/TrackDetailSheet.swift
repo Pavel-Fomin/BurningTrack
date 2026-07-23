@@ -32,6 +32,7 @@ struct TrackDetailSheet: View {
     @Binding var editedFileName: String                     /// Редактируемое имя файла без расширения
     @Binding var artworkUIImage: UIImage?                   /// Обложка для отображения в sheet
     @Binding var artworkEditState: ArtworkEditState         /// Состояние редактирования обложки
+    @Binding var initialArtworkEditState: ArtworkEditState  /// Исходное состояние для отмены редактирования
 
     // MARK: - Runtime state
 
@@ -66,6 +67,7 @@ struct TrackDetailSheet: View {
                 TrackDetailEditForm(
                     fileName: $editedFileName,
                     values: $editedValues,
+                    trackId: track.trackId,
                     artworkUIImage: artworkUIImage,
                     artworkEditState: $artworkEditState
                 )
@@ -100,9 +102,7 @@ struct TrackDetailSheet: View {
         let snapshot = await loadSnapshot()
         guard let snapshot else { return }
 
-        await MainActor.run {
-            applySnapshotToSheetState(snapshot)
-        }
+        await applySnapshotToSheetState(snapshot)
     }
 
     /// Загружает runtime-данные iTunes-трека без BookmarkResolver и кэша метаданных.
@@ -118,8 +118,8 @@ struct TrackDetailSheet: View {
         await MainActor.run {
             resolvedURL = nil
             TrackRuntimeStore.shared.storeSnapshot(snapshot)
-            applySnapshotToSheetState(snapshot)
         }
+        await applySnapshotToSheetState(snapshot)
     }
 
     /// Загружает runtime snapshot трека из store или собирает через builder.
@@ -135,7 +135,8 @@ struct TrackDetailSheet: View {
     /// Применяет runtime snapshot к состоянию sheet.
     /// Не читает файл напрямую и не обращается к TagLib.
     /// - Parameter snapshot: Актуальный runtime snapshot трека
-    private func applySnapshotToSheetState(_ snapshot: TrackRuntimeSnapshot) {
+    @MainActor
+    private func applySnapshotToSheetState(_ snapshot: TrackRuntimeSnapshot) async {
 
         let values: [EditableTrackField: String] = [
             .title: snapshot.title ?? "",
@@ -147,16 +148,31 @@ struct TrackDetailSheet: View {
             .comment: snapshot.comment ?? ""
         ]
 
-        let image = ArtworkProvider.shared.image(
-            trackId: track.trackId,
-            artworkData: snapshot.artworkData,
-            purpose: .trackInfoSheet
-        )
-
         editedFileName = makeFileNameWithoutExtension(snapshot.fileName)
         editedValues = values
+        let loadingArtworkState = ArtworkEditState(hadOriginalArtwork: false)
+        artworkUIImage = nil
+        artworkEditState = loadingArtworkState
+        initialArtworkEditState = loadingArtworkState
+
+        let image: UIImage?
+        if let artworkRequest = ArtworkRequest(
+            trackId: track.trackId,
+            snapshot: snapshot,
+            purpose: .trackInfoSheet
+        ) {
+            image = await ArtworkProvider.shared.image(for: artworkRequest)
+        } else {
+            image = nil
+        }
+        guard !Task.isCancelled else { return }
+        let resolvedArtworkState = ArtworkEditState(hadOriginalArtwork: image != nil)
         artworkUIImage = image
-        artworkEditState = ArtworkEditState(hadOriginalArtwork: image != nil)
+        initialArtworkEditState = resolvedArtworkState
+        // Не перезаписываем замену или удаление, сделанные до завершения подготовки оригинала.
+        if artworkEditState == loadingArtworkState {
+            artworkEditState = resolvedArtworkState
+        }
     }
     
     // MARK: - Helpers

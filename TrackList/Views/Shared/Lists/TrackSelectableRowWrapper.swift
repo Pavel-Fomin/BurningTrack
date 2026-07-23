@@ -9,7 +9,6 @@
 //
 
 import SwiftUI
-import UIKit
 
 struct TrackSelectableRowWrapper: View {
     
@@ -29,13 +28,11 @@ struct TrackSelectableRowWrapper: View {
         metadataProvider.snapshot(for: track.trackId)
     }
     
-    /// Обложка трека (строится из snapshot.artworkData)
-    private var artwork: UIImage? {
-        guard let data = snapshot?.artworkData else { return nil }
-        
-        return ArtworkProvider.shared.image(
+    /// Лёгкий запрос обложки строится из snapshot без запуска подготовки во View.
+    private var artworkRequest: ArtworkRequest? {
+        return ArtworkRequest(
             trackId: track.trackId,
-            artworkData: data,
+            snapshot: snapshot,
             purpose: .trackList
         )
     }
@@ -50,7 +47,7 @@ struct TrackSelectableRowWrapper: View {
             isCurrent: false,
             isPlaying: false,
             isHighlighted: false,
-            artwork: artwork,
+            artworkRequest: artworkRequest,
             title: snapshot?.title ?? track.title,
             artist: snapshot?.artist ?? track.artist ?? "",
             duration: snapshot?.duration ?? track.duration,

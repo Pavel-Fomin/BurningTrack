@@ -7,7 +7,7 @@
 //  Created by Pavel Fomin on 08.07.2025.
 //
 
-import SwiftUI
+import Foundation
 
 struct ToastData: Identifiable, Equatable {
 
@@ -19,10 +19,8 @@ struct ToastData: Identifiable, Equatable {
     let id = UUID()
     let style: Style
 
-    /// Готовое изображение для тоста.
-    /// Формируется через ArtworkProvider (.toast)
-    /// ToastView ничего не знает о размерах, данных и декодировании.
-    let artworkImage: Image?
+    /// Лёгкий запрос обложки для асинхронной подписки тоста.
+    let artworkRequest: ArtworkRequest?
 
     let message: String
 

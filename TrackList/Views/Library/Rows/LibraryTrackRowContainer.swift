@@ -48,7 +48,7 @@ struct LibraryTrackRowContainer: View {
             isCurrent: rowState.isCurrent,
             isPlaying: rowState.isPlaying,
             isHighlighted: rowState.isHighlighted,
-            artwork: rowState.artwork,
+            artworkRequest: rowState.artworkRequest,
             // Данные отображения берём из LibraryTrackRowState.
             title: rowState.title,
             artist: rowState.artist,

@@ -19,6 +19,8 @@ struct BatchTagArtworkPreviewItem: Identifiable, Equatable {
     let title: String
     /// Есть ли у трека обложка.
     let hasArtwork: Bool
+    /// Ревизия runtime snapshot перезапускает подписку после обновления обложки.
+    let artworkRevision: Date?
     /// Размер исходной обложки в байтах.
     let artworkSizeBytes: Int?
 }
