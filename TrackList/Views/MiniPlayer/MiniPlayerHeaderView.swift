@@ -45,7 +45,8 @@ struct MiniPlayerHeaderView: View {
                     }
 
                     Text(title)
-                        .font(artist.isEmpty ? .caption : .caption2)
+                        // Название использует тот же шрифт, что и исполнитель.
+                        .font(.caption)
                         .foregroundColor(
                             titleColorOverride ?? (artist.isEmpty ? .primary : .secondary)
                         )

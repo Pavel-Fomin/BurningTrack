@@ -295,18 +295,19 @@ struct TrackRowView<ActionMenuContent: View>: View {
     /// Левая колонка с основным текстом трека
     private var leftTextColumn: some View {
         VStack(alignment: .leading, spacing: hasArtist ? 2 : 0) {
-            Text(displayTitle)
-                .font(.subheadline)
-                .foregroundColor(.primary)
-                .lineLimit(1)
-
             if hasArtist, let artistText = artist {
                 Text(artistText)
-                    // Исполнитель находится в одной строке со временем.
-                    .font(.footnote)
-                    .foregroundColor(.secondary)
+                    // Верхняя строка сохраняет прежний основной стиль.
+                    .font(.subheadline)
+                    .foregroundColor(.primary)
                     .lineLimit(1)
             }
+
+            Text(displayTitle)
+                // Название использует тот же шрифт, что и исполнитель.
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .lineLimit(1)
         }
     }
 
