@@ -55,7 +55,8 @@ struct SettingsView: View {
                 )
             }
 
-            Section(SettingsPresentationText.librarySectionTitle) {
+            // Системный footer размещает описание за пределами заливки строки переключателя.
+            Section {
                 Toggle(
                     SettingsPresentationText.showITunesPurchasesTitle,
                     isOn: Binding(
@@ -67,10 +68,10 @@ struct SettingsView: View {
                         }
                     )
                 )
-
+            } header: {
+                Text(SettingsPresentationText.librarySectionTitle)
+            } footer: {
                 Text(SettingsPresentationText.iTunesPurchasesFooter)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
             }
         }
         .listStyle(.insetGrouped)

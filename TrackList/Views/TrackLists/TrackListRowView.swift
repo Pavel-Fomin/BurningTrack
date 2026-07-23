@@ -104,7 +104,7 @@ struct TrackListRowView: View {
             Button {
                 onShowInLibrary()
             } label: {
-                Label("Show in Library", systemImage: "scope")
+                Label("Show in Library", systemImage: "magnifyingglass")
             }
         }
 

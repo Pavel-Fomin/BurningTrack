@@ -28,7 +28,7 @@ struct MiniPlayerExpandedContent: View {
     var body: some View {
         HStack {
             optionalActionButton(
-                systemName: "scope",
+                systemName: "magnifyingglass",
                 accessibilityLabel: String(localized: "Show in Library"),
                 action: showInLibraryAction
             )
