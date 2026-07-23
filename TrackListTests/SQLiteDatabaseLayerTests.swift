@@ -1243,6 +1243,7 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
 
         XCTAssertEqual(initialSettings, AppSettings.defaultValue)
         XCTAssertEqual(initialSettings.internalSettings.libraryRootDisplayMode, .folders)
+        XCTAssertEqual(initialSettings.internalSettings.purchasedITunesTrackSortMode, .titleAsc)
 
         let reloadedSettings = try store.fetchSettings {
             nil
@@ -1263,6 +1264,7 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
         settings.visible.library.isFileFormatVisible = false
         settings.visible.library.isPurchasedITunesSourceVisible = false
         settings.internalSettings.libraryRootDisplayMode = .tracks
+        settings.internalSettings.purchasedITunesTrackSortMode = .dateAddedDesc
         settings.internalSettings.trackListsSortMode = .name
 
         try store.saveSettings(settings)
@@ -1276,6 +1278,7 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
         XCTAssertFalse(reloadedSettings.visible.library.isFileFormatVisible)
         XCTAssertFalse(reloadedSettings.visible.library.isPurchasedITunesSourceVisible)
         XCTAssertEqual(reloadedSettings.internalSettings.libraryRootDisplayMode, .tracks)
+        XCTAssertEqual(reloadedSettings.internalSettings.purchasedITunesTrackSortMode, .dateAddedDesc)
         XCTAssertEqual(reloadedSettings.internalSettings.trackListsSortMode, .name)
 
         var foldersSettings = reloadedSettings

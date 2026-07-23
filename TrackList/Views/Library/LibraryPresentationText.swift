@@ -83,6 +83,38 @@ enum LibraryPresentationText {
         }
     }
 
+    /// Возвращает полное локализованное название сортировки купленных iTunes-треков.
+    static func purchasedITunesTrackSortModeTitle(
+        for mode: PurchasedITunesTrackSortMode
+    ) -> String {
+        switch mode {
+        case .artistAsc:
+            return String(localized: "Artist A–Z")
+        case .artistDesc:
+            return String(localized: "Artist Z–A")
+        case .titleAsc:
+            return String(localized: "Title A–Z")
+        case .titleDesc:
+            return String(localized: "Title Z–A")
+        case .albumAsc:
+            return String(localized: "Album A–Z")
+        case .albumDesc:
+            return String(localized: "Album Z–A")
+        case .yearDesc:
+            return String(localized: "Year: Newest First")
+        case .yearAsc:
+            return String(localized: "Year: Oldest First")
+        case .genreAsc:
+            return String(localized: "Genre A–Z")
+        case .genreDesc:
+            return String(localized: "Genre Z–A")
+        case .dateAddedDesc:
+            return String(localized: "Date Added: Newest First")
+        case .dateAddedAsc:
+            return String(localized: "Date Added: Oldest First")
+        }
+    }
+
     static func collectionValueSortModeTitle(for mode: LibraryCollectionValueSortMode) -> String {
         switch mode {
         case .titleAscending,

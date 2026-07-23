@@ -10,7 +10,7 @@
 | --- | ---: | ---: | ---: |
 | app_settings | 9 | 0 | 0 |
 | folders | 13 | 2 | 6 |
-| library_view_settings | 12 | 1 | 0 |
+| library_view_settings | 13 | 1 | 0 |
 | player_queue | 12 | 0 | 4 |
 | player_settings | 8 | 0 | 0 |
 | player_state | 14 | 1 | 0 |
@@ -101,6 +101,7 @@ No indexes.
 | library_root_display_mode | TEXT | no | - | 0 | 0 |
 | last_opened_folder_id | TEXT | no | - | 0 | 0 |
 | updated_at | TEXT | yes | - | 0 | 0 |
+| purchased_itunes_sort_mode | TEXT | yes | 'titleAsc' | 0 | 0 |
 
 ### Foreign Keys
 

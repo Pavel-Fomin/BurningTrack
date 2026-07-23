@@ -90,6 +90,8 @@ extension AppSettings {
     // Внутренние настройки приложения, не предназначенные для пользовательского редактирования.
     struct InternalSettings: Equatable {
         var libraryTrackSortMode: LibraryTrackSortMode
+        // Последняя сортировка отдельного runtime-источника системной медиатеки.
+        var purchasedITunesTrackSortMode: PurchasedITunesTrackSortMode
         var trackListsSortMode: TrackListsSortMode?
         // Последний выбранный режим отображения корня фонотеки.
         var libraryRootDisplayMode: LibraryRootDisplayMode
@@ -98,20 +100,23 @@ extension AppSettings {
 
         init(
             libraryTrackSortMode: LibraryTrackSortMode,
+            purchasedITunesTrackSortMode: PurchasedITunesTrackSortMode,
             trackListsSortMode: TrackListsSortMode?,
             libraryRootDisplayMode: LibraryRootDisplayMode,
             isMiniPlayerExpanded: Bool
         ) {
             self.libraryTrackSortMode = libraryTrackSortMode
+            self.purchasedITunesTrackSortMode = purchasedITunesTrackSortMode
             self.trackListsSortMode = trackListsSortMode
             self.libraryRootDisplayMode = libraryRootDisplayMode
             self.isMiniPlayerExpanded = isMiniPlayerExpanded
         }
 
-        // По умолчанию треки фонотеки идут по дате файла, а треклисты — в сохранённом фактическом порядке.
+        // По умолчанию фонотека идёт по дате файла, iTunes — по названию, а треклисты — в фактическом порядке.
         static var defaultValue: InternalSettings {
             InternalSettings(
                 libraryTrackSortMode: .fileDateDesc,
+                purchasedITunesTrackSortMode: .titleAsc,
                 trackListsSortMode: nil,
                 libraryRootDisplayMode: .folders,
                 isMiniPlayerExpanded: false

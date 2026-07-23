@@ -32,7 +32,8 @@ extension DatabaseMigration {
         .playerContextSource,
         .libraryPlaybackContextSource,
         .libraryCollectionPlaybackContextSource,
-        .playerQueueAndStateAllowExternalTrackIds
+        .playerQueueAndStateAllowExternalTrackIds,
+        .purchasedITunesSortModeSetting
     ]
 
     // Первая миграция фиксирует стартовую версию схемы без создания бизнес-таблиц.
@@ -907,6 +908,25 @@ extension DatabaseMigration {
 
             DROP TABLE player_state_backup;
             """
+        )
+    }
+
+    // Восемнадцатая миграция сохраняет сортировку runtime-источника iTunes в настройках фонотеки.
+    static let purchasedITunesSortModeSetting = DatabaseMigration(
+        identifier: "018_purchased_itunes_sort_mode_setting"
+    ) { database in
+        try ensureColumn(
+            "purchased_itunes_sort_mode",
+            in: "library_view_settings",
+            definition: """
+            TEXT NOT NULL DEFAULT 'titleAsc'
+            CHECK (purchased_itunes_sort_mode IN (
+                'artistAsc', 'artistDesc', 'titleAsc', 'titleDesc',
+                'albumAsc', 'albumDesc', 'yearDesc', 'yearAsc',
+                'genreAsc', 'genreDesc', 'dateAddedDesc', 'dateAddedAsc'
+            ))
+            """,
+            database: database
         )
     }
 

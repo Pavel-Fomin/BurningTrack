@@ -21,22 +21,43 @@ enum ExportFileNamingMode: Sendable {
 
 /// Подготовленное к выполнению задание экспорта.
 ///
-/// В задание передаются только Sendable-данные, нужные сервису: идентификатор
-/// трека и итоговое имя файла. Тяжёлая display-модель Track не
-/// пересекает границу фонового сервиса.
+/// В задание передаются только Sendable-данные, нужные сервису: тип источника
+/// и итоговое имя файла. Тяжёлая display-модель Track не пересекает границу
+/// фонового сервиса.
 struct ExportJob: Sendable {
 
     /// Один элемент задания экспорта.
     struct Item: Equatable, Sendable {
 
+        /// Разделяет bookmark-файлы фонотеки и runtime-ассеты MediaPlayer.
+        enum Source: Equatable, Sendable {
+            /// Обычный файл восстанавливается по идентификатору через BookmarkResolver.
+            case bookmark(trackID: UUID)
+            /// iTunes-источник использует только готовый assetURL, если он доступен.
+            case purchasedITunes(
+                trackID: UUID,
+                asset: PurchasedITunesAsset?
+            )
+        }
+
         /// Позиция трека в исходном порядке.
         let index: Int
 
-        /// Идентификатор, через который BookmarkResolver получает исходный URL.
-        let trackID: UUID
+        /// Типизированный источник не позволяет отправить iTunes-трек в BookmarkResolver.
+        let source: Source
 
-        /// Итоговое имя файла, подготовленное для сервиса экспорта.
+        /// Для обычного файла содержит полное имя, а для iTunes — основу без расширения.
         let exportFileName: String
+
+        /// Сохраняет прежний доступ к идентификатору независимо от типа источника.
+        var trackID: UUID {
+            switch source {
+            case .bookmark(let trackID):
+                return trackID
+            case .purchasedITunes(let trackID, _):
+                return trackID
+            }
+        }
     }
 
     /// Файлы в порядке, выбранном пользователем или текущим треклистом.
@@ -56,19 +77,38 @@ struct ExportJob: Sendable {
         fileNamingMode: ExportFileNamingMode
     ) {
         self.items = tracks.enumerated().map { index, track in
+            let source: Item.Source
+            let sourceFileName: String
+
+            if track.source == .purchasedITunes {
+                let asset = PurchasedITunesAsset(track: track)
+                source = .purchasedITunes(
+                    trackID: track.trackId,
+                    asset: asset
+                )
+                // Формат Artist - Title задаётся общим writer-ом до добавления
+                // фактического расширения выбранного плана AVFoundation.
+                sourceFileName = asset.map(
+                    PurchasedITunesAssetWriter.displayFileBaseName(for:)
+                ) ?? track.fileName
+            } else {
+                source = .bookmark(trackID: track.trackId)
+                sourceFileName = track.fileName
+            }
+
             let exportFileName: String
 
             switch fileNamingMode {
             case .numbered:
                 let prefix = String(format: "%02d", index + 1)
-                exportFileName = "\(prefix) \(track.fileName)"
+                exportFileName = "\(prefix) \(sourceFileName)"
             case .original:
-                exportFileName = track.fileName
+                exportFileName = sourceFileName
             }
 
             return Item(
                 index: index,
-                trackID: track.trackId,
+                source: source,
                 exportFileName: exportFileName
             )
         }

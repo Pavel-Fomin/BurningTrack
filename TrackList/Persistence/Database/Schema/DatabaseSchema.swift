@@ -166,6 +166,7 @@ enum DatabaseSchema {
 
         static let id = "id"
         static let sortMode = "sort_mode"
+        static let purchasedITunesSortMode = "purchased_itunes_sort_mode"
         static let trackListsSortMode = "tracklists_sort_mode"
         static let groupMode = "group_mode"
         static let showTrackListBadges = "show_tracklist_badges"

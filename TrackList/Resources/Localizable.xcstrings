@@ -667,6 +667,39 @@
         }
       }
     },
+    "Date Added" : {
+      "comment" : "Название поля сортировки по системной дате добавления трека в медиатеку.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Date Added"
+          }
+        }
+      }
+    },
+    "Date Added: Newest First" : {
+      "comment" : "Полное название сортировки купленных iTunes-треков по дате добавления: сначала новые.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Date Added: Newest First"
+          }
+        }
+      }
+    },
+    "Date Added: Oldest First" : {
+      "comment" : "Полное название сортировки купленных iTunes-треков по дате добавления: сначала старые.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Date Added: Oldest First"
+          }
+        }
+      }
+    },
     "Date: Newest First" : {
       "localizations" : {
         "en" : {
@@ -1601,6 +1634,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Purchased in iTunes"
+          }
+        }
+      }
+    },
+    "Purchased in iTunes Actions" : {
+      "comment" : "Accessibility label для toolbar-меню раздела купленных iTunes-треков.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Purchased in iTunes Actions"
           }
         }
       }

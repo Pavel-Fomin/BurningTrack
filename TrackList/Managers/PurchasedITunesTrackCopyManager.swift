@@ -8,7 +8,6 @@
 //
 
 import Foundation
-@preconcurrency import AVFoundation
 
 /// Ошибки копирования iTunes-трека на уровне файлового слоя.
 enum PurchasedITunesTrackCopyError: Error {
@@ -44,6 +43,9 @@ actor PurchasedITunesTrackCopyManager {
 
     static let shared = PurchasedITunesTrackCopyManager()
 
+    /// Общий writer не содержит логики фонотеки и используется также внешним экспортом.
+    private let assetWriter = PurchasedITunesAssetWriter()
+
     private init() {}
 
     // MARK: - Public API
@@ -71,20 +73,21 @@ actor PurchasedITunesTrackCopyManager {
             }
         }
 
+        let asset = PurchasedITunesAsset(track: track)
         let copyPlan = try makeCopyPlan(
-            track: track,
+            asset: asset,
             destinationFolderURL: destinationContext.folder.url
         )
 
         let temporaryURL = try makeTemporaryURL(
-            fileExtension: copyPlan.sourceWritePlan.fileExtension
+            fileExtension: copyPlan.writePlan.fileExtension
         )
 
         do {
-            try await writeSource(
-                track,
-                toTemporaryURL: temporaryURL,
-                using: copyPlan.sourceWritePlan
+            try await assetWriter.write(
+                asset,
+                to: temporaryURL,
+                using: copyPlan.writePlan
             )
 
             try FileManager.default.moveItem(
@@ -101,6 +104,9 @@ actor PurchasedITunesTrackCopyManager {
                 rootFolderId: destinationContext.rootFolder.id,
                 rootFolderURL: destinationContext.rootFolder.url
             )
+        } catch let error as PurchasedITunesAssetWriterError {
+            try? removeTemporaryFile(at: temporaryURL)
+            throw copyError(from: error)
         } catch let error as PurchasedITunesTrackCopyError {
             try? removeTemporaryFile(at: temporaryURL)
             throw error
@@ -129,22 +135,7 @@ actor PurchasedITunesTrackCopyManager {
     /// План записи файла с уже подобранным уникальным именем.
     private struct CopyPlan {
         let destinationURL: URL
-        let sourceWritePlan: SourceWritePlan
-    }
-
-    /// Способ записи исходного iTunes-ассета во временный файл.
-    private enum SourceWritePlan {
-        case fileCopy(fileExtension: String)
-        case assetExport(fileExtension: String, outputFileType: AVFileType)
-
-        var fileExtension: String {
-            switch self {
-            case .fileCopy(let fileExtension):
-                return fileExtension
-            case .assetExport(let fileExtension, _):
-                return fileExtension
-            }
-        }
+        let writePlan: PurchasedITunesAssetWriter.WritePlan
     }
 
     /// Получает выбранную папку и её root-папку из текущего дерева фонотеки.
@@ -195,117 +186,23 @@ actor PurchasedITunesTrackCopyManager {
 
     /// Создаёт план копирования с безопасным уникальным именем файла.
     private func makeCopyPlan(
-        track: PurchasedITunesPlayableTrack,
+        asset: PurchasedITunesAsset,
         destinationFolderURL: URL
     ) throws -> CopyPlan {
-        let sourceWritePlan = try makeSourceWritePlan(for: track.assetURL)
-        let baseName = displayFileBaseName(for: track)
+        let writePlan = try assetWriter.makeWritePlan(for: asset)
+        let baseName = PurchasedITunesAssetWriter.displayFileBaseName(
+            for: asset
+        )
         let destinationURL = uniqueDestinationURL(
             baseName: baseName,
-            fileExtension: sourceWritePlan.fileExtension,
+            fileExtension: writePlan.fileExtension,
             in: destinationFolderURL
         )
 
         return CopyPlan(
             destinationURL: destinationURL,
-            sourceWritePlan: sourceWritePlan
+            writePlan: writePlan
         )
-    }
-
-    /// Определяет способ записи и расширение итогового файла.
-    private func makeSourceWritePlan(
-        for sourceURL: URL
-    ) throws -> SourceWritePlan {
-        if sourceURL.isFileURL {
-            return .fileCopy(
-                fileExtension: preferredFileExtension(for: sourceURL)
-            )
-        }
-
-        let asset = AVURLAsset(url: sourceURL)
-        guard let exportSession = AVAssetExportSession(
-            asset: asset,
-            presetName: AVAssetExportPresetPassthrough
-        ) else {
-            throw PurchasedITunesTrackCopyError.exportSessionUnavailable
-        }
-
-        let preferredExtension = preferredFileExtension(for: sourceURL)
-        if let preferredType = avFileType(for: preferredExtension),
-           exportSession.supportedFileTypes.contains(preferredType) {
-            return .assetExport(
-                fileExtension: preferredExtension,
-                outputFileType: preferredType
-            )
-        }
-
-        if exportSession.supportedFileTypes.contains(.m4a) {
-            return .assetExport(
-                fileExtension: "m4a",
-                outputFileType: .m4a
-            )
-        }
-
-        guard let supportedType = exportSession.supportedFileTypes.first,
-              let supportedExtension = fileExtension(for: supportedType)
-        else {
-            throw PurchasedITunesTrackCopyError.exportSessionUnavailable
-        }
-
-        return .assetExport(
-            fileExtension: supportedExtension,
-            outputFileType: supportedType
-        )
-    }
-
-    /// Возвращает расширение исходного URL, а если оно неизвестно — m4a.
-    private func preferredFileExtension(
-        for sourceURL: URL
-    ) -> String {
-        let extensionValue = sourceURL.pathExtension
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
-
-        return extensionValue.isEmpty ? "m4a" : extensionValue
-    }
-
-    /// Собирает имя файла в формате Artist - Title без запрещённых символов.
-    private func displayFileBaseName(
-        for track: PurchasedITunesPlayableTrack
-    ) -> String {
-        let title = sanitizedFileNameComponent(
-            track.title ?? track.fileName
-        )
-        let artist = sanitizedFileNameComponent(
-            track.artist ?? ""
-        )
-
-        let baseName: String
-        if artist.isEmpty {
-            baseName = title
-        } else {
-            baseName = "\(artist) - \(title)"
-        }
-
-        return baseName.isEmpty ? "iTunes Track" : baseName
-    }
-
-    /// Убирает символы, которые нельзя безопасно использовать в имени файла.
-    private func sanitizedFileNameComponent(
-        _ value: String
-    ) -> String {
-        let forbidden = CharacterSet(
-            charactersIn: "/\\?%*|\"<>:\u{0000}"
-        )
-        let scalars = value.unicodeScalars.map { scalar in
-            forbidden.contains(scalar) ? " " : String(scalar)
-        }
-
-        return scalars
-            .joined()
-            .components(separatedBy: .whitespacesAndNewlines)
-            .filter { $0.isEmpty == false }
-            .joined(separator: " ")
     }
 
     /// Подбирает свободное имя файла, добавляя суффикс 2, 3 и далее.
@@ -336,187 +233,21 @@ actor PurchasedITunesTrackCopyManager {
         }
     }
 
-    // MARK: - File writing
-
-    /// Записывает исходный iTunes-ассет во временный файл.
-    private func writeSource(
-        _ track: PurchasedITunesPlayableTrack,
-        toTemporaryURL temporaryURL: URL,
-        using plan: SourceWritePlan
-    ) async throws {
-        switch plan {
-        case .fileCopy:
-            try copyFileURLSource(
-                track.assetURL,
-                to: temporaryURL
-            )
-
-        case .assetExport(_, let outputFileType):
-            try await exportMediaLibrarySource(
-                track.assetURL,
-                to: temporaryURL,
-                outputFileType: outputFileType,
-                metadata: makeExportMetadata(for: track)
-            )
-        }
-    }
-
-    /// Копирует обычный file URL без обращения к BookmarkResolver.
-    private func copyFileURLSource(
-        _ sourceURL: URL,
-        to temporaryURL: URL
-    ) throws {
-        let sourceStarted = sourceURL.startAccessingSecurityScopedResource()
-        defer {
-            if sourceStarted {
-                sourceURL.stopAccessingSecurityScopedResource()
-            }
-        }
-
-        do {
-            try FileManager.default.copyItem(
-                at: sourceURL,
-                to: temporaryURL
-            )
-        } catch {
-            throw PurchasedITunesTrackCopyError.copyFailed(underlying: error)
-        }
-    }
-
-    /// Экспортирует media-library URL через AVAssetExportSession без перекодирования.
-    private func exportMediaLibrarySource(
-        _ sourceURL: URL,
-        to temporaryURL: URL,
-        outputFileType: AVFileType,
-        metadata: [AVMetadataItem]
-    ) async throws {
-        let asset = AVURLAsset(url: sourceURL)
-        guard let exportSession = AVAssetExportSession(
-            asset: asset,
-            presetName: AVAssetExportPresetPassthrough
-        ) else {
-            throw PurchasedITunesTrackCopyError.exportSessionUnavailable
-        }
-
-        // Media-library export не переносит runtime-теги автоматически,
-        // поэтому явно записываем common metadata в создаваемый файл.
-        exportSession.metadata = metadata
-
-        do {
-            try await exportSession.export(
-                to: temporaryURL,
-                as: outputFileType
-            )
-        } catch {
-            throw PurchasedITunesTrackCopyError.exportFailed(
-                underlying: error
-            )
-        }
-    }
-
-    /// Собирает common metadata для AVAssetExportSession из runtime-данных iTunes-трека.
-    private func makeExportMetadata(
-        for track: PurchasedITunesPlayableTrack
-    ) -> [AVMetadataItem] {
-        var metadata: [AVMetadataItem] = []
-
-        if let titleItem = makeStringMetadataItem(
-            identifier: .commonIdentifierTitle,
-            value: track.title
-        ) {
-            metadata.append(titleItem)
-        }
-
-        if let artistItem = makeStringMetadataItem(
-            identifier: .commonIdentifierArtist,
-            value: track.artist
-        ) {
-            metadata.append(artistItem)
-        }
-
-        if let albumItem = makeStringMetadataItem(
-            identifier: .commonIdentifierAlbumName,
-            value: track.album
-        ) {
-            metadata.append(albumItem)
-        }
-
-        if let artworkItem = makeArtworkMetadataItem(
-            artworkData: track.artworkData
-        ) {
-            metadata.append(artworkItem)
-        }
-
-        return metadata
-    }
-
-    /// Создаёт строковый common metadata item и пропускает пустые значения.
-    private func makeStringMetadataItem(
-        identifier: AVMetadataIdentifier,
-        value: String?
-    ) -> AVMetadataItem? {
-        guard let value else { return nil }
-
-        let trimmedValue = value.trimmingCharacters(
-            in: .whitespacesAndNewlines
-        )
-        guard trimmedValue.isEmpty == false else { return nil }
-
-        let item = AVMutableMetadataItem()
-        item.identifier = identifier
-        item.value = trimmedValue as NSString
-
-        return item.copy() as? AVMetadataItem
-    }
-
-    /// Создаёт common artwork metadata item из raw-данных обложки.
-    private func makeArtworkMetadataItem(
-        artworkData: Data?
-    ) -> AVMetadataItem? {
-        guard let artworkData, artworkData.isEmpty == false else {
-            return nil
-        }
-
-        let item = AVMutableMetadataItem()
-        item.identifier = .commonIdentifierArtwork
-        item.value = artworkData as NSData
-
-        return item.copy() as? AVMetadataItem
-    }
-
-    /// Маппит понятное расширение на AVFileType.
-    private func avFileType(
-        for fileExtension: String
-    ) -> AVFileType? {
-        switch fileExtension.lowercased() {
-        case "m4a":
-            return .m4a
-        case "mp4":
-            return .mp4
-        case "mov":
-            return .mov
-        case "caf":
-            return .caf
-        default:
-            return nil
-        }
-    }
-
-    /// Возвращает расширение файла для AVFileType, если оно поддержано приложением.
-    private func fileExtension(
-        for fileType: AVFileType
-    ) -> String? {
-        switch fileType {
-        case .m4a:
-            return "m4a"
-        case .mp4:
-            return "mp4"
-        case .mov:
-            return "mov"
-        case .caf:
-            return "caf"
-        default:
-            return nil
+    /// Сохраняет прежнее отображение ошибок одиночного копирования.
+    private func copyError(
+        from error: PurchasedITunesAssetWriterError
+    ) -> PurchasedITunesTrackCopyError {
+        switch error {
+        case .sourceUnavailable:
+            return .sourceUnavailable
+        case .exportSessionUnavailable:
+            return .exportSessionUnavailable
+        case .exportFailed(let underlying):
+            return .exportFailed(underlying: underlying)
+        case .sourceSizeUnavailable:
+            return .copyFailed(underlying: error)
+        case .copyFailed(let underlying):
+            return .copyFailed(underlying: underlying)
         }
     }
 

@@ -15,6 +15,8 @@ struct PurchasedITunesMusicView: View {
     // MARK: - Входные данные
 
     @ObservedObject var playerViewModel: PlayerViewModel
+    /// Передаёт действия всего экрана в экранный action handler.
+    let onAction: (PurchasedITunesMusicAction) -> Void
     @Environment(\.scenePhase) private var scenePhase
 
     // MARK: - Модель представления
@@ -30,6 +32,16 @@ struct PurchasedITunesMusicView: View {
         .background(Color(.systemBackground))
         .navigationTitle("Purchased in iTunes")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                PurchasedITunesToolbarMenuButton(
+                    selectedSortMode: viewModel.sortMode,
+                    onSortModeSelection: viewModel.selectSortMode,
+                    isExportEnabled: exportableTracks.isEmpty == false,
+                    onExport: exportAllTracks
+                )
+            }
+        }
         .task {
             await viewModel.load()
         }
@@ -47,14 +59,24 @@ struct PurchasedITunesMusicView: View {
         case .empty:
             messageView("No local iTunes tracks available for copying.")
 
-        case .loaded(let tracks):
-            // Один раз собираем адаптеры для строки и контекста воспроизведения из одного списка медиатеки.
-            tracksList(
-                tracks.map { track in
-                    PurchasedITunesPlayableTrack(track: track)
-                }
-            )
+        case .loaded:
+            tracksList(exportableTracks)
         }
+    }
+
+    /// Собирает общий набор адаптеров для списка, playback-контекста и экспорта.
+    private var exportableTracks: [PurchasedITunesPlayableTrack] {
+        guard case .loaded(let tracks) = viewModel.state else {
+            return []
+        }
+
+        return tracks.map(PurchasedITunesPlayableTrack.init(track:))
+    }
+
+    /// Передаёт все доступные треки раздела в текущем отображаемом порядке.
+    private func exportAllTracks() {
+        guard exportableTracks.isEmpty == false else { return }
+        onAction(.exportTracks(exportableTracks))
     }
 
     /// Показывает состояние чтения системной медиатеки.
@@ -126,6 +148,14 @@ struct PurchasedITunesMusicView: View {
                     animated: true
                 )
             }
+            .onChange(of: tracks.map(\.trackId)) { _, _ in
+                // После смены порядка сохраняем существующее поведение фокуса на текущем треке.
+                scrollToCurrentTrackIfNeeded(
+                    using: proxy,
+                    tracks: tracks,
+                    animated: true
+                )
+            }
             .onChange(of: scenePhase) { _, newPhase in
                 guard newPhase == .active else { return }
                 scrollToCurrentTrackIfNeeded(
@@ -168,6 +198,151 @@ struct PurchasedITunesMusicView: View {
             }
         } else {
             proxy.scrollTo(targetTrackId, anchor: .center)
+        }
+    }
+}
+
+/// Нативная toolbar-кнопка показывает поддерживаемые действия раздела iTunes.
+private struct PurchasedITunesToolbarMenuButton: UIViewRepresentable {
+    /// Текущий режим нужен системе для checkmark активного направления.
+    let selectedSortMode: PurchasedITunesTrackSortMode
+    /// Передаёт пользовательский выбор обратно во ViewModel.
+    let onSortModeSelection: (PurchasedITunesTrackSortMode) -> Void
+    /// Определяет доступность обычного экспорта загруженного списка.
+    let isExportEnabled: Bool
+    /// Передаёт экспорт всех доступных треков экранному action handler.
+    let onExport: () -> Void
+
+    func makeUIView(context: Context) -> UIButton {
+        let button = UIButton(type: .system)
+        button.setImage(UIImage(systemName: "ellipsis"), for: .normal)
+        button.showsMenuAsPrimaryAction = true
+        button.changesSelectionAsPrimaryAction = false
+        button.accessibilityLabel = String(
+            localized: "Purchased in iTunes Actions"
+        )
+        button.setContentHuggingPriority(.required, for: .horizontal)
+        button.setContentCompressionResistancePriority(.required, for: .horizontal)
+        button.menu = makeMenu()
+        return button
+    }
+
+    func updateUIView(_ button: UIButton, context: Context) {
+        button.menu = makeMenu()
+    }
+
+    /// Собирает системное меню, где subtitle и checkmark рисуются UIKit.
+    private func makeMenu() -> UIMenu {
+        let menu = UIMenu(
+            children: [
+                makeSortMenu(),
+                makeExportAction()
+            ]
+        )
+
+        // Разрешает системе показать title и subtitle для пункта "Сортировка".
+        let displayPreferences = UIMenuDisplayPreferences()
+        displayPreferences.maximumNumberOfTitleLines = 2
+        menu.displayPreferences = displayPreferences
+
+        return menu
+    }
+
+    /// Собирает обычный пункт экспорта по паттерну папок фонотеки.
+    private func makeExportAction() -> UIAction {
+        UIAction(
+            title: String(localized: "Export"),
+            image: UIImage(systemName: "externaldrive"),
+            attributes: isExportEnabled ? [] : [.disabled]
+        ) { _ in
+            onExport()
+        }
+    }
+
+    /// Группирует направления и показывает выбранный режим системной подписью.
+    private func makeSortMenu() -> UIMenu {
+        let menu = UIMenu(
+            title: String(localized: "Sort"),
+            image: UIImage(systemName: "arrow.up.arrow.down"),
+            children: [
+                makeDirectionalSortMenu(
+                    title: String(localized: "Artist"),
+                    firstTitle: String(localized: "A–Z"),
+                    firstMode: .artistAsc,
+                    secondTitle: String(localized: "Z–A"),
+                    secondMode: .artistDesc
+                ),
+                makeDirectionalSortMenu(
+                    title: String(localized: "Title"),
+                    firstTitle: String(localized: "A–Z"),
+                    firstMode: .titleAsc,
+                    secondTitle: String(localized: "Z–A"),
+                    secondMode: .titleDesc
+                ),
+                makeDirectionalSortMenu(
+                    title: String(localized: "Album"),
+                    firstTitle: String(localized: "A–Z"),
+                    firstMode: .albumAsc,
+                    secondTitle: String(localized: "Z–A"),
+                    secondMode: .albumDesc
+                ),
+                makeDirectionalSortMenu(
+                    title: String(localized: "Year"),
+                    firstTitle: String(localized: "Newest First"),
+                    firstMode: .yearDesc,
+                    secondTitle: String(localized: "Oldest First"),
+                    secondMode: .yearAsc
+                ),
+                makeDirectionalSortMenu(
+                    title: String(localized: "Genre"),
+                    firstTitle: String(localized: "A–Z"),
+                    firstMode: .genreAsc,
+                    secondTitle: String(localized: "Z–A"),
+                    secondMode: .genreDesc
+                ),
+                makeDirectionalSortMenu(
+                    title: String(localized: "Date Added"),
+                    firstTitle: String(localized: "Newest First"),
+                    firstMode: .dateAddedDesc,
+                    secondTitle: String(localized: "Oldest First"),
+                    secondMode: .dateAddedAsc
+                )
+            ]
+        )
+        menu.subtitle = LibraryPresentationText.purchasedITunesTrackSortModeTitle(
+            for: selectedSortMode
+        )
+        return menu
+    }
+
+    /// Создаёт single-selection подменю с системным checkmark.
+    private func makeDirectionalSortMenu(
+        title: String,
+        firstTitle: String,
+        firstMode: PurchasedITunesTrackSortMode,
+        secondTitle: String,
+        secondMode: PurchasedITunesTrackSortMode
+    ) -> UIMenu {
+        UIMenu(
+            title: title,
+            options: .singleSelection,
+            children: [
+                makeSortAction(title: firstTitle, mode: firstMode),
+                makeSortAction(title: secondTitle, mode: secondMode)
+            ]
+        )
+    }
+
+    /// Создаёт направление сортировки и отмечает выбранный режим.
+    private func makeSortAction(
+        title: String,
+        mode: PurchasedITunesTrackSortMode
+    ) -> UIAction {
+        UIAction(
+            title: title,
+            state: selectedSortMode == mode ? .on : .off
+        ) { _ in
+            onSortModeSelection(mode)
         }
     }
 }

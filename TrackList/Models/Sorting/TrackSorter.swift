@@ -135,25 +135,70 @@ private extension TrackSorter {
     ) -> ComparisonResult {
         switch (lhs, rhs) {
         case (.string(let leftValue), .string(let rightValue)):
-            return compareOptionalValues(leftValue, rightValue, direction: direction) {
-                compareStrings($0, $1)
-            }
+            return compareOptionalStrings(leftValue, rightValue, direction: direction)
         case (.date(let leftValue), .date(let rightValue)):
-            return compareOptionalValues(leftValue, rightValue, direction: direction) {
-                compareDates($0, $1)
-            }
+            return compareOptionalDates(leftValue, rightValue, direction: direction)
         case (.number(let leftValue), .number(let rightValue)):
-            return compareOptionalValues(leftValue, rightValue, direction: direction) {
-                compareIntegers($0, $1)
-            }
+            return compareOptionalIntegers(leftValue, rightValue, direction: direction)
         default:
             // Разные типы ключей не должны встречаться для одного поля; сохраняем исходный порядок.
             return .orderedSame
         }
     }
+}
+
+// MARK: - Shared comparison
+
+extension TrackSorter {
+    /// Сравнивает optional-строки локализованно и оставляет пустые значения в конце.
+    static func compareOptionalStrings(
+        _ lhs: String?,
+        _ rhs: String?,
+        direction: TrackSortDirection
+    ) -> ComparisonResult {
+        compareOptionalValues(
+            nonEmptyString(lhs),
+            nonEmptyString(rhs),
+            direction: direction
+        ) {
+            compareStrings($0, $1)
+        }
+    }
+
+    /// Сравнивает optional-даты и оставляет отсутствующие значения в конце.
+    static func compareOptionalDates(
+        _ lhs: Date?,
+        _ rhs: Date?,
+        direction: TrackSortDirection
+    ) -> ComparisonResult {
+        compareOptionalValues(lhs, rhs, direction: direction) {
+            compareDates($0, $1)
+        }
+    }
+
+    /// Сравнивает optional-целые числа и оставляет отсутствующие значения в конце.
+    static func compareOptionalIntegers(
+        _ lhs: Int?,
+        _ rhs: Int?,
+        direction: TrackSortDirection
+    ) -> ComparisonResult {
+        compareOptionalValues(lhs, rhs, direction: direction) {
+            compareIntegers($0, $1)
+        }
+    }
+
+    /// Сравнивает стабильные UInt64-идентификаторы в возрастающем порядке.
+    static func compareUnsignedIntegers(
+        _ lhs: UInt64,
+        _ rhs: UInt64
+    ) -> ComparisonResult {
+        if lhs < rhs { return .orderedAscending }
+        if lhs > rhs { return .orderedDescending }
+        return .orderedSame
+    }
 
     /// Сравнивает optional-значения и не меняет правило расположения пустых значений для descending.
-    static func compareOptionalValues<Value>(
+    private static func compareOptionalValues<Value>(
         _ lhs: Value?,
         _ rhs: Value?,
         direction: TrackSortDirection,
@@ -172,7 +217,7 @@ private extension TrackSorter {
     }
 
     /// Применяет направление сортировки только к реально сравнимым значениям.
-    static func oriented(
+    private static func oriented(
         _ result: ComparisonResult,
         direction: TrackSortDirection
     ) -> ComparisonResult {
@@ -192,7 +237,7 @@ private extension TrackSorter {
     }
 
     /// Сравнивает строки локализованно, без учёта регистра и диакритики.
-    static func compareStrings(
+    private static func compareStrings(
         _ lhs: String,
         _ rhs: String
     ) -> ComparisonResult {
@@ -205,7 +250,7 @@ private extension TrackSorter {
     }
 
     /// Сравнивает даты без допущений о семантике конкретного источника.
-    static func compareDates(
+    private static func compareDates(
         _ lhs: Date,
         _ rhs: Date
     ) -> ComparisonResult {
@@ -215,7 +260,7 @@ private extension TrackSorter {
     }
 
     /// Сравнивает целочисленные ключи без преобразования в строки.
-    static func compareIntegers(
+    private static func compareIntegers(
         _ lhs: Int,
         _ rhs: Int
     ) -> ComparisonResult {

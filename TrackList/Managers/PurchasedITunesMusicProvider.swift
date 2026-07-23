@@ -22,7 +22,13 @@ enum PurchasedITunesMusicAccessState: Equatable {
     case authorized
 }
 
-final class PurchasedITunesMusicProvider {
+/// Контракт чтения системной медиатеки позволяет ViewModel тестировать сортировку без MediaPlayer.
+protocol PurchasedITunesMusicProviding {
+    func requestAccessIfNeeded() async -> PurchasedITunesMusicAccessState
+    func loadTracks() -> [PurchasedITunesTrack]
+}
+
+final class PurchasedITunesMusicProvider: PurchasedITunesMusicProviding {
 
     // MARK: - Доступ
 
@@ -91,14 +97,28 @@ final class PurchasedITunesMusicProvider {
                 title: item.title ?? fallbackTitle,
                 artist: item.artist,
                 album: item.albumTitle,
+                year: releaseYear(from: item.releaseDate),
+                genre: item.genre,
+                dateAdded: item.dateAdded,
                 artworkData: artworkData(for: item),
                 duration: item.playbackDuration,
                 assetURL: assetURL
             )
         }
-        .sorted { first, second in
-            first.title.localizedCaseInsensitiveCompare(second.title) == .orderedAscending
+    }
+
+    /// Получает год только из системной даты релиза, не анализируя текстовые metadata.
+    private func releaseYear(
+        from releaseDate: Date?
+    ) -> Int? {
+        guard let releaseDate else {
+            return nil
         }
+
+        var calendar = Calendar(identifier: .gregorian)
+        // UTC не позволяет локальному часовому поясу сдвинуть календарный год системной даты релиза.
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? calendar.timeZone
+        return calendar.component(.year, from: releaseDate)
     }
 
     /// Готовит runtime-данные обложки из MediaPlayer без записи на диск.

@@ -46,6 +46,8 @@ struct LibraryScreen: View {
     private let allTracksActionHandlerFactory = LibraryAllTracksActionHandlerFactory()
     /// Фабрика обработчика экспорта выбранного значения коллекции.
     private let collectionTracksActionHandlerFactory = LibraryCollectionTracksActionHandlerFactory()
+    /// Фабрика обработчика обычного экспорта раздела «Куплено в iTunes».
+    private let purchasedITunesActionHandlerFactory = PurchasedITunesMusicActionHandlerFactory()
 
     let playerViewModel: PlayerViewModel
     @ObservedObject var exportProgressViewModel: ExportProgressViewModel
@@ -103,6 +105,13 @@ struct LibraryScreen: View {
     ) -> LibraryCollectionTracksActionHandler {
         collectionTracksActionHandlerFactory.make(
             source: source,
+            exportProgressViewModel: exportProgressViewModel
+        )
+    }
+
+    /// Собирает обработчик действий iTunes с существующим глобальным экспортом.
+    private var purchasedITunesActionHandler: PurchasedITunesMusicActionHandler {
+        purchasedITunesActionHandlerFactory.make(
             exportProgressViewModel: exportProgressViewModel
         )
     }
@@ -213,7 +222,10 @@ struct LibraryScreen: View {
 
         case .purchasedITunes:
             PurchasedITunesMusicView(
-                playerViewModel: playerViewModel
+                playerViewModel: playerViewModel,
+                onAction: { action in
+                    purchasedITunesActionHandler.handle(action)
+                }
             )
                 .onAppear {
                     selectionActionBarConfig = nil

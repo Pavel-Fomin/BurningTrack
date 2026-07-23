@@ -81,15 +81,16 @@ final class SQLiteLibraryViewSettingsStore: LibraryViewSettingsDatabaseReading, 
         LibraryViewSettingsDatabaseModel(
             id: try row.requiredInt(at: 0),
             sortMode: try row.requiredString(at: 1),
-            trackListsSortMode: row.string(at: 2),
-            groupMode: try row.requiredString(at: 3),
-            showTrackListBadges: try row.requiredBool(at: 4),
-            showUnavailableTracks: try row.requiredBool(at: 5),
-            showFileFormat: try row.requiredBool(at: 6),
-            showPurchasedITunesSource: try row.requiredBool(at: 7),
-            libraryRootDisplayMode: row.string(at: 8),
-            lastOpenedFolderId: try row.uuid(at: 9),
-            updatedAt: try row.requiredDate(at: 10)
+            purchasedITunesSortMode: try row.requiredString(at: 2),
+            trackListsSortMode: row.string(at: 3),
+            groupMode: try row.requiredString(at: 4),
+            showTrackListBadges: try row.requiredBool(at: 5),
+            showUnavailableTracks: try row.requiredBool(at: 6),
+            showFileFormat: try row.requiredBool(at: 7),
+            showPurchasedITunesSource: try row.requiredBool(at: 8),
+            libraryRootDisplayMode: row.string(at: 9),
+            lastOpenedFolderId: try row.uuid(at: 10),
+            updatedAt: try row.requiredDate(at: 11)
         )
     }
 
@@ -100,6 +101,25 @@ final class SQLiteLibraryViewSettingsStore: LibraryViewSettingsDatabaseReading, 
         // Порядок bind соответствует INSERT/UPSERT-запросу library_view_settings.
         try statement.bind(model.id, at: 1)
         try statement.bind(model.sortMode, at: 2)
+        try statement.bind(model.purchasedITunesSortMode, at: 3)
+        try statement.bind(model.trackListsSortMode, at: 4)
+        try statement.bind(model.groupMode, at: 5)
+        try statement.bind(model.showTrackListBadges, at: 6)
+        try statement.bind(model.showUnavailableTracks, at: 7)
+        try statement.bind(model.showFileFormat, at: 8)
+        try statement.bind(model.showPurchasedITunesSource, at: 9)
+        try statement.bind(model.libraryRootDisplayMode, at: 10)
+        try statement.bind(model.lastOpenedFolderId, at: 11)
+        try statement.bind(model.updatedAt, at: 12)
+    }
+
+    private static func bindUpdate(
+        _ model: LibraryViewSettingsDatabaseModel,
+        statement: DatabaseStatement
+    ) throws {
+        // UPDATE держит id последним, чтобы изменяемые поля шли в порядке схемы.
+        try statement.bind(model.sortMode, at: 1)
+        try statement.bind(model.purchasedITunesSortMode, at: 2)
         try statement.bind(model.trackListsSortMode, at: 3)
         try statement.bind(model.groupMode, at: 4)
         try statement.bind(model.showTrackListBadges, at: 5)
@@ -109,23 +129,6 @@ final class SQLiteLibraryViewSettingsStore: LibraryViewSettingsDatabaseReading, 
         try statement.bind(model.libraryRootDisplayMode, at: 9)
         try statement.bind(model.lastOpenedFolderId, at: 10)
         try statement.bind(model.updatedAt, at: 11)
-    }
-
-    private static func bindUpdate(
-        _ model: LibraryViewSettingsDatabaseModel,
-        statement: DatabaseStatement
-    ) throws {
-        // UPDATE держит id последним, чтобы изменяемые поля шли в порядке схемы.
-        try statement.bind(model.sortMode, at: 1)
-        try statement.bind(model.trackListsSortMode, at: 2)
-        try statement.bind(model.groupMode, at: 3)
-        try statement.bind(model.showTrackListBadges, at: 4)
-        try statement.bind(model.showUnavailableTracks, at: 5)
-        try statement.bind(model.showFileFormat, at: 6)
-        try statement.bind(model.showPurchasedITunesSource, at: 7)
-        try statement.bind(model.libraryRootDisplayMode, at: 8)
-        try statement.bind(model.lastOpenedFolderId, at: 9)
-        try statement.bind(model.updatedAt, at: 10)
-        try statement.bind(model.id, at: 11)
+        try statement.bind(model.id, at: 12)
     }
 }

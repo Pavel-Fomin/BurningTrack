@@ -177,6 +177,23 @@ final class AppSettingsManager: ObservableObject, SettingsManaging, PlaybackMode
         // Сортировка уже применяется инициировавшей LibraryTracksViewModel и не касается плеера.
     }
 
+    /// Сохраняет выбранную сортировку runtime-источника системной медиатеки.
+    func setPurchasedITunesTrackSortMode(_ mode: PurchasedITunesTrackSortMode) throws {
+        guard settings.internalSettings.purchasedITunesTrackSortMode != mode else { return }
+
+        let previousMode = settings.internalSettings.purchasedITunesTrackSortMode
+        settings.internalSettings.purchasedITunesTrackSortMode = mode
+
+        do {
+            try settingsStore.saveSettings(settings)
+        } catch {
+            settings.internalSettings.purchasedITunesTrackSortMode = previousMode
+            throw error
+        }
+
+        // Экран сам пересобирает загруженный список; текущая очередь плеера не изменяется.
+    }
+
     func setTrackListsSortMode(_ mode: TrackListsSortMode?) throws {
         guard settings.internalSettings.trackListsSortMode != mode else { return }
 

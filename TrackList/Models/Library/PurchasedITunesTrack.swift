@@ -18,6 +18,12 @@ struct PurchasedITunesTrack: Identifiable, Hashable {
     let artist: String?
     /// Название альбома, если оно есть в медиатеке.
     let album: String?
+    /// Год выпуска из системной releaseDate, если она предоставлена медиатекой.
+    let year: Int?
+    /// Жанр, если он предоставлен системной медиатекой.
+    let genre: String?
+    /// Дата добавления, которую системная медиатека предоставляет для каждого элемента.
+    let dateAdded: Date
     /// Runtime-данные обложки из системной медиатеки; на диск не сохраняются.
     let artworkData: Data?
     /// Длительность трека в секундах.

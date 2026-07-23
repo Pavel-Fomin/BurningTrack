@@ -25,6 +25,12 @@ final class ExportRequestSpy: TrackExporting {
     /// Исходные имена файлов каждого запроса в переданном порядке.
     private(set) var exportedFileNames: [[String]] = []
 
+    /// Источники треков каждого запроса сохраняют отличие iTunes от фонотеки.
+    private(set) var exportedSources: [[TrackSource]] = []
+
+    /// Runtime assetURL каждого запроса позволяют проверить обход BookmarkResolver.
+    private(set) var exportedAssetURLs: [[URL?]] = []
+
     /// Имена дочерних экспортных папок.
     private(set) var exportFolderNames: [String] = []
 
@@ -45,6 +51,8 @@ final class ExportRequestSpy: TrackExporting {
         exportCallCount += 1
         exportedTrackIDs.append(tracks.map(\.trackId))
         exportedFileNames.append(tracks.map(\.fileName))
+        exportedSources.append(tracks.map(\.source))
+        exportedAssetURLs.append(tracks.map(\.assetURL))
         exportFolderNames.append(exportFolderName)
         fileNamingModes.append(fileNamingMode)
 

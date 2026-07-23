@@ -63,27 +63,69 @@ final class ExportCancellationToken: @unchecked Sendable {
     }
 }
 
-/// Готовый к копированию файл и его размер, полученные на этапе подготовки.
+/// Подготовленный низкоуровневый источник одного экспортируемого файла.
+private enum PreparedExportSource {
+    /// Обычный файл и его заранее определённый размер.
+    case bookmarkFile(sourceURL: URL, byteCount: Int64)
+    /// Runtime iTunes-ассет и фактический план его записи.
+    case purchasedITunes(
+        asset: PurchasedITunesAsset,
+        writePlan: PurchasedITunesAssetWriter.WritePlan
+    )
+
+    /// Размер известен только для обычного bookmark-файла.
+    var byteCount: Int64 {
+        switch self {
+        case .bookmarkFile(_, let byteCount):
+            return byteCount
+        case .purchasedITunes:
+            return 0
+        }
+    }
+
+    /// Байтовый прогресс используется только когда источник уже является обычным файлом.
+    var supportsByteProgress: Bool {
+        switch self {
+        case .bookmarkFile:
+            return true
+        case .purchasedITunes:
+            return false
+        }
+    }
+}
+
+/// Готовый к последовательной записи элемент экспортного задания.
 private struct PreparedExportItem {
-    /// Исходный URL, восстановленный через существующий bookmark pipeline.
-    let sourceURL: URL
-
-    /// Элемент исходного задания с итоговым именем файла.
+    /// Элемент исходного задания сохраняет исходный порядок.
     let item: ExportJob.Item
+    /// Фактический источник, подготовленный без изменения обычного bookmark-пути.
+    let source: PreparedExportSource
+    /// Полное итоговое имя с расширением для текущего источника.
+    let exportFileName: String
 
-    /// Размер файла до начала копирования.
-    let byteCount: Int64
+    /// Возвращает размер, если источник поддерживает байтовый прогресс.
+    var byteCount: Int64 {
+        source.byteCount
+    }
+
+    /// Показывает, можно ли включить общий байтовый прогресс операции.
+    var supportsByteProgress: Bool {
+        source.supportsByteProgress
+    }
 }
 
 /// Управляет подготовкой и последовательным копированием задания экспорта.
 ///
-/// Сервис не знает о UIViewController, picker и SwiftUI. Все операции FileHandle
-/// выполняются внутри actor, поэтому MainActor не блокируется чтением больших
-/// FLAC/WAV-файлов.
+/// Сервис не знает о UIViewController, picker и SwiftUI. Файловое копирование
+/// и подготовка runtime iTunes-ассетов выполняются внутри actor, поэтому
+/// MainActor не блокируется длительными операциями экспорта.
 actor TrackExportService {
 
     /// Низкоуровневый копировщик одного файла.
     private let fileCopier: ExportFileCopier
+
+    /// Общий writer обрабатывает assetURL без BookmarkResolver.
+    private let purchasedITunesAssetWriter: PurchasedITunesAssetWriter
 
     /// Флаг активной операции защищён actor.
     private var isExportRunning = false
@@ -95,6 +137,9 @@ actor TrackExportService {
     /// Создаёт сервис с отдельным копировщиком, который удобно заменить в тестах.
     init(fileCopier: ExportFileCopier = ExportFileCopier()) {
         self.fileCopier = fileCopier
+        self.purchasedITunesAssetWriter = PurchasedITunesAssetWriter(
+            fileCopier: fileCopier
+        )
     }
 
     /// Отменяет активную операцию без ожидания переключения на actor.
@@ -163,13 +208,19 @@ actor TrackExportService {
                 named: job.exportFolderName
             )
             progress.destination = exportDestination
-            progress.totalBytes = preparedItems.reduce(into: Int64(0)) {
-                $0 += $1.byteCount
+            // Для media-library URL размер заранее неизвестен, поэтому
+            // существующий экран автоматически показывает файловый прогресс.
+            if preparedItems.allSatisfy(\.supportsByteProgress) {
+                progress.totalBytes = preparedItems.reduce(into: Int64(0)) {
+                    $0 += $1.byteCount
+                }
+            } else {
+                progress.totalBytes = 0
             }
             progress.state = .copying
             onProgress(progress)
 
-            let summary = try copyPreparedItems(
+            let summary = try await copyPreparedItems(
                 preparedItems,
                 progress: &progress,
                 onProgress: onProgress
@@ -192,7 +243,7 @@ actor TrackExportService {
         }
     }
 
-    /// Получает URL и размер каждого исходного файла, не останавливаясь на ошибке.
+    /// Подготавливает bookmark-файлы и runtime iTunes-ассеты, не останавливаясь на ошибке.
     private func prepareItems(
         _ items: [ExportJob.Item],
         progress: inout ExportProgress,
@@ -204,18 +255,49 @@ actor TrackExportService {
             try throwIfCancelled()
 
             do {
-                guard let sourceURL = await BookmarkResolver.url(forTrack: item.trackID) else {
-                    throw ExportFileCopierError.sourceIsNotRegularFile
-                }
+                switch item.source {
+                case .bookmark(let trackID):
+                    guard let sourceURL = await BookmarkResolver.url(
+                        forTrack: trackID
+                    ) else {
+                        throw ExportFileCopierError.sourceIsNotRegularFile
+                    }
 
-                let byteCount = try fileByteCount(at: sourceURL)
-                preparedItems.append(
-                    PreparedExportItem(
-                        sourceURL: sourceURL,
-                        item: item,
-                        byteCount: byteCount
+                    let byteCount = try fileByteCount(at: sourceURL)
+                    preparedItems.append(
+                        PreparedExportItem(
+                            item: item,
+                            source: .bookmarkFile(
+                                sourceURL: sourceURL,
+                                byteCount: byteCount
+                            ),
+                            exportFileName: item.exportFileName
+                        )
                     )
-                )
+
+                case .purchasedITunes(_, let asset):
+                    guard let asset else {
+                        throw PurchasedITunesAssetWriterError.sourceUnavailable
+                    }
+
+                    let writePlan = try purchasedITunesAssetWriter
+                        .makeWritePlan(for: asset)
+                    let exportFileName = PurchasedITunesAssetWriter
+                        .exportFileName(
+                            baseName: item.exportFileName,
+                            using: writePlan
+                        )
+                    preparedItems.append(
+                        PreparedExportItem(
+                            item: item,
+                            source: .purchasedITunes(
+                                asset: asset,
+                                writePlan: writePlan
+                            ),
+                            exportFileName: exportFileName
+                        )
+                    )
+                }
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
@@ -237,7 +319,7 @@ actor TrackExportService {
         _ items: [PreparedExportItem],
         progress: inout ExportProgress,
         onProgress: ExportProgressHandler
-    ) throws -> ExportSummary {
+    ) async throws -> ExportSummary {
         var completedBytes: Int64 = 0
 
         for preparedItem in items {
@@ -250,32 +332,48 @@ actor TrackExportService {
             )
             #endif
 
-            progress.currentFileName = preparedItem.item.exportFileName
+            progress.currentFileName = preparedItem.exportFileName
             progress.currentFileBytes = preparedItem.byteCount
             progress.currentFileCopiedBytes = 0
             progress.copiedBytes = completedBytes
             onProgress(progress)
 
             let destinationURL = progress.destination.folderURL
-                .appendingPathComponent(preparedItem.item.exportFileName, isDirectory: false)
+                .appendingPathComponent(
+                    preparedItem.exportFileName,
+                    isDirectory: false
+                )
 
             do {
-                try fileCopier.copy(
-                    from: preparedItem.sourceURL,
-                    to: destinationURL,
-                    expectedByteCount: preparedItem.byteCount,
-                    shouldCancel: { [cancellationToken] in
-                        cancellationToken.isCancelled || Task.isCancelled
-                    },
-                    onBytesCopied: { copiedBytes in
-                        #if DEBUG
-                        ExportDiagnostics.shared.recordByteCallback()
-                        #endif
-                        progress.currentFileCopiedBytes = copiedBytes
-                        progress.copiedBytes = completedBytes + copiedBytes
-                        onProgress(progress)
-                    }
-                )
+                switch preparedItem.source {
+                case .bookmarkFile(let sourceURL, let byteCount):
+                    try fileCopier.copy(
+                        from: sourceURL,
+                        to: destinationURL,
+                        expectedByteCount: byteCount,
+                        shouldCancel: { [cancellationToken] in
+                            cancellationToken.isCancelled || Task.isCancelled
+                        },
+                        onBytesCopied: { copiedBytes in
+                            #if DEBUG
+                            ExportDiagnostics.shared.recordByteCallback()
+                            #endif
+                            progress.currentFileCopiedBytes = copiedBytes
+                            progress.copiedBytes = completedBytes + copiedBytes
+                            onProgress(progress)
+                        }
+                    )
+
+                case .purchasedITunes(let asset, let writePlan):
+                    try await purchasedITunesAssetWriter.write(
+                        asset,
+                        to: destinationURL,
+                        using: writePlan,
+                        shouldCancel: { [cancellationToken] in
+                            cancellationToken.isCancelled || Task.isCancelled
+                        }
+                    )
+                }
 
                 completedBytes += preparedItem.byteCount
                 progress.completedFiles += 1
@@ -293,7 +391,7 @@ actor TrackExportService {
                 progress.currentFileCopiedBytes = 0
                 progress.failedFiles.append(
                     ExportFileResult(
-                        fileName: preparedItem.item.exportFileName,
+                        fileName: preparedItem.exportFileName,
                         errorDescription: error.localizedDescription
                     )
                 )
