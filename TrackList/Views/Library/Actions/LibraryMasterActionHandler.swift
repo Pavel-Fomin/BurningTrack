@@ -75,6 +75,9 @@ final class LibraryMasterActionHandler {
         case .requestDetachFolder(let folderId):
             requestDetachFolder(folderId)
 
+        case .confirmDetachFolder:
+            confirmDetachFolder()
+
         case .confirmStopAndDetachFolder:
             confirmStopAndDetachFolder()
 
@@ -118,12 +121,22 @@ final class LibraryMasterActionHandler {
         }
     }
 
-    /// Проверяет, можно ли открепить папку сразу, или нужно показать предупреждение.
+    /// Запоминает папку и показывает обязательное подтверждение её открепления.
     private func requestDetachFolder(
         _ folderId: UUID
     ) {
         guard let folder = manager.folder(for: folderId) else {
             toastPresenter.handle(.folderNotFound)
+            return
+        }
+
+        output.requestDetachFolderConfirmation(folder)
+    }
+
+    /// Проверяет активный трек после подтверждения и запускает существующее открепление.
+    private func confirmDetachFolder() {
+        guard let folder = output.pendingDetachFolder else {
+            output.clearPendingDetachFolder()
             return
         }
 
@@ -135,9 +148,11 @@ final class LibraryMasterActionHandler {
             )
 
             if canDetach {
+                output.dismissDetachFolderConfirmation()
                 await detachFolder(folder)
+                output.clearPendingDetachFolder()
             } else {
-                output.setPendingDetachFolder(folder)
+                output.showPlayingTrackDetachWarning(for: folder)
             }
         }
     }

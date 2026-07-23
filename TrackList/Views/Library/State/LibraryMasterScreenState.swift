@@ -10,6 +10,16 @@
 
 import Foundation
 
+/// Фаза подтверждения открепления выбранной папки.
+enum LibraryMasterDetachFolderConfirmation {
+    /// Подтверждение не показывается.
+    case none
+    /// Пользователь должен подтвердить обычное открепление папки.
+    case detachFolder
+    /// Пользователь должен остановить воспроизведение перед откреплением папки.
+    case stopPlayback
+}
+
 struct LibraryMasterScreenState {
     /// Состояние восстановления доступа к фонотеке.
     let accessState: MusicLibraryManager.LibraryAccessState
@@ -19,6 +29,16 @@ struct LibraryMasterScreenState {
     let showsPurchasedITunesSource: Bool
     /// Нужно ли показывать пустое состояние.
     let isEmpty: Bool
+    /// Текущая фаза подтверждения открепления папки.
+    let detachFolderConfirmation: LibraryMasterDetachFolderConfirmation
+
+    /// Нужно ли показать обязательное подтверждение обычного открепления папки.
+    var showsDetachFolderConfirmation: Bool {
+        detachFolderConfirmation == .detachFolder
+    }
+
     /// Нужно ли показать предупреждение перед откреплением папки с активным треком.
-    let folderContainsPlayingTrack: Bool
+    var folderContainsPlayingTrack: Bool {
+        detachFolderConfirmation == .stopPlayback
+    }
 }

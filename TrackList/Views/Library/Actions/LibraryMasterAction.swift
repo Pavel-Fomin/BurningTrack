@@ -26,6 +26,8 @@ enum LibraryMasterAction {
     case openPurchasedITunes
     /// Пользователь запросил открепление папки.
     case requestDetachFolder(UUID)
+    /// Пользователь подтвердил обязательное открепление папки.
+    case confirmDetachFolder
     /// Пользователь подтвердил остановку воспроизведения и открепление папки.
     case confirmStopAndDetachFolder
     /// Пользователь отменил открепление папки.

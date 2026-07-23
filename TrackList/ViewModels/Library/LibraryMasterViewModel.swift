@@ -21,11 +21,13 @@ final class LibraryMasterViewModel: ObservableObject, LibraryMasterActionOutput 
         folders: [],
         showsPurchasedITunesSource: AppSettings.defaultValue.visible.library.isPurchasedITunesSourceVisible,
         isEmpty: true,
-        folderContainsPlayingTrack: false
+        detachFolderConfirmation: .none
     )
 
     /// Папка, ожидающая подтверждения открепления.
     private(set) var pendingDetachFolder: LibraryFolder?
+    /// Фаза подтверждения открепления ожидающей папки.
+    private var detachFolderConfirmation: LibraryMasterDetachFolderConfirmation = .none
 
     /// Менеджер фонотеки, из которого собирается состояние.
     private let manager: MusicLibraryManager
@@ -64,21 +66,38 @@ final class LibraryMasterViewModel: ObservableObject, LibraryMasterActionOutput 
         screenState = stateBuilder.build(
             manager: manager,
             settings: settings,
-            pendingDetachFolder: pendingDetachFolder
+            detachFolderConfirmation: detachFolderConfirmation
         )
     }
 
-    /// Запоминает папку, для которой нужно показать подтверждение открепления.
-    func setPendingDetachFolder(
+    /// Запоминает папку и открывает обязательное подтверждение открепления.
+    func requestDetachFolderConfirmation(
         _ folder: LibraryFolder
     ) {
         pendingDetachFolder = folder
+        detachFolderConfirmation = .detachFolder
         refreshState()
     }
 
-    /// Сбрасывает папку, ожидающую подтверждения открепления.
+    /// Скрывает подтверждение перед окончательным откреплением папки.
+    func dismissDetachFolderConfirmation() {
+        detachFolderConfirmation = .none
+        refreshState()
+    }
+
+    /// Показывает предупреждение об остановке воспроизведения для ожидающей папки.
+    func showPlayingTrackDetachWarning(
+        for folder: LibraryFolder
+    ) {
+        pendingDetachFolder = folder
+        detachFolderConfirmation = .stopPlayback
+        refreshState()
+    }
+
+    /// Сбрасывает папку и фазу, ожидающие подтверждения открепления.
     func clearPendingDetachFolder() {
         pendingDetachFolder = nil
+        detachFolderConfirmation = .none
         refreshState()
     }
 

@@ -26,6 +26,32 @@ struct MusicLibraryView: View {
         .onAppear {
             onAction(.onAppear)
         }
+        // Первое подтверждение не допускает открепления папки сразу после свайпа.
+        .alert(
+            "Remove Folder?",
+            isPresented: Binding(
+                get: { state.showsDetachFolderConfirmation },
+                set: { isPresented in
+                    if isPresented == false {
+                        onAction(.cancelDetachFolder)
+                    }
+                }
+            )
+        ) {
+            Button("Remove", role: .destructive) {
+                onAction(.confirmDetachFolder)
+            }
+
+            Button("Cancel", role: .cancel) {
+                onAction(.cancelDetachFolder)
+            }
+        } message: {
+            Text(
+                "This folder will be removed from the library, "
+                + "but the files on your device will remain unchanged."
+            )
+        }
+        // Второе подтверждение показывается только после проверки активного трека.
         .alert(
             "Stop Playback to Remove Folder",
             isPresented: Binding(

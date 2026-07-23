@@ -17,10 +17,16 @@ protocol LibraryMasterActionOutput: AnyObject {
     /// Пересобирает состояние корневого экрана.
     func refreshState()
 
-    /// Показывает предупреждение перед откреплением папки.
-    func setPendingDetachFolder(_ folder: LibraryFolder)
+    /// Запоминает папку и показывает обязательное подтверждение её открепления.
+    func requestDetachFolderConfirmation(_ folder: LibraryFolder)
 
-    /// Скрывает предупреждение перед откреплением папки.
+    /// Скрывает подтверждение перед окончательным откреплением папки.
+    func dismissDetachFolderConfirmation()
+
+    /// Показывает предупреждение об остановке воспроизведения перед откреплением.
+    func showPlayingTrackDetachWarning(for folder: LibraryFolder)
+
+    /// Скрывает подтверждения и очищает папку, ожидающую открепления.
     func clearPendingDetachFolder()
 
     /// Сохраняет ручное перемещение прикреплённой папки.

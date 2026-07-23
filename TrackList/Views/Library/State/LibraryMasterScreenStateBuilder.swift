@@ -11,12 +11,12 @@ import Foundation
 
 struct LibraryMasterScreenStateBuilder {
 
-    /// Собирает состояние экрана с учётом текущей папки, ожидающей открепления.
+    /// Собирает состояние экрана с учётом текущей фазы подтверждения открепления.
     @MainActor
     func build(
         manager: MusicLibraryManager,
         settings: AppSettings,
-        pendingDetachFolder: LibraryFolder?
+        detachFolderConfirmation: LibraryMasterDetachFolderConfirmation
     ) -> LibraryMasterScreenState {
 
         let folders = manager.attachedFolders.map { folder in
@@ -33,7 +33,7 @@ struct LibraryMasterScreenStateBuilder {
             folders: folders,
             showsPurchasedITunesSource: settings.visible.library.isPurchasedITunesSourceVisible,
             isEmpty: folders.isEmpty,
-            folderContainsPlayingTrack: pendingDetachFolder != nil
+            detachFolderConfirmation: detachFolderConfirmation
         )
     }
 }
