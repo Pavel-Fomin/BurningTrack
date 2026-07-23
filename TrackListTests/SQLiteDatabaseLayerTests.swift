@@ -137,6 +137,254 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
         XCTAssertEqual(queue.first?.position, 0)
     }
 
+    func testPlayerExternalTrackIdsMigrationPreservesDataIndexesAndQueueReference() throws {
+        // Создаём базу на схеме до миграции 017, чтобы проверить реальный upgrade существующих данных.
+        let legacyMigrations = DatabaseMigration.all.filter {
+            $0.identifier != DatabaseMigration.playerQueueAndStateAllowExternalTrackIds.identifier
+        }
+        let legacyDatabase = try makeDatabase(migrations: legacyMigrations)
+        let legacyExecutor = try legacyDatabase.databaseExecutor()
+        let trackStore = SQLiteTrackStore(executor: legacyExecutor)
+        let queueStore = SQLitePlayerQueueStore(executor: legacyExecutor)
+        let stateStore = SQLitePlayerStateStore(executor: legacyExecutor)
+        let firstTrack = makeTrack(fileName: "MigrationFirst.mp3")
+        var secondTrack = makeTrack(fileName: "MigrationImported.m4a")
+        secondTrack.source = .imported
+        let firstQueueItem = makePlayerQueueItem(
+            trackId: firstTrack.id,
+            position: 0,
+            source: .library,
+            title: "Migration First",
+            assetURL: nil
+        )
+        let secondQueueItem = makePlayerQueueItem(
+            trackId: secondTrack.id,
+            position: 1,
+            source: .imported,
+            title: "Migration Imported",
+            assetURL: URL(string: "file:///tmp/MigrationImported.m4a")
+        )
+        let state = PlayerStateDatabaseModel(
+            id: 1,
+            currentQueueItemId: secondQueueItem.id,
+            currentTrackId: secondTrack.id,
+            contextType: .libraryCollection,
+            contextId: nil,
+            collectionCategory: "albums",
+            collectionValue: "Migration Album",
+            collectionArtistKey: "Migration Artist",
+            playbackTime: 25,
+            duration: 180,
+            isPlaying: false,
+            repeatMode: .all,
+            shuffleEnabled: true,
+            updatedAt: Date(timeIntervalSince1970: 300)
+        )
+
+        try trackStore.insert(firstTrack)
+        try trackStore.insert(secondTrack)
+        try queueStore.replaceAll([firstQueueItem, secondQueueItem])
+        try stateStore.upsert(state)
+
+        let databaseURL = try XCTUnwrap(legacyDatabase.databaseURL)
+        try legacyDatabase.close()
+
+        // Повторное открытие той же базы применяет только новую миграцию 017.
+        let migratedDatabase = AppDatabase(
+            location: DatabaseLocation(databaseURL: databaseURL),
+            migrator: DatabaseMigrator(migrations: DatabaseMigration.all)
+        )
+        try migratedDatabase.open()
+        database = migratedDatabase
+
+        let migratedExecutor = try migratedDatabase.databaseExecutor()
+        let migratedQueueStore = SQLitePlayerQueueStore(executor: migratedExecutor)
+        let migratedStateStore = SQLitePlayerStateStore(executor: migratedExecutor)
+        let restoredQueue = try migratedQueueStore.fetchAll()
+        let restoredState = try XCTUnwrap(migratedStateStore.fetch())
+
+        XCTAssertEqual(restoredQueue, [firstQueueItem, secondQueueItem])
+        XCTAssertEqual(restoredState, state)
+
+        // player_queue больше не требует строку tracks для внешнего track_id.
+        let queueForeignKeys: [String] = try migratedExecutor.fetchAll(
+            "PRAGMA foreign_key_list(player_queue);",
+            map: { try $0.requiredString(at: 3) }
+        )
+        XCTAssertTrue(queueForeignKeys.isEmpty)
+
+        // player_state сохраняет только связь текущего элемента с очередью.
+        let stateForeignKeys: [String] = try migratedExecutor.fetchAll(
+            "PRAGMA foreign_key_list(player_state);",
+            map: { row in
+                let sourceColumn = try row.requiredString(at: 3)
+                let targetTable = try row.requiredString(at: 2)
+                let targetColumn = try row.requiredString(at: 4)
+                let deleteAction = try row.requiredString(at: 6)
+                return "\(sourceColumn)->\(targetTable).\(targetColumn):\(deleteAction)"
+            }
+        )
+        XCTAssertEqual(
+            stateForeignKeys,
+            ["current_queue_item_id->player_queue.id:SET NULL"]
+        )
+
+        // После перестройки должны сохраниться все именованные индексы очереди.
+        let queueIndexes = Set(
+            try migratedExecutor.fetchAll(
+                "PRAGMA index_list(player_queue);",
+                map: { try $0.requiredString(at: 1) }
+            )
+        )
+        XCTAssertTrue(queueIndexes.contains("idx_player_queue_unique_position"))
+        XCTAssertTrue(queueIndexes.contains("idx_player_queue_position"))
+        XCTAssertTrue(queueIndexes.contains("idx_player_queue_track_id"))
+
+        let foreignKeyViolations: [String] = try migratedExecutor.fetchAll(
+            "PRAGMA foreign_key_check;",
+            map: { try $0.requiredString(at: 0) }
+        )
+        XCTAssertTrue(foreignKeyViolations.isEmpty)
+    }
+
+    func testPlayerQueuePersistsLibraryImportedAndPurchasedITunesTracks() throws {
+        let database = try makeDatabase()
+        let executor = try database.databaseExecutor()
+        let trackStore = SQLiteTrackStore(executor: executor)
+        let queueStore = SQLitePlayerQueueStore(executor: executor)
+        let stateStore = SQLitePlayerStateStore(executor: executor)
+        let databaseStore = PlayerDatabaseStore(
+            queueStore: queueStore,
+            stateStore: stateStore
+        )
+        let libraryTrack = makeTrack(fileName: "Library.mp3")
+        var importedTrack = makeTrack(fileName: "Imported.m4a")
+        importedTrack.source = .imported
+        let purchasedAssetURL = try XCTUnwrap(
+            URL(string: "ipod-library://item/item.m4a?id=1001")
+        )
+        let secondPurchasedAssetURL = try XCTUnwrap(
+            URL(string: "ipod-library://item/item.m4a?id=1002")
+        )
+        let libraryPlayerTrack = makePlayerTrack(
+            trackId: libraryTrack.id,
+            title: "Library",
+            source: .library,
+            assetURL: nil
+        )
+        let importedPlayerTrack = makePlayerTrack(
+            trackId: importedTrack.id,
+            title: "Imported",
+            source: .imported,
+            assetURL: URL(string: "file:///tmp/Imported.m4a")
+        )
+        let purchasedPlayerTrack = makePlayerTrack(
+            trackId: UUID(),
+            title: "Purchased First",
+            source: .purchasedITunes,
+            assetURL: purchasedAssetURL
+        )
+        let secondPurchasedPlayerTrack = makePlayerTrack(
+            trackId: UUID(),
+            title: "Purchased Second",
+            source: .purchasedITunes,
+            assetURL: secondPurchasedAssetURL
+        )
+
+        try trackStore.insert(libraryTrack)
+        try trackStore.insert(importedTrack)
+
+        // Проверяем добавление purchased iTunes-трека в пустую очередь.
+        try databaseStore.replaceQueue([purchasedPlayerTrack])
+        XCTAssertEqual(try databaseStore.fetchQueue(), [purchasedPlayerTrack])
+
+        // Проверяем добавление purchased iTunes-трека к обычному library-треку.
+        try databaseStore.replaceQueue([
+            libraryPlayerTrack,
+            purchasedPlayerTrack
+        ])
+        XCTAssertEqual(
+            try databaseStore.fetchQueue(),
+            [libraryPlayerTrack, purchasedPlayerTrack]
+        )
+
+        // Сохраняем смешанную очередь с несколькими purchased iTunes-треками.
+        let expectedQueue = [
+            libraryPlayerTrack,
+            importedPlayerTrack,
+            purchasedPlayerTrack,
+            secondPurchasedPlayerTrack
+        ]
+        try databaseStore.replaceQueue(expectedQueue)
+
+        let statePersistence = PlayerStatePersistence(databaseStore: databaseStore)
+        try statePersistence.saveCurrentTrack(
+            trackId: purchasedPlayerTrack.trackId,
+            queueItemId: purchasedPlayerTrack.queueItemId,
+            duration: purchasedPlayerTrack.duration,
+            playbackMode: .defaultValue
+        )
+
+        let databaseURL = try XCTUnwrap(database.databaseURL)
+        try database.close()
+
+        // Повторное открытие базы моделирует восстановление очереди после перезапуска приложения.
+        let reopenedDatabase = AppDatabase(
+            location: DatabaseLocation(databaseURL: databaseURL),
+            migrator: DatabaseMigrator(migrations: DatabaseMigration.all)
+        )
+        try reopenedDatabase.open()
+        self.database = reopenedDatabase
+
+        let reopenedExecutor = try reopenedDatabase.databaseExecutor()
+        let reopenedDatabaseStore = PlayerDatabaseStore(
+            queueStore: SQLitePlayerQueueStore(executor: reopenedExecutor),
+            stateStore: SQLitePlayerStateStore(executor: reopenedExecutor)
+        )
+        let restoredQueue = try reopenedDatabaseStore.fetchQueue()
+        let restoredState = try XCTUnwrap(reopenedDatabaseStore.fetchState())
+
+        XCTAssertEqual(restoredQueue, expectedQueue)
+        XCTAssertEqual(restoredState.currentTrackId, purchasedPlayerTrack.trackId)
+        XCTAssertEqual(
+            restoredState.currentQueueItemId,
+            purchasedPlayerTrack.queueItemId
+        )
+
+        let restoredPurchasedTracks = restoredQueue.filter {
+            $0.source == .purchasedITunes
+        }
+        XCTAssertEqual(restoredPurchasedTracks.count, 2)
+        XCTAssertEqual(restoredPurchasedTracks[0].assetURL, purchasedAssetURL)
+        XCTAssertEqual(
+            restoredPurchasedTracks[1].assetURL,
+            secondPurchasedAssetURL
+        )
+
+        // Очистка очереди должна обнулить только current_queue_item_id через сохранённый внешний ключ.
+        try reopenedDatabaseStore.clearQueue()
+        XCTAssertTrue(try reopenedDatabaseStore.fetchQueue().isEmpty)
+        let stateAfterClear = try XCTUnwrap(reopenedDatabaseStore.fetchState())
+        XCTAssertNil(stateAfterClear.currentQueueItemId)
+        XCTAssertEqual(
+            stateAfterClear.currentTrackId,
+            purchasedPlayerTrack.trackId
+        )
+
+        // Связь current_queue_item_id с player_queue остаётся обязательной.
+        var invalidQueueReferenceState = stateAfterClear
+        invalidQueueReferenceState.currentQueueItemId = UUID()
+        XCTAssertThrowsError(
+            try reopenedDatabaseStore.saveState(invalidQueueReferenceState)
+        )
+
+        let foreignKeyViolations: [String] = try reopenedExecutor.fetchAll(
+            "PRAGMA foreign_key_check;",
+            map: { try $0.requiredString(at: 0) }
+        )
+        XCTAssertTrue(foreignKeyViolations.isEmpty)
+    }
+
     func testPlayerStatePersistenceUpsertsSinglePausedRow() throws {
         let database = try makeDatabase()
         let executor = try database.databaseExecutor()
@@ -1201,31 +1449,16 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
     }
     #endif
 
-    private func makeDatabase() throws -> AppDatabase {
+    private func makeDatabase(
+        migrations: [DatabaseMigration] = DatabaseMigration.all
+    ) throws -> AppDatabase {
         let directory = FileManager.default
             .temporaryDirectory
             .appendingPathComponent("SQLiteDatabaseLayerTests-\(UUID().uuidString)", isDirectory: true)
         let databaseURL = directory.appendingPathComponent("TrackList.sqlite")
         let database = AppDatabase(
             location: DatabaseLocation(databaseURL: databaseURL),
-            migrator: DatabaseMigrator(migrations: [
-                .initialSchema,
-                .initialTables,
-                .trackListTracksAllowExternalTrackIds,
-                .settingsPhase7,
-                .importedTracksPhase8,
-                .trackListsSortModeSetting,
-                .libraryFoldersSorting,
-                .trackMetadataLabel,
-                .folderTrackSortMode,
-                .libraryRootDisplayModeSetting,
-                .libraryRootDisplayModeColumnRepair,
-                .playbackModeSettings,
-                .miniPlayerPresentationState,
-                .playerContextSource,
-                .libraryPlaybackContextSource,
-                .libraryCollectionPlaybackContextSource
-            ])
+            migrator: DatabaseMigrator(migrations: migrations)
         )
 
         try database.open()
@@ -1234,6 +1467,52 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
         self.databaseDirectory = directory
 
         return database
+    }
+
+    /// Создаёт SQLite-снимок элемента очереди с заданным источником.
+    private func makePlayerQueueItem(
+        trackId: UUID,
+        position: Int,
+        source: DatabaseTrackSource,
+        title: String,
+        assetURL: URL?
+    ) -> PlayerQueueItemDatabaseModel {
+        PlayerQueueItemDatabaseModel(
+            id: UUID(),
+            trackId: trackId,
+            position: position,
+            sourceSnapshot: source,
+            titleSnapshot: title,
+            artistSnapshot: "Artist",
+            albumSnapshot: "Album",
+            durationSnapshot: 180,
+            fileNameSnapshot: "\(title).m4a",
+            assetURLSnapshot: assetURL?.absoluteString,
+            isAvailableSnapshot: true,
+            createdAt: Date(timeIntervalSince1970: 300)
+        )
+    }
+
+    /// Создаёт runtime-модель очереди для проверки смешанных источников.
+    private func makePlayerTrack(
+        trackId: UUID,
+        title: String,
+        source: TrackSource,
+        assetURL: URL?
+    ) -> PlayerTrack {
+        PlayerTrack(
+            queueItemId: UUID(),
+            trackId: trackId,
+            title: title,
+            artist: "Artist",
+            album: "Album",
+            artworkData: nil,
+            duration: 180,
+            fileName: "\(title).m4a",
+            isAvailable: true,
+            source: source,
+            assetURL: assetURL
+        )
     }
 
     private func makeTrack(fileName: String) -> TrackDatabaseModel {

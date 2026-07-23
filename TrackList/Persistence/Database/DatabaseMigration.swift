@@ -31,7 +31,8 @@ extension DatabaseMigration {
         .miniPlayerPresentationState,
         .playerContextSource,
         .libraryPlaybackContextSource,
-        .libraryCollectionPlaybackContextSource
+        .libraryCollectionPlaybackContextSource,
+        .playerQueueAndStateAllowExternalTrackIds
     ]
 
     // Первая миграция фиксирует стартовую версию схемы без создания бизнес-таблиц.
@@ -818,6 +819,93 @@ extension DatabaseMigration {
 
             DROP TABLE player_state;
             ALTER TABLE player_state_rebuilt RENAME TO player_state;
+            """
+        )
+    }
+
+    // Семнадцатая миграция разрешает очереди и состоянию плеера хранить внешние track_id из iTunes.
+    static let playerQueueAndStateAllowExternalTrackIds = DatabaseMigration(
+        identifier: "017_player_queue_and_state_allow_external_track_ids"
+    ) { database in
+        // Backup-таблицы сохраняют все строки до удаления связанных player_state и player_queue.
+        try database.executeScript(
+            """
+            PRAGMA defer_foreign_keys = ON;
+
+            CREATE TABLE player_queue_backup AS SELECT * FROM player_queue;
+            CREATE TABLE player_state_backup AS SELECT * FROM player_state;
+
+            DROP TABLE player_state;
+            DROP TABLE player_queue;
+
+            CREATE TABLE player_queue (
+                id TEXT PRIMARY KEY,
+                track_id TEXT NOT NULL,
+                position INTEGER NOT NULL,
+                source_snapshot TEXT NOT NULL CHECK (source_snapshot IN ('library', 'imported', 'purchasedITunes')),
+                title_snapshot TEXT,
+                artist_snapshot TEXT,
+                album_snapshot TEXT,
+                duration_snapshot REAL,
+                file_name_snapshot TEXT,
+                asset_url_snapshot TEXT,
+                is_available_snapshot INTEGER NOT NULL DEFAULT 1 CHECK (is_available_snapshot IN (0, 1)),
+                created_at TEXT NOT NULL
+            );
+
+            INSERT INTO player_queue (
+                id, track_id, position, source_snapshot, title_snapshot, artist_snapshot,
+                album_snapshot, duration_snapshot, file_name_snapshot, asset_url_snapshot,
+                is_available_snapshot, created_at
+            )
+            SELECT
+                id, track_id, position, source_snapshot, title_snapshot, artist_snapshot,
+                album_snapshot, duration_snapshot, file_name_snapshot, asset_url_snapshot,
+                is_available_snapshot, created_at
+            FROM player_queue_backup;
+
+            DROP TABLE player_queue_backup;
+
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_player_queue_unique_position
+            ON player_queue(position);
+
+            CREATE INDEX IF NOT EXISTS idx_player_queue_position
+            ON player_queue(position);
+
+            CREATE INDEX IF NOT EXISTS idx_player_queue_track_id
+            ON player_queue(track_id);
+
+            CREATE TABLE player_state (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                current_queue_item_id TEXT,
+                current_track_id TEXT,
+                context_type TEXT NOT NULL DEFAULT 'playerQueue'
+                    CHECK (context_type IN ('playerQueue', 'trackList', 'libraryFolder', 'libraryRoot', 'libraryCollection')),
+                context_id TEXT,
+                collection_category TEXT,
+                collection_value TEXT,
+                collection_artist_key TEXT,
+                playback_time REAL NOT NULL DEFAULT 0,
+                duration REAL,
+                is_playing INTEGER NOT NULL DEFAULT 0 CHECK (is_playing IN (0, 1)),
+                repeat_mode TEXT NOT NULL DEFAULT 'off' CHECK (repeat_mode IN ('off', 'one', 'all')),
+                shuffle_enabled INTEGER NOT NULL DEFAULT 0 CHECK (shuffle_enabled IN (0, 1)),
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY (current_queue_item_id) REFERENCES player_queue(id) ON DELETE SET NULL
+            );
+
+            INSERT INTO player_state (
+                id, current_queue_item_id, current_track_id, context_type, context_id,
+                collection_category, collection_value, collection_artist_key,
+                playback_time, duration, is_playing, repeat_mode, shuffle_enabled, updated_at
+            )
+            SELECT
+                id, current_queue_item_id, current_track_id, context_type, context_id,
+                collection_category, collection_value, collection_artist_key,
+                playback_time, duration, is_playing, repeat_mode, shuffle_enabled, updated_at
+            FROM player_state_backup;
+
+            DROP TABLE player_state_backup;
             """
         )
     }

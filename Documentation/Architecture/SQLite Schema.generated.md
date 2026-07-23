@@ -11,9 +11,9 @@
 | app_settings | 9 | 0 | 0 |
 | folders | 13 | 2 | 6 |
 | library_view_settings | 12 | 1 | 0 |
-| player_queue | 12 | 1 | 4 |
+| player_queue | 12 | 0 | 4 |
 | player_settings | 8 | 0 | 0 |
-| player_state | 14 | 2 | 0 |
+| player_state | 14 | 1 | 0 |
 | schema_migrations | 2 | 0 | 1 |
 | track_identity_keys | 5 | 1 | 2 |
 | track_metadata | 18 | 1 | 5 |
@@ -133,9 +133,7 @@ No indexes.
 
 ### Foreign Keys
 
-| Id | Seq | From | Target Table | Target Column | On Update | On Delete | Match |
-| ---: | ---: | --- | --- | --- | --- | --- | --- |
-| 0 | 0 | track_id | tracks | id | NO ACTION | NO ACTION | NONE |
+No foreign keys.
 
 ### Indexes
 
@@ -194,8 +192,7 @@ No indexes.
 
 | Id | Seq | From | Target Table | Target Column | On Update | On Delete | Match |
 | ---: | ---: | --- | --- | --- | --- | --- | --- |
-| 0 | 0 | current_track_id | tracks | id | NO ACTION | SET NULL | NONE |
-| 1 | 0 | current_queue_item_id | player_queue | id | NO ACTION | SET NULL | NONE |
+| 0 | 0 | current_queue_item_id | player_queue | id | NO ACTION | SET NULL | NONE |
 
 ### Indexes
 
