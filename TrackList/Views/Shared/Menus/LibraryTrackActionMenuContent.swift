@@ -16,6 +16,8 @@ struct LibraryTrackActionMenuContent: View {
     let onAddToPlayer: () -> Void
     let onAddToTrackList: () -> Void
     let collectionNavigationTarget: TrackCollectionNavigationTarget?
+    /// Текущая категория выбранного значения коллекции, если меню открыто внутри него.
+    let currentCollectionCategory: LibraryCollectionCategory?
     let onGoToArtist: () -> Void
     let onGoToAlbum: () -> Void
     let onEditTags: () -> Void
@@ -134,7 +136,8 @@ struct LibraryTrackActionMenuContent: View {
         TrackMenuActionAvailability.isAvailable(
             action,
             source: .library,
-            context: .library
+            context: .library,
+            currentCollectionCategory: currentCollectionCategory
         )
     }
 }

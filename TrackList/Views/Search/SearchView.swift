@@ -284,6 +284,7 @@ private struct SearchTrackRowView: View {
                 onAction(.addToTrackList(row.result))
             },
             collectionNavigationTarget: nil,
+            currentCollectionCategory: nil,
             onGoToArtist: {},
             onGoToAlbum: {},
             onEditTags: {

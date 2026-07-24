@@ -36,13 +36,35 @@ struct TrackMenuActionAvailability {
     static func isAvailable(
         _ action: TrackMenuAction,
         source: TrackSource,
-        context: TrackMenuContext
+        context: TrackMenuContext,
+        currentCollectionCategory: LibraryCollectionCategory? = nil
     ) -> Bool {
-        availableActions(
+        guard availableActions(
             source: source,
             context: context
         )
-        .contains(action)
+        .contains(action) else {
+            return false
+        }
+
+        return isAvailable(
+            action,
+            in: currentCollectionCategory
+        )
+    }
+
+    /// Не предлагает повторно открыть категорию, список которой пользователь уже просматривает.
+    private static func isAvailable(
+        _ action: TrackMenuAction,
+        in currentCollectionCategory: LibraryCollectionCategory?
+    ) -> Bool {
+        switch (action, currentCollectionCategory) {
+        case (.goToArtist, .artists),
+             (.goToAlbum, .albums):
+            return false
+        default:
+            return true
+        }
     }
 
     /// Прежние наборы меню для локальных файлов приложения.

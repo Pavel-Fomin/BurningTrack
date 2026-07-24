@@ -17,6 +17,8 @@ struct LibraryTrackRowContainer: View {
 
     let state: LibraryTrackRowState               /// Готовое состояние строки без iCloud runtime-состояния
     let allTracks: [LibraryTrack]                 /// Контекст всех треков (для переключения)
+    /// Текущая категория коллекции, явно переданная из источника списка.
+    let currentCollectionCategory: LibraryCollectionCategory?
     let commandHandler: LibraryTrackCommandHandler /// Обработчик намерений строки
     @ObservedObject var cloudAvailabilityStateStore: CloudTrackAvailabilityRowStateStore /// Точечное runtime-состояние iCloud
 
@@ -158,6 +160,7 @@ struct LibraryTrackRowContainer: View {
                 )
             },
             collectionNavigationTarget: rowState.collectionNavigationTarget,
+            currentCollectionCategory: currentCollectionCategory,
             onGoToArtist: {
                 commandHandler.handle(
                     .goToArtist(trackId: rowState.track.trackId)

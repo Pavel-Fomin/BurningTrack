@@ -20,6 +20,8 @@ struct LibraryTrackSectionView: View {
     let tracks: [LibraryTrack]
     let allTracks: [LibraryTrack]
     let playbackSource: PlaybackContextSource?
+    /// Текущая категория коллекции для пунктов меню строк выбранного значения.
+    let currentCollectionCategory: LibraryCollectionCategory?
 
     let trackListNamesById: [UUID: [String]]
 
@@ -113,6 +115,7 @@ struct LibraryTrackSectionView: View {
         return LibraryTrackRowContainer(
             state: rowState,
             allTracks: allTracks,
+            currentCollectionCategory: currentCollectionCategory,
             commandHandler: commandHandler,
             cloudAvailabilityStateStore: cloudAvailabilityStateStore(track.trackId)
         )

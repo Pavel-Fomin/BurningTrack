@@ -104,6 +104,65 @@ final class TrackCollectionNavigationTests: XCTestCase {
         }
     }
 
+    func testCollectionActionsHideOnlyCurrentArtistsCategory() {
+        XCTAssertFalse(
+            TrackMenuActionAvailability.isAvailable(
+                .goToArtist,
+                source: .library,
+                context: .library,
+                currentCollectionCategory: .artists
+            )
+        )
+        XCTAssertTrue(
+            TrackMenuActionAvailability.isAvailable(
+                .goToAlbum,
+                source: .library,
+                context: .library,
+                currentCollectionCategory: .artists
+            )
+        )
+    }
+
+    func testCollectionActionsHideOnlyCurrentAlbumsCategory() {
+        XCTAssertFalse(
+            TrackMenuActionAvailability.isAvailable(
+                .goToAlbum,
+                source: .library,
+                context: .library,
+                currentCollectionCategory: .albums
+            )
+        )
+        XCTAssertTrue(
+            TrackMenuActionAvailability.isAvailable(
+                .goToArtist,
+                source: .library,
+                context: .library,
+                currentCollectionCategory: .albums
+            )
+        )
+    }
+
+    func testCollectionActionsRemainAvailableInOtherCollectionCategories() {
+        for category in [LibraryCollectionCategory.genres, .labels, .years] {
+            XCTAssertTrue(
+                TrackMenuActionAvailability.isAvailable(
+                    .goToArtist,
+                    source: .library,
+                    context: .library,
+                    currentCollectionCategory: category
+                )
+            )
+            XCTAssertTrue(
+                TrackMenuActionAvailability.isAvailable(
+                    .goToAlbum,
+                    source: .library,
+                    context: .library,
+                    currentCollectionCategory: category
+                )
+            )
+        }
+    }
+
     func testOpenArtistBuildsCategoryAndValueRoute() {
         let coordinator = NavigationCoordinator.shared
         defer { coordinator.libraryPath = [] }

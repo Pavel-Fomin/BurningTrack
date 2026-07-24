@@ -16,6 +16,8 @@ struct LibraryTrackSectionsListView: View {
     let sections: [TrackSection]
     let allTracks: [LibraryTrack]
     let playbackSource: PlaybackContextSource?
+    /// Текущая категория коллекции, переданная из типизированного источника списка.
+    let currentCollectionCategory: LibraryCollectionCategory?
 
     let trackListNamesById: [UUID: [String]]
     
@@ -47,6 +49,7 @@ struct LibraryTrackSectionsListView: View {
                 tracks: section.tracks,
                 allTracks: allTracks,
                 playbackSource: playbackSource,
+                currentCollectionCategory: currentCollectionCategory,
                 trackListNamesById: trackListNamesById,
                 playerViewModel: playerViewModel,
                 metadataProvider: metadataProvider,
