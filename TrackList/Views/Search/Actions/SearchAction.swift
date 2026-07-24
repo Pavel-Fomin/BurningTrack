@@ -19,6 +19,7 @@ enum SearchAction: Equatable {
     case openFolder(SearchFolderResult)
     case openTrackList(SearchTrackListResult)
     case showDetails(SearchTrackResult)
+    case share(SearchTrackResult)
     case moveToFolder(SearchTrackResult)
     case addToPlayer(UUID)
     case addToTrackList(SearchTrackResult)

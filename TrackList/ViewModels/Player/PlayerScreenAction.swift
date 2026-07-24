@@ -60,6 +60,11 @@ enum PlayerScreenAction {
         queueItemId: UUID
     )
 
+    /// Передаёт один аудиофайл элемента очереди в системное меню.
+    case shareTrack(
+        queueItemId: UUID
+    )
+
     /// Открывает сценарий копирования iTunes-трека из очереди.
     case copyTrack(
         queueItemId: UUID

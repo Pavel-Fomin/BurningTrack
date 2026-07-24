@@ -65,6 +65,13 @@ final class TrackListPresentationHandler {
         presenter.presentTrackDetail(track)
     }
 
+    /// Передаёт локальный или iTunes-трек в общий flow подготовки и системной отправки.
+    func shareTrack(rowId: UUID) {
+        guard let track = reader.tracks.first(where: { $0.id == rowId }) else { return }
+
+        TrackShareActionHandler.shared.share(track)
+    }
+
     /// Открывает сценарий копирования iTunes-трека из строки треклиста.
     func copyTrack(rowId: UUID) {
         guard let track = reader.tracks.first(where: { $0.id == rowId }) else { return }

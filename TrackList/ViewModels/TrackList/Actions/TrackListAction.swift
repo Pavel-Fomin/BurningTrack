@@ -19,6 +19,9 @@ enum TrackListAction {
     /// Пользователь запросил удаление строки из треклиста.
     case deleteTrack(rowId: UUID)
 
+    /// Пользователь запросил отправку одного аудиофайла из треклиста.
+    case shareTrack(rowId: UUID)
+
     /// Пользователь запросил копирование iTunes-трека.
     case copyTrack(rowId: UUID)
 

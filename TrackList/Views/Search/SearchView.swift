@@ -274,6 +274,9 @@ private struct SearchTrackRowView: View {
             onDetails: {
                 onAction(.showDetails(row.result))
             },
+            onShare: {
+                onAction(.share(row.result))
+            },
             onMoveToFolder: {
                 onAction(.moveToFolder(row.result))
             },

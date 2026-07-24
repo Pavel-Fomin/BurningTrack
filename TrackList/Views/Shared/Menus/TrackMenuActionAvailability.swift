@@ -75,6 +75,7 @@ struct TrackMenuActionAvailability {
         case .library:
             return [
                 .details,
+                .share,
                 .addToPlayer,
                 .addToTrackList,
                 .goToArtist,
@@ -87,6 +88,7 @@ struct TrackMenuActionAvailability {
         case .player:
             return [
                 .details,
+                .share,
                 .showInLibrary,
                 .moveToFolder,
                 .addToTrackList,
@@ -100,6 +102,7 @@ struct TrackMenuActionAvailability {
         case .trackList:
             return [
                 .details,
+                .share,
                 .showInLibrary,
                 .moveToFolder,
                 .goToArtist,
@@ -125,6 +128,7 @@ struct TrackMenuActionAvailability {
         case .player:
             return [
                 .details,
+                .share,
                 .addToTrackList,
                 .editTags,
                 .renameFile,
@@ -134,6 +138,7 @@ struct TrackMenuActionAvailability {
         case .trackList:
             return [
                 .details,
+                .share,
                 .addToPlayer,
                 .editTags,
                 .renameFile,
@@ -153,6 +158,7 @@ struct TrackMenuActionAvailability {
         case .purchasedITunes:
             return [
                 .details,
+                .share,
                 .copy,
                 .addToTrackList,
                 .addToPlayer
@@ -161,6 +167,7 @@ struct TrackMenuActionAvailability {
         case .player:
             return [
                 .details,
+                .share,
                 .copy,
                 .addToTrackList,
                 .deleteFromPlayer
@@ -169,6 +176,7 @@ struct TrackMenuActionAvailability {
         case .trackList:
             return [
                 .details,
+                .share,
                 .copy,
                 .addToPlayer,
                 .deleteFromTrackList

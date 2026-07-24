@@ -21,6 +21,8 @@ enum PurchasedITunesTrackAction {
     case copy(track: PurchasedITunesPlayableTrack)
     /// Пользователь запросил карточку "О треке" для runtime iTunes-трека.
     case details(track: PurchasedITunesPlayableTrack)
+    /// Пользователь запросил отправку iTunes-трека через системное меню.
+    case share(track: PurchasedITunesPlayableTrack)
     /// Пользователь запросил добавление iTunes-трека в треклист.
     case addToTrackList(track: PurchasedITunesPlayableTrack)
     /// Пользователь запросил добавление iTunes-трека в очередь плеера.

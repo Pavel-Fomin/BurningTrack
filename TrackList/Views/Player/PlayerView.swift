@@ -21,6 +21,7 @@ struct PlayerView: View {
     let onAddToTrackList: (UUID) -> Void  /// Добавление элемента очереди в треклист
     let onGoToArtist: (UUID) -> Void      /// Переход к артисту элемента очереди
     let onGoToAlbum: (UUID) -> Void       /// Переход к альбому элемента очереди
+    let onShareTrack: (UUID) -> Void      /// Отправка аудиофайла элемента очереди
     let onCopyTrack: (UUID) -> Void       /// Копирование iTunes-трека из очереди
     let onEditTags: (UUID) -> Void        /// Редактирование тегов элемента очереди
     let onArtworkTap: (UUID) -> Void
@@ -47,6 +48,7 @@ struct PlayerView: View {
                         onAddToTrackList: onAddToTrackList,
                         onGoToArtist: onGoToArtist,
                         onGoToAlbum: onGoToAlbum,
+                        onShareTrack: onShareTrack,
                         onCopyTrack: onCopyTrack,
                         onEditTags: onEditTags,
                         onArtworkTap: onArtworkTap,
@@ -94,6 +96,7 @@ struct PlayerView: View {
         let onAddToTrackList: (UUID) -> Void  /// Добавление элемента очереди в треклист
         let onGoToArtist: (UUID) -> Void      /// Переход к артисту элемента очереди
         let onGoToAlbum: (UUID) -> Void       /// Переход к альбому элемента очереди
+        let onShareTrack: (UUID) -> Void      /// Отправка аудиофайла элемента очереди
         let onCopyTrack: (UUID) -> Void       /// Копирование iTunes-трека из очереди
         let onEditTags: (UUID) -> Void        /// Редактирование тегов элемента очереди
         let onArtworkTap: (UUID) -> Void
@@ -112,6 +115,7 @@ struct PlayerView: View {
                     onAddToTrackList: onAddToTrackList,
                     onGoToArtist: onGoToArtist,
                     onGoToAlbum: onGoToAlbum,
+                    onShareTrack: onShareTrack,
                     onCopyTrack: onCopyTrack,
                     onEditTags: onEditTags,
                     onArtworkTap: onArtworkTap,

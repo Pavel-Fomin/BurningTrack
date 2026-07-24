@@ -66,6 +66,11 @@ final class SearchActionHandler {
         case .showDetails(let result):
             sheetManager.presentTrackDetail(result)
 
+        case .share(let result):
+            TrackShareActionHandler.shared.shareLocalTrack(
+                trackID: result.trackId
+            )
+
         case .moveToFolder(let result):
             sheetActionCoordinator.handle(
                 action: .moveToFolder,

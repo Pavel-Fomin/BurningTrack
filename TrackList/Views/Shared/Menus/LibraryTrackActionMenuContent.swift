@@ -12,6 +12,7 @@ import SwiftUI
 struct LibraryTrackActionMenuContent: View {
     let labels: TrackActionMenuLabels
     let onDetails: () -> Void
+    let onShare: () -> Void
     let onMoveToFolder: () -> Void
     let onAddToPlayer: () -> Void
     let onAddToTrackList: () -> Void
@@ -29,6 +30,14 @@ struct LibraryTrackActionMenuContent: View {
                 onDetails()
             } label: {
                 Label(labels.trackInfo, systemImage: "info.circle")
+            }
+        }
+
+        if isMenuActionAvailable(.share) {
+            Button {
+                onShare()
+            } label: {
+                Label(labels.share, systemImage: "square.and.arrow.up")
             }
         }
 
@@ -145,6 +154,7 @@ struct LibraryTrackActionMenuContent: View {
 /// Подписи контекстного меню передаются вызывающим presentation-слоем.
 struct TrackActionMenuLabels {
     let trackInfo: String
+    let share: String
     let move: String
     let addToPlayer: String
     let addToTracklist: String

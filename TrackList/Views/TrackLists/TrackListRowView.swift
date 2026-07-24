@@ -21,6 +21,7 @@ struct TrackListRowView: View {
     let state: TrackListRowState /// Готовое состояние строки треклиста
     let onTap: () -> Void        /// Тап по строке (воспроизведение / пауза)
     let onDelete: () -> Void     /// Удаление строки (локальное действие)
+    let onShareTrack: () -> Void /// Отправка аудиофайла трека
     let onCopyTrack: () -> Void  /// Копирование iTunes-трека
     let onAddToPlayer: () -> Void /// Добавление iTunes-трека в плеер
     let onRenameTrack: (FileRenameStrategy) -> Void /// Переименование файла трека
@@ -83,6 +84,17 @@ struct TrackListRowView: View {
                 onArtworkTap()
             } label: {
                 Label("Track Info", systemImage: "info.circle")
+            }
+        }
+
+        if isMenuActionAvailable(.share) {
+            Button {
+                onShareTrack()
+            } label: {
+                Label(
+                    TrackSharePresentationText.actionTitle,
+                    systemImage: "square.and.arrow.up"
+                )
             }
         }
 

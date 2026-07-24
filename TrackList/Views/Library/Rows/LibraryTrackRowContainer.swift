@@ -144,6 +144,11 @@ struct LibraryTrackRowContainer: View {
                     .tapArtwork(track: rowState.track)
                 )
             },
+            onShare: {
+                commandHandler.handle(
+                    .share(track: rowState.track)
+                )
+            },
             onMoveToFolder: {
                 commandHandler.handle(
                     .moveToFolder(track: rowState.track)

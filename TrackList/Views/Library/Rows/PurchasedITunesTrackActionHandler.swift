@@ -64,6 +64,9 @@ struct PurchasedITunesTrackActionHandler {
         case .details(let track):
             showDetails(track)
 
+        case .share(let track):
+            TrackShareActionHandler.shared.sharePurchasedITunesTrack(track)
+
         case .addToTrackList(let track):
             sheetManager.presentAddToTrackList(for: track)
 

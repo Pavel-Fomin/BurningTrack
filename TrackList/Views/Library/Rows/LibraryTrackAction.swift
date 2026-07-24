@@ -5,6 +5,7 @@ import Foundation
 enum LibraryTrackAction {
     case tapRow(track: LibraryTrack, context: [LibraryTrack])
     case tapArtwork(track: LibraryTrack)
+    case share(track: LibraryTrack)
     case addToPlayer(trackId: UUID)
     case addToTrackList(track: LibraryTrack)
     case goToArtist(trackId: UUID)

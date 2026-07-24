@@ -19,6 +19,7 @@ struct PlayerTrackRowWrapper: View {
     let onAddToTrackList: (UUID) -> Void                 /// Обработчик добавления элемента очереди в треклист
     let onGoToArtist: (UUID) -> Void                     /// Обработчик перехода к артисту элемента очереди
     let onGoToAlbum: (UUID) -> Void                      /// Обработчик перехода к альбому элемента очереди
+    let onShareTrack: (UUID) -> Void                     /// Обработчик отправки аудиофайла
     let onCopyTrack: (UUID) -> Void                      /// Обработчик копирования iTunes-трека
     let onEditTags: (UUID) -> Void                       /// Обработчик редактирования тегов элемента очереди
     let onArtworkTap: (UUID) -> Void                     /// Обработчик пункта меню "О треке"
@@ -100,6 +101,17 @@ struct PlayerTrackRowWrapper: View {
                 onArtworkTap(row.id)
             } label: {
                 Label("Track Info", systemImage: "info.circle")
+            }
+        }
+
+        if isMenuActionAvailable(.share) {
+            Button {
+                onShareTrack(row.id)
+            } label: {
+                Label(
+                    TrackSharePresentationText.actionTitle,
+                    systemImage: "square.and.arrow.up"
+                )
             }
         }
 

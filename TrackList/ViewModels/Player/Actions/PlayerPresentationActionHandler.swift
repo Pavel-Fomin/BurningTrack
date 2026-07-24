@@ -124,6 +124,13 @@ final class PlayerPresentationActionHandler {
         sheetManager.present(.trackDetail(track))
     }
 
+    /// Подготавливает файл элемента очереди через общий flow без работы с URL во View.
+    func shareTrack(queueItemId: UUID) {
+        guard let track = track(queueItemId: queueItemId) else { return }
+
+        TrackShareActionHandler.shared.share(track)
+    }
+
     /// Открывает сценарий копирования iTunes-трека из очереди плеера.
     func copyTrack(queueItemId: UUID) {
         guard let track = track(queueItemId: queueItemId) else { return }

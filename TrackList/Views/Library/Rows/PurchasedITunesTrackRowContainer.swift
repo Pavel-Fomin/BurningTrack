@@ -117,6 +117,17 @@ struct PurchasedITunesTrackRowContainer: View {
             }
         }
 
+        if isMenuActionAvailable(.share) {
+            Button {
+                actionHandler.handle(.share(track: track))
+            } label: {
+                Label(
+                    TrackSharePresentationText.actionTitle,
+                    systemImage: "square.and.arrow.up"
+                )
+            }
+        }
+
         if isMenuActionAvailable(.copy) {
             Button {
                 actionHandler.handle(.copy(track: track))

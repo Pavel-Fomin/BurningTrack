@@ -77,6 +77,9 @@ final class TrackListFlowActionHandler {
         case .deleteTrack(let rowId):
             mutationHandler.deleteTrack(rowId: rowId)
 
+        case .shareTrack(let rowId):
+            presentationHandler.shareTrack(rowId: rowId)
+
         case .copyTrack(let rowId):
             presentationHandler.copyTrack(rowId: rowId)
 

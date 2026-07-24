@@ -18,6 +18,8 @@ struct LibraryTrackCommandHandler {
             playbackHandler.handleTap(track: track, context: context)
         case .tapArtwork(let track):
             sheetManager.present(.trackDetail(track))
+        case .share(let track):
+            TrackShareActionHandler.shared.share(track)
         case .addToPlayer(let trackId):
             addToPlayer(trackId: trackId)
         case .addToTrackList(let track):

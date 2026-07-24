@@ -134,6 +134,7 @@ enum SearchPresentationText {
     static var trackActionLabels: TrackActionMenuLabels {
         TrackActionMenuLabels(
             trackInfo: String(localized: "Track Info"),
+            share: TrackSharePresentationText.actionTitle,
             move: String(localized: "Move"),
             addToPlayer: String(localized: "Add to Player"),
             addToTracklist: String(localized: "Add to Tracklist"),

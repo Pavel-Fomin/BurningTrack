@@ -213,6 +213,7 @@ enum LibraryPresentationText {
     static var trackActionMenuLabels: TrackActionMenuLabels {
         TrackActionMenuLabels(
             trackInfo: String(localized: "Track Info"),
+            share: TrackSharePresentationText.actionTitle,
             move: String(localized: "Move"),
             addToPlayer: String(localized: "Add to Player"),
             addToTracklist: String(localized: "Add to Tracklist"),

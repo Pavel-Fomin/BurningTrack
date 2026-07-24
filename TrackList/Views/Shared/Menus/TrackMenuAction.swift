@@ -13,6 +13,8 @@ import Foundation
 enum TrackMenuAction: Hashable {
     /// Открыть карточку "О треке".
     case details
+    /// Передать один аудиофайл в системное меню iOS.
+    case share
     /// Скопировать iTunes-трек в выбранную папку.
     case copy
     /// Добавить трек в треклист.

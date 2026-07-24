@@ -47,6 +47,9 @@ struct TrackListView: View {
                             onDelete: { rowId in
                                 onAction(.deleteTrack(rowId: rowId))
                             },
+                            onShareTrack: { rowId in
+                                onAction(.shareTrack(rowId: rowId))
+                            },
                             onCopyTrack: { rowId in
                                 onAction(.copyTrack(rowId: rowId))
                             },
@@ -128,6 +131,7 @@ struct TrackListView: View {
                 let onRequestSnapshot: (UUID) -> Void
                 let onTap: (UUID) -> Void
                 let onDelete: (UUID) -> Void
+                let onShareTrack: (UUID) -> Void
                 let onCopyTrack: (UUID) -> Void
                 let onAddToPlayer: (UUID) -> Void
                 let onRenameTrack: (UUID, FileRenameStrategy) -> Void
@@ -160,6 +164,9 @@ struct TrackListView: View {
                             },
                             onDelete: {
                                 onDelete(row.id)
+                            },
+                            onShareTrack: {
+                                onShareTrack(row.id)
                             },
                             onCopyTrack: {
                                 onCopyTrack(row.id)

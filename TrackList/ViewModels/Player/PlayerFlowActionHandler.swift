@@ -72,6 +72,8 @@ final class PlayerFlowActionHandler {
             presentationActionHandler.goToArtist(queueItemId: queueItemId)
         case .goToAlbum(let queueItemId):
             presentationActionHandler.goToAlbum(queueItemId: queueItemId)
+        case .shareTrack(let queueItemId):
+            presentationActionHandler.shareTrack(queueItemId: queueItemId)
         case .copyTrack(let queueItemId):
             presentationActionHandler.copyTrack(queueItemId: queueItemId)
         case .editTags(let queueItemId):
