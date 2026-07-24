@@ -134,14 +134,24 @@ struct LibraryCollectionTracksView: View {
         source.playbackContextSource
     }
 
+    /// Готовые строки заголовка без сборки пользовательского текста во View.
+    private var navigationTitlePresentation: LibraryNavigationTitlePresentation {
+        LibraryPresentationText.sourceNavigationTitlePresentation(for: source)
+    }
+
     // MARK: - UI
 
     var body: some View {
         contentView
-            .navigationTitle(LibraryPresentationText.sourceNavigationTitle(for: source))
+            .navigationTitle(navigationTitlePresentation.title)
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden(isSelecting)
             .toolbar {
+                if source.isCollectionValue {
+                    ToolbarItem(placement: .principal) {
+                        collectionValueNavigationTitle
+                    }
+                }
                 navigationToolbarContent
             }
             .refreshable {
@@ -163,6 +173,22 @@ struct LibraryCollectionTracksView: View {
                 cloudAvailabilityActionHandler.handle(.screenDidDisappear)
                 selectionActionBarConfig = nil
             }
+    }
+
+    /// Отображает подготовленный составной заголовок только для выбранного значения коллекции.
+    private var collectionValueNavigationTitle: some View {
+        VStack(spacing: 0) {
+            Text(navigationTitlePresentation.title)
+                .font(.headline)
+                .lineLimit(1)
+
+            if let subtitle = navigationTitlePresentation.subtitle {
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+        }
     }
 
     /// Контент панели навигации отдаёт наружу только пользовательские намерения.

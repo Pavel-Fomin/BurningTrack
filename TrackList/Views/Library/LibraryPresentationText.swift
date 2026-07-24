@@ -9,6 +9,14 @@
 
 import Foundation
 
+/// Готовые данные составного заголовка панели навигации фонотеки.
+struct LibraryNavigationTitlePresentation: Equatable {
+    /// Основная строка заголовка.
+    let title: String
+    /// Дополнительная строка заголовка, если она нужна текущему источнику.
+    let subtitle: String?
+}
+
 /// Сопоставляет смысловые значения фонотеки с локализованными подписями интерфейса.
 enum LibraryPresentationText {
     /// Форматтер нужен только presentation-слою для заголовков date-секций.
@@ -217,14 +225,63 @@ enum LibraryPresentationText {
     }
 
     static func sourceNavigationTitle(for source: LibraryTrackListSource) -> String {
+        sourceNavigationTitlePresentation(for: source).title
+    }
+
+    /// Готовит основной заголовок и подзаголовок для типизированного источника списка треков.
+    static func sourceNavigationTitlePresentation(
+        for source: LibraryTrackListSource
+    ) -> LibraryNavigationTitlePresentation {
         switch source {
         case .folder:
-            return String(localized: "Tracks")
+            return LibraryNavigationTitlePresentation(
+                title: String(localized: "Tracks"),
+                subtitle: nil
+            )
         case .allLibraryTracks:
-            return String(localized: "Tracks")
-        case .collectionValue(_, let rawValue, _):
-            return rawValue
+            return LibraryNavigationTitlePresentation(
+                title: String(localized: "Tracks"),
+                subtitle: nil
+            )
+        case .collectionValue(let category, let rawValue, let artistKey):
+            return LibraryNavigationTitlePresentation(
+                title: rawValue,
+                subtitle: collectionValueNavigationSubtitle(
+                    for: category,
+                    albumArtist: artistKey
+                )
+            )
         }
+    }
+
+    /// Возвращает локализованную вторую строку для выбранного значения коллекции.
+    private static func collectionValueNavigationSubtitle(
+        for category: LibraryCollectionCategory,
+        albumArtist: String?
+    ) -> String {
+        switch category {
+        case .artists:
+            return String(localized: "Artist")
+        case .albums:
+            return nonEmptyNavigationSubtitle(albumArtist)
+                ?? String(localized: "Album")
+        case .genres:
+            return String(localized: "Genre")
+        case .labels:
+            return String(localized: "Label")
+        case .years:
+            return String(localized: "Year")
+        }
+    }
+
+    /// Не допускает пустую metadata-строку в подзаголовок альбома.
+    private static func nonEmptyNavigationSubtitle(_ value: String?) -> String? {
+        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+              value.isEmpty == false else {
+            return nil
+        }
+
+        return value
     }
 
     static func selectedTrackCountText(for count: Int) -> String {
