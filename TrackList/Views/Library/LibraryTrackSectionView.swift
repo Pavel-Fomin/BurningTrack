@@ -58,7 +58,8 @@ struct LibraryTrackSectionView: View {
     /// Заголовок секции вынесен из body, чтобы уменьшить сложность SwiftUI-выражения.
     private var sectionHeader: some View {
         Text(title)
-            .font(.headline)
+            // Дата остаётся вторичным ориентиром относительно содержимого списка.
+            .font(.subheadline)
             .id(id)
     }
 

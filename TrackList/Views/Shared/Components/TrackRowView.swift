@@ -174,7 +174,8 @@ struct TrackRowView<ActionMenuContent: View>: View {
                     .padding(.top, 2)
             }
         }
-        .padding(.vertical, 0)
+        // высота общей строки
+        .padding(.vertical, -6)
         .padding(.horizontal, 4)
         .opacity(isContentAvailable ? 1 : 0.4)
         .listRowBackground(rowHighlightColor)
