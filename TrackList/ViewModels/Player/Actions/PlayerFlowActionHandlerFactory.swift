@@ -36,7 +36,8 @@ struct PlayerFlowActionHandlerFactory {
             playlistManager: PlaylistManager.shared,
             sheetManager: SheetManager.shared,
             sheetActionCoordinator: SheetActionCoordinator.shared,
-            toastPresenter: ToastManager.shared
+            toastPresenter: ToastManager.shared,
+            collectionNavigationHandler: .shared
         )
         let viewControllerProvider = ApplicationViewControllerProvider()
         let exportActionHandler = PlayerExportActionHandler(

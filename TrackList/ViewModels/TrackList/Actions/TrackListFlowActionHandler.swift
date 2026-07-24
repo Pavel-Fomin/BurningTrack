@@ -41,7 +41,8 @@ final class TrackListFlowActionHandler {
         self.presentationHandler = TrackListPresentationHandler(
             reader: reader,
             presenter: presenter,
-            toastPresenter: toastPresenter
+            toastPresenter: toastPresenter,
+            collectionNavigationHandler: .shared
         )
         self.playbackHandler = TrackListPlaybackHandler(
             reader: reader,

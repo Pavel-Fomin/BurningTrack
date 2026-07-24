@@ -32,7 +32,7 @@ final class TrackListPresentationHandler {
         presenter: any TrackListPresenting,
         toastPresenter: any ToastPresenting,
         commandExecutor: AppCommandExecutor = .shared,
-        collectionNavigationHandler: TrackCollectionNavigationHandler = .shared
+        collectionNavigationHandler: TrackCollectionNavigationHandler
     ) {
         self.reader = reader
         self.presenter = presenter

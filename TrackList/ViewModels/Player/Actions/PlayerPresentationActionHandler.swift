@@ -42,7 +42,7 @@ final class PlayerPresentationActionHandler {
         sheetManager: SheetManager,
         sheetActionCoordinator: SheetActionCoordinator,
         toastPresenter: any ToastPresenting,
-        collectionNavigationHandler: TrackCollectionNavigationHandler = .shared
+        collectionNavigationHandler: TrackCollectionNavigationHandler
     ) {
         self.playlistManager = playlistManager
         self.sheetManager = sheetManager
