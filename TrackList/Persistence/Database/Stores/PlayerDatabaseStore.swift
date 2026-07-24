@@ -10,8 +10,14 @@
 
 import Foundation
 
+/// Описывает операции очереди, необходимые PlaylistManager для восстановления и сохранения runtime-состояния.
+protocol PlayerQueuePersisting: AnyObject {
+    func fetchQueue() throws -> [PlayerTrack]
+    func replaceQueue(_ tracks: [PlayerTrack]) throws
+}
+
 // Фасад плеера скрывает низкоуровневые SQLite Store от Manager и верхних слоёв.
-final class PlayerDatabaseStore {
+final class PlayerDatabaseStore: PlayerQueuePersisting {
     private let queueStore: any PlayerQueueDatabaseReading & PlayerQueueDatabaseWriting
     private let stateStore: any PlayerStateDatabaseReading & PlayerStateDatabaseWriting
 

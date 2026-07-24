@@ -10,12 +10,20 @@ import Foundation
 import SwiftUI
 @MainActor
 final class PlaylistManager: ObservableObject {
+
+    /// Различает штатную начальную загрузку и reload после восстановления доступа к фонотеке.
+    private enum QueueLoadReason: String {
+        case initial = "init"
+        case libraryAccessRestored
+    }
     
     @Published var tracks: [PlayerTrack] = []
     var onTracksChanged: (([PlayerTrack]) -> Void)?
     
     static let shared = PlaylistManager()
-    private let databaseStore: PlayerDatabaseStore
+    private let databaseStore: any PlayerQueuePersisting
+    /// Версия повышается только после успешного сохранения пользовательского изменения очереди.
+    private var queueMutationVersion: UInt64 = 0
     
     private init() {
         do {
@@ -31,31 +39,91 @@ final class PlaylistManager: ObservableObject {
             object: nil
         )
         
-        loadQueue()
+        loadQueue(reason: .initial)
+    }
+
+    /// Создаёт изолированный Manager для автоматических проверок без подписки на глобальное notification-событие.
+    init(
+        databaseStore: any PlayerQueuePersisting,
+        loadsInitialQueue: Bool = true
+    ) {
+        self.databaseStore = databaseStore
+
+        if loadsInitialQueue {
+            loadQueue(reason: .initial)
+        }
     }
     
     @objc private func onLibraryAccessRestored() {
         print("🔔 PlaylistManager: libraryAccessRestored → reloadQueue")
-        loadQueue()
+        reloadQueueAfterLibraryAccessRestored()
     }
     
     // MARK: - Загрузка очереди плеера
 
-    /// Загружает очередь плеера из SQLite.
-    func loadQueue() {
-        do {
-            tracks = try databaseStore.fetchQueue()
-            let availableCount = tracks.filter { $0.isAvailable }.count
-            PersistentLogger.log("📥 PlaylistManager: loaded SQLite player queue tracks=\(tracks.count)")
-            print("📥 Загружено \(tracks.count) треков в плеер из SQLite (доступно: \(availableCount))")
-        } catch {
-            tracks = []
-            PersistentLogger.log("⚠️ PlaylistManager: SQLite queue load error \(error)")
-            print("⚠️ Ошибка загрузки очереди плеера из SQLite: \(error)")
+    /// Восстанавливает сохранённую очередь только пока пользователь не изменил её в текущем запуске.
+    func reloadQueueAfterLibraryAccessRestored() {
+        guard queueMutationVersion == 0 else {
+            PersistentLogger.log(
+                "PlaylistManager queue loadQueue skipped " +
+                    "reason=libraryAccessRestored queueMutationVersion=\(queueMutationVersion)"
+            )
+            return
         }
 
-        // Обновление нужно и после reload, чтобы текущий удалённый элемент не оставался в мини-плеере.
-        onTracksChanged?(tracks)
+        loadQueue(reason: .libraryAccessRestored)
+    }
+
+    /// Загружает очередь плеера из SQLite.
+    private func loadQueue(reason: QueueLoadReason) {
+        let runtimeCountBefore = tracks.count
+        let loadMutationVersion = queueMutationVersion
+        PersistentLogger.log(
+            "PlaylistManager queue loadQueue started " +
+                "reason=\(reason.rawValue) runtimeCountBefore=\(runtimeCountBefore) " +
+                "queueMutationVersion=\(loadMutationVersion)"
+        )
+
+        var didApplyLoadedQueue = false
+        do {
+            let loadedTracks = try databaseStore.fetchQueue()
+
+            if queueMutationVersion != loadMutationVersion {
+                PersistentLogger.log(
+                    "PlaylistManager queue loadQueue discarded stale result " +
+                        "reason=\(reason.rawValue) loadMutationVersion=\(loadMutationVersion) " +
+                        "currentMutationVersion=\(queueMutationVersion) loadedCount=\(loadedTracks.count)"
+                )
+            } else {
+                tracks = loadedTracks
+                didApplyLoadedQueue = true
+                let availableCount = tracks.filter { $0.isAvailable }.count
+                PersistentLogger.log(
+                    "PlaylistManager queue loadQueue loaded " +
+                        "reason=\(reason.rawValue) loadedCount=\(tracks.count)"
+                )
+                PersistentLogger.log("📥 PlaylistManager: loaded SQLite player queue tracks=\(tracks.count)")
+                print("📥 Загружено \(tracks.count) треков в плеер из SQLite (доступно: \(availableCount))")
+            }
+        } catch {
+            PersistentLogger.log(
+                "PlaylistManager queue loadQueue error " +
+                    "reason=\(reason.rawValue) error=\(error)"
+            )
+            print("⚠️ Ошибка загрузки очереди плеера из SQLite: \(error)")
+            PersistentLogger.log("⚠️ PlaylistManager: SQLite queue load error \(error)")
+        }
+
+        PersistentLogger.log(
+            "PlaylistManager queue loadQueue completed " +
+                "reason=\(reason.rawValue) applied=\(didApplyLoadedQueue) " +
+                "runtimeCountAfter=\(tracks.count)"
+        )
+
+        if didApplyLoadedQueue {
+            // Обновление нужно после применённого reload, чтобы удалённый элемент не оставался в мини-плеере.
+            onTracksChanged?(tracks)
+        }
     }
 
     // MARK: - Сохранение очереди плеера
@@ -65,9 +133,13 @@ final class PlaylistManager: ObservableObject {
     func saveQueue() -> Bool {
         do {
             try databaseStore.replaceQueue(tracks)
+            queueMutationVersion &+= 1
             // Сообщаем владельцам playback-состояния только после успешной записи очереди.
             onTracksChanged?(tracks)
-            PersistentLogger.log("💾 PlaylistManager: saved SQLite player queue items=\(tracks.count)")
+            PersistentLogger.log(
+                "💾 PlaylistManager: saved SQLite player queue items=\(tracks.count) " +
+                    "queueMutationVersion=\(queueMutationVersion)"
+            )
             return true
         } catch {
             PersistentLogger.log("❌ PlaylistManager: SQLite queue save error \(error)")
@@ -119,17 +191,46 @@ final class PlaylistManager: ObservableObject {
 
     @discardableResult
     func addTracks(_ tracksToAdd: [PlayerTrack]) -> Bool {
-        guard !tracksToAdd.isEmpty else { return true }
+        let tracksCountBefore = tracks.count
+        PersistentLogger.log(
+            "PlaylistManager queue addTracks started " +
+                "tracksToAddCount=\(tracksToAdd.count) tracksCountBefore=\(tracksCountBefore)"
+        )
+
+        guard !tracksToAdd.isEmpty else {
+            PersistentLogger.log(
+                "PlaylistManager queue addTracks completed " +
+                    "saveQueueResult=notRequired tracksCountAfter=\(tracks.count)"
+            )
+            return true
+        }
 
         // Откат нужен, чтобы runtime-очередь не расходилась с SQLite при ошибке записи.
         let previousTracks = tracks
         tracks.append(contentsOf: tracksToAdd)
+        PersistentLogger.log(
+            "PlaylistManager queue addTracks appended " +
+                "tracksCountAfterAppend=\(tracks.count)"
+        )
 
-        guard saveQueue() else {
+        let didSave = saveQueue()
+        PersistentLogger.log(
+            "PlaylistManager queue addTracks saveQueue result=\(didSave)"
+        )
+
+        guard didSave else {
             tracks = previousTracks
+            PersistentLogger.log(
+                "PlaylistManager queue addTracks completed " +
+                    "saveQueueResult=false tracksCountAfter=\(tracks.count)"
+            )
             return false
         }
 
+        PersistentLogger.log(
+            "PlaylistManager queue addTracks completed " +
+                "saveQueueResult=true tracksCountAfter=\(tracks.count)"
+        )
         return true
     }
 
