@@ -5,7 +5,7 @@
 //  Read-only представление информации о треке.
 //
 //  Роль:
-//  - отображает путь к файлу, имя файла и теги
+//  - отображает путь, технические данные, имя файла и теги
 //  - полностью повторяет текущий UI просмотра
 //  - не содержит логики редактирования
 //
@@ -25,6 +25,7 @@ struct TrackDetailReadOnlyView: View {
     
     let artworkUIImage: UIImage?
     let filePath: String?
+    let fileTechnicalInfo: String
     let fileName: String?
     let tags: [(field: EditableTrackField, value: String)]
     
@@ -48,6 +49,11 @@ struct TrackDetailReadOnlyView: View {
                     value: filePath ?? TrackDetailPresentationText.unavailableTechnicalValue,
                     isMonospaced: true,
                     isSecondary: true
+                )
+
+                ListRow(
+                    title: TrackDetailPresentationText.aboutFileTitle,
+                    value: fileTechnicalInfo
                 )
                 
                 ListRow(

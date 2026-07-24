@@ -37,6 +37,7 @@ struct TrackDetailSheet: View {
     // MARK: - Runtime state
 
     @State private var resolvedURL: URL?                   /// URL файла для отображения пути
+    @State private var fileTechnicalInfo = TrackDetailPresentationText.unavailableTechnicalValue /// Готовая строка технических данных
     @State private var didLoad = false                     /// Флаг первичной загрузки sheet
 
     // MARK: - Body
@@ -51,6 +52,7 @@ struct TrackDetailSheet: View {
                     filePath: resolvedURL.map {
                         displayPath(from: $0.deletingLastPathComponent())
                     },
+                    fileTechnicalInfo: fileTechnicalInfo,
                     fileName: editedFileName,
                     tags: [
                         (.title, editedValues[.title] ?? ""),
@@ -111,8 +113,8 @@ struct TrackDetailSheet: View {
     private func loadPurchasedITunesRuntimeData(
         _ track: PurchasedITunesPlayableTrack
     ) async {
-        let snapshot = TrackRuntimeSnapshot(
-            purchasedITunesTrack: track
+        let snapshot = await TrackRuntimeSnapshotBuilder.shared.buildSnapshot(
+            forPurchasedITunesTrack: track
         )
 
         await MainActor.run {
@@ -150,6 +152,9 @@ struct TrackDetailSheet: View {
 
         editedFileName = makeFileNameWithoutExtension(snapshot.fileName)
         editedValues = values
+        fileTechnicalInfo = TrackTechnicalMetadataFormatter.string(
+            from: snapshot.technicalMetadata
+        )
         let loadingArtworkState = ArtworkEditState(hadOriginalArtwork: false)
         artworkUIImage = nil
         artworkEditState = loadingArtworkState

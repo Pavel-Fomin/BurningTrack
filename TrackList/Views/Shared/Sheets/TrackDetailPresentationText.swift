@@ -19,6 +19,10 @@ enum TrackDetailPresentationText {
         String(localized: "File Path")
     }
 
+    static var aboutFileTitle: String {
+        String(localized: "About File")
+    }
+
     static var unavailableTechnicalValue: String {
         String(localized: "Unavailable")
     }

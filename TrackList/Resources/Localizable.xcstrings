@@ -63,6 +63,17 @@
         }
       }
     },
+    "About File" : {
+      "comment" : "Название технических данных файла в Track Detail.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "About File"
+          }
+        }
+      }
+    },
     "Add" : {
       "localizations" : {
         "en" : {
@@ -1136,6 +1147,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Invalid File Name"
+          }
+        }
+      }
+    },
+    "kbps" : {
+      "comment" : "Единица аудиобитрейта в строке технических данных файла.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "kbps"
           }
         }
       }

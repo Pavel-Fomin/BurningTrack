@@ -67,10 +67,14 @@ final class TrackRuntimeSnapshotBuilder {
         // Runtime-данные читаем через существующий metadata cache manager.
         let cachedMetadata = await TrackMetadataCacheManager.shared.loadMetadata(for: url)
 
+        // Технические свойства читаем асинхронно и храним в snapshot без UI-форматирования.
+        let technicalMetadata = await TrackTechnicalMetadataReader.shared.metadata(for: url)
+
         let snapshot = TrackRuntimeSnapshot(
             trackId: trackId,                         /// Идентификатор трека
             fileName: fileName,                       /// Имя файла
             isAvailable: isAvailable,                 /// Доступность файла
+            technicalMetadata: technicalMetadata,     /// Размер, формат и битрейт файла
 
             title: parsedMetadata?.title,             /// Название трека
             artist: parsedMetadata?.artist,           /// Основной исполнитель
@@ -113,6 +117,23 @@ final class TrackRuntimeSnapshotBuilder {
         try persistMetadata(snapshot)
 
         return snapshot
+    }
+
+    /// Собирает runtime snapshot купленного iTunes-трека без BookmarkResolver и SQLite.
+    /// - Parameter track: Доступный playback-адаптер системной медиатеки.
+    /// - Returns: Snapshot с техническими значениями, доступными по assetURL.
+    func buildSnapshot(
+        forPurchasedITunesTrack track: PurchasedITunesPlayableTrack
+    ) async -> TrackRuntimeSnapshot {
+        // assetURL предоставлен MediaPlayer, поэтому bookmark pipeline для iTunes не используется.
+        let technicalMetadata = await TrackTechnicalMetadataReader.shared.metadata(
+            for: track.assetURL
+        )
+
+        return TrackRuntimeSnapshot(
+            purchasedITunesTrack: track,
+            technicalMetadata: technicalMetadata
+        )
     }
 
     /// Сохраняет metadata snapshot в постоянное хранилище фонотеки.

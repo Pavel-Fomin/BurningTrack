@@ -26,6 +26,7 @@ struct TrackRuntimeSnapshot: Equatable {
 
     let fileName: String
     let isAvailable: Bool
+    let technicalMetadata: TrackTechnicalMetadata
 
     // MARK: - Основное
 
@@ -77,7 +78,8 @@ struct TrackRuntimeSnapshot: Equatable {
 extension TrackRuntimeSnapshot {
     /// Собирает runtime snapshot для купленного iTunes-трека без BookmarkResolver и кэша метаданных.
     init(
-        purchasedITunesTrack track: PurchasedITunesPlayableTrack
+        purchasedITunesTrack track: PurchasedITunesPlayableTrack,
+        technicalMetadata: TrackTechnicalMetadata
     ) {
         let fallbackFileName = track.title ?? track.fileName
 
@@ -85,6 +87,7 @@ extension TrackRuntimeSnapshot {
             trackId: track.trackId,
             fileName: track.fileName.isEmpty ? fallbackFileName : track.fileName,
             isAvailable: track.isAvailable,
+            technicalMetadata: technicalMetadata,
             title: track.title,
             artist: track.artist,
             album: track.album,
