@@ -51,6 +51,8 @@ private extension TrackSectionBuilder {
 
         let calendar = Calendar.current
         let dateFormatter = DateFormatter()
+        // Заголовки date-секций используют базовую английскую локаль приложения.
+        dateFormatter.locale = Locale(identifier: "en")
         dateFormatter.dateStyle = .medium
         dateFormatter.timeStyle = .none
         var sections: [(day: Date, tracks: [LibraryTrack])] = []
