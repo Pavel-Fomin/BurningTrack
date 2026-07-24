@@ -13,11 +13,11 @@ struct LibraryFolderStateBuilder {
 
     func build(
         folder: LibraryFolder,
-        summaryText: String? = nil
+        summary: TrackCollectionSummary? = nil
     ) -> LibraryFolderScreenState {
         LibraryFolderScreenState(
             title: folder.name,
-            summaryText: summaryText,
+            summary: summary,
             folder: folder,
             subfolders: folder.subfolders,
             displayMode: displayMode(for: folder)

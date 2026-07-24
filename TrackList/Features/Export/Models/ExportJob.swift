@@ -19,6 +19,32 @@ enum ExportFileNamingMode: Sendable {
     case original
 }
 
+/// Определяет смысл источника экспорта отдельно от физического имени папки.
+enum ExportFolder: Equatable, Sendable {
+    /// Экспорт текущей очереди плеера.
+    case playerQueue
+    /// Экспорт всех треков фонотеки.
+    case libraryTracks
+    /// Экспорт купленных iTunes-треков.
+    case purchasedITunes
+    /// Экспорт пользовательской папки, треклиста или значения коллекции.
+    case named(String)
+
+    /// Сохраняет физические имена ранее созданных служебных папок экспорта.
+    var fileSystemName: String {
+        switch self {
+        case .playerQueue:
+            return "Плеер"
+        case .libraryTracks:
+            return "Треки"
+        case .purchasedITunes:
+            return "Purchased iTunes"
+        case .named(let name):
+            return name
+        }
+    }
+}
+
 /// Подготовленное к выполнению задание экспорта.
 ///
 /// В задание передаются только Sendable-данные, нужные сервису: тип источника
@@ -66,14 +92,19 @@ struct ExportJob: Sendable {
     /// Папка назначения, выбранная до запуска копирования.
     let destination: ExportDestination
 
-    /// Имя дочерней папки, в которой должен храниться экспорт этого списка.
-    let exportFolderName: String
+    /// Смысл дочерней папки, в которой должен храниться экспорт этого списка.
+    let exportFolder: ExportFolder
+
+    /// Физическое имя дочерней папки, используемое только файловым сервисом.
+    var exportFolderName: String {
+        exportFolder.fileSystemName
+    }
 
     /// Создаёт задание и формирует имена файлов в выбранном режиме.
     init(
         tracks: [Track],
         destination: ExportDestination,
-        exportFolderName: String,
+        exportFolder: ExportFolder,
         fileNamingMode: ExportFileNamingMode
     ) {
         self.items = tracks.enumerated().map { index, track in
@@ -113,7 +144,7 @@ struct ExportJob: Sendable {
             )
         }
         self.destination = destination
-        self.exportFolderName = exportFolderName
+        self.exportFolder = exportFolder
     }
 }
 

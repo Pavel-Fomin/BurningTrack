@@ -21,10 +21,7 @@ struct ExportProgressDetailsView: View {
 
     /// Безопасно форматирует количество байтов для короткого пользовательского текста.
     private func byteCountText(_ value: Int64) -> String {
-        ByteCountFormatter.string(
-            fromByteCount: max(value, 0),
-            countStyle: .file
-        )
+        SharedPresentationText.fileSize(value)
     }
 
     /// Показывает название папки, выбранной пользователем до создания подпапки треклиста.

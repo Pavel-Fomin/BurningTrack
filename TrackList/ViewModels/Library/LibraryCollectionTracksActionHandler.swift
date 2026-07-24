@@ -52,7 +52,7 @@ final class LibraryCollectionTracksActionHandler {
     /// Запускает экспорт треков выбранного значения без изменения текущего порядка строк.
     private func exportTracks(_ libraryTracks: [LibraryTrack]) {
         guard source.isCollectionValue,
-              let exportFolderName = source.exportFolderName,
+              let exportFolder = source.exportFolder,
               libraryTracks.isEmpty == false else {
             return
         }
@@ -65,7 +65,7 @@ final class LibraryCollectionTracksActionHandler {
         let tracks = libraryTracks.map(Track.init(libraryTrack:))
         exportProgressViewModel.startExport(
             tracks: tracks,
-            exportFolderName: exportFolderName,
+            exportFolder: exportFolder,
             fileNamingMode: .original,
             presenter: presenter
         )

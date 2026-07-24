@@ -163,7 +163,7 @@ actor TrackExportService {
         var progress = ExportProgress(
             totalFiles: job.items.count,
             destination: job.destination,
-            sourceName: job.exportFolderName,
+            exportFolder: job.exportFolder,
             rootDestinationName: job.destination.displayName,
             state: .preparing
         )

@@ -58,7 +58,7 @@ final class LibraryAllTracksActionHandler {
         let tracks = libraryTracks.map(Track.init(libraryTrack:))
         exportProgressViewModel.startExport(
             tracks: tracks,
-            exportFolderName: "Треки",
+            exportFolder: .libraryTracks,
             fileNamingMode: .original,
             presenter: presenter
         )

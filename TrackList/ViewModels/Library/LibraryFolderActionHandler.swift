@@ -21,8 +21,8 @@ final class LibraryFolderActionHandler {
     private let viewControllerProvider: any ViewControllerProviding
     /// Показывает ошибку, если системный picker нельзя презентовать.
     private let toastPresenter: any ToastPresenting
-    /// Имя дочерней папки экспортируемого содержимого.
-    private let exportFolderName: String
+    /// Семантическая дочерняя папка экспортируемого содержимого.
+    private let exportFolder: ExportFolder
 
     // MARK: - Init
 
@@ -31,14 +31,14 @@ final class LibraryFolderActionHandler {
         exportProgressViewModel: ExportProgressViewModel,
         viewControllerProvider: any ViewControllerProviding,
         toastPresenter: any ToastPresenting,
-        exportFolderName: String,
+        exportFolder: ExportFolder,
         clearSelectionActionBar: @escaping @MainActor () -> Void
     ) {
         self.navigationCoordinator = navigationCoordinator
         self.exportProgressViewModel = exportProgressViewModel
         self.viewControllerProvider = viewControllerProvider
         self.toastPresenter = toastPresenter
-        self.exportFolderName = exportFolderName
+        self.exportFolder = exportFolder
         self.clearSelectionActionBar = clearSelectionActionBar
     }
 
@@ -70,7 +70,7 @@ final class LibraryFolderActionHandler {
         let tracks = libraryTracks.map(Track.init(libraryTrack:))
         exportProgressViewModel.startExport(
             tracks: tracks,
-            exportFolderName: exportFolderName,
+            exportFolder: exportFolder,
             fileNamingMode: .original,
             presenter: presenter
         )

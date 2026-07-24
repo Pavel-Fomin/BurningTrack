@@ -109,7 +109,7 @@ final class LibraryFolderViewModel: ObservableObject {
 
                 self.screenState = self.stateBuilder.build(
                     folder: self.screenState.folder,
-                    summaryText: TrackCollectionSummaryFormatter.string(from: summary)
+                    summary: summary
                 )
             } catch is CancellationError {
                 // Отмена ожидаема при новом событии или закрытии экрана.
@@ -124,7 +124,7 @@ final class LibraryFolderViewModel: ObservableObject {
                 PersistentLogger.log("LibraryFolderViewModel: summary loading failed folderId=\(folderId) error=\(error)")
                 self.screenState = self.stateBuilder.build(
                     folder: self.screenState.folder,
-                    summaryText: nil
+                    summary: nil
                 )
             }
         }

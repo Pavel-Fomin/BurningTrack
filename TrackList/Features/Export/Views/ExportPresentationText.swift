@@ -152,15 +152,22 @@ enum ExportPresentationText {
         statusTitle(for: .completedWithErrors)
     }
 
-    /// Переводит только встроенные технические имена экспорта для интерфейса.
-    static func displaySourceName(for sourceName: String) -> String {
-        switch sourceName {
-        case "Плеер":
+    /// Преобразует семантический источник экспорта в подпись интерфейса.
+    static func displaySourceName(
+        for source: ExportFolder?,
+        fallback: String = ""
+    ) -> String {
+        switch source {
+        case .playerQueue:
             return String(localized: "Player")
-        case "Треки":
+        case .libraryTracks:
             return String(localized: "Tracks")
-        default:
-            return sourceName
+        case .purchasedITunes:
+            return String(localized: "Purchased in iTunes")
+        case .named(let name):
+            return name
+        case nil:
+            return fallback
         }
     }
 }

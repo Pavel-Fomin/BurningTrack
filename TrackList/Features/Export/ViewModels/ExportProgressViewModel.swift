@@ -88,10 +88,10 @@ final class ExportProgressViewModel: ObservableObject {
     /// Направляет действие интерфейса в существующий маршрут экспорта.
     func handle(_ action: ExportAction) {
         switch action {
-        case let .start(tracks, exportFolderName, fileNamingMode, presenter):
+        case let .start(tracks, exportFolder, fileNamingMode, presenter):
             startExport(
                 tracks: tracks,
-                exportFolderName: exportFolderName,
+                exportFolder: exportFolder,
                 fileNamingMode: fileNamingMode,
                 presenter: presenter
             )
@@ -111,13 +111,13 @@ final class ExportProgressViewModel: ObservableObject {
     /// Запускает экспорт и оставляет его независимым от жизненного цикла экрана.
     func startExport(
         tracks: [Track],
-        exportFolderName: String,
+        exportFolder: ExportFolder,
         fileNamingMode: ExportFileNamingMode,
         presenter: UIViewController
     ) {
         guard coordinator.startExport(
             tracks: tracks,
-            exportFolderName: exportFolderName,
+            exportFolder: exportFolder,
             fileNamingMode: fileNamingMode,
             presenter: presenter
         ) else {

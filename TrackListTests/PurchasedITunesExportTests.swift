@@ -50,7 +50,7 @@ final class PurchasedITunesExportTests: XCTestCase {
         let job = ExportJob(
             tracks: [firstTrack, secondTrack],
             destination: ExportDestination(folderURL: rootURL),
-            exportFolderName: "Куплено в iTunes",
+            exportFolder: .purchasedITunes,
             fileNamingMode: .original
         )
 
@@ -62,7 +62,7 @@ final class PurchasedITunesExportTests: XCTestCase {
 
         let summary = try await TrackExportService().export(job: job)
         let exportFolderURL = rootURL.appendingPathComponent(
-            "Куплено в iTunes",
+            "Purchased iTunes",
             isDirectory: true
         )
         let firstDestinationURL = exportFolderURL
@@ -131,7 +131,7 @@ final class PurchasedITunesMusicActionHandlerTests: XCTestCase {
         await yieldToExportTask()
 
         XCTAssertEqual(exporter.exportCallCount, 1)
-        XCTAssertEqual(exporter.exportFolderNames, ["Куплено в iTunes"])
+        XCTAssertEqual(exporter.exportFolderNames, ["Purchased iTunes"])
         XCTAssertEqual(
             exporter.exportedTrackIDs,
             [[secondTrack.trackId, firstTrack.trackId]]

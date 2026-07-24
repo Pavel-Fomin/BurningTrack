@@ -23,7 +23,7 @@ struct MiniPlayerProgressView: View {
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
 
-            Text(formatTimeSmart(currentTime))
+            Text(SharedPresentationText.duration(currentTime))
                 .font(.caption2)
                 .frame(width: 40, alignment: .leading)
 
@@ -41,7 +41,7 @@ struct MiniPlayerProgressView: View {
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 4)
 
-            Text("-\(formatTimeSmart(duration - currentTime))")
+            Text(SharedPresentationText.remainingDuration(duration - currentTime))
                 .font(.caption2)
                 .frame(width: 40, alignment: .trailing)
         }

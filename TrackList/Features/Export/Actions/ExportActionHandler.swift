@@ -33,7 +33,7 @@ final class ExportActionHandler {
     /// Пустой или неуспешный сценарий уже сопровождается пользовательским сообщением.
     func startExport(
         tracks: [Track],
-        exportFolderName: String,
+        exportFolder: ExportFolder,
         fileNamingMode: ExportFileNamingMode,
         presenter: UIViewController,
         onExportAccepted: () -> Void,
@@ -49,7 +49,7 @@ final class ExportActionHandler {
         do {
             return try await exporter.exportTracks(
                 tracks,
-                exportFolderName: exportFolderName,
+                exportFolder: exportFolder,
                 fileNamingMode: fileNamingMode,
                 presenter: presenter,
                 onProgress: onProgress

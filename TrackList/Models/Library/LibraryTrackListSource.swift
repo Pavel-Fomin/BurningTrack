@@ -85,13 +85,13 @@ enum LibraryTrackListSource: Hashable, Identifiable {
         return true
     }
 
-    /// Отображаемое имя дочерней папки для экспорта, если источник поддерживает экспорт.
-    var exportFolderName: String? {
+    /// Семантический источник дочерней папки для экспорта, если источник поддерживает экспорт.
+    var exportFolder: ExportFolder? {
         switch self {
         case .allLibraryTracks:
-            return "Треки"
+            return .libraryTracks
         case .collectionValue(_, let rawValue, _):
-            return rawValue
+            return .named(rawValue)
         case .folder:
             return nil
         }

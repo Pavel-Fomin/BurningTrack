@@ -36,8 +36,8 @@ final class LibraryCollectionTracksActionHandlerTests: XCTestCase {
         let firstTrack = makeLibraryTrack(fileName: "First.flac")
         let secondTrack = makeLibraryTrack(fileName: "Second.FLAC")
         let visibleSections = [
-            TrackSection(id: "later", title: "", tracks: [secondTrack], showsHeader: false),
-            TrackSection(id: "earlier", title: "", tracks: [firstTrack], showsHeader: false)
+            TrackSection(id: "later", header: .hidden, tracks: [secondTrack]),
+            TrackSection(id: "earlier", header: .hidden, tracks: [firstTrack])
         ]
 
         handler.handle(.exportTracks(visibleSections.flatMap(\.tracks)))
@@ -112,12 +112,12 @@ final class LibraryCollectionTracksActionHandlerTests: XCTestCase {
 
         XCTAssertTrue(LibraryTrackListSource.allLibraryTracks.isAllLibraryTracks)
         XCTAssertFalse(LibraryTrackListSource.allLibraryTracks.isCollectionValue)
-        XCTAssertEqual(LibraryTrackListSource.allLibraryTracks.exportFolderName, "Треки")
+        XCTAssertEqual(LibraryTrackListSource.allLibraryTracks.exportFolder, .libraryTracks)
         XCTAssertTrue(source.isCollectionValue)
         XCTAssertFalse(source.isAllLibraryTracks)
         XCTAssertEqual(source.collectionCategory, .years)
-        XCTAssertEqual(source.exportFolderName, "2024")
-        XCTAssertNil(LibraryTrackListSource.folder(folderId: UUID()).exportFolderName)
+        XCTAssertEqual(source.exportFolder, .named("2024"))
+        XCTAssertNil(LibraryTrackListSource.folder(folderId: UUID()).exportFolder)
     }
 
     /// Проверяет, что доступные режимы сортировки корня категории остались прежними.
@@ -211,13 +211,13 @@ private final class CollectionTracksExportingSpy: TrackExporting {
     /// Сохраняет параметры и завершает экспорт успешным итогом.
     func exportTracks(
         _ tracks: [Track],
-        exportFolderName: String,
+        exportFolder: ExportFolder,
         fileNamingMode: ExportFileNamingMode,
         presenter: UIViewController,
         onProgress: @escaping ExportProgressHandler
     ) async throws -> ExportSummary {
         exportCallCount += 1
-        exportFolderNames.append(exportFolderName)
+        exportFolderNames.append(exportFolder.fileSystemName)
         fileNamingModes.append(fileNamingMode)
         exportedTrackIDs.append(tracks.map(\.trackId))
         exportedFileNames.append(tracks.map(\.fileName))

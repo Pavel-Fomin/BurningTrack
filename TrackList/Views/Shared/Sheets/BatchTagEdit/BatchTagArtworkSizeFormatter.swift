@@ -17,9 +17,6 @@ enum BatchTagArtworkSizeFormatter {
             return BatchTagEditPresentationText.noArtworkTitle
         }
 
-        return ByteCountFormatter.string(
-            fromByteCount: Int64(bytes),
-            countStyle: .file
-        )
+        return SharedPresentationText.fileSize(Int64(bytes))
     }
 }

@@ -235,7 +235,7 @@ final class ExportOperationCoordinatorTests: XCTestCase {
     ) -> Bool {
         coordinator.startExport(
             tracks: [makeTrack()],
-            exportFolderName: "Плеер",
+            exportFolder: .playerQueue,
             fileNamingMode: .numbered,
             presenter: UIViewController()
         )
@@ -370,7 +370,7 @@ private final class CoordinatorExportingSpy: TrackExporting {
     /// Передаёт подготовленные progress-снимки и возвращает итог операции.
     func exportTracks(
         _ tracks: [Track],
-        exportFolderName: String,
+        exportFolder: ExportFolder,
         fileNamingMode: ExportFileNamingMode,
         presenter: UIViewController,
         onProgress: @escaping ExportProgressHandler

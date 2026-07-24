@@ -10,33 +10,6 @@
 import Foundation
 
 
-// MARK: - Форматирует длительность трека в строку
-
-// до 1 часа:     "03:27"
-// от 1 часа:     "01h:12m"
-// от суток:      "1d:03h:12m"
-// если значение некорректно — возвращает "–:–"
-func formatTimeSmart(_ duration: TimeInterval) -> String {
-    guard duration.isFinite && duration > 0 else { return "–:–" }
-    
-    let totalMinutes = Int(duration) / 60
-    let seconds = Int(duration) % 60
-    let hours = totalMinutes / 60
-    let minutes = totalMinutes % 60
-    let days = hours / 24
-    let remainingHours = hours % 24
-    
-    if days > 0 {
-        return String(format: "%dd:%02dh:%02dm", days, remainingHours, minutes)
-    } else if hours > 0 {
-        return String(format: "%02dh:%02dm", hours, minutes)
-    } else {
-        return String(format: "%02d:%02d", minutes, seconds)
-    }
-
- }
-
-
 // MARK: - Формирует подпись к треклисту на основе даты создания
 
 // В этом году: "15 июн 14:20"
@@ -47,7 +20,7 @@ func formatTrackListLabel(from date: Date) -> String {
         let year = calendar.component(.year, from: date)
 
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ru_RU")
+        formatter.locale = Locale(identifier: "en_US")
 
         if currentYear == year {
             formatter.dateFormat = "d MMM HH:mm"
@@ -63,7 +36,7 @@ func formatTrackListLabel(from date: Date) -> String {
 
 func generateDefaultTrackListName() -> String {
     let formatter = DateFormatter()
-    formatter.locale = Locale(identifier: "ru_RU")
+    formatter.locale = Locale(identifier: "en_US")
     formatter.dateFormat = "dd.MM.yy, HH:mm"
     return formatter.string(from: Date())
 }

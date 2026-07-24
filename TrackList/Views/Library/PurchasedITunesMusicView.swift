@@ -54,10 +54,10 @@ struct PurchasedITunesMusicView: View {
             loadingView
 
         case .denied:
-            messageView("Media Library Access Unavailable")
+            messageView(LibraryPresentationText.purchasedITunesAccessUnavailableMessage)
 
         case .empty:
-            messageView("No local iTunes tracks available for copying.")
+            messageView(LibraryPresentationText.purchasedITunesEmptyMessage)
 
         case .loaded:
             tracksList(exportableTracks)
@@ -84,7 +84,7 @@ struct PurchasedITunesMusicView: View {
         VStack(spacing: 12) {
             ProgressView()
 
-            Text("Reading Media Library…")
+            Text(LibraryPresentationText.purchasedITunesLoadingMessage)
                 .font(.body)
                 .foregroundStyle(.secondary)
         }

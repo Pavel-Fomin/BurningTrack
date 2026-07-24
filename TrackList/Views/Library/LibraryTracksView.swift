@@ -14,8 +14,8 @@ import UIKit
 struct LibraryTracksView: View {
 
     let folder: LibraryFolder
-    /// Готовая вторичная строка заголовка без UI-логики расчёта статистики.
-    let summaryText: String?
+    /// Семантическая статистика для формирования вторичной строки заголовка во View.
+    let summary: TrackCollectionSummary?
     /// Подпапки текущей папки, которые нужно показать над секциями треков.
     let subfolders: [LibraryFolder]
     /// Передаёт навигационное действие владельцу flow фонотеки.
@@ -70,7 +70,7 @@ struct LibraryTracksView: View {
     
     init(
         folder: LibraryFolder,
-        summaryText: String? = nil,
+        summary: TrackCollectionSummary? = nil,
         subfolders: [LibraryFolder] = [],
         onSubfolderTap: @escaping (LibraryFolder) -> Void = { _ in },
         onExportTracks: @escaping ([LibraryTrack]) -> Void = { _ in },
@@ -80,7 +80,7 @@ struct LibraryTracksView: View {
         selectionActionBarConfig: Binding<SelectionActionBarConfig?> = .constant(nil)
     ) {
         self.folder = folder
-        self.summaryText = summaryText
+        self.summary = summary
         self.subfolders = subfolders
         self.onSubfolderTap = onSubfolderTap
         self.onExportTracks = onExportTracks
@@ -125,7 +125,7 @@ struct LibraryTracksView: View {
                     ToolbarItem(placement: .principal) {
                         ScreenToolbarTitleView(
                             title: folder.name,
-                            subtitle: summaryText
+                            subtitle: summary.map(SharedPresentationText.trackCollectionSummary)
                         )
                     }
                 }

@@ -61,7 +61,7 @@ final class PlayerExportActionHandler {
         // Action handler только передаёт команду глобальному владельцу операции.
         exportProgressViewModel.startExport(
             tracks: tracks,
-            exportFolderName: "Плеер",
+            exportFolder: .playerQueue,
             fileNamingMode: .numbered,
             presenter: topVC
         )

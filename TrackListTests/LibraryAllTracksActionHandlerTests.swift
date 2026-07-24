@@ -32,15 +32,13 @@ final class LibraryAllTracksActionHandlerTests: XCTestCase {
         let visibleSections = [
             TrackSection(
                 id: "second",
-                title: "",
-                tracks: [secondTrack],
-                showsHeader: false
+                header: .hidden,
+                tracks: [secondTrack]
             ),
             TrackSection(
                 id: "first",
-                title: "",
-                tracks: [firstTrack],
-                showsHeader: false
+                header: .hidden,
+                tracks: [firstTrack]
             )
         ]
 
@@ -99,10 +97,10 @@ final class LibraryAllTracksActionHandlerTests: XCTestCase {
 
         XCTAssertTrue(LibraryTrackListSource.allLibraryTracks.isAllLibraryTracks)
         XCTAssertFalse(LibraryTrackListSource.allLibraryTracks.isCollectionValue)
-        XCTAssertEqual(LibraryTrackListSource.allLibraryTracks.exportFolderName, "Треки")
+        XCTAssertEqual(LibraryTrackListSource.allLibraryTracks.exportFolder, .libraryTracks)
         XCTAssertFalse(collectionSource.isAllLibraryTracks)
         XCTAssertTrue(collectionSource.isCollectionValue)
-        XCTAssertEqual(collectionSource.exportFolderName, "Артист")
+        XCTAssertEqual(collectionSource.exportFolder, .named("Артист"))
     }
 
     /// Проверяет, что общий список сохраняет все существующие режимы сортировки.
@@ -185,13 +183,13 @@ private final class AllTracksExportingSpy: TrackExporting {
     /// Сохраняет параметры запроса и завершает экспорт успешным итогом.
     func exportTracks(
         _ tracks: [Track],
-        exportFolderName: String,
+        exportFolder: ExportFolder,
         fileNamingMode: ExportFileNamingMode,
         presenter: UIViewController,
         onProgress: @escaping ExportProgressHandler
     ) async throws -> ExportSummary {
         exportCallCount += 1
-        exportFolderNames.append(exportFolderName)
+        exportFolderNames.append(exportFolder.fileSystemName)
         fileNamingModes.append(fileNamingMode)
         exportedTrackIDs.append(tracks.map(\.trackId))
         exportedFileNames.append(tracks.map(\.fileName))

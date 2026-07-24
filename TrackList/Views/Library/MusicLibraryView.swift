@@ -46,10 +46,7 @@ struct MusicLibraryView: View {
                 onAction(.cancelDetachFolder)
             }
         } message: {
-            Text(
-                "This folder will be removed from the library, "
-                + "but the files on your device will remain unchanged."
-            )
+            Text(LibraryPresentationText.removeFolderConfirmationMessage)
         }
         // Второе подтверждение показывается только после проверки активного трека.
         .alert(

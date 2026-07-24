@@ -68,7 +68,7 @@ final class PurchasedITunesMusicActionHandler {
         )
         exportProgressViewModel.startExport(
             tracks: exportTracks,
-            exportFolderName: "Куплено в iTunes",
+            exportFolder: .purchasedITunes,
             fileNamingMode: .original,
             presenter: presenter
         )

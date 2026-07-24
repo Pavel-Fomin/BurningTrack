@@ -47,7 +47,7 @@ struct TrackSelectableSectionsView: View {
 
                 // Заголовок секции (если есть)
                 if section.showsHeader {
-                    Text(section.title)
+                    Text(LibraryPresentationText.trackSectionHeader(section.header))
                 }
             }
         }

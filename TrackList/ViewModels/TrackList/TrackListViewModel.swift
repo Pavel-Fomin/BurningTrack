@@ -52,7 +52,8 @@ final class TrackListViewModel: ObservableObject {
     /// Собирает готовое состояние экрана одного треклиста.
     private let screenStateBuilder = TrackListScreenStateBuilder()
     /// Готовый вторичный текст заголовка, не зависящий от runtime snapshot строк.
-    private var summaryText: String?
+    /// Семантическая статистика, которую View локализует при отображении.
+    private var summary: TrackCollectionSummary?
     /// Незавершённый запрос статистики, который отменяется при следующем релевантном событии.
     private var summaryTask: Task<Void, Never>?
     /// Пропускает собственное событие сохранения перестановки, не меняющее итоговые суммы.
@@ -293,7 +294,7 @@ final class TrackListViewModel: ObservableObject {
         screenState = screenStateBuilder.build(
             id: id,
             title: name,
-            summaryText: summaryText,
+            summary: summary,
             tracks: tracks,
             snapshotsByTrackId: snapshotsByTrackId,
             currentTrackId: currentTrackId,
@@ -406,7 +407,7 @@ final class TrackListViewModel: ObservableObject {
                     return
                 }
 
-                self.summaryText = TrackCollectionSummaryFormatter.string(from: summary)
+                self.summary = summary
                 self.rebuildScreenState()
             } catch is CancellationError {
                 // Отмена ожидаема при новом составе треклиста или закрытии экрана.
@@ -419,7 +420,7 @@ final class TrackListViewModel: ObservableObject {
 
                 // Не показываем отдельный toast, чтобы ошибка статистики не блокировала экран треклиста.
                 PersistentLogger.log("TrackListViewModel: summary loading failed trackListId=\(trackListId) error=\(error)")
-                self.summaryText = nil
+                self.summary = nil
                 self.rebuildScreenState()
             }
         }

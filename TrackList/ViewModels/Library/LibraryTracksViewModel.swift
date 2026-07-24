@@ -349,7 +349,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
 
             return TrackSection(
                 id: section.id,
-                title: section.title,
+                header: section.header,
                 tracks: updatedTracks
             )
         }
@@ -596,7 +596,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
 
             return TrackSection(
                 id: section.id,
-                title: section.title,
+                header: section.header,
                 tracks: updatedTracks
             )
         }

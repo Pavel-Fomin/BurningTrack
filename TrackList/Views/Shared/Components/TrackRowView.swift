@@ -133,7 +133,7 @@ struct TrackRowView<ActionMenuContent: View>: View {
     /// Есть ли отображаемый исполнитель
     private var hasArtist: Bool {
         guard let artist = artist?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() else { return false }
-        return !artist.isEmpty && artist != "неизвестен"
+        return artist.isEmpty == false
     }
 
     /// Возвращает локализованную замену, если в модели отсутствуют данные для заголовка.
@@ -337,7 +337,7 @@ struct TrackRowView<ActionMenuContent: View>: View {
                     .lineLimit(1)
             }
 
-            Text(formatTimeSmart(duration ?? track.duration))
+            Text(SharedPresentationText.duration(duration ?? track.duration))
                 .font(.footnote)
                 .foregroundColor(.secondary)
                 .lineLimit(1)

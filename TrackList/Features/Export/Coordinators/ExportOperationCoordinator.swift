@@ -89,7 +89,7 @@ final class ExportOperationCoordinator {
     @discardableResult
     func startExport(
         tracks: [Track],
-        exportFolderName: String,
+        exportFolder: ExportFolder,
         fileNamingMode: ExportFileNamingMode,
         presenter: UIViewController
     ) -> Bool {
@@ -102,7 +102,7 @@ final class ExportOperationCoordinator {
         liveActivityOperationID = nil
         estimatedEndDate = nil
         isTimeEstimationStarted = false
-        liveActivitySubjectTitle = exportFolderName
+        liveActivitySubjectTitle = ExportPresentationText.displaySourceName(for: exportFolder)
         timeEstimator.stop()
 
         exportTask = Task { [weak self] in
@@ -122,7 +122,7 @@ final class ExportOperationCoordinator {
             do {
                 _ = try await self.actionHandler.startExport(
                     tracks: tracks,
-                    exportFolderName: exportFolderName,
+                    exportFolder: exportFolder,
                     fileNamingMode: fileNamingMode,
                     presenter: presenter,
                     onExportAccepted: {
@@ -355,9 +355,7 @@ final class ExportOperationCoordinator {
             liveActivityManager.start(
                 operationID: operationID,
                 operationTitle: ExportPresentationText.exportingTitle,
-                subjectTitle: ExportPresentationText.displaySourceName(
-                    for: subjectTitle
-                ),
+                subjectTitle: subjectTitle,
                 progress: progress
             )
         }

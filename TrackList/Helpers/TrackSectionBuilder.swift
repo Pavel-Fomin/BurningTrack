@@ -50,11 +50,6 @@ private extension TrackSectionBuilder {
     ) -> [TrackSection] {
 
         let calendar = Calendar.current
-        let dateFormatter = DateFormatter()
-        // Заголовки date-секций используют базовую английскую локаль приложения.
-        dateFormatter.locale = Locale(identifier: "en")
-        dateFormatter.dateStyle = .medium
-        dateFormatter.timeStyle = .none
         var sections: [(day: Date, tracks: [LibraryTrack])] = []
         var sectionIndexByDay: [Date: Int] = [:]
 
@@ -72,11 +67,7 @@ private extension TrackSectionBuilder {
         return sections.map { section in
             TrackSection(
                 id: section.day.iso8601String,
-                title: title(
-                    for: section.day,
-                    calendar: calendar,
-                    dateFormatter: dateFormatter
-                ),
+                header: .date(section.day),
                 tracks: section.tracks
             )
         }
@@ -91,22 +82,10 @@ private extension TrackSectionBuilder {
         return [
             TrackSection(
                 id: "library-tracks-flat-section",
-                title: "",
-                tracks: tracks,
-                showsHeader: false
+                header: .hidden,
+                tracks: tracks
             )
         ]
-    }
-
-    /// Возвращает человекочитаемый заголовок date-секции.
-    static func title(
-        for day: Date,
-        calendar: Calendar,
-        dateFormatter: DateFormatter
-    ) -> String {
-        if calendar.isDateInToday(day) { return String(localized: "Today") }
-        if calendar.isDateInYesterday(day) { return String(localized: "Yesterday") }
-        return dateFormatter.string(from: day)
     }
 }
 
@@ -118,23 +97,21 @@ private extension TrackSectionBuilder {
         _ tracks: [LibraryTrack]
     ) -> [TrackSection] {
 
-        let grouped = Dictionary(grouping: tracks) {
-            normalizedArtist($0)
-        }
+        let grouped = Dictionary(grouping: tracks, by: artistGroup)
 
         let sortedKeys = grouped.keys.sorted {
-            $0.localizedCaseInsensitiveCompare($1) == .orderedAscending
+            $0.sortValue.localizedCaseInsensitiveCompare($1.sortValue) == .orderedAscending
         }
 
-        return sortedKeys.map { artist in
-            let items = (grouped[artist] ?? []).sorted {
+        return sortedKeys.map { group in
+            let items = (grouped[group] ?? []).sorted {
                 normalizedTitle($0)
                     .localizedCaseInsensitiveCompare(normalizedTitle($1)) == .orderedAscending
             }
 
             return TrackSection(
-                id: artist,
-                title: artist,
+                id: group.id,
+                header: group.header,
                 tracks: items
             )
         }
@@ -164,7 +141,7 @@ private extension TrackSectionBuilder {
 
             return TrackSection(
                 id: letter,
-                title: letter,
+                header: .metadata(letter),
                 tracks: items
             )
         }
@@ -175,14 +152,37 @@ private extension TrackSectionBuilder {
 
 private extension TrackSectionBuilder {
 
-    static func normalizedArtist(_ track: LibraryTrack) -> String {
+    /// Формирует технический ключ группировки, не подменяя отсутствующего исполнителя готовым текстом.
+    static func artistGroup(_ track: LibraryTrack) -> ArtistGroup {
         let artist = track.artist?.trimmingCharacters(in: .whitespacesAndNewlines)
-        return artist?.isEmpty == false ? artist! : String(localized: "Unknown Artist")
+        guard let artist, artist.isEmpty == false else {
+            return ArtistGroup(
+                id: "artist:missing",
+                sortValue: "\u{FFFF}",
+                header: .unknownArtist
+            )
+        }
+
+        return ArtistGroup(
+            id: "artist:\(artist)",
+            sortValue: artist,
+            header: .metadata(artist)
+        )
     }
 
     static func normalizedTitle(_ track: LibraryTrack) -> String {
         let title = track.title?.trimmingCharacters(in: .whitespacesAndNewlines)
         return title?.isEmpty == false ? title! : track.fileName
+    }
+}
+
+private extension TrackSectionBuilder {
+
+    /// Сохраняет устойчивый ключ и порядок группировки отдельно от подписи интерфейса.
+    struct ArtistGroup: Hashable {
+        let id: String
+        let sortValue: String
+        let header: TrackSectionHeader
     }
 }
 

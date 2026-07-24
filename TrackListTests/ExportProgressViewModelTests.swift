@@ -44,7 +44,7 @@ final class ExportProgressViewModelTests: XCTestCase {
 
         viewModel.startExport(
             tracks: [makeTrack()],
-            exportFolderName: "Плеер",
+            exportFolder: .playerQueue,
             fileNamingMode: .numbered,
             presenter: UIViewController()
         )
@@ -79,7 +79,7 @@ final class ExportProgressViewModelTests: XCTestCase {
 
         viewModel.startExport(
             tracks: [makeTrack()],
-            exportFolderName: "Плеер",
+            exportFolder: .playerQueue,
             fileNamingMode: .numbered,
             presenter: UIViewController()
         )
@@ -117,7 +117,7 @@ final class ExportProgressViewModelTests: XCTestCase {
 
         viewModel.startExport(
             tracks: [makeTrack()],
-            exportFolderName: "Плеер",
+            exportFolder: .playerQueue,
             fileNamingMode: .numbered,
             presenter: UIViewController()
         )
@@ -147,7 +147,7 @@ final class ExportProgressViewModelTests: XCTestCase {
 
         viewModel.startExport(
             tracks: [makeTrack()],
-            exportFolderName: "Плеер",
+            exportFolder: .playerQueue,
             fileNamingMode: .numbered,
             presenter: UIViewController()
         )
@@ -182,7 +182,7 @@ final class ExportProgressViewModelTests: XCTestCase {
 
         viewModel.startExport(
             tracks: [makeTrack()],
-            exportFolderName: "Плеер",
+            exportFolder: .playerQueue,
             fileNamingMode: .numbered,
             presenter: UIViewController()
         )
@@ -205,7 +205,7 @@ final class ExportProgressViewModelTests: XCTestCase {
 
         viewModel.startExport(
             tracks: [makeTrack()],
-            exportFolderName: "Плеер",
+            exportFolder: .playerQueue,
             fileNamingMode: .numbered,
             presenter: UIViewController()
         )
@@ -233,7 +233,7 @@ final class ExportProgressViewModelTests: XCTestCase {
 
         viewModel.startExport(
             tracks: [makeTrack()],
-            exportFolderName: "Плеер",
+            exportFolder: .playerQueue,
             fileNamingMode: .numbered,
             presenter: UIViewController()
         )
@@ -257,7 +257,7 @@ final class ExportProgressViewModelTests: XCTestCase {
 
         viewModel.startExport(
             tracks: [makeTrack()],
-            exportFolderName: "Плеер",
+            exportFolder: .playerQueue,
             fileNamingMode: .numbered,
             presenter: UIViewController()
         )
@@ -287,7 +287,7 @@ final class ExportProgressViewModelTests: XCTestCase {
 
             viewModel.startExport(
                 tracks: [makeTrack()],
-                exportFolderName: "Плеер",
+                exportFolder: .playerQueue,
                 fileNamingMode: .numbered,
                 presenter: UIViewController()
             )
@@ -308,7 +308,7 @@ final class ExportProgressViewModelTests: XCTestCase {
 
         viewModel.startExport(
             tracks: [makeTrack()],
-            exportFolderName: "Плеер",
+            exportFolder: .playerQueue,
             fileNamingMode: .numbered,
             presenter: UIViewController()
         )
@@ -334,7 +334,7 @@ final class ExportProgressViewModelTests: XCTestCase {
 
         viewModel.startExport(
             tracks: [makeTrack()],
-            exportFolderName: "Плеер",
+            exportFolder: .playerQueue,
             fileNamingMode: .numbered,
             presenter: UIViewController()
         )
@@ -342,7 +342,7 @@ final class ExportProgressViewModelTests: XCTestCase {
 
         viewModel.startExport(
             tracks: [makeTrack()],
-            exportFolderName: "Другой список",
+            exportFolder: .named("Другой список"),
             fileNamingMode: .numbered,
             presenter: UIViewController()
         )
@@ -368,7 +368,7 @@ final class ExportProgressViewModelTests: XCTestCase {
         viewModel.handle(
             .start(
                 tracks: [track],
-                exportFolderName: "Экспорт через action",
+                exportFolder: .named("Экспорт через action"),
                 fileNamingMode: .numbered,
                 presenter: UIViewController()
             )
@@ -410,7 +410,7 @@ final class ExportProgressViewModelTests: XCTestCase {
 
         viewModel.startExport(
             tracks: [makeTrack()],
-            exportFolderName: "Первый список",
+            exportFolder: .named("Первый список"),
             fileNamingMode: .numbered,
             presenter: UIViewController()
         )
@@ -421,7 +421,7 @@ final class ExportProgressViewModelTests: XCTestCase {
 
         viewModel.startExport(
             tracks: [makeTrack()],
-            exportFolderName: "Второй список",
+            exportFolder: .named("Второй список"),
             fileNamingMode: .numbered,
             presenter: UIViewController()
         )
@@ -456,7 +456,7 @@ final class ExportProgressViewModelTests: XCTestCase {
 
         viewModel.startExport(
             tracks: [makeTrack()],
-            exportFolderName: "Первый список",
+            exportFolder: .named("Первый список"),
             fileNamingMode: .numbered,
             presenter: UIViewController()
         )
@@ -470,7 +470,7 @@ final class ExportProgressViewModelTests: XCTestCase {
 
         viewModel.startExport(
             tracks: [makeTrack()],
-            exportFolderName: "Второй список",
+            exportFolder: .named("Второй список"),
             fileNamingMode: .numbered,
             presenter: UIViewController()
         )
@@ -520,7 +520,7 @@ final class ExportProgressViewModelTests: XCTestCase {
 
         viewModel.startExport(
             tracks: [makeTrack()],
-            exportFolderName: "Первый список",
+            exportFolder: .named("Первый список"),
             fileNamingMode: .numbered,
             presenter: UIViewController()
         )
@@ -528,7 +528,7 @@ final class ExportProgressViewModelTests: XCTestCase {
 
         viewModel.startExport(
             tracks: [makeTrack()],
-            exportFolderName: "Второй список",
+            exportFolder: .named("Второй список"),
             fileNamingMode: .numbered,
             presenter: UIViewController()
         )
@@ -579,7 +579,7 @@ final class ExportProgressViewModelTests: XCTestCase {
 
             viewModel.startExport(
                 tracks: [makeTrack()],
-                exportFolderName: "Плеер",
+                exportFolder: .playerQueue,
                 fileNamingMode: .numbered,
                 presenter: UIViewController()
             )
@@ -632,7 +632,7 @@ final class ExportProgressViewModelTests: XCTestCase {
 
         viewModel.startExport(
             tracks: [makeTrack()],
-            exportFolderName: "Плеер",
+            exportFolder: .playerQueue,
             fileNamingMode: .numbered,
             presenter: UIViewController()
         )
@@ -660,7 +660,7 @@ final class ExportProgressViewModelTests: XCTestCase {
 
         viewModel.startExport(
             tracks: [makeTrack()],
-            exportFolderName: "Первый список",
+            exportFolder: .named("Первый список"),
             fileNamingMode: .numbered,
             presenter: UIViewController()
         )
@@ -674,7 +674,7 @@ final class ExportProgressViewModelTests: XCTestCase {
 
         viewModel.startExport(
             tracks: [makeTrack()],
-            exportFolderName: "Второй список",
+            exportFolder: .named("Второй список"),
             fileNamingMode: .numbered,
             presenter: UIViewController()
         )
@@ -700,7 +700,7 @@ final class ExportProgressViewModelTests: XCTestCase {
 
         viewModel.startExport(
             tracks: [makeTrack()],
-            exportFolderName: "Первый список",
+            exportFolder: .named("Первый список"),
             fileNamingMode: .numbered,
             presenter: UIViewController()
         )
@@ -713,7 +713,7 @@ final class ExportProgressViewModelTests: XCTestCase {
         exporter.errorToThrow = nil
         viewModel.startExport(
             tracks: [makeTrack()],
-            exportFolderName: "Второй список",
+            exportFolder: .named("Второй список"),
             fileNamingMode: .numbered,
             presenter: UIViewController()
         )
@@ -835,13 +835,13 @@ private final class ExportingSpy: TrackExporting {
     /// Выполняет тестовый сценарий экспорта.
     func exportTracks(
         _ tracks: [Track],
-        exportFolderName: String,
+        exportFolder: ExportFolder,
         fileNamingMode: ExportFileNamingMode,
         presenter: UIViewController,
         onProgress: @escaping ExportProgressHandler
     ) async throws -> ExportSummary {
         exportCallCount += 1
-        exportFolderNames.append(exportFolderName)
+        exportFolderNames.append(exportFolder.fileSystemName)
         exportedTrackIDs.append(tracks.map(\.trackId))
         progressHandlers.append(onProgress)
 

@@ -15,8 +15,8 @@ typealias ExportProgressHandler = @Sendable (ExportProgress) -> Void
 /// Содержит данные, необходимые для текущего и будущего UI прогресса экспорта.
 struct ExportProgress: Equatable, Sendable {
 
-    /// Имя источника, для которого формируется текущий экспорт.
-    var sourceName: String
+    /// Семантический источник, для которого формируется текущий экспорт.
+    var exportFolder: ExportFolder?
 
     /// Имя корневой папки, выбранной пользователем в системном picker-е.
     var rootDestinationName: String
@@ -58,11 +58,11 @@ struct ExportProgress: Equatable, Sendable {
     init(
         totalFiles: Int,
         destination: ExportDestination,
-        sourceName: String? = nil,
+        exportFolder: ExportFolder? = nil,
         rootDestinationName: String? = nil,
         state: ExportState = .idle
     ) {
-        self.sourceName = sourceName ?? destination.displayName
+        self.exportFolder = exportFolder
         self.rootDestinationName = rootDestinationName ?? destination.displayName
         self.totalFiles = totalFiles
         self.completedFiles = 0

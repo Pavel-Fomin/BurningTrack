@@ -15,7 +15,7 @@ enum ExportAction {
     /// Запускает экспорт выбранных треков в папку, выбранную пользователем.
     case start(
         tracks: [Track],
-        exportFolderName: String,
+        exportFolder: ExportFolder,
         fileNamingMode: ExportFileNamingMode,
         presenter: UIViewController
     )

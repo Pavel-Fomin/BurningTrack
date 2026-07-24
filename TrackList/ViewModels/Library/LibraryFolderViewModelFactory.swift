@@ -47,7 +47,7 @@ enum LibraryFolderViewModelFactory {
             exportProgressViewModel: exportProgressViewModel,
             viewControllerProvider: viewControllerProvider,
             toastPresenter: toastPresenter,
-            exportFolderName: folder.name,
+            exportFolder: .named(folder.name),
             clearSelectionActionBar: clearSelectionActionBar
         )
         return LibraryFolderViewModel(

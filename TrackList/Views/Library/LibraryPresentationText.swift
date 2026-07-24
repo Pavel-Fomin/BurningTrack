@@ -11,6 +11,52 @@ import Foundation
 
 /// Сопоставляет смысловые значения фонотеки с локализованными подписями интерфейса.
 enum LibraryPresentationText {
+    /// Форматтер нужен только presentation-слою для заголовков date-секций.
+    private static let trackSectionDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US")
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return formatter
+    }()
+
+    /// Преобразует семантический заголовок секции в локализованный текст интерфейса.
+    static func trackSectionHeader(_ header: TrackSectionHeader) -> String {
+        switch header {
+        case .hidden:
+            return ""
+        case .date(let date):
+            let calendar = Calendar.current
+            if calendar.isDateInToday(date) {
+                return String(localized: "Today")
+            }
+            if calendar.isDateInYesterday(date) {
+                return String(localized: "Yesterday")
+            }
+            return trackSectionDateFormatter.string(from: date)
+        case .metadata(let value):
+            return value
+        case .unknownArtist:
+            return String(localized: "Unknown Artist")
+        }
+    }
+
+    static var removeFolderConfirmationMessage: String {
+        String(localized: "library.removeFolder.message")
+    }
+
+    static var purchasedITunesAccessUnavailableMessage: String {
+        String(localized: "Media Library Access Unavailable")
+    }
+
+    static var purchasedITunesEmptyMessage: String {
+        String(localized: "No local iTunes tracks available for copying.")
+    }
+
+    static var purchasedITunesLoadingMessage: String {
+        String(localized: "Reading Media Library…")
+    }
+
     static func rootDisplayModeTitle(for mode: LibraryRootDisplayMode) -> String {
         switch mode {
         case .folders:

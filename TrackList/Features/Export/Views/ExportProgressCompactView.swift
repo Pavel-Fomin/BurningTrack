@@ -133,7 +133,8 @@ struct ExportProgressCompactView: View {
 
                             Text(
                                 ExportPresentationText.displaySourceName(
-                                    for: progress.sourceName
+                                    for: progress.exportFolder,
+                                    fallback: progress.destination.displayName
                                 )
                             )
                                 .font(.subheadline)

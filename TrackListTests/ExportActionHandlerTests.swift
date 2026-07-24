@@ -28,7 +28,7 @@ final class ExportActionHandlerTests: XCTestCase {
 
         let result = try await handler.startExport(
             tracks: [],
-            exportFolderName: "Плеер",
+            exportFolder: .playerQueue,
             fileNamingMode: .numbered,
             presenter: UIViewController(),
             onExportAccepted: {
@@ -57,7 +57,7 @@ final class ExportActionHandlerTests: XCTestCase {
 
         let result = try await handler.startExport(
             tracks: [track],
-            exportFolderName: "Экспорт",
+            exportFolder: .named("Экспорт"),
             fileNamingMode: .numbered,
             presenter: UIViewController(),
             onExportAccepted: {
@@ -188,7 +188,7 @@ final class ExportActionHandlerTests: XCTestCase {
     ) async throws -> ExportSummary? {
         try await handler.startExport(
             tracks: [makeTrack()],
-            exportFolderName: "Плеер",
+            exportFolder: .playerQueue,
             fileNamingMode: .numbered,
             presenter: UIViewController(),
             onExportAccepted: {},
@@ -238,13 +238,13 @@ private final class ExportingSpy: TrackExporting {
     /// Выполняет управляемый тестовый запуск.
     func exportTracks(
         _ tracks: [Track],
-        exportFolderName: String,
+        exportFolder: ExportFolder,
         fileNamingMode: ExportFileNamingMode,
         presenter: UIViewController,
         onProgress: @escaping ExportProgressHandler
     ) async throws -> ExportSummary {
         exportCallCount += 1
-        exportFolderNames.append(exportFolderName)
+        exportFolderNames.append(exportFolder.fileSystemName)
         fileNamingModes.append(fileNamingMode)
         exportedTrackIDs.append(tracks.map(\.trackId))
 

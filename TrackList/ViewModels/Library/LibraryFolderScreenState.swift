@@ -22,8 +22,8 @@ struct LibraryFolderScreenState {
     // MARK: - Данные экрана
 
     let title: String
-    /// Готовая строка статистики папки или nil, если сохранённые данные неполные либо недоступны.
-    let summaryText: String?
+    /// Семантическая статистика папки или nil, если сохранённые данные неполные либо недоступны.
+    let summary: TrackCollectionSummary?
     let folder: LibraryFolder
     let subfolders: [LibraryFolder]
     let displayMode: DisplayMode

@@ -38,7 +38,7 @@ final class ExportManager {
     /// Выбирает папку и запускает самостоятельное копирование треков.
     func exportTracks(
         _ tracks: [Track],
-        exportFolderName: String,
+        exportFolder: ExportFolder,
         fileNamingMode: ExportFileNamingMode,
         presenter: UIViewController,
         onProgress: @escaping ExportProgressHandler = { _ in }
@@ -50,7 +50,7 @@ final class ExportManager {
         let job = ExportJob(
             tracks: tracks,
             destination: destination,
-            exportFolderName: exportFolderName,
+            exportFolder: exportFolder,
             fileNamingMode: fileNamingMode
         )
         return try await trackExportService.export(

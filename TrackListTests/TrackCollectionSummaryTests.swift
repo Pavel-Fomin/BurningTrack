@@ -50,36 +50,36 @@ final class TrackCollectionSummaryTests: XCTestCase {
         XCTAssertFalse(incomplete.hasCompleteFileSize)
     }
 
-    func testFormatterUsesRussianTrackDeclensionAndCollectionDuration() {
+    func testPresentationUsesEnglishTrackPluralizationAndCollectionDuration() {
         XCTAssertEqual(
-            TrackCollectionSummaryFormatter.string(from: makeSummary(count: 0)),
-            "0 треков"
+            SharedPresentationText.trackCollectionSummary(from: makeSummary(count: 0)),
+            "0 tracks"
         )
         XCTAssertEqual(
-            TrackCollectionSummaryFormatter.string(from: makeSummary(count: 1, duration: 240)),
-            "1 трек • 4 мин"
+            SharedPresentationText.trackCollectionSummary(from: makeSummary(count: 1, duration: 240)),
+            "1 track • 4m"
         )
         XCTAssertEqual(
-            TrackCollectionSummaryFormatter.string(from: makeSummary(count: 2, duration: 480)),
-            "2 трека • 8 мин"
+            SharedPresentationText.trackCollectionSummary(from: makeSummary(count: 2, duration: 480)),
+            "2 tracks • 8m"
         )
         XCTAssertEqual(
-            TrackCollectionSummaryFormatter.string(from: makeSummary(count: 5, duration: 4_080)),
-            "5 треков • 1 ч 08 мин"
+            SharedPresentationText.trackCollectionSummary(from: makeSummary(count: 5, duration: 4_080)),
+            "5 tracks • 1h 8m"
         )
     }
 
-    func testFormatterUsesSystemFileSizeFormattingForMegabytesAndGigabytes() {
+    func testFormatterUsesEnglishFileSizeFormattingForMegabytesAndGigabytes() {
         let megabytes = Int64(12 * 1_024 * 1_024)
         let gigabytes = Int64(5 * 1_024 * 1_024 * 1_024)
 
         XCTAssertEqual(
-            TrackCollectionSummaryFormatter.string(from: makeSummary(count: 1, fileSize: megabytes)),
-            "1 трек • \(ByteCountFormatter.string(fromByteCount: megabytes, countStyle: .file))"
+            SharedPresentationText.trackCollectionSummary(from: makeSummary(count: 1, fileSize: megabytes)),
+            "1 track • 12.6 MB"
         )
         XCTAssertEqual(
-            TrackCollectionSummaryFormatter.string(from: makeSummary(count: 5, fileSize: gigabytes)),
-            "5 треков • \(ByteCountFormatter.string(fromByteCount: gigabytes, countStyle: .file))"
+            SharedPresentationText.trackCollectionSummary(from: makeSummary(count: 5, fileSize: gigabytes)),
+            "5 tracks • 5.37 GB"
         )
     }
 
@@ -100,12 +100,12 @@ final class TrackCollectionSummaryTests: XCTestCase {
         )
 
         XCTAssertEqual(
-            TrackCollectionSummaryFormatter.string(from: incompleteDuration),
-            "5 треков • \(ByteCountFormatter.string(fromByteCount: 1_024, countStyle: .file))"
+            SharedPresentationText.trackCollectionSummary(from: incompleteDuration),
+            "5 tracks • 1 kB"
         )
         XCTAssertEqual(
-            TrackCollectionSummaryFormatter.string(from: incompleteSize),
-            "5 треков • 1 мин"
+            SharedPresentationText.trackCollectionSummary(from: incompleteSize),
+            "5 tracks • 1m"
         )
     }
 
@@ -192,8 +192,8 @@ final class TrackCollectionSummaryTests: XCTestCase {
         XCTAssertEqual(summary.unknownDurationCount, 0)
         XCTAssertEqual(summary.unknownFileSizeCount, 0)
         XCTAssertEqual(
-            TrackCollectionSummaryFormatter.string(from: summary),
-            "2 трека • 3 мин • \(ByteCountFormatter.string(fromByteCount: 300, countStyle: .file))"
+            SharedPresentationText.trackCollectionSummary(from: summary),
+            "2 tracks • 3m • 300 bytes"
         )
     }
 
@@ -223,8 +223,8 @@ final class TrackCollectionSummaryTests: XCTestCase {
         XCTAssertEqual(summary.unknownDurationCount, 0)
         XCTAssertEqual(summary.unknownFileSizeCount, 1)
         XCTAssertEqual(
-            TrackCollectionSummaryFormatter.string(from: summary),
-            "2 трека • 2 мин"
+            SharedPresentationText.trackCollectionSummary(from: summary),
+            "2 tracks • 2m"
         )
     }
 

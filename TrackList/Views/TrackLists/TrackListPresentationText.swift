@@ -15,6 +15,7 @@ enum TrackListPresentationText {
     /// Форматирует дату создания треклиста без времени в текущей системной locale.
     private static let createdAtFormatter: DateFormatter = {
         let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US")
         formatter.dateStyle = .medium
         formatter.timeStyle = .none
         return formatter

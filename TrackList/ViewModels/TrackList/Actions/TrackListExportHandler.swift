@@ -54,7 +54,7 @@ final class TrackListExportHandler {
         // Action handler не запускает копирование и не привязывает его к экрану.
         exportProgressViewModel.startExport(
             tracks: tracks,
-            exportFolderName: reader.name,
+            exportFolder: .named(reader.name),
             fileNamingMode: .numbered,
             presenter: topVC
         )

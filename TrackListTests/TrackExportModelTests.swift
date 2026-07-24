@@ -39,7 +39,7 @@ final class TrackExportModelTests: XCTestCase {
         let job = ExportJob(
             tracks: [firstTrack, secondTrack],
             destination: destination,
-            exportFolderName: "Peak Time",
+            exportFolder: .named("Peak Time"),
             fileNamingMode: .numbered
         )
 
@@ -81,7 +81,7 @@ final class TrackExportModelTests: XCTestCase {
         let job = ExportJob(
             tracks: tracks,
             destination: destination,
-            exportFolderName: "Original",
+            exportFolder: .named("Original"),
             fileNamingMode: .original
         )
 

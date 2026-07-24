@@ -43,7 +43,7 @@ final class ExportRequestSpy: TrackExporting {
     /// Сохраняет параметры и завершает тестовую операцию успешным итогом.
     func exportTracks(
         _ tracks: [Track],
-        exportFolderName: String,
+        exportFolder: ExportFolder,
         fileNamingMode: ExportFileNamingMode,
         presenter: UIViewController,
         onProgress: @escaping ExportProgressHandler
@@ -53,7 +53,7 @@ final class ExportRequestSpy: TrackExporting {
         exportedFileNames.append(tracks.map(\.fileName))
         exportedSources.append(tracks.map(\.source))
         exportedAssetURLs.append(tracks.map(\.assetURL))
-        exportFolderNames.append(exportFolderName)
+        exportFolderNames.append(exportFolder.fileSystemName)
         fileNamingModes.append(fileNamingMode)
 
         return ExportSummary(

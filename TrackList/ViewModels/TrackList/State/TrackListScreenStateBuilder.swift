@@ -34,7 +34,7 @@ struct TrackListScreenStateBuilder {
     /// - Parameters:
     ///   - id: Идентификатор треклиста.
     ///   - title: Название треклиста.
-    ///   - summaryText: Готовая вторичная строка статистики.
+    ///   - summary: Семантическая статистика для преобразования во View.
     ///   - tracks: Треки треклиста.
     ///   - snapshotsByTrackId: Runtime snapshots треков по физическому id трека.
     ///   - currentTrackId: Идентификатор текущего TrackDisplayable; для Track это id строки треклиста.
@@ -46,7 +46,7 @@ struct TrackListScreenStateBuilder {
     func build(
         id: UUID,
         title: String,
-        summaryText: String?,
+        summary: TrackCollectionSummary?,
         tracks: [Track],
         snapshotsByTrackId: [UUID: TrackRuntimeSnapshot],
         currentTrackId: UUID?,
@@ -73,7 +73,7 @@ struct TrackListScreenStateBuilder {
         return TrackListScreenState(
             id: id,
             title: title,
-            summaryText: summaryText,
+            summary: summary,
             rows: rows,
             scrollTargetRowId: scrollTargetRowId
         )

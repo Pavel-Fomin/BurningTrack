@@ -27,12 +27,9 @@ enum TrackTechnicalMetadataFormatter {
         return components.joined(separator: " • ")
     }
 
-    /// Использует системное форматирование размера файлов для текущей локали устройства.
+    /// Форматирует размер файла через общий presentation-слой с английской локалью.
     private static func fileSizeText(for fileSizeBytes: Int64) -> String {
-        ByteCountFormatter.string(
-            fromByteCount: max(0, fileSizeBytes),
-            countStyle: .file
-        )
+        SharedPresentationText.fileSize(fileSizeBytes)
     }
 
     /// Округляет битрейт до целых килобит в секунду и локализует только его единицу.

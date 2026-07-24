@@ -70,7 +70,9 @@ struct TrackListScreen: View {
             ToolbarItem(placement: .principal) {
                 ScreenToolbarTitleView(
                     title: viewModel.screenState?.title ?? viewModel.name,
-                    subtitle: viewModel.screenState?.summaryText
+                    subtitle: viewModel.screenState?.summary.map(
+                        SharedPresentationText.trackCollectionSummary
+                    )
                 )
             }
 

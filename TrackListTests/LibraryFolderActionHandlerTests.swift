@@ -240,13 +240,13 @@ private final class FolderExportingSpy: TrackExporting {
     /// Сохраняет параметры запроса и завершает экспорт успешным итогом.
     func exportTracks(
         _ tracks: [Track],
-        exportFolderName: String,
+        exportFolder: ExportFolder,
         fileNamingMode: ExportFileNamingMode,
         presenter: UIViewController,
         onProgress: @escaping ExportProgressHandler
     ) async throws -> ExportSummary {
         exportCallCount += 1
-        exportFolderNames.append(exportFolderName)
+        exportFolderNames.append(exportFolder.fileSystemName)
         fileNamingModes.append(fileNamingMode)
         exportedTrackIDs.append(tracks.map(\.trackId))
         exportedFileNames.append(tracks.map(\.fileName))
