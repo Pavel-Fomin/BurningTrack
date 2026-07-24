@@ -74,6 +74,23 @@ final class NavigationCoordinator: ObservableObject {
         setTab(.library)
     }
 
+    /// Открывает конкретное значение музыкальной коллекции и переключает приложение на вкладку фонотеки.
+    func openCollectionValueFromApp(
+        category: LibraryCollectionCategory,
+        value: String,
+        artistKey: String? = nil
+    ) {
+        libraryPath = [
+            .collectionCategory(category),
+            .collectionValue(
+                category: category,
+                value: value,
+                artistKey: artistKey
+            )
+        ]
+        setTab(.library)
+    }
+
     /// Запрашивает открытие треклиста во вкладке треклистов.
     func openTrackListFromApp(_ trackListId: UUID) {
         pendingTrackListOpenRequest = TrackListOpenRequest(

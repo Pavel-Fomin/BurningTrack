@@ -19,6 +19,10 @@ enum TrackMenuAction: Hashable {
     case addToTrackList
     /// Добавить трек в очередь плеера.
     case addToPlayer
+    /// Открыть артиста трека в музыкальной коллекции.
+    case goToArtist
+    /// Открыть альбом трека в музыкальной коллекции.
+    case goToAlbum
     /// Показать локальный файл в фонотеке.
     case showInLibrary
     /// Переместить локальный файл в другую папку.

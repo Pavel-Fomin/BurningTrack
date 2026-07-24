@@ -55,6 +55,8 @@ struct TrackMenuActionAvailability {
                 .details,
                 .addToPlayer,
                 .addToTrackList,
+                .goToArtist,
+                .goToAlbum,
                 .moveToFolder,
                 .editTags,
                 .renameFile
@@ -66,6 +68,8 @@ struct TrackMenuActionAvailability {
                 .showInLibrary,
                 .moveToFolder,
                 .addToTrackList,
+                .goToArtist,
+                .goToAlbum,
                 .editTags,
                 .renameFile,
                 .deleteFromPlayer
@@ -76,6 +80,8 @@ struct TrackMenuActionAvailability {
                 .details,
                 .showInLibrary,
                 .moveToFolder,
+                .goToArtist,
+                .goToAlbum,
                 .editTags,
                 .renameFile,
                 .deleteFromTrackList

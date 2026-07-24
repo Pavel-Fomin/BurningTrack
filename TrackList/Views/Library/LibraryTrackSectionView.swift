@@ -105,6 +105,7 @@ struct LibraryTrackSectionView: View {
             playbackHandler: playbackHandler,
             presentationHandler: presentationHandler,
             cloudAvailabilityActionHandler: cloudAvailabilityActionHandler,
+            collectionNavigationHandler: .shared,
             onToggleSelection: onToggleSelection,
             onRenameTrack: onRenameTrack
         )

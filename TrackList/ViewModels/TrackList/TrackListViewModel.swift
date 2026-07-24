@@ -72,6 +72,10 @@ final class TrackListViewModel: ObservableObject {
     private var lastFileFormatVisible: Bool
     /// Снимок настроек для консистентной сборки presentation state строк.
     private var rowPresentationSettings: AppSettings
+    /// Сохранённые metadata локальных треков для перехода к музыкальной коллекции.
+    private var collectionNavigationTargetsByTrackId: [UUID: TrackCollectionNavigationTarget] = [:]
+    /// Незавершённая загрузка metadata отменяется при изменении состава треклиста.
+    private var collectionNavigationTargetLoadTask: Task<Void, Never>?
 
     private var cancellables = Set<AnyCancellable>()
 
@@ -189,6 +193,7 @@ final class TrackListViewModel: ObservableObject {
             .store(in: &cancellables)
 
         reloadSummary()
+        reloadCollectionNavigationTargets()
     }
 
     deinit {
@@ -248,6 +253,7 @@ final class TrackListViewModel: ObservableObject {
             let loadedTracks = try trackListManager.loadTracks(for: id)
             self.tracks = loadedTracks
             rebuildScreenState()
+            reloadCollectionNavigationTargets()
             print("📥 Загружено \(tracks.count) треков из треклиста \(id)")
         } catch let appError as AppError {
             tracks = []
@@ -301,8 +307,43 @@ final class TrackListViewModel: ObservableObject {
             currentContext: currentContext,
             isPlaying: isPlaybackActive,
             highlightedRowId: highlightedRowId,
-            settings: rowPresentationSettings
+            settings: rowPresentationSettings,
+            collectionNavigationTargetsByTrackId: collectionNavigationTargetsByTrackId
         )
+    }
+
+    /// Загружает сохранённые metadata обычных локальных строк без чтения их файлов.
+    private func reloadCollectionNavigationTargets() {
+        let trackIds = Set(
+            tracks
+                .filter { $0.source == .library }
+                .map(\.trackId)
+        )
+        collectionNavigationTargetLoadTask?.cancel()
+
+        collectionNavigationTargetLoadTask = Task { [weak self] in
+            let metadataByTrackId = await TrackRegistry.shared.cachedMetadata(
+                forTrackIds: Array(trackIds)
+            )
+            guard Task.isCancelled == false,
+                  let self,
+                  Set(
+                    self.tracks
+                        .filter { $0.source == .library }
+                        .map(\.trackId)
+                  ) == trackIds else {
+                return
+            }
+
+            self.collectionNavigationTargetsByTrackId = metadataByTrackId.reduce(
+                into: [:]
+            ) { targets, item in
+                targets[item.key] = TrackCollectionNavigationTarget(
+                    metadata: item.value
+                )
+            }
+            self.rebuildScreenState()
+        }
     }
     
     
@@ -379,6 +420,7 @@ final class TrackListViewModel: ObservableObject {
     private func applyTrackUpdateEvent(_ updateEvent: TrackUpdateEvent) {
         snapshotsByTrackId[updateEvent.trackId] = updateEvent.snapshot
         rebuildScreenState()
+        reloadCollectionNavigationTargets()
 
         // Runtime snapshot без новой длительности не меняет итоговую статистику треклиста.
         guard updateEvent.changedFields.contains(.duration),

@@ -29,6 +29,7 @@ final class PlayerTrackRowStateBuilder {
         currentQueueItemId: UUID?,
         isPlaying: Bool,
         snapshotsByTrackId: [UUID: TrackRuntimeSnapshot],
+        collectionNavigationTargetsByTrackId: [UUID: TrackCollectionNavigationTarget],
         highlightedRowId: UUID?,
         shouldShowTags: Bool,
         shouldShowFileFormat: Bool
@@ -50,6 +51,7 @@ final class PlayerTrackRowStateBuilder {
                     snapshot: snapshot,
                     shouldShowTags: shouldShowTags
                 ),
+                collectionNavigationTarget: collectionNavigationTargetsByTrackId[track.trackId],
                 title: makeTitle(
                     track: track,
                     snapshot: snapshot,

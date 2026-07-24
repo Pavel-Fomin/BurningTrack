@@ -8,6 +8,8 @@ struct LibraryTrackRowState {
     let isPlaying: Bool
     let isHighlighted: Bool
     let artworkRequest: ArtworkRequest?
+    /// Сохранённые metadata для условного показа переходов к артисту и альбому.
+    let collectionNavigationTarget: TrackCollectionNavigationTarget?
     let title: String?
     let artist: String?
     let duration: Double?
@@ -28,6 +30,7 @@ struct LibraryTrackRowState {
             isPlaying: isPlaying,
             isHighlighted: isHighlighted,
             artworkRequest: artworkRequest,
+            collectionNavigationTarget: collectionNavigationTarget,
             title: title,
             artist: artist,
             duration: duration,

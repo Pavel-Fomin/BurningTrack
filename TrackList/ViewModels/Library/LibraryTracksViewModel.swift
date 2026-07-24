@@ -45,7 +45,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
     private let settingsManager: any SettingsManaging
     /// Разрешает читать и сохранять сортировку в настройках папки.
     private let usesLibrarySortSettings: Bool
-    /// SQLite metadata, используемые только как сохранённые ключи сортировки.
+    /// SQLite metadata, используемые как сохранённые ключи сортировки и целей перехода коллекции.
     private var cachedMetadataByTrackId: [UUID: TrackCachedMetadata] = [:]
     /// Флаг не даёт повторно перечитывать режим сортировки папки при обычной перезагрузке строк.
     private var didLoadFolderSortMode = false
@@ -91,11 +91,12 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         }
     )
 
-    /// Поля tag-событий, после которых SQLite-ключи сортировки нужно перечитать.
-    private static let cachedMetadataSortFields: Set<TrackChangedField> = [
+    /// Поля tag-событий, после которых SQLite metadata сортировки и переходов нужно перечитать.
+    private static let cachedMetadataFields: Set<TrackChangedField> = [
         .title,
         .artist,
         .album,
+        .albumArtist,
         .year,
         .publisherOrLabel,
         .genre,
@@ -241,7 +242,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         await loadFolderSortModeIfNeeded()
 
         let tracks = await tracksProvider.tracks(for: source)
-        await reloadCachedMetadataIfNeeded(for: tracks)
+        await reloadCachedMetadata(for: tracks)
 
         trackSections = makeTrackSections(from: tracks)
     }
@@ -259,7 +260,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
             await TrackRegistry.shared.setLibraryTrackSortMode(mode, forFolderId: folderId)
         }
 
-        await reloadCachedMetadataIfNeeded(for: visibleTracks())
+        await reloadCachedMetadata(for: visibleTracks())
         rebuildTrackSectionsFromVisibleTracks()
     }
 
@@ -287,18 +288,15 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         )
     }
 
-    /// Догружает SQLite metadata только для режимов, которым нужны сохранённые metadata-ключи.
-    private func reloadCachedMetadataIfNeeded(for tracks: [LibraryTrack]) async {
-        guard sortMode.requiresCachedMetadata else { return }
-
+    /// Догружает SQLite metadata для сортировки и доступности переходов к коллекции.
+    private func reloadCachedMetadata(for tracks: [LibraryTrack]) async {
         cachedMetadataByTrackId = await TrackRegistry.shared.cachedMetadata(
             forTrackIds: tracks.map(\.trackId)
         )
     }
 
-    /// Обновляет SQLite metadata для конкретных треков после tag-событий.
+    /// Обновляет SQLite metadata конкретных треков после tag-событий.
     private func reloadCachedMetadata(for trackIds: [UUID]) async {
-        guard sortMode.requiresCachedMetadata else { return }
 
         let metadataByTrackId = await TrackRegistry.shared.cachedMetadata(
             forTrackIds: trackIds
@@ -541,6 +539,13 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         runtimeController.snapshot(for: trackId)
     }
 
+    /// Возвращает цель перехода, собранную из уже загруженных SQLite metadata трека.
+    func collectionNavigationTarget(
+        for trackId: UUID
+    ) -> TrackCollectionNavigationTarget? {
+        cachedMetadataByTrackId[trackId].map(TrackCollectionNavigationTarget.init)
+    }
+
     /// Запрашивает runtime snapshot трека, если он ещё не загружен.
     ///
     /// - Parameter trackId: Идентификатор трека
@@ -630,7 +635,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
     /// Возвращает события, после которых сортировочные metadata-ключи нужно перечитать из SQLite.
     private func eventsRequiringCachedMetadataReload(_ events: [TrackUpdateEvent]) -> [UUID] {
         events.compactMap { event in
-            guard event.changedFields.isDisjoint(with: Self.cachedMetadataSortFields) == false else {
+            guard event.changedFields.isDisjoint(with: Self.cachedMetadataFields) == false else {
                 return nil
             }
 

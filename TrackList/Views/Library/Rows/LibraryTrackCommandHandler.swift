@@ -7,6 +7,7 @@ struct LibraryTrackCommandHandler {
     let playbackHandler: LibraryTrackPlaybackHandler
     let presentationHandler: LibraryTrackPresentationHandler
     let cloudAvailabilityActionHandler: LibraryCloudAvailabilityActionHandler
+    let collectionNavigationHandler: TrackCollectionNavigationHandler
     let onToggleSelection: () -> Void
     let onRenameTrack: (UUID, FileRenameStrategy) -> Void
 
@@ -21,6 +22,10 @@ struct LibraryTrackCommandHandler {
             addToPlayer(trackId: trackId)
         case .addToTrackList(let track):
             sheetManager.presentAddToTrackList(for: track)
+        case .goToArtist(let trackId):
+            collectionNavigationHandler.openArtist(trackId: trackId)
+        case .goToAlbum(let trackId):
+            collectionNavigationHandler.openAlbum(trackId: trackId)
         case .moveToFolder(let track):
             SheetActionCoordinator.shared.handle(
                 action: .moveToFolder,

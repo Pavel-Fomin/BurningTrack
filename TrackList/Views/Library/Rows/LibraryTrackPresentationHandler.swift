@@ -11,6 +11,13 @@ struct LibraryTrackPresentationHandler {
         metadataProvider.snapshot(for: trackId)
     }
 
+    /// Возвращает цель перехода, подготовленную ViewModel из сохранённых metadata.
+    func collectionNavigationTarget(
+        for trackId: UUID
+    ) -> TrackCollectionNavigationTarget? {
+        metadataProvider.collectionNavigationTarget(for: trackId)
+    }
+
     /// Запрашивает runtime snapshot, если он ещё не загружен.
     func requestSnapshotIfNeeded(for trackId: UUID) {
         metadataProvider.requestSnapshotIfNeeded(for: trackId)
@@ -37,6 +44,7 @@ struct LibraryTrackPresentationHandler {
             isCurrent: isCurrent,
             isPlaying: isPlaying,
             isHighlighted: isHighlighted,
+            collectionNavigationTarget: collectionNavigationTarget(for: track.trackId),
             trackListNames: trackListNames,
             showsSelection: showsSelection,
             isSelected: isSelected,

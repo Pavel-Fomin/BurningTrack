@@ -58,6 +58,20 @@ struct PlayerPlaylistView: View {
                     )
                 )
             },
+            onGoToArtist: { queueItemId in
+                screenViewModel.handle(
+                    .goToArtist(
+                        queueItemId: queueItemId
+                    )
+                )
+            },
+            onGoToAlbum: { queueItemId in
+                screenViewModel.handle(
+                    .goToAlbum(
+                        queueItemId: queueItemId
+                    )
+                )
+            },
             onCopyTrack: { queueItemId in
                 screenViewModel.handle(
                     .copyTrack(

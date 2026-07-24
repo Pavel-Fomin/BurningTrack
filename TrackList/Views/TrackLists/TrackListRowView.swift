@@ -28,6 +28,8 @@ struct TrackListRowView: View {
     let onArtworkTap: () -> Void /// Открытие карточки трека из меню
     let onShowInLibrary: () -> Void /// Переход к треку в фонотеке
     let onMoveToFolder: () -> Void  /// Перемещение файла трека в папку
+    let onGoToArtist: () -> Void /// Переход к артисту трека
+    let onGoToAlbum: () -> Void /// Переход к альбому трека
 
     /// Проверяет доступность пункта меню для строки треклиста.
     private func isMenuActionAvailable(
@@ -113,6 +115,30 @@ struct TrackListRowView: View {
                 onMoveToFolder()
             } label: {
                 Label("Move", systemImage: "arrow.forward.folder")
+            }
+        }
+
+        if isMenuActionAvailable(.goToArtist),
+           state.collectionNavigationTarget?.artist != nil {
+            Button {
+                onGoToArtist()
+            } label: {
+                Label(
+                    TrackListPresentationText.goToArtist,
+                    systemImage: LibraryCollectionCategory.artists.systemImage
+                )
+            }
+        }
+
+        if isMenuActionAvailable(.goToAlbum),
+           state.collectionNavigationTarget?.album != nil {
+            Button {
+                onGoToAlbum()
+            } label: {
+                Label(
+                    TrackListPresentationText.goToAlbum,
+                    systemImage: LibraryCollectionCategory.albums.systemImage
+                )
             }
         }
 

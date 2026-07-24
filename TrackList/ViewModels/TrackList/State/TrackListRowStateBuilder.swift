@@ -34,7 +34,8 @@ struct TrackListRowStateBuilder {
             isCurrent: isCurrent,
             isPlaying: isPlaying,
             isHighlighted: isHighlighted,
-            settings: AppSettingsManager.shared.settings
+            settings: AppSettingsManager.shared.settings,
+            collectionNavigationTarget: nil
         )
     }
 
@@ -54,7 +55,8 @@ struct TrackListRowStateBuilder {
         isCurrent: Bool,
         isPlaying: Bool,
         isHighlighted: Bool,
-        settings: AppSettings
+        settings: AppSettings,
+        collectionNavigationTarget: TrackCollectionNavigationTarget?
     ) -> TrackListRowState {
         let shouldShowTags = settings.visible.metadata.isTagReadingEnabled
         let shouldShowFileFormat = settings.visible.library.isFileFormatVisible
@@ -77,6 +79,7 @@ struct TrackListRowStateBuilder {
                     purpose: .trackList,
                     sourceIdentifier: .mediaLibrary(trackId: track.trackId)
                 ),
+                collectionNavigationTarget: nil,
                 showsFileFormat: false,
                 renameArtist: nil,
                 renameTitle: nil
@@ -111,6 +114,7 @@ struct TrackListRowStateBuilder {
             isPlaying: isPlaying,
             isHighlighted: isHighlighted,
             artworkRequest: artworkRequest,
+            collectionNavigationTarget: collectionNavigationTarget,
             showsFileFormat: shouldShowFileFormat,
             renameArtist: snapshot?.artist,
             renameTitle: snapshot?.title

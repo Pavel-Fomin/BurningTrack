@@ -32,6 +32,8 @@ final class PlayerPresentationActionHandler {
 
     /// Презентер пользовательских сообщений.
     private let toastPresenter: any ToastPresenting
+    /// Обработчик переходов к значениям музыкальной коллекции.
+    private let collectionNavigationHandler: TrackCollectionNavigationHandler
 
     // MARK: - Инициализация
 
@@ -39,12 +41,14 @@ final class PlayerPresentationActionHandler {
         playlistManager: PlaylistManager,
         sheetManager: SheetManager,
         sheetActionCoordinator: SheetActionCoordinator,
-        toastPresenter: any ToastPresenting
+        toastPresenter: any ToastPresenting,
+        collectionNavigationHandler: TrackCollectionNavigationHandler = .shared
     ) {
         self.playlistManager = playlistManager
         self.sheetManager = sheetManager
         self.sheetActionCoordinator = sheetActionCoordinator
         self.toastPresenter = toastPresenter
+        self.collectionNavigationHandler = collectionNavigationHandler
     }
 
     // MARK: - Actions
@@ -83,6 +87,26 @@ final class PlayerPresentationActionHandler {
         guard let track = track(queueItemId: queueItemId) else { return }
 
         sheetManager.presentAddToTrackList(for: track)
+    }
+
+    /// Открывает артиста обычного локального элемента очереди.
+    func goToArtist(queueItemId: UUID) {
+        guard let track = track(queueItemId: queueItemId),
+              track.source == .library else {
+            return
+        }
+
+        collectionNavigationHandler.openArtist(trackId: track.trackId)
+    }
+
+    /// Открывает альбом обычного локального элемента очереди.
+    func goToAlbum(queueItemId: UUID) {
+        guard let track = track(queueItemId: queueItemId),
+              track.source == .library else {
+            return
+        }
+
+        collectionNavigationHandler.openAlbum(trackId: track.trackId)
     }
 
     /// Открывает карточку элемента очереди сразу в режиме редактирования тегов.

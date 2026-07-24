@@ -15,6 +15,9 @@ struct LibraryTrackActionMenuContent: View {
     let onMoveToFolder: () -> Void
     let onAddToPlayer: () -> Void
     let onAddToTrackList: () -> Void
+    let collectionNavigationTarget: TrackCollectionNavigationTarget?
+    let onGoToArtist: () -> Void
+    let onGoToAlbum: () -> Void
     let onEditTags: () -> Void
     let onRenameFile: (FileRenameStrategy) -> Void
 
@@ -48,6 +51,30 @@ struct LibraryTrackActionMenuContent: View {
                 onAddToTrackList()
             } label: {
                 Label(labels.addToTracklist, systemImage: "list.star")
+            }
+        }
+
+        if isMenuActionAvailable(.goToArtist),
+           collectionNavigationTarget?.artist != nil {
+            Button {
+                onGoToArtist()
+            } label: {
+                Label(
+                    labels.goToArtist,
+                    systemImage: LibraryCollectionCategory.artists.systemImage
+                )
+            }
+        }
+
+        if isMenuActionAvailable(.goToAlbum),
+           collectionNavigationTarget?.album != nil {
+            Button {
+                onGoToAlbum()
+            } label: {
+                Label(
+                    labels.goToAlbum,
+                    systemImage: LibraryCollectionCategory.albums.systemImage
+                )
             }
         }
 
@@ -118,6 +145,8 @@ struct TrackActionMenuLabels {
     let move: String
     let addToPlayer: String
     let addToTracklist: String
+    let goToArtist: String
+    let goToAlbum: String
     let tags: String
     let fileName: String
     let edit: String

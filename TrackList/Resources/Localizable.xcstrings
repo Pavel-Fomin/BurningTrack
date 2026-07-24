@@ -1131,6 +1131,26 @@
         }
       }
     },
+    "Go to Album" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Go to Album"
+          }
+        }
+      }
+    },
+    "Go to Artist" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Go to Artist"
+          }
+        }
+      }
+    },
     "Genre" : {
       "localizations" : {
         "en" : {

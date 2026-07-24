@@ -12,6 +12,14 @@ import Foundation
 /// Преобразует смысловые данные треклистов в локализованные подписи интерфейса.
 enum TrackListPresentationText {
 
+    static var goToArtist: String {
+        String(localized: "Go to Artist")
+    }
+
+    static var goToAlbum: String {
+        String(localized: "Go to Album")
+    }
+
     /// Форматирует дату создания треклиста без времени в текущей системной locale.
     private static let createdAtFormatter: DateFormatter = {
         let formatter = DateFormatter()

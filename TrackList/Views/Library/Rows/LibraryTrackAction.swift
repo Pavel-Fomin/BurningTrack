@@ -7,6 +7,8 @@ enum LibraryTrackAction {
     case tapArtwork(track: LibraryTrack)
     case addToPlayer(trackId: UUID)
     case addToTrackList(track: LibraryTrack)
+    case goToArtist(trackId: UUID)
+    case goToAlbum(trackId: UUID)
     case moveToFolder(track: LibraryTrack)
     case editTags(track: LibraryTrack)
     case rename(trackId: UUID, strategy: FileRenameStrategy)

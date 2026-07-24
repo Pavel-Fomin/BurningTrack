@@ -99,6 +99,12 @@ final class TrackListFlowActionHandler {
 
         case .moveToFolder(let rowId):
             presentationHandler.moveToFolder(rowId: rowId)
+
+        case .goToArtist(let rowId):
+            presentationHandler.goToArtist(rowId: rowId)
+
+        case .goToAlbum(let rowId):
+            presentationHandler.goToAlbum(rowId: rowId)
         }
     }
 }

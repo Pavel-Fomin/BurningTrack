@@ -73,6 +73,12 @@ struct TrackListView: View {
                             onMoveToFolder: { rowId in
                                 onAction(.moveToFolder(rowId: rowId))
                             },
+                            onGoToArtist: { rowId in
+                                onAction(.goToArtist(rowId: rowId))
+                            },
+                            onGoToAlbum: { rowId in
+                                onAction(.goToAlbum(rowId: rowId))
+                            },
                             onMove: { source, destination in
                                 onAction(
                                     .moveTrack(
@@ -129,6 +135,8 @@ struct TrackListView: View {
                 let onArtworkTap: (UUID) -> Void
                 let onShowInLibrary: (UUID) -> Void
                 let onMoveToFolder: (UUID) -> Void
+                let onGoToArtist: (UUID) -> Void
+                let onGoToAlbum: (UUID) -> Void
                 let onMove: (IndexSet, Int) -> Void
 
                 /// Проверяет доступность пункта меню для строки треклиста.
@@ -173,6 +181,12 @@ struct TrackListView: View {
                             },
                             onMoveToFolder: {
                                 onMoveToFolder(row.id)
+                            },
+                            onGoToArtist: {
+                                onGoToArtist(row.id)
+                            },
+                            onGoToAlbum: {
+                                onGoToAlbum(row.id)
                             }
                         )
                         .task(id: row.trackId) {

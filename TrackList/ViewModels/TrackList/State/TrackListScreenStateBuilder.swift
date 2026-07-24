@@ -53,7 +53,8 @@ struct TrackListScreenStateBuilder {
         currentContext: PlaybackContext?,
         isPlaying: Bool,
         highlightedRowId: UUID?,
-        settings: AppSettings
+        settings: AppSettings,
+        collectionNavigationTargetsByTrackId: [UUID: TrackCollectionNavigationTarget]
     ) -> TrackListScreenState {
         let rows = tracks.map { track in
             let isCurrent = currentContext == .trackList && currentTrackId == track.id
@@ -64,7 +65,8 @@ struct TrackListScreenStateBuilder {
                 isCurrent: isCurrent,
                 isPlaying: isCurrent && isPlaying,
                 isHighlighted: highlightedRowId == track.id,
-                settings: settings
+                settings: settings,
+                collectionNavigationTarget: collectionNavigationTargetsByTrackId[track.trackId]
             )
         }
 

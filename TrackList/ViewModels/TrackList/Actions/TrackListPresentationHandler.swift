@@ -23,18 +23,22 @@ final class TrackListPresentationHandler {
 
     /// Исполнитель команд приложения для runtime-действий iTunes-треков.
     private let commandExecutor: AppCommandExecutor
+    /// Обработчик переходов к значениям музыкальной коллекции.
+    private let collectionNavigationHandler: TrackCollectionNavigationHandler
 
     /// Создаёт обработчик presentation-действий одного треклиста.
     init(
         reader: any TrackListReading,
         presenter: any TrackListPresenting,
         toastPresenter: any ToastPresenting,
-        commandExecutor: AppCommandExecutor = .shared
+        commandExecutor: AppCommandExecutor = .shared,
+        collectionNavigationHandler: TrackCollectionNavigationHandler = .shared
     ) {
         self.reader = reader
         self.presenter = presenter
         self.toastPresenter = toastPresenter
         self.commandExecutor = commandExecutor
+        self.collectionNavigationHandler = collectionNavigationHandler
     }
 
     /// Открывает выбор трека для добавления в текущий треклист.
@@ -113,6 +117,26 @@ final class TrackListPresentationHandler {
         guard canUseFileActions(track) else { return }
 
         presenter.moveToFolder(track)
+    }
+
+    /// Открывает артиста обычной локальной строки треклиста.
+    func goToArtist(rowId: UUID) {
+        guard let track = reader.tracks.first(where: { $0.id == rowId }),
+              track.source == .library else {
+            return
+        }
+
+        collectionNavigationHandler.openArtist(trackId: track.trackId)
+    }
+
+    /// Открывает альбом обычной локальной строки треклиста.
+    func goToAlbum(rowId: UUID) {
+        guard let track = reader.tracks.first(where: { $0.id == rowId }),
+              track.source == .library else {
+            return
+        }
+
+        collectionNavigationHandler.openAlbum(trackId: track.trackId)
     }
 
     /// Проверяет, можно ли запускать файловый flow для строки треклиста.

@@ -11,6 +11,14 @@ import Foundation
 
 /// Преобразует данные плеера в локализованные подписи без изменения playback-логики.
 enum PlayerPresentationText {
+    static var goToArtist: String {
+        String(localized: "Go to Artist")
+    }
+
+    static var goToAlbum: String {
+        String(localized: "Go to Album")
+    }
+
     static func miniPlayerArtist(for artist: String?) -> String {
         guard let artist = artist?.trimmingCharacters(in: .whitespacesAndNewlines),
               artist.isEmpty == false else {

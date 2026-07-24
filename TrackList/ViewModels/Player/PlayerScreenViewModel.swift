@@ -52,6 +52,12 @@ final class PlayerScreenViewModel: ObservableObject {
 
     /// Последняя известная очередь плеера.
     private var currentTracks: [PlayerTrack] = []
+    /// Сохранённые metadata текущей очереди, доступные для перехода к музыкальной коллекции.
+    private var collectionNavigationTargetsByTrackId: [UUID: TrackCollectionNavigationTarget] = [:]
+    /// Набор локальных треков, для которого уже запрошены сохранённые metadata.
+    private var collectionNavigationTargetTrackIds = Set<UUID>()
+    /// Незавершённая загрузка metadata отменяется при изменении состава очереди.
+    private var collectionNavigationTargetLoadTask: Task<Void, Never>?
 
     // MARK: - Инициализация
 
@@ -91,8 +97,21 @@ final class PlayerScreenViewModel: ObservableObject {
     }
 
     /// Пересобирает состояние экрана плеера из текущей очереди.
-    func updateTracks(_ tracks: [PlayerTrack]) {
+    func updateTracks(
+        _ tracks: [PlayerTrack],
+        reloadCollectionNavigationTargets: Bool = false
+    ) {
         currentTracks = tracks
+        if reloadCollectionNavigationTargets {
+            loadCollectionNavigationTargetsIfNeeded(for: tracks)
+        }
+
+        rebuildState()
+    }
+
+    /// Пересобирает состояние списка с уже загруженными сохранёнными metadata.
+    private func rebuildState() {
+        let tracks = currentTracks
         let shouldShowTags = appSettingsManager.settings.visible.metadata.isTagReadingEnabled
         let shouldShowFileFormat = appSettingsManager.settings.visible.library.isFileFormatVisible
         let currentQueueItemId = currentPlayerQueueItemId(in: tracks)
@@ -101,6 +120,7 @@ final class PlayerScreenViewModel: ObservableObject {
             currentQueueItemId: currentQueueItemId,
             isPlaying: playerViewModel.isPlaying,
             snapshotsByTrackId: playerViewModel.snapshotsByTrackId,
+            collectionNavigationTargetsByTrackId: collectionNavigationTargetsByTrackId,
             highlightedRowId: sheetManager.highlightedRowID,
             shouldShowTags: shouldShowTags,
             shouldShowFileFormat: shouldShowFileFormat
@@ -114,15 +134,56 @@ final class PlayerScreenViewModel: ObservableObject {
         )
     }
 
+    /// Загружает сохранённые metadata только для обычных локальных треков очереди.
+    private func loadCollectionNavigationTargetsIfNeeded(
+        for tracks: [PlayerTrack]
+    ) {
+        let trackIds = Set(
+            tracks
+                .filter { $0.source == .library }
+                .map(\.trackId)
+        )
+        guard trackIds != collectionNavigationTargetTrackIds else { return }
+
+        collectionNavigationTargetTrackIds = trackIds
+        collectionNavigationTargetLoadTask?.cancel()
+
+        collectionNavigationTargetLoadTask = Task { [weak self] in
+            let metadataByTrackId = await TrackRegistry.shared.cachedMetadata(
+                forTrackIds: Array(trackIds)
+            )
+            guard Task.isCancelled == false,
+                  let self,
+                  self.collectionNavigationTargetTrackIds == trackIds else {
+                return
+            }
+
+            self.collectionNavigationTargetsByTrackId = metadataByTrackId.reduce(
+                into: [:]
+            ) { targets, item in
+                targets[item.key] = TrackCollectionNavigationTarget(
+                    metadata: item.value
+                )
+            }
+            self.rebuildState()
+        }
+    }
+
     /// Наблюдает за очередью плеера и пересобирает состояние экрана.
     private func observePlaylist() {
         playlistManager.$tracks
             .receive(on: DispatchQueue.main)
             .sink { [weak self] tracks in
-                self?.updateTracks(tracks)
+                self?.updateTracks(
+                    tracks,
+                    reloadCollectionNavigationTargets: true
+                )
             }
             .store(in: &cancellables)
-        updateTracks(playlistManager.tracks)
+        updateTracks(
+            playlistManager.tracks,
+            reloadCollectionNavigationTargets: true
+        )
     }
 
     /// Наблюдает за состоянием воспроизведения и обновляет строки плеера.

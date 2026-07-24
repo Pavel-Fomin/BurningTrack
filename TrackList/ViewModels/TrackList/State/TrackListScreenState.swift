@@ -69,6 +69,9 @@ struct TrackListRowState: Identifiable {
     /// Лёгкий запрос обложки для асинхронного отображения.
     let artworkRequest: ArtworkRequest?
 
+    /// Сохранённые metadata для условного показа переходов к артисту и альбому.
+    let collectionNavigationTarget: TrackCollectionNavigationTarget?
+
     /// Показывать ли формат файла.
     let showsFileFormat: Bool
 

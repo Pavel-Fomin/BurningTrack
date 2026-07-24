@@ -137,6 +137,8 @@ enum SearchPresentationText {
             move: String(localized: "Move"),
             addToPlayer: String(localized: "Add to Player"),
             addToTracklist: String(localized: "Add to Tracklist"),
+            goToArtist: String(localized: "Go to Artist"),
+            goToAlbum: String(localized: "Go to Album"),
             tags: String(localized: "Tags"),
             fileName: String(localized: "File Name"),
             edit: String(localized: "Edit")

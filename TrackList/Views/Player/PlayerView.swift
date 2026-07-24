@@ -19,6 +19,8 @@ struct PlayerView: View {
     let onShowInLibrary: (UUID) -> Void
     let onMoveToFolder: (UUID) -> Void
     let onAddToTrackList: (UUID) -> Void  /// Добавление элемента очереди в треклист
+    let onGoToArtist: (UUID) -> Void      /// Переход к артисту элемента очереди
+    let onGoToAlbum: (UUID) -> Void       /// Переход к альбому элемента очереди
     let onCopyTrack: (UUID) -> Void       /// Копирование iTunes-трека из очереди
     let onEditTags: (UUID) -> Void        /// Редактирование тегов элемента очереди
     let onArtworkTap: (UUID) -> Void
@@ -43,6 +45,8 @@ struct PlayerView: View {
                         onShowInLibrary: onShowInLibrary,
                         onMoveToFolder: onMoveToFolder,
                         onAddToTrackList: onAddToTrackList,
+                        onGoToArtist: onGoToArtist,
+                        onGoToAlbum: onGoToAlbum,
                         onCopyTrack: onCopyTrack,
                         onEditTags: onEditTags,
                         onArtworkTap: onArtworkTap,
@@ -88,6 +92,8 @@ struct PlayerView: View {
         let onShowInLibrary: (UUID) -> Void
         let onMoveToFolder: (UUID) -> Void
         let onAddToTrackList: (UUID) -> Void  /// Добавление элемента очереди в треклист
+        let onGoToArtist: (UUID) -> Void      /// Переход к артисту элемента очереди
+        let onGoToAlbum: (UUID) -> Void       /// Переход к альбому элемента очереди
         let onCopyTrack: (UUID) -> Void       /// Копирование iTunes-трека из очереди
         let onEditTags: (UUID) -> Void        /// Редактирование тегов элемента очереди
         let onArtworkTap: (UUID) -> Void
@@ -104,6 +110,8 @@ struct PlayerView: View {
                     onShowInLibrary: onShowInLibrary,
                     onMoveToFolder: onMoveToFolder,
                     onAddToTrackList: onAddToTrackList,
+                    onGoToArtist: onGoToArtist,
+                    onGoToAlbum: onGoToAlbum,
                     onCopyTrack: onCopyTrack,
                     onEditTags: onEditTags,
                     onArtworkTap: onArtworkTap,

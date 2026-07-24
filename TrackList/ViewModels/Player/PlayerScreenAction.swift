@@ -50,6 +50,16 @@ enum PlayerScreenAction {
         queueItemId: UUID
     )
 
+    /// Открывает артиста элемента очереди в музыкальной коллекции.
+    case goToArtist(
+        queueItemId: UUID
+    )
+
+    /// Открывает альбом элемента очереди в музыкальной коллекции.
+    case goToAlbum(
+        queueItemId: UUID
+    )
+
     /// Открывает сценарий копирования iTunes-трека из очереди.
     case copyTrack(
         queueItemId: UUID

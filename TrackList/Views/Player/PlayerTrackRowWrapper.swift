@@ -17,6 +17,8 @@ struct PlayerTrackRowWrapper: View {
     let onShowInLibrary: (UUID) -> Void                  /// Обработчик показа элемента очереди в фонотеке
     let onMoveToFolder: (UUID) -> Void                   /// Обработчик перемещения элемента очереди в папку
     let onAddToTrackList: (UUID) -> Void                 /// Обработчик добавления элемента очереди в треклист
+    let onGoToArtist: (UUID) -> Void                     /// Обработчик перехода к артисту элемента очереди
+    let onGoToAlbum: (UUID) -> Void                      /// Обработчик перехода к альбому элемента очереди
     let onCopyTrack: (UUID) -> Void                      /// Обработчик копирования iTunes-трека
     let onEditTags: (UUID) -> Void                       /// Обработчик редактирования тегов элемента очереди
     let onArtworkTap: (UUID) -> Void                     /// Обработчик пункта меню "О треке"
@@ -131,6 +133,30 @@ struct PlayerTrackRowWrapper: View {
                 onAddToTrackList(row.id)
             } label: {
                 Label("Add to Tracklist", systemImage: "list.star")
+            }
+        }
+
+        if isMenuActionAvailable(.goToArtist),
+           row.collectionNavigationTarget?.artist != nil {
+            Button {
+                onGoToArtist(row.id)
+            } label: {
+                Label(
+                    PlayerPresentationText.goToArtist,
+                    systemImage: LibraryCollectionCategory.artists.systemImage
+                )
+            }
+        }
+
+        if isMenuActionAvailable(.goToAlbum),
+           row.collectionNavigationTarget?.album != nil {
+            Button {
+                onGoToAlbum(row.id)
+            } label: {
+                Label(
+                    PlayerPresentationText.goToAlbum,
+                    systemImage: LibraryCollectionCategory.albums.systemImage
+                )
             }
         }
 

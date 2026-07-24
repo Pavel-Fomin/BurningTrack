@@ -157,6 +157,17 @@ struct LibraryTrackRowContainer: View {
                     .addToTrackList(track: rowState.track)
                 )
             },
+            collectionNavigationTarget: rowState.collectionNavigationTarget,
+            onGoToArtist: {
+                commandHandler.handle(
+                    .goToArtist(trackId: rowState.track.trackId)
+                )
+            },
+            onGoToAlbum: {
+                commandHandler.handle(
+                    .goToAlbum(trackId: rowState.track.trackId)
+                )
+            },
             onEditTags: {
                 commandHandler.handle(
                     .editTags(track: rowState.track)
