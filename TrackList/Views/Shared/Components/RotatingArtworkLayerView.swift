@@ -49,6 +49,8 @@ struct RotatingArtworkView: UIViewRepresentable {
         var appActive = true
         weak var cachedSource: CGImage?
         var cachedSize: CGFloat = 0
+        /// Масштаб дисплея входит в ключ готового bitmap, чтобы не растягивать изображение после смены экрана.
+        var cachedDisplayScale: CGFloat = 0
         var observers: [NSObjectProtocol] = []
     }
     
@@ -62,12 +64,19 @@ struct RotatingArtworkView: UIViewRepresentable {
     
     /// Создаёт UIView (ViewBox) с закруглённым изображением и настраивает подписки на события жизненного цикла приложения
     func makeUIView(context: Context) -> ViewBox {
-        let rounded = bakeCircle(image, size: size)
+        // Разрешение готового bitmap определяет экран, а не scale исходной UIImage из общего кэша.
+        let displayScale = context.environment.displayScale
+        let rounded = bakeCircle(
+            image,
+            size: size,
+            displayScale: displayScale
+        )
         let v = ViewBox(size: size, rounded: rounded)
 
         // кэш
         context.coordinator.cachedSource = image.cgImage
         context.coordinator.cachedSize   = size
+        context.coordinator.cachedDisplayScale = displayScale
 
         // Жизненный цикл приложения
         let nc = NotificationCenter.default
@@ -115,12 +124,20 @@ struct RotatingArtworkView: UIViewRepresentable {
     
 // MARK: -  Обновляет UIView при изменении входных параметров (isActive, isPlaying, image, size)
     func updateUIView(_ v: ViewBox, context: Context) {
+        let displayScale = context.environment.displayScale
         
-        // Перерисовываем bitmap только если реально поменялся
-        if context.coordinator.cachedSource !== image.cgImage || context.coordinator.cachedSize != size {
-            v.img.image = bakeCircle(image, size: size)
+        // Перерисовываем bitmap при смене исходной обложки, размера или плотности экрана.
+        if context.coordinator.cachedSource !== image.cgImage
+            || context.coordinator.cachedSize != size
+            || context.coordinator.cachedDisplayScale != displayScale {
+            v.img.image = bakeCircle(
+                image,
+                size: size,
+                displayScale: displayScale
+            )
             context.coordinator.cachedSource = image.cgImage
             context.coordinator.cachedSize   = size
+            context.coordinator.cachedDisplayScale = displayScale
         }
 
         // Обновляем «прошлые» флаги
@@ -251,9 +268,14 @@ struct RotatingArtworkView: UIViewRepresentable {
 // MARK: -  «Запекаем» круг (без cornerRadius/masks)
     
     /// Создаёт круговую обложку из изображения без использования cornerRadius/masks
-    private func bakeCircle(_ image: UIImage, size: CGFloat) -> UIImage {
+    private func bakeCircle(
+        _ image: UIImage,
+        size: CGFloat,
+        displayScale: CGFloat
+    ) -> UIImage {
         let fmt = UIGraphicsImageRendererFormat()
-        fmt.scale = image.scale
+        // Растр создаётся в плотности отображения, даже если кэшированная UIImage имеет scale = 1.
+        fmt.scale = max(displayScale, 1)
         fmt.opaque = false // ← вот здесь ключевое изменение
         return UIGraphicsImageRenderer(size: .init(width: size, height: size), format: fmt).image { _ in
             let rect = CGRect(x: 0, y: 0, width: size, height: size)
