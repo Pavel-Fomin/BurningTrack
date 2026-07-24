@@ -16,28 +16,24 @@ import Foundation
 
 struct MainTabView: View {
 
-    // MARK: - Global managers
-
-    @ObservedObject private var scene = ScenePhaseHandler.shared
-    @ObservedObject private var nav = NavigationCoordinator.shared
+    // MARK: - Зависимости
 
     @ObservedObject var playerViewModel: PlayerViewModel
 
     /// Глобальная ViewModel экспорта передаётся в обе точки запуска операции.
     @ObservedObject var exportProgressViewModel: ExportProgressViewModel
 
-    /// Фабрика production ViewModel для master-flow списка треклистов.
-    private static let trackListsViewModelFactory = TrackListsViewModelFactory()
-
-    /// ViewModel master-flow списка треклистов.
-    @StateObject private var trackListsVM = Self.trackListsViewModelFactory.make()
+    /// Общая ViewModel master-flow треклистов, которой владеет корневой контейнер.
+    @ObservedObject var trackListsViewModel: TrackListsViewModel
+    /// ViewModel хранит и синхронизирует выбор корневой навигации.
+    @ObservedObject var navigationViewModel: MainNavigationViewModel
 
     /// Состояние системного поиска управляет только глобальной нижней геометрией.
-    @State private var isSearchActive = false
+    @Binding var isSearchActive: Bool
 
     /// Высокий MiniPlayer скрывается только в активном интерфейсе Search-вкладки.
     private var showsMiniPlayer: Bool {
-        scene.activeTab != .search || isSearchActive == false
+        navigationViewModel.activeTab != .search || isSearchActive == false
     }
 
     /// Передаёт экранам единый резерв только на время показа высокого MiniPlayer.
@@ -46,10 +42,10 @@ struct MainTabView: View {
     }
     
     
-// MARK: - UI
+// MARK: - Интерфейс
     
     var body: some View {
-        TabView(selection: $scene.activeTab) {
+        TabView(selection: navigationViewModel.tabSelection) {
 
 // MARK: - Плеер
             
@@ -95,7 +91,7 @@ struct MainTabView: View {
                 value: ScenePhaseHandler.Tab.tracklists
             ) {
                 TrackListsScreen(
-                    trackListsViewModel: trackListsVM,
+                    trackListsViewModel: trackListsViewModel,
                     playerViewModel: playerViewModel,
                     exportProgressViewModel: exportProgressViewModel
                 )

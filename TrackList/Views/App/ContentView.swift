@@ -3,12 +3,12 @@
 //  TrackList
 //
 //  Корневой контейнер приложения.
-//  - содержит TabView (через MainTabView),
+//  - выбирает compact- или regular-компоновку корневой навигации,
 //  - поверх показывает тосты и шиты,
-//  - НЕ содержит никакой навигационной логики.
+//  - владеет общими ViewModel навигации и треклистов.
 //
 //  Навигация:
-//  — вкладки: ScenePhaseHandler.shared
+//  — основные разделы: MainNavigationViewModel и ScenePhaseHandler.shared
 //  — маршрутизация фонотеки: NavigationCoordinator.shared
 //
 //  Created by Pavel Fomin on 28.04.2025.
@@ -23,13 +23,23 @@ struct ContentView: View {
     @StateObject private var sheetManager = SheetManager.shared
     @StateObject private var trackDetailManager = TrackDetailManager.shared
     
-    @ObservedObject private var navigation = NavigationCoordinator.shared
-    @ObservedObject private var scene = ScenePhaseHandler.shared
-
     @ObservedObject var playerViewModel: PlayerViewModel
 
     /// Единое состояние экспорта передаётся в корневой контейнер вкладок.
     @EnvironmentObject private var exportProgressViewModel: ExportProgressViewModel
+
+    /// Размерный класс определяет единственный активный корневой контейнер приложения.
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    /// Фабрика создаёт единственную ViewModel master-flow треклистов для обеих компоновок.
+    private static let trackListsViewModelFactory = TrackListsViewModelFactory()
+
+    /// Общая ViewModel не пересоздаётся при переходе окна между compact и regular.
+    @StateObject private var trackListsViewModel = Self.trackListsViewModelFactory.make()
+    /// ViewModel синхронизирует выбор корневой навигации с глобальной активной вкладкой.
+    @StateObject private var navigationViewModel = MainNavigationViewModel()
+    /// Активность системного поиска влияет только на видимость глобального MiniPlayer.
+    @State private var isSearchActive = false
 
     // MARK: - Обёртка для sheet(item:)
     
@@ -42,13 +52,28 @@ struct ContentView: View {
         trackDetailManager.track.map { IdentifiableTrack(track: $0) }
     }
 
-    // MARK: - UI
+    // MARK: - Интерфейс
     
     var body: some View {
-        MainTabView(
-            playerViewModel: playerViewModel,
-            exportProgressViewModel: exportProgressViewModel
-        )
+        Group {
+            if horizontalSizeClass == .regular {
+                MainSidebarView(
+                    playerViewModel: playerViewModel,
+                    exportProgressViewModel: exportProgressViewModel,
+                    trackListsViewModel: trackListsViewModel,
+                    navigationViewModel: navigationViewModel,
+                    isSearchActive: $isSearchActive
+                )
+            } else {
+                MainTabView(
+                    playerViewModel: playerViewModel,
+                    exportProgressViewModel: exportProgressViewModel,
+                    trackListsViewModel: trackListsViewModel,
+                    navigationViewModel: navigationViewModel,
+                    isSearchActive: $isSearchActive
+                )
+            }
+        }
         .sheetHost(playerManager: playerViewModel.fileOperationPlayerManager)
         .toastHost()
     }

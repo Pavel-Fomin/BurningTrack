@@ -44,6 +44,8 @@ final class TrackListsViewModel: ObservableObject {
     private let eventProvider: any TrackListsEventProviding
     /// Идентификатор треклиста, ожидающего подтверждения удаления.
     private var pendingDeleteTrackListId: UUID?
+    /// Защищает общий master-flow от повторной начальной загрузки при смене корневой компоновки.
+    private var hasLoadedTrackLists = false
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Init
@@ -133,8 +135,18 @@ final class TrackListsViewModel: ObservableObject {
     func refresh() {
         self.trackLists = loadTrackLists()
         updateScreenState()
+        hasLoadedTrackLists = true
 
         print("📥 Загружено \(trackLists.count) треклистов")
+    }
+
+    /// Загружает треклисты только при первом появлении общего master-flow.
+    func loadTrackListsIfNeeded() {
+        guard hasLoadedTrackLists == false else {
+            return
+        }
+
+        refresh()
     }
 
     // MARK: - Navigation

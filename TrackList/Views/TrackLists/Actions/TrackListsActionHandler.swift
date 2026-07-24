@@ -33,7 +33,8 @@ final class TrackListsActionHandler {
         switch action {
 
         case .onAppear:
-            viewModel.refresh()
+            // Оба корневых контейнера используют один master-flow без повторной начальной загрузки.
+            viewModel.loadTrackListsIfNeeded()
 
         case .openTrackList(let id):
             viewModel.openTrackList(id: id)
