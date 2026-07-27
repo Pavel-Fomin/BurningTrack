@@ -172,6 +172,18 @@ struct MiniPlayerView: View {
                 isPlaying: content.isPlaying,
                 // Пустое состояние не конкурирует визуально с содержимым трека.
                 titleColorOverride: hasTrack ? nil : .secondary,
+                onContentTap: {
+                    guard hasTrack else { return }
+                    playerViewModel.togglePlayPause()
+                },
+                onContentSwipePrevious: {
+                    guard hasTrack else { return }
+                    playerViewModel.playPreviousTrack()
+                },
+                onContentSwipeNext: {
+                    guard hasTrack else { return }
+                    playerViewModel.playNextTrack()
+                },
                 onPrevious: {
                     guard hasTrack else { return }
                     playerViewModel.playPreviousTrack()

@@ -45,6 +45,7 @@ struct MiniPlayerProgressView: View {
                 .font(.caption2)
                 .frame(width: 40, alignment: .trailing)
         }
-        .padding(.top, 8)
+        // Отделяем прогресс от информационной части мини-плеера дополнительным вертикальным пространством.
+        .padding(.top, 14)
     }
 }
