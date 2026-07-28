@@ -9,11 +9,17 @@
 
 import Foundation
 
+/// Одноразово сообщает MainActor о подготовленном локальном файле, не передавая AVPlayer или внутреннее состояние менеджера.
+typealias PlayerPreparedLocalFileHandler = @MainActor (PlayerPreparedLocalFile) -> Void
+
 /// Описывает только playback API, который реально нужен PlayerViewModel.
 protocol PlayerManaging: AnyObject {
 
-    /// Запускает воспроизведение переданного трека.
-    func play(track: any TrackDisplayable) async throws
+    /// Запускает воспроизведение и сообщает о готовом локальном файле до ожидания длительности asset.
+    func play(
+        track: any TrackDisplayable,
+        onPreparedLocalFile: @escaping PlayerPreparedLocalFileHandler
+    ) async throws
 
     /// Продолжает воспроизведение текущего AVPlayerItem.
     func playCurrent()
@@ -29,6 +35,9 @@ protocol PlayerManaging: AnyObject {
 
     /// Освобождает security-scoped доступ к текущему треку.
     func stopAccessingCurrentTrack()
+
+    /// Возвращает уже подготовленный плеером локальный URL текущего трека без повторного открытия bookmark-доступа.
+    func preparedLocalFileURL(for trackId: UUID) -> URL?
 
     /// Подписывает внешний слой на обновления прогресса воспроизведения.
     func observeProgress(update: @escaping (TimeInterval) -> Void)

@@ -201,6 +201,7 @@ struct MiniPlayerView: View {
             MiniPlayerProgressView(
                 currentTime: content.currentTime,
                 duration: content.duration,
+                waveformState: playerViewModel.waveformState,
                 onSeek: { time in
                     guard hasTrack else { return }
                     playerViewModel.seek(to: time)
@@ -239,7 +240,7 @@ struct MiniPlayerView: View {
         .glassEffect(.regular, in: shape)
         .clipShape(shape)
         .contentShape(shape)
-        // Одновременное распознавание не блокирует горизонтальный seek прогресс-бара.
+        // Одновременное распознавание не блокирует горизонтальный seek waveform.
         .simultaneousGesture(presentationGesture)
         .padding(.horizontal, 16)
     }

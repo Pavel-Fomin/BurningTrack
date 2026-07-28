@@ -46,10 +46,14 @@ final class PlayerViewModel: ObservableObject {
 
     /// Статические данные сохраняются между обновлениями прогресса.
     private var miniPlayerStaticState: MiniPlayerStaticState?
+
+    /// Производное состояние waveform хранится отдельно от часто обновляемого состояния прогресса.
+    @Published private(set) var waveformState: PlayerWaveformState = .unavailable
+    /// Задача существует только для текущего трека и отменяется до запуска следующей генерации.
+    private var waveformTask: Task<Void, Never>?
     
     // MARK: - Throttling
-    
-    private var lastMiniPlayerTick: CFTimeInterval = 0
+
     private var lastNowPlayingTick: CFTimeInterval = 0
     
     // MARK: - Внутренние зависимости
@@ -67,6 +71,8 @@ final class PlayerViewModel: ObservableObject {
     private let playlistManager: PlaylistManager
     /// Загружает актуальные списки фонотеки без переноса SQLite-логики в PlayerViewModel.
     private let libraryContextLoader: any LibraryPlaybackContextLoading
+    /// Слой генерации скрывает AVAssetReader и файловый кэш от ViewModel.
+    private let waveformGenerator: any WaveformGenerating
     /// Показывает, что текущий трек восстановлен для интерфейса, но ещё не загружен в PlayerManager.
     private var isCurrentTrackPreparedForPlayback = false
     /// Источник текущего playback-контекста нужен для сохранения его при переходе Next/Previous.
@@ -121,7 +127,8 @@ final class PlayerViewModel: ObservableObject {
         toastPresenter: (any ToastPresenting)? = nil,
         statePersistence: (any PlayerStatePersisting)? = nil,
         playlistManager: PlaylistManager? = nil,
-        libraryContextLoader: (any LibraryPlaybackContextLoading)? = nil
+        libraryContextLoader: (any LibraryPlaybackContextLoading)? = nil,
+        waveformGenerator: (any WaveformGenerating)? = nil
     ) {
         let resolvedPlaylistManager = playlistManager ?? PlaylistManager.shared
 
@@ -135,6 +142,10 @@ final class PlayerViewModel: ObservableObject {
         self.statePersistence = statePersistence ?? (try? PlayerStatePersistence())
         self.playlistManager = resolvedPlaylistManager
         self.libraryContextLoader = libraryContextLoader ?? LibraryPlaybackContextLoader()
+        self.waveformGenerator = waveformGenerator ?? WaveformCachedGenerator(
+            generator: WaveformGenerator(),
+            cache: WaveformFileCache()
+        )
         self.concretePlayerManager = playerManager as? PlayerManager
 
         if self.statePersistence == nil {
@@ -580,6 +591,7 @@ final class PlayerViewModel: ObservableObject {
         trackDuration = track.duration
         isPlaying = false
         miniPlayerStaticState = nil
+        resetWaveformState()
         requestSnapshotIfNeeded(for: track)
         updateMiniPlayerStaticState(for: track)
         updateMiniPlayerProgressState()
@@ -642,6 +654,7 @@ final class PlayerViewModel: ObservableObject {
         isPlaying = false
         isCurrentTrackPreparedForPlayback = false
         miniPlayerStaticState = nil
+        resetWaveformState()
         updateMiniPlayerProgressState()
     }
 
@@ -870,6 +883,70 @@ final class PlayerViewModel: ObservableObject {
         updateMiniPlayerState()
     }
 
+    // MARK: - Waveform
+
+    /// Отменяет работу прежнего трека и немедленно убирает его данные из интерфейса.
+    private func resetWaveformState() {
+        waveformTask?.cancel()
+        waveformTask = nil
+        waveformState = .unavailable
+    }
+
+    /// Запускает генерацию после контрольной точки PlayerManager, не ожидая завершения загрузки duration.
+    private func loadWaveformIfPossible(
+        for preparedLocalFile: PlayerPreparedLocalFile
+    ) {
+        let trackId = preparedLocalFile.trackId
+
+        guard currentTrackDisplayable?.trackId == trackId else {
+            // Поздний сигнал прежнего трека не должен отменять уже начатую задачу нового selection.
+            return
+        }
+
+        waveformTask?.cancel()
+        waveformTask = nil
+        waveformState = .unavailable
+
+        waveformState = .loading
+        let waveformGenerator = waveformGenerator
+        let fileURL = preparedLocalFile.fileURL
+
+        waveformTask = Task { [weak self] in
+            do {
+                let samples = try await waveformGenerator.generateSamples(
+                    from: fileURL,
+                    cacheKey: trackId.uuidString,
+                    sampleCount: PlayerWaveformConfiguration.miniPlayerSampleCount
+                )
+
+                guard !Task.isCancelled,
+                      let self,
+                      self.currentTrackDisplayable?.trackId == trackId
+                else {
+                    // Результат старого трека нельзя публиковать после быстрой смены selection.
+                    return
+                }
+
+                self.waveformState = .ready(samples)
+            } catch is CancellationError {
+                // Отмена штатна при смене текущего трека и не является ошибкой playback.
+            } catch {
+                guard !Task.isCancelled,
+                      let self,
+                      self.currentTrackDisplayable?.trackId == trackId
+                else {
+                    return
+                }
+
+                // Ошибка производных данных не влияет на AVPlayer и оставляет доступный fallback ProgressBar.
+                self.waveformState = .failed
+                PersistentLogger.log(
+                    "Player waveform failed trackId=\(trackId) error=\(error)"
+                )
+            }
+        }
+    }
+
     /// Публикует состояние мини-плеера без изменения существующей playback-логики.
     private func updateMiniPlayerState() {
         guard currentTrackDisplayable != nil else {
@@ -993,6 +1070,7 @@ final class PlayerViewModel: ObservableObject {
         
         // Новый трек: останавливаем доступ к старому
         playerManager.stopAccessingCurrentTrack()
+        resetWaveformState()
         currentTrackDisplayable = track
         miniPlayerStaticState = nil
         currentTime = 0
@@ -1010,7 +1088,17 @@ final class PlayerViewModel: ObservableObject {
                 // Для iTunes-источника передаём в PlayerManager адаптер с assetURL,
                 // а currentTrackDisplayable оставляем исходным для подсветки контекста.
                 let playbackTrack = playbackTrack(for: track)
-                try await playerManager.play(track: playbackTrack)
+                try await playerManager.play(
+                    track: playbackTrack,
+                    onPreparedLocalFile: { [weak self] preparedLocalFile in
+                        // ViewModel запускает waveform до получения duration; PlayerManager не знает о кэше и генераторе.
+                        self?.loadWaveformIfPossible(for: preparedLocalFile)
+                    }
+                )
+                guard currentTrackDisplayable?.trackId == track.trackId else {
+                    // Асинхронный запуск прежнего трека не должен менять waveform нового selection.
+                    return
+                }
                 isCurrentTrackPreparedForPlayback = true
                 isPlaying = true
                 updateMiniPlayerProgressState()
@@ -1044,12 +1132,9 @@ final class PlayerViewModel: ObservableObject {
         playerManager.observeProgress { [weak self] time in
             guard let self else { return }
             self.currentTime = time
+            // Источник уже ограничен четырьмя обновлениями в секунду, поэтому progress публикуется без второго throttle.
+            self.updateMiniPlayerProgressState()
             let now = CACurrentMediaTime()
-            // UI прогресс: ~20 Hz.
-            if now - self.lastMiniPlayerTick >= 1.0 {
-                self.lastMiniPlayerTick = now
-                self.updateMiniPlayerProgressState()
-            }
             // Now Playing: 1 Hz.
             if now - self.lastNowPlayingTick >= 1.0 {
                 self.lastNowPlayingTick = now
@@ -1063,7 +1148,17 @@ final class PlayerViewModel: ObservableObject {
         Task { @MainActor in
             do {
                 let playbackTrack = playbackTrack(for: track)
-                try await playerManager.play(track: playbackTrack)
+                try await playerManager.play(
+                    track: playbackTrack,
+                    onPreparedLocalFile: { [weak self] preparedLocalFile in
+                        // Восстановленный трек использует тот же ранний сигнал без второго обращения к bookmark.
+                        self?.loadWaveformIfPossible(for: preparedLocalFile)
+                    }
+                )
+                guard currentTrackDisplayable?.trackId == track.trackId else {
+                    // Восстановленный запуск мог устареть до завершения подготовки файла.
+                    return
+                }
                 isCurrentTrackPreparedForPlayback = true
                 isPlaying = true
                 updateMiniPlayerProgressState()
@@ -1253,6 +1348,7 @@ final class PlayerViewModel: ObservableObject {
     // MARK: - Деинициализация
     
     deinit {
+        waveformTask?.cancel()
         if let libraryAccessRestoredObserver {
             NotificationCenter.default.removeObserver(libraryAccessRestoredObserver)
         }

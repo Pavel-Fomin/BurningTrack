@@ -6,7 +6,7 @@
 //
 //  Роль:
 //  - отображает текущее время и оставшееся время
-//  - отображает прогресс-бар
+//  - отображает waveform с прогрессом воспроизведения
 //  - выполняет seek при перемотке
 //
 //  Created by Pavel Fomin on 08.02.2026.
@@ -18,6 +18,8 @@ struct MiniPlayerProgressView: View {
 
     let currentTime: TimeInterval
     let duration: TimeInterval
+    /// Явное состояние передаётся ViewModel; View не читает кэш и не анализирует аудио.
+    let waveformState: PlayerWaveformState
     let onSeek: (TimeInterval) -> Void
 
     var body: some View {
@@ -27,17 +29,7 @@ struct MiniPlayerProgressView: View {
                 .font(.caption2)
                 .frame(width: 40, alignment: .leading)
 
-            ProgressBar(
-                progress: {
-                    let ratio = duration > 0 ? currentTime / duration : 0
-                    return ratio
-                }(),
-                onSeek: { ratio in
-                    let newTime = ratio * duration
-                    onSeek(newTime)
-                },
-                height: 10
-            )
+            playbackIndicator
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 4)
 
@@ -47,5 +39,35 @@ struct MiniPlayerProgressView: View {
         }
         // Отделяем прогресс от информационной части мини-плеера дополнительным вертикальным пространством.
         .padding(.top, 14)
+    }
+
+    /// Представление определяет тип индикатора без чтения кэша или изменения состояния воспроизведения.
+    private var waveformPresentation: MiniPlayerWaveformPresentation {
+        MiniPlayerWaveformPresentation(waveformState: waveformState)
+    }
+
+    /// Готовая waveform поддерживает перемотку, а все отсутствующие состояния используют одну неинтерактивную заглушку.
+    @ViewBuilder
+    private var playbackIndicator: some View {
+        switch waveformPresentation {
+        case let .waveform(samples):
+            MiniPlayerWaveformView(
+                samples: samples,
+                currentTime: currentTime,
+                duration: duration,
+                progress: MiniPlayerWaveformLayout.progress(
+                    currentTime: currentTime,
+                    duration: duration
+                ),
+                onSeek: seek
+            )
+        case .placeholder:
+            MiniPlayerWaveformPlaceholderView()
+        }
+    }
+
+    /// Переводит выбранную позицию готовой waveform в секунды трека.
+    private func seek(to ratio: Double) {
+        onSeek(ratio * duration)
     }
 }

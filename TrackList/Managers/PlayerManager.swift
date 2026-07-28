@@ -17,6 +17,13 @@ import Combine
 import MediaPlayer
 @preconcurrency import AVFoundation
 
+/// Общий интервал обновления пользовательского progress без отдельного визуального таймера.
+enum PlayerProgressObservationConfiguration {
+
+    /// Четыре обновления в секунду делают waveform плавной, не приближаясь к кадровой частоте интерфейса.
+    static let interval: TimeInterval = 0.25
+}
+
 final class PlayerManager {
 
     // MARK: - Private
@@ -24,6 +31,8 @@ final class PlayerManager {
     private let player = AVPlayer()
     private var timeObserverToken: Any?
     private var currentAccessedURL: URL?
+    /// URL сохраняется после успешной подготовки AVPlayerItem и используется только связанными runtime-сценариями.
+    private var currentPreparedURL: URL?
 
     // MARK: - Состояние трека
 
@@ -56,7 +65,10 @@ final class PlayerManager {
 
     // MARK: - Main Playback
 
-    func play(track: any TrackDisplayable) async throws {
+    func play(
+        track: any TrackDisplayable,
+        onPreparedLocalFile: @escaping PlayerPreparedLocalFileHandler
+    ) async throws {
         let trackId = track.trackId
 
         // 1. Получаем URL воспроизведения из подходящего источника.
@@ -107,7 +119,19 @@ final class PlayerManager {
 
         // Обновляем состояние текущего трека
         currentTrackId = trackId
+        currentPreparedURL = resolvedURL
         isPlaying = true
+
+        if let preparedLocalFileURL = preparedLocalFileURL(for: trackId) {
+            // Контрольная точка появляется после подготовки AVPlayerItem и security scope, но до ожидания duration.
+            // Менеджер сообщает только ресурс: запуск waveform остаётся ответственностью ViewModel.
+            await onPreparedLocalFile(
+                PlayerPreparedLocalFile(
+                    trackId: trackId,
+                    fileURL: preparedLocalFileURL
+                )
+            )
+        }
 
         // 7. Читаем длительность трека
         let duration = (try? await item.asset.load(.duration))?.seconds ?? 0
@@ -144,6 +168,47 @@ final class PlayerManager {
             url.stopAccessingSecurityScopedResource()
             currentAccessedURL = nil
         }
+
+        // После освобождения scope прежний URL больше нельзя отдавать фоновым производным операциям.
+        currentPreparedURL = nil
+    }
+
+    /// Возвращает только уже подготовленный локальный файл текущего AVPlayerItem.
+    /// Новый bookmark и security scope здесь не создаются, чтобы waveform использовал тот же доступ, что и playback.
+    func preparedLocalFileURL(for trackId: UUID) -> URL? {
+        guard currentTrackId == trackId,
+              let currentPreparedURL,
+              currentPreparedURL.isFileURL,
+              FileManager.default.fileExists(atPath: currentPreparedURL.path),
+              FileManager.default.isReadableFile(atPath: currentPreparedURL.path)
+        else {
+            return nil
+        }
+
+        guard let resourceValues = try? currentPreparedURL.resourceValues(
+            forKeys: [
+                .isRegularFileKey,
+                .isUbiquitousItemKey,
+                .ubiquitousItemDownloadingStatusKey
+            ]
+        ),
+              resourceValues.isRegularFile == true
+        else {
+            // Для iCloud placeholder не запускаем отдельную загрузку только ради waveform.
+            return nil
+        }
+
+        if resourceValues.isUbiquitousItem == true {
+            let downloadingStatus = resourceValues.ubiquitousItemDownloadingStatus
+            let isLocallyAvailable = downloadingStatus == .current || downloadingStatus == .downloaded
+
+            guard isLocallyAvailable else {
+                // `.notDownloaded` и неизвестный статус не должны запускать отдельную загрузку ради waveform.
+                return nil
+            }
+        }
+
+        return currentPreparedURL
     }
 
     // MARK: - Controls
@@ -191,7 +256,10 @@ final class PlayerManager {
 
     func observeProgress(update: @escaping (TimeInterval) -> Void) {
         removeTimeObserver()
-        let interval = CMTimeMakeWithSeconds(1.0, preferredTimescale: 600)
+        let interval = CMTimeMakeWithSeconds(
+            PlayerProgressObservationConfiguration.interval,
+            preferredTimescale: 600
+        )
 
         timeObserverToken = player.addPeriodicTimeObserver(
             forInterval: interval,
