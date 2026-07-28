@@ -56,46 +56,46 @@ struct MiniPlayerHeaderView: View {
 
     /// Объединяет обложку и метаданные в единую область управления без транспортных кнопок.
     private var informationArea: some View {
-        Button(action: onContentTap) {
-            HStack(spacing: 12) {
-                artworkView
+        HStack(spacing: 12) {
+            artworkView
 
-                VStack(alignment: .leading, spacing: 2) {
-                    if !artist.isEmpty {
-                        Text(artist)
-                            .font(.caption)
-                            .foregroundColor(.primary)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                    }
-
-                    Text(title)
-                        // Название использует тот же шрифт, что и исполнитель.
+            VStack(alignment: .leading, spacing: 2) {
+                if !artist.isEmpty {
+                    Text(artist)
                         .font(.caption)
-                        .foregroundColor(
-                            titleColorOverride ?? (artist.isEmpty ? .primary : .secondary)
-                        )
+                        .foregroundColor(.primary)
                         .lineLimit(1)
                         .truncationMode(.tail)
                 }
-                // Текст занимает только оставшееся место и не вытесняет кнопки.
-                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Text(title)
+                    // Название использует тот же шрифт, что и исполнитель.
+                    .font(.caption)
+                    .foregroundColor(
+                        titleColorOverride ?? (artist.isEmpty ? .primary : .secondary)
+                    )
+                    .lineLimit(1)
+                    .truncationMode(.tail)
             }
+            // Текст занимает только оставшееся место и не вытесняет кнопки.
             .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
         .offset(x: contentDragOffset)
-        // Горизонтальный жест ограничен информационной областью,
-        // чтобы не конкурировать с перемоткой и транспортными кнопками.
-        .simultaneousGesture(contentSwipeGesture)
+        // Единый жест исключает одновременное срабатывание нажатия и смены трека.
+        .gesture(contentInteractionGesture)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction {
+            onContentTap()
+        }
         .accessibilityLabel(isPlaying ? String(localized: "Pause") : String(localized: "Play"))
         .accessibilityValue([artist, title].filter { !$0.isEmpty }.joined(separator: ", "))
     }
 
-    /// Отделяет смену трека от вертикального жеста карточки по преобладающему направлению.
-    private var contentSwipeGesture: some Gesture {
-        DragGesture(minimumDistance: 20)
+    /// Разделяет нажатие и смену трека, не перехватывая вертикальный жест карточки.
+    private var contentInteractionGesture: some Gesture {
+        DragGesture(minimumDistance: 0)
             .onChanged { value in
                 let horizontalDistance = value.translation.width
                 let verticalDistance = value.translation.height
@@ -111,7 +111,8 @@ struct MiniPlayerHeaderView: View {
             .onEnded { value in
                 let horizontalDistance = value.translation.width
                 let verticalDistance = value.translation.height
-                let threshold: CGFloat = 48
+                let swipeThreshold: CGFloat = 48
+                let tapThreshold: CGFloat = 10
 
                 defer {
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
@@ -119,8 +120,15 @@ struct MiniPlayerHeaderView: View {
                     }
                 }
 
+                let totalDistance = hypot(horizontalDistance, verticalDistance)
+
+                guard totalDistance >= tapThreshold else {
+                    onContentTap()
+                    return
+                }
+
                 guard abs(horizontalDistance) > abs(verticalDistance),
-                      abs(horizontalDistance) >= threshold else {
+                      abs(horizontalDistance) >= swipeThreshold else {
                     return
                 }
 
