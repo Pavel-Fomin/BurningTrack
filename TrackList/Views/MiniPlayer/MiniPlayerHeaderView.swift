@@ -24,6 +24,8 @@ struct MiniPlayerHeaderView: View {
     let title: String
     let artist: String
     let isPlaying: Bool
+    let isPreviousEnabled: Bool
+    let isNextEnabled: Bool
     /// Переопределение цвета заголовка для специальных состояний мини-плеера.
     let titleColorOverride: Color?
 
@@ -42,6 +44,8 @@ struct MiniPlayerHeaderView: View {
 
             MiniPlayerTransportControlsView(
                 isPlaying: isPlaying,
+                isPreviousEnabled: isPreviousEnabled,
+                isNextEnabled: isNextEnabled,
                 onPrevious: onPrevious,
                 onPlayPause: onPlayPause,
                 onNext: onNext

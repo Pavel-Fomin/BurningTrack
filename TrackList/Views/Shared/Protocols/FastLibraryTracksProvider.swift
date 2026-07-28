@@ -16,7 +16,35 @@
 
 import Foundation
 
-final class FastLibraryTracksProvider: LibraryTracksProvider {
+/// Быстро находит один трек в SQLite-реестре без обращения к файлу или bookmark.
+///
+/// Отдельный контракт нужен восстановлению мини-плеера: ему достаточно display-модели
+/// одного сохранённого трека, пока полный playback-контекст фонотеки готовится отдельно.
+protocol FastLibraryTrackProviding {
+    func track(for trackId: UUID) async -> LibraryTrack?
+}
+
+final class FastLibraryTracksProvider: LibraryTracksProvider, FastLibraryTrackProviding {
+
+    /// Возвращает одну display-модель из TrackRegistry без проверки доступности файла.
+    ///
+    /// Раннее восстановление использует только уже сохранённые данные SQLite, поэтому
+    /// не открывает security-scoped resource и не задерживает интерфейс синхронизацией.
+    func track(for trackId: UUID) async -> LibraryTrack? {
+        guard let entry = await TrackRegistry.shared.entry(for: trackId) else {
+            return nil
+        }
+
+        // Краткие metadata уже сохранены в SQLite и не требуют bookmark или чтения аудиофайла.
+        let cachedMetadata = await TrackRegistry.shared.cachedMetadata(
+            forTrackIds: [trackId]
+        )[trackId]
+
+        return makeLibraryTrack(
+            from: entry,
+            cachedMetadata: cachedMetadata
+        )
+    }
 
     func tracks(for source: LibraryTrackListSource) async -> [LibraryTrack] {
         switch source {
@@ -78,16 +106,17 @@ final class FastLibraryTracksProvider: LibraryTracksProvider {
 
     /// Создаёт строку фонотеки из SQLite-записи, не восстанавливая bookmark и не проверяя файл.
     private func makeLibraryTrack(
-        from entry: TrackRegistry.TrackEntry
+        from entry: TrackRegistry.TrackEntry,
+        cachedMetadata: TrackCachedMetadata? = nil
     ) -> LibraryTrack? {
         guard let relativePath = entry.relativePath else { return nil }
 
         return LibraryTrack(
             id: entry.id,
             fileURL: URL(fileURLWithPath: relativePath),
-            title: nil,
-            artist: nil,
-            duration: 0,
+            title: cachedMetadata?.title,
+            artist: cachedMetadata?.artist,
+            duration: cachedMetadata?.duration ?? 0,
             addedDate: entry.fileDate,
             isAvailable: entry.isAvailable
         )

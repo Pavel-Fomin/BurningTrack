@@ -161,6 +161,28 @@ final class PlayerPlaybackContextStore {
         return (originalTracks[originalIndex], originalTracks)
     }
 
+    /// Проверяет возможность перехода вперёд, не изменяя текущую позицию playback-порядка.
+    func canMoveToNext(after currentTrack: any TrackDisplayable) -> Bool {
+        guard playbackIndexes.count > 1,
+              let currentIndex = playbackIndex(for: currentTrack)
+        else {
+            return false
+        }
+
+        return currentIndex + 1 < playbackIndexes.count || playbackMode.repeatMode == .all
+    }
+
+    /// Проверяет возможность перехода назад, не изменяя текущую позицию playback-порядка.
+    func canMoveToPrevious(before currentTrack: any TrackDisplayable) -> Bool {
+        guard playbackIndexes.count > 1,
+              let currentIndex = playbackIndex(for: currentTrack)
+        else {
+            return false
+        }
+
+        return currentIndex > 0 || playbackMode.repeatMode == .all
+    }
+
     /// Показывает, можно ли выполнять переходы внутри текущего контекста.
     var hasMultipleTracks: Bool {
         originalTracks.count > 1

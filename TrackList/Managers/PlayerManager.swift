@@ -319,6 +319,16 @@ final class PlayerManager {
         }
     }
 
+    /// Временно выключает системные команды перехода, пока ViewModel не получила достоверный playback-контекст.
+    func setTrackNavigationCommandsEnabled(
+        isNextEnabled: Bool,
+        isPreviousEnabled: Bool
+    ) {
+        let center = MPRemoteCommandCenter.shared()
+        center.nextTrackCommand.isEnabled = isNextEnabled
+        center.previousTrackCommand.isEnabled = isPreviousEnabled
+    }
+
     // MARK: - Now Playing Info
 
     /// Применяет полный snapshot в Control Center.

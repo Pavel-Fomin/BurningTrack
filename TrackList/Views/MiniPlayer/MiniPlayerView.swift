@@ -170,6 +170,8 @@ struct MiniPlayerView: View {
                 title: content.title,
                 artist: content.artist,
                 isPlaying: content.isPlaying,
+                isPreviousEnabled: playerViewModel.canPlayPreviousTrack,
+                isNextEnabled: playerViewModel.canPlayNextTrack,
                 // Пустое состояние не конкурирует визуально с содержимым трека.
                 titleColorOverride: hasTrack ? nil : .secondary,
                 onContentTap: {

@@ -35,8 +35,8 @@ final class MiniPlayerStateBuilder {
 
         let shouldShowTags = AppSettingsManager.shared.settings.visible.metadata.isTagReadingEnabled
 
-        // Название берём из snapshot, если оно есть.
-        // Если в тегах пусто — показываем имя файла.
+        // Название из позднего snapshot имеет приоритет, затем используется сохранённый тег ранней display-модели.
+        // Имя файла остаётся fallback только при действительно отсутствующем названии.
         let title: String = {
             if !shouldShowTags { return track.fileName }
 
@@ -44,16 +44,24 @@ final class MiniPlayerStateBuilder {
                 return snapshot?.title ?? ""
             }
 
+            if track.title?.isEmpty == false {
+                return track.title ?? ""
+            }
+
             return track.fileName
         }()
 
-        // Исполнителя берём из snapshot, если он есть.
-        // Если в тегах пусто — передаём отсутствие metadata в presentation-слой.
+        // Исполнитель из позднего snapshot имеет приоритет, затем используется сохранённый тег ранней display-модели.
+        // Если тег отсутствует, передаём nil в существующий presentation-слой без подстановки имени файла.
         let artist: String? = {
             if !shouldShowTags { return nil }
 
             if snapshot?.artist?.isEmpty == false {
                 return snapshot?.artist
+            }
+
+            if track.artist?.isEmpty == false {
+                return track.artist
             }
 
             return nil

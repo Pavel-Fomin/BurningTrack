@@ -53,11 +53,25 @@ protocol PlayerManaging: AnyObject {
         onPrevious: @escaping () -> Void
     )
 
+    /// Синхронизирует системные команды перехода с опубликованной готовностью playback-контекста.
+    func setTrackNavigationCommandsEnabled(
+        isNextEnabled: Bool,
+        isPreviousEnabled: Bool
+    )
+
     /// Применяет полный snapshot Now Playing в системный Control Center.
     func applyNowPlaying(snapshot: NowPlayingSnapshot)
 
     /// Обновляет только время и состояние воспроизведения в Now Playing.
     func applyPlaybackTime(currentTime: TimeInterval, isPlaying: Bool)
+}
+
+extension PlayerManaging {
+    /// Подмены PlayerManager в изолированных тестах не обязаны управлять системным Remote Command Center.
+    func setTrackNavigationCommandsEnabled(
+        isNextEnabled: Bool,
+        isPreviousEnabled: Bool
+    ) {}
 }
 
 extension PlayerManager: PlayerManaging {}

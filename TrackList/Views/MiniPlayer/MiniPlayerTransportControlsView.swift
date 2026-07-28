@@ -14,6 +14,8 @@ struct MiniPlayerTransportControlsView: View {
     // MARK: - Input
 
     let isPlaying: Bool
+    let isPreviousEnabled: Bool
+    let isNextEnabled: Bool
     let onPrevious: () -> Void
     let onPlayPause: () -> Void
     let onNext: () -> Void
@@ -25,6 +27,7 @@ struct MiniPlayerTransportControlsView: View {
             controlButton(
                 systemName: "backward.end.fill",
                 accessibilityLabel: String(localized: "Previous Track"),
+                isEnabled: isPreviousEnabled,
                 action: onPrevious
             )
 
@@ -39,6 +42,7 @@ struct MiniPlayerTransportControlsView: View {
             controlButton(
                 systemName: "forward.end.fill",
                 accessibilityLabel: String(localized: "Next Track"),
+                isEnabled: isNextEnabled,
                 action: onNext
             )
         }
@@ -50,6 +54,7 @@ struct MiniPlayerTransportControlsView: View {
     private func controlButton(
         systemName: String,
         accessibilityLabel: String,
+        isEnabled: Bool = true,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
@@ -59,6 +64,7 @@ struct MiniPlayerTransportControlsView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .disabled(!isEnabled)
         .accessibilityLabel(accessibilityLabel)
     }
 }
