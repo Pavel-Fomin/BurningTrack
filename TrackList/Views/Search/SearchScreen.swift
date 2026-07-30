@@ -29,7 +29,9 @@ struct SearchScreen: View {
         self.playerViewModel = playerViewModel
         self._isSearchActive = isSearchActive
         self._viewModel = StateObject(
-            wrappedValue: SearchViewModelFactory.make()
+            wrappedValue: SearchViewModelFactory.make(
+                favoriteTrackIdsProvider: playerViewModel
+            )
         )
     }
 

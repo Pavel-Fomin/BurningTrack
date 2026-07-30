@@ -14,7 +14,7 @@ struct PurchasedITunesTrackRowContainer: View {
 
     // MARK: - Входные данные
 
-    let track: PurchasedITunesPlayableTrack
+    let state: PurchasedITunesTrackRowState
     let context: [PurchasedITunesPlayableTrack]
     @ObservedObject var playerViewModel: PlayerViewModel
 
@@ -31,12 +31,12 @@ struct PurchasedITunesTrackRowContainer: View {
 
     /// Проверяет, является ли строка текущим iTunes-треком плеера.
     private var isCurrent: Bool {
-        actionHandler.isCurrent(track)
+        actionHandler.isCurrent(state.track)
     }
 
     /// Проверяет, играет ли текущий iTunes-трек.
     private var isPlaying: Bool {
-        actionHandler.isPlaying(track)
+        actionHandler.isPlaying(state.track)
     }
 
     /// Проверяет доступность пункта меню для раздела "Куплено в iTunes".
@@ -54,19 +54,15 @@ struct PurchasedITunesTrackRowContainer: View {
 
     var body: some View {
         TrackRowView(
-            track: track,
+            track: state.track,
             isCurrent: isCurrent,
             isPlaying: isPlaying,
             isHighlighted: false,
-            artworkRequest: ArtworkRequest(
-                trackId: track.trackId,
-                artworkData: track.artworkData,
-                purpose: .trackList,
-                sourceIdentifier: .mediaLibrary(trackId: track.trackId)
-            ),
-            title: track.title,
-            artist: track.artist ?? "Unknown Artist",
-            duration: track.duration,
+            artworkRequest: state.artworkRequest,
+            artworkBadgeState: state.artworkBadgeState,
+            title: state.title,
+            artist: state.artist,
+            duration: state.duration,
             onRowTap: play,
             showsFileFormat: false
         ) {
@@ -76,7 +72,7 @@ struct PurchasedITunesTrackRowContainer: View {
             // Заглушка копирования ничего не пишет на диск.
             if isMenuActionAvailable(.copy) {
                 Button {
-                    actionHandler.handle(.copy(track: track))
+                    actionHandler.handle(.copy(track: state.track))
                 } label: {
                     Label("Copy", systemImage: "doc.on.doc")
                 }
@@ -86,7 +82,7 @@ struct PurchasedITunesTrackRowContainer: View {
             // Отправляем намерение добавления в треклист обработчику действий.
             if isMenuActionAvailable(.addToTrackList) {
                 Button {
-                    actionHandler.handle(.addToTrackList(track: track))
+                    actionHandler.handle(.addToTrackList(track: state.track))
                 } label: {
                     Label("Add to Tracklist", systemImage: "list.star")
                 }
@@ -96,7 +92,7 @@ struct PurchasedITunesTrackRowContainer: View {
             // Отправляем намерение добавления в очередь плеера обработчику действий.
             if isMenuActionAvailable(.addToPlayer) {
                 Button {
-                    actionHandler.handle(.addToPlayer(track: track))
+                    actionHandler.handle(.addToPlayer(track: state.track))
                 } label: {
                     Label("Add to Player", systemImage: "waveform")
                 }
@@ -111,7 +107,7 @@ struct PurchasedITunesTrackRowContainer: View {
         // Открытие карточки "О треке" остаётся намерением View и выполняется обработчиком.
         if isMenuActionAvailable(.details) {
             Button {
-                actionHandler.handle(.details(track: track))
+                actionHandler.handle(.details(track: state.track))
             } label: {
                 Label("Track Info", systemImage: "info.circle")
             }
@@ -119,7 +115,7 @@ struct PurchasedITunesTrackRowContainer: View {
 
         if isMenuActionAvailable(.share) {
             Button {
-                actionHandler.handle(.share(track: track))
+                actionHandler.handle(.share(track: state.track))
             } label: {
                 Label(
                     TrackSharePresentationText.actionTitle,
@@ -130,7 +126,7 @@ struct PurchasedITunesTrackRowContainer: View {
 
         if isMenuActionAvailable(.copy) {
             Button {
-                actionHandler.handle(.copy(track: track))
+                actionHandler.handle(.copy(track: state.track))
             } label: {
                 Label("Copy", systemImage: "doc.on.doc")
             }
@@ -138,7 +134,7 @@ struct PurchasedITunesTrackRowContainer: View {
 
         if isMenuActionAvailable(.addToTrackList) {
             Button {
-                actionHandler.handle(.addToTrackList(track: track))
+                actionHandler.handle(.addToTrackList(track: state.track))
             } label: {
                 Label("Add to Tracklist", systemImage: "list.star")
             }
@@ -146,7 +142,7 @@ struct PurchasedITunesTrackRowContainer: View {
 
         if isMenuActionAvailable(.addToPlayer) {
             Button {
-                actionHandler.handle(.addToPlayer(track: track))
+                actionHandler.handle(.addToPlayer(track: state.track))
             } label: {
                 Label("Add to Player", systemImage: "waveform")
             }
@@ -157,7 +153,7 @@ struct PurchasedITunesTrackRowContainer: View {
     private func play() {
         actionHandler.handle(
             .play(
-                track: track,
+                track: state.track,
                 context: context
             )
         )

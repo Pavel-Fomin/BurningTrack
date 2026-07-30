@@ -13,6 +13,9 @@ import Foundation
 @MainActor
 protocol FavoritesServicing {
 
+    /// Загружает все логические идентификаторы треков системного треклиста одним чтением.
+    func loadFavoriteTrackIds() throws -> Set<UUID>
+
     /// Проверяет наличие логического идентификатора трека в системном треклисте.
     func isFavorite(trackId: UUID) throws -> Bool
 

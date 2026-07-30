@@ -12,6 +12,16 @@ import Foundation
 @MainActor
 struct TrackListRowStateBuilder {
 
+    /// Фабрика централизует сопоставление типизированного источника с бейджем.
+    private let artworkBadgeStateFactory: any TrackArtworkBadgeStateBuilding
+
+    /// Создаёт builder с общей фабрикой состояния бейджа.
+    init(
+        artworkBadgeStateFactory: any TrackArtworkBadgeStateBuilding = TrackArtworkBadgeStateFactory()
+    ) {
+        self.artworkBadgeStateFactory = artworkBadgeStateFactory
+    }
+
     /// Собирает состояние строки трека.
     ///
     /// - Parameters:
@@ -26,7 +36,8 @@ struct TrackListRowStateBuilder {
         snapshot: TrackRuntimeSnapshot?,
         isCurrent: Bool,
         isPlaying: Bool,
-        isHighlighted: Bool
+        isHighlighted: Bool,
+        isFavorite: Bool
     ) -> TrackListRowState {
         build(
             track: track,
@@ -34,6 +45,7 @@ struct TrackListRowStateBuilder {
             isCurrent: isCurrent,
             isPlaying: isPlaying,
             isHighlighted: isHighlighted,
+            isFavorite: isFavorite,
             settings: AppSettingsManager.shared.settings,
             collectionNavigationTarget: nil
         )
@@ -55,6 +67,7 @@ struct TrackListRowStateBuilder {
         isCurrent: Bool,
         isPlaying: Bool,
         isHighlighted: Bool,
+        isFavorite: Bool,
         settings: AppSettings,
         collectionNavigationTarget: TrackCollectionNavigationTarget?
     ) -> TrackListRowState {
@@ -78,6 +91,10 @@ struct TrackListRowStateBuilder {
                     artworkData: track.artworkData,
                     purpose: .trackList,
                     sourceIdentifier: .mediaLibrary(trackId: track.trackId)
+                ),
+                artworkBadgeState: artworkBadgeStateFactory.makeState(
+                    source: track.source,
+                    isFavorite: isFavorite
                 ),
                 collectionNavigationTarget: nil,
                 showsFileFormat: false,
@@ -114,6 +131,10 @@ struct TrackListRowStateBuilder {
             isPlaying: isPlaying,
             isHighlighted: isHighlighted,
             artworkRequest: artworkRequest,
+            artworkBadgeState: artworkBadgeStateFactory.makeState(
+                source: track.source,
+                isFavorite: isFavorite
+            ),
             collectionNavigationTarget: collectionNavigationTarget,
             showsFileFormat: shouldShowFileFormat,
             renameArtist: snapshot?.artist,

@@ -14,33 +14,28 @@ struct TrackSelectableSectionsView: View {
 
     // MARK: - Input
 
-    /// Секции треков (уже сгруппированные)
-    let sections: [TrackSection]
+    /// Секции с готовым presentation-состоянием строк.
+    let sections: [TrackSelectableSectionState]
 
-    /// Выбранные треки
-    @Binding var selection: Set<UUID>
-    
-    /// Провайдер runtime snapshot
-    let metadataProvider: TrackMetadataProviding
+    /// Передаёт действие выбора владельцу состояния sheet.
+    let onToggleSelection: (LibraryTrack) -> Void
+
+    /// Запрашивает runtime snapshot через ViewModel фонотеки.
+    let onRequestSnapshot: (UUID) -> Void
 
     // MARK: - UI
 
     var body: some View {
         ForEach(sections, id: \.id) { section in
             Section {
-                ForEach(section.tracks, id: \.id) { track in
+                ForEach(section.rows) { row in
 
                     TrackSelectableRowWrapper(
-                        track: track,
-                        isSelected: selection.contains(track.id),
-                        metadataProvider: metadataProvider,
+                        state: row,
                         onToggleSelection: {
-                            if selection.contains(track.id) {
-                                selection.remove(track.id)
-                            } else {
-                                selection.insert(track.id)
-                            }
-                        }
+                            onToggleSelection(row.track)
+                        },
+                        onRequestSnapshot: onRequestSnapshot
                     )
                 }
             } header: {

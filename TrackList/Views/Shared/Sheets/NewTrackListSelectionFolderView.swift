@@ -21,6 +21,8 @@ struct NewTrackListSelectionFolderView: View {
     // MARK: - State
 
     @ObservedObject var selectionViewModel: NewTrackListSelectionViewModel
+    /// Published-состояние «Избранного» используется только как вход state builder-а.
+    @ObservedObject var playerViewModel: PlayerViewModel
 
     /// ViewModel для загрузки треков папки
     @StateObject private var tracksViewModel: LibraryTracksViewModel
@@ -30,11 +32,13 @@ struct NewTrackListSelectionFolderView: View {
     init(
         folder: LibraryFolder,
         selectionViewModel: NewTrackListSelectionViewModel,
-        renameActionHandler: TrackFileRenameActionHandler
+        renameActionHandler: TrackFileRenameActionHandler,
+        playerViewModel: PlayerViewModel
     ) {
         self.folder = folder
         self.selectionViewModel = selectionViewModel
         self.renameActionHandler = renameActionHandler
+        self.playerViewModel = playerViewModel
 
         _tracksViewModel = StateObject(
             wrappedValue: LibraryTracksViewModel(
@@ -50,6 +54,14 @@ struct NewTrackListSelectionFolderView: View {
         tracksViewModel.trackSections.flatMap(\.tracks)
     }
 
+    /// Готовые секции не оставляют View вычислять источник или принадлежность к «Избранному».
+    private var selectableTrackSections: [TrackSelectableSectionState] {
+        tracksViewModel.makeSelectableTrackSections(
+            favoriteTrackIds: playerViewModel.favoriteTrackIds,
+            selectedTrackIds: Set(selectionViewModel.selectedTracksById.keys)
+        )
+    }
+
     // MARK: - UI
 
     var body: some View {
@@ -62,7 +74,8 @@ struct NewTrackListSelectionFolderView: View {
                                 NewTrackListSelectionFolderView(
                                     folder: subfolder,
                                     selectionViewModel: selectionViewModel,
-                                    renameActionHandler: renameActionHandler
+                                    renameActionHandler: renameActionHandler,
+                                    playerViewModel: playerViewModel
                                 )
                             } label: {
                                 HStack(spacing: 12) {
@@ -81,28 +94,13 @@ struct NewTrackListSelectionFolderView: View {
 
                 if !tracksViewModel.trackSections.isEmpty {
                     TrackSelectableSectionsView(
-                        sections: tracksViewModel.trackSections,
-                        selection: Binding(
-                            get: { Set(selectionViewModel.selectedTracksById.keys) },
-                            set: { newValue in
-
-                                let allTracks = tracksViewModel.trackSections.flatMap(\.tracks)
-
-                                for track in allTracks {
-                                    let isSelected = selectionViewModel.isSelected(track)
-                                    let shouldBeSelected = newValue.contains(track.id)
-
-                                    if shouldBeSelected && !isSelected {
-                                        selectionViewModel.toggle(track)
-                                    }
-
-                                    if !shouldBeSelected && isSelected {
-                                        selectionViewModel.toggle(track)
-                                    }
-                                }
-                            }
-                        ),
-                        metadataProvider: tracksViewModel
+                        sections: selectableTrackSections,
+                        onToggleSelection: { track in
+                            selectionViewModel.toggle(track)
+                        },
+                        onRequestSnapshot: { trackId in
+                            tracksViewModel.requestSnapshotIfNeeded(for: trackId)
+                        }
                     )
                 }
 

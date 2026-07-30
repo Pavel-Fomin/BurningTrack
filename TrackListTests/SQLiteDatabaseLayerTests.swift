@@ -1325,6 +1325,7 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
             currentContext: nil,
             isPlaying: false,
             highlightedRowId: nil,
+            favoriteTrackIds: [],
             settings: AppSettings.defaultValue,
             collectionNavigationTargetsByTrackId: [:]
         )

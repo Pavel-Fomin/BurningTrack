@@ -48,6 +48,8 @@ final class PlayerViewModel: ObservableObject {
     /// Разрешает переход к следующему треку только после проверки готового playback-контекста.
     @Published private(set) var canPlayNextTrack = false
     @Published private(set) var snapshotsByTrackId: [UUID: TrackRuntimeSnapshot] = [:] /// Runtime snapshot треков по id
+    /// Подтверждённые идентификаторы «Избранного» для presentation-состояния строк.
+    @Published private(set) var favoriteTrackIds: Set<UUID> = []
     /// Показывает состояние «Избранного» только для текущего трека плеера.
     @Published private(set) var isCurrentTrackFavorite: Bool = false {
         didSet {
@@ -87,7 +89,7 @@ final class PlayerViewModel: ObservableObject {
     private let eventObserver: any PlayerEventObserving
     /// Выполняет доменные операции «Избранного», не раскрывая ViewModel работу с треклистами.
     private let favoritesService: any FavoritesServicing
-    /// Передаёт точечные изменения «Избранного» для уже выбранного трека.
+    /// Передаёт точечные изменения «Избранного» для presentation-состояния приложения.
     private let favoritesEvents: any FavoritesEventsObserving
     /// Показывает пользовательские ошибки без прямой зависимости от ToastManager.shared.
     private let toastPresenter: any ToastPresenting
@@ -328,6 +330,7 @@ final class PlayerViewModel: ObservableObject {
                 ? .success
                 : .commandFailed
         }
+        refreshFavoriteTrackIds()
         updateFavoriteCommandState()
         updateTrackNavigationAvailability()
 
@@ -346,9 +349,14 @@ final class PlayerViewModel: ObservableObject {
         }
 
         do {
-            isCurrentTrackFavorite = try favoritesService.isFavorite(
+            let isFavorite = try favoritesService.isFavorite(
                 trackId: currentTrack.trackId
             )
+            updateFavoriteTrackState(
+                trackId: currentTrack.trackId,
+                isFavorite: isFavorite
+            )
+            isCurrentTrackFavorite = isFavorite
         } catch {
             // Ошибка чтения не должна оставлять состояние предыдущего трека в интерфейсной модели.
             isCurrentTrackFavorite = false
@@ -356,6 +364,35 @@ final class PlayerViewModel: ObservableObject {
                 "PlayerViewModel: ошибка проверки избранного trackId=\(currentTrack.trackId) error=\(error)"
             )
         }
+    }
+
+    /// Загружает исходный снимок «Избранного» для видимых строк до поступления точечных событий.
+    private func refreshFavoriteTrackIds() {
+        do {
+            favoriteTrackIds = try favoritesService.loadFavoriteTrackIds()
+        } catch {
+            // Ошибка не должна оставлять в строках подтверждённое состояние предыдущего запуска.
+            favoriteTrackIds = []
+            PersistentLogger.log(
+                "PlayerViewModel: ошибка загрузки избранного error=\(error)"
+            )
+        }
+    }
+
+    /// Точечно меняет published-снимок без повторного чтения всего системного треклиста.
+    private func updateFavoriteTrackState(
+        trackId: UUID,
+        isFavorite: Bool
+    ) {
+        var updatedTrackIds = favoriteTrackIds
+
+        if isFavorite {
+            updatedTrackIds.insert(trackId)
+        } else {
+            updatedTrackIds.remove(trackId)
+        }
+
+        favoriteTrackIds = updatedTrackIds
     }
 
     /// Синхронизирует системную команду с наличием текущего трека и подтверждённым состоянием «Избранного».
@@ -371,9 +408,16 @@ final class PlayerViewModel: ObservableObject {
     private func observeFavoritesChanges() {
         favoritesEvents.events
             .sink { [weak self] event in
-                guard let self,
-                      event.trackId == self.currentTrackDisplayable?.trackId
-                else {
+                guard let self else {
+                    return
+                }
+
+                self.updateFavoriteTrackState(
+                    trackId: event.trackId,
+                    isFavorite: event.isFavorite
+                )
+
+                guard event.trackId == self.currentTrackDisplayable?.trackId else {
                     return
                 }
 

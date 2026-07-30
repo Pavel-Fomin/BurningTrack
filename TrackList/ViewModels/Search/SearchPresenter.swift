@@ -20,6 +20,15 @@ struct SearchTrackDisplaySettings {
 struct SearchPresenter {
     /// Считает совпавшие поля и чипы фильтрации для треков.
     private let trackSearchFilterBuilder = TrackSearchFilterBuilder()
+    /// Фабрика централизует правила выбора бейджа обложки.
+    private let artworkBadgeStateFactory: any TrackArtworkBadgeStateBuilding
+
+    /// Создаёт presenter с общей фабрикой presentation-состояния бейджа.
+    init(
+        artworkBadgeStateFactory: any TrackArtworkBadgeStateBuilding = TrackArtworkBadgeStateFactory()
+    ) {
+        self.artworkBadgeStateFactory = artworkBadgeStateFactory
+    }
 
     /// Состояние до ввода запроса.
     func empty(
@@ -70,6 +79,7 @@ struct SearchPresenter {
         selectedTrackFilterField: TrackSearchMatchField?,
         selectedSortMode: SearchSortMode,
         snapshotsByTrackId: [UUID: TrackRuntimeSnapshot],
+        favoriteTrackIds: Set<UUID>,
         displaySettings: SearchTrackDisplaySettings
     ) -> SearchScreenState {
         let trackListRows = makeTrackListRows(from: results.trackLists)
@@ -85,6 +95,7 @@ struct SearchPresenter {
         let trackRows = makeTrackRows(
             from: sortedTrackResults,
             snapshotsByTrackId: snapshotsByTrackId,
+            favoriteTrackIds: favoriteTrackIds,
             displaySettings: displaySettings
         )
         let visibleFolders = selectedTrackFilterField == nil ? results.folders : []
@@ -128,6 +139,7 @@ struct SearchPresenter {
     private func makeTrackRows(
         from results: [SearchTrackResult],
         snapshotsByTrackId: [UUID: TrackRuntimeSnapshot],
+        favoriteTrackIds: Set<UUID>,
         displaySettings: SearchTrackDisplaySettings
     ) -> [SearchTrackRowState] {
         results.map { result in
@@ -140,6 +152,11 @@ struct SearchPresenter {
                     result: result,
                     snapshot: snapshot,
                     shouldShowTags: displaySettings.shouldShowTags
+                ),
+                // Поиск читает SQLite-фонотеку, поэтому его результаты имеют локальный источник.
+                artworkBadgeState: artworkBadgeStateFactory.makeState(
+                    source: .library,
+                    isFavorite: favoriteTrackIds.contains(result.trackId)
                 ),
                 title: displaySettings.shouldShowTags
                     ? (nonEmpty(snapshot?.title) ?? nonEmpty(result.title) ?? displayFileName)

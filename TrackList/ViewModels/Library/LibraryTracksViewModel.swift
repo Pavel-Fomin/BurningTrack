@@ -53,6 +53,8 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
     private var lastTagReadingEnabled: Bool
     /// Собирает UI-состояние выбора строк фонотеки.
     private let selectionStateBuilder = LibrarySelectionStateBuilder()
+    /// Собирает готовые строки режима выбора без вычислений во View.
+    private let selectableRowStateBuilder = TrackSelectableRowStateBuilder()
     /// Обрабатывает подготовку и применение массового переименования файлов.
     private lazy var batchRenameHandler = LibraryBatchRenameHandler(
         snapshotProvider: { [weak self] trackId in
@@ -121,6 +123,30 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
             sections: trackSections,
             selection: bulkSelection.selection
         )
+    }
+
+    /// Собирает секции выбора с опубликованным снимком «Избранного» из PlayerViewModel.
+    func makeSelectableTrackSections(
+        favoriteTrackIds: Set<UUID>,
+        selectedTrackIds: Set<UUID>
+    ) -> [TrackSelectableSectionState] {
+        let showsFileFormat = settingsManager.settings.visible.library.isFileFormatVisible
+
+        return trackSections.map { section in
+            TrackSelectableSectionState(
+                id: section.id,
+                header: section.header,
+                rows: section.tracks.map { track in
+                    selectableRowStateBuilder.build(
+                        track: track,
+                        snapshot: runtimeController.snapshot(for: track.trackId),
+                        favoriteTrackIds: favoriteTrackIds,
+                        isSelected: selectedTrackIds.contains(track.id),
+                        showsFileFormat: showsFileFormat
+                    )
+                }
+            )
+        }
     }
 
     // MARK: - Инициализация

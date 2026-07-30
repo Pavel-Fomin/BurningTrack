@@ -147,8 +147,8 @@ final class PlayerViewModelFavoritesTests: XCTestCase {
         XCTAssertFalse(harness.viewModel.isCurrentTrackFavorite)
     }
 
-    /// Точечное событие обновляет только текущий трек и не инициирует повторное чтение сервиса.
-    func testFavoritesEventUpdatesOnlyCurrentTrack() {
+    /// Точечное событие обновляет published-снимок и не инициирует повторное чтение сервиса.
+    func testFavoritesEventUpdatesPublishedStateAndCurrentTrack() {
         let currentTrack = makeLocalTrack()
         let anotherTrack = makeLocalTrack()
         let service = PlayerFavoritesServiceSpy(favoriteTrackIds: [])
@@ -165,6 +165,7 @@ final class PlayerViewModelFavoritesTests: XCTestCase {
             FavoritesChangeEvent(trackId: anotherTrack.trackId, isFavorite: true)
         )
         XCTAssertFalse(viewModel.isCurrentTrackFavorite)
+        XCTAssertTrue(viewModel.favoriteTrackIds.contains(anotherTrack.trackId))
 
         events.send(
             FavoritesChangeEvent(trackId: currentTrack.trackId, isFavorite: true)
@@ -205,8 +206,8 @@ final class PlayerViewModelFavoritesTests: XCTestCase {
         )
     }
 
-    /// Событие при пустом плеере не меняет его ложное состояние.
-    func testFavoritesEventIsIgnoredWithoutCurrentTrack() {
+    /// Событие при пустом плеере обновляет строки и не меняет ложное состояние текущего трека.
+    func testFavoritesEventUpdatesRowsWithoutCurrentTrack() {
         let events = PlayerFavoritesEventsSubject()
         let viewModel = makeViewModel(
             favoritesService: PlayerFavoritesServiceSpy(),
@@ -216,6 +217,7 @@ final class PlayerViewModelFavoritesTests: XCTestCase {
         events.send(FavoritesChangeEvent(trackId: UUID(), isFavorite: true))
 
         XCTAssertFalse(viewModel.isCurrentTrackFavorite)
+        XCTAssertEqual(viewModel.favoriteTrackIds.count, 1)
     }
 
     /// Toggle передаёт полный snapshot текущего iTunes-трека и ожидает событие вместо оптимистического изменения.
@@ -514,6 +516,10 @@ final class PlayerFavoritesServiceSpy: FavoritesServicing {
 
     init(favoriteTrackIds: Set<UUID> = []) {
         self.favoriteTrackIds = favoriteTrackIds
+    }
+
+    func loadFavoriteTrackIds() throws -> Set<UUID> {
+        favoriteTrackIds
     }
 
     func isFavorite(trackId: UUID) throws -> Bool {

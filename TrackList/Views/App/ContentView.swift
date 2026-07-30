@@ -74,7 +74,7 @@ struct ContentView: View {
                 )
             }
         }
-        .sheetHost(playerManager: playerViewModel.fileOperationPlayerManager)
+        .sheetHost(playerViewModel: playerViewModel)
         .toastHost()
     }
 }

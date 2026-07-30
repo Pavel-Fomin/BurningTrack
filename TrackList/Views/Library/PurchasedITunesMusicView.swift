@@ -23,6 +23,8 @@ struct PurchasedITunesMusicView: View {
 
     /// Модель представления владеет запросом доступа и чтением системной медиатеки.
     @StateObject private var viewModel = PurchasedITunesMusicViewModel()
+    /// Собирает готовое состояние строки iTunes до передачи в её контейнер.
+    private let rowStateBuilder = PurchasedITunesTrackRowStateBuilder()
 
     // MARK: - Интерфейс
 
@@ -115,8 +117,13 @@ struct PurchasedITunesMusicView: View {
             List {
                 Section {
                     ForEach(tracks) { track in
-                        PurchasedITunesTrackRowContainer(
+                        let rowState = rowStateBuilder.build(
                             track: track,
+                            favoriteTrackIds: playerViewModel.favoriteTrackIds
+                        )
+
+                        PurchasedITunesTrackRowContainer(
+                            state: rowState,
                             context: tracks,
                             playerViewModel: playerViewModel
                         )

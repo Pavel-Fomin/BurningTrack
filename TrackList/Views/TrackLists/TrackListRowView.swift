@@ -54,12 +54,14 @@ struct TrackListRowView: View {
                 artist: state.artist,
                 duration: state.duration,
                 fileName: state.fileName,
-                isAvailable: state.isAvailable
+                isAvailable: state.isAvailable,
+                source: state.source
             ),
             isCurrent: state.isCurrent,
             isPlaying: state.isPlaying,
             isHighlighted: state.isHighlighted, /// Подсветка управляется wrapper'ом
             artworkRequest: state.artworkRequest,
+            artworkBadgeState: state.artworkBadgeState,
             title: state.title,
             artist: state.artist,
             duration: state.duration,

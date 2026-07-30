@@ -84,6 +84,7 @@ final class PlayerScreenViewModel: ObservableObject {
         )
         observePlaylist()
         observePlaybackState()
+        observeFavoriteTrackIds()
         observeSnapshots()
         observeDisplaySettings()
         observeHighlightedRow()
@@ -119,6 +120,7 @@ final class PlayerScreenViewModel: ObservableObject {
             tracks: tracks,
             currentQueueItemId: currentQueueItemId,
             isPlaying: playerViewModel.isPlaying,
+            favoriteTrackIds: playerViewModel.favoriteTrackIds,
             snapshotsByTrackId: playerViewModel.snapshotsByTrackId,
             collectionNavigationTargetsByTrackId: collectionNavigationTargetsByTrackId,
             highlightedRowId: sheetManager.highlightedRowID,
@@ -203,6 +205,17 @@ final class PlayerScreenViewModel: ObservableObject {
             }
             .store(in: &cancellables)
         playerViewModel.$currentContext
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                self.updateTracks(self.currentTracks)
+            }
+            .store(in: &cancellables)
+    }
+
+    /// Пересобирает строки очереди после изменения единого published-состояния «Избранного».
+    private func observeFavoriteTrackIds() {
+        playerViewModel.$favoriteTrackIds
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 guard let self else { return }

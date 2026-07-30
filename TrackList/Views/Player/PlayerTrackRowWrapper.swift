@@ -46,6 +46,7 @@ struct PlayerTrackRowWrapper: View {
             isPlaying: row.isPlaying,
             isHighlighted: row.isHighlighted,
             artworkRequest: row.artworkRequest,
+            artworkBadgeState: row.artworkBadgeState,
             title: row.title,
             artist: row.artist,
             duration: row.duration,

@@ -2,6 +2,16 @@
 /// Собирает состояние строки фонотеки из модели трека, runtime snapshot и флагов отображения.
 struct LibraryTrackRowStateBuilder {
 
+    /// Фабрика сохраняет правила выбора бейджа вне общего состояния строки.
+    private let artworkBadgeStateFactory: any TrackArtworkBadgeStateBuilding
+
+    /// Создаёт builder с общей фабрикой presentation-состояния бейджа.
+    init(
+        artworkBadgeStateFactory: any TrackArtworkBadgeStateBuilding = TrackArtworkBadgeStateFactory()
+    ) {
+        self.artworkBadgeStateFactory = artworkBadgeStateFactory
+    }
+
     /// Собирает готовое состояние строки.
     ///
     /// - Parameters:
@@ -10,6 +20,7 @@ struct LibraryTrackRowStateBuilder {
     ///   - isCurrent: Является ли трек текущим.
     ///   - isPlaying: Играет ли текущий трек.
     ///   - isHighlighted: Нужно ли подсветить строку.
+    ///   - isFavorite: Находится ли трек в системном треклисте «Избранное».
     ///   - trackListMemberships: Семантические принадлежности треклиста, где уже есть трек.
     ///   - showsSelection: Показывать ли режим выбора.
     ///   - isSelected: Выбрана ли строка.
@@ -22,6 +33,7 @@ struct LibraryTrackRowStateBuilder {
         isCurrent: Bool,
         isPlaying: Bool,
         isHighlighted: Bool,
+        isFavorite: Bool,
         collectionNavigationTarget: TrackCollectionNavigationTarget?,
         trackListMemberships: [TrackListMembership],
         showsSelection: Bool,
@@ -44,6 +56,10 @@ struct LibraryTrackRowStateBuilder {
             isPlaying: isPlaying,
             isHighlighted: isHighlighted,
             artworkRequest: artworkRequest,
+            artworkBadgeState: artworkBadgeStateFactory.makeState(
+                source: .library,
+                isFavorite: isFavorite
+            ),
             collectionNavigationTarget: collectionNavigationTarget,
             title: shouldShowTags ? (snapshot?.title ?? track.title ?? displayFileName) : displayFileName,
             artist: shouldShowTags ? (snapshot?.artist ?? track.artist ?? "") : "",

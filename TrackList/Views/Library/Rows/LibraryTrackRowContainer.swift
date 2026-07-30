@@ -51,6 +51,7 @@ struct LibraryTrackRowContainer: View {
             isPlaying: rowState.isPlaying,
             isHighlighted: rowState.isHighlighted,
             artworkRequest: rowState.artworkRequest,
+            artworkBadgeState: rowState.artworkBadgeState,
             // Данные отображения берём из LibraryTrackRowState.
             title: rowState.title,
             artist: rowState.artist,

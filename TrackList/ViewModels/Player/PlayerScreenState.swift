@@ -52,6 +52,9 @@ struct PlayerTrackRowState: Identifiable {
     /// Лёгкий запрос обложки трека для общей асинхронной подсистемы.
     let artworkRequest: ArtworkRequest?
 
+    /// Готовое presentation-состояние бейджа обложки.
+    let artworkBadgeState: TrackArtworkBadgeState
+
     /// Сохранённые metadata для условного показа переходов к артисту и альбому.
     let collectionNavigationTarget: TrackCollectionNavigationTarget?
 

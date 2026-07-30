@@ -23,6 +23,7 @@ private func makeTrackRowPreview(
             isPlaying: isPlaying,
             isHighlighted: false,
             artworkRequest: nil,
+            artworkBadgeState: .hidden,
             title: track.title,
             artist: track.artist,
             duration: track.duration,

@@ -15,7 +15,8 @@ struct TrackListViewModelFactory {
     func make(
         trackList: TrackList,
         playerManager: PlayerManager,
-        playbackStateProvider: any PlaybackStateProviding
+        playbackStateProvider: any PlaybackStateProviding,
+        favoriteTrackIdsProvider: any FavoriteTrackIdsProviding
     ) -> TrackListViewModel {
         TrackListViewModel(
             trackList: trackList,
@@ -33,6 +34,7 @@ struct TrackListViewModelFactory {
             eventProvider: NotificationTrackListEventProvider(),
             settingsManager: AppSettingsManager.shared,
             playbackStateProvider: playbackStateProvider,
+            favoriteTrackIdsProvider: favoriteTrackIdsProvider,
             runtimeSnapshotProvider: TrackRuntimeStore.shared,
             runtimeSnapshotBuilder: TrackRuntimeSnapshotBuilder.shared,
             summaryProvider: makeSummaryProvider()

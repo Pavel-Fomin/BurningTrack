@@ -30,6 +30,8 @@ struct SearchTrackListRowState: Identifiable, Equatable {
 struct SearchTrackRowState: Identifiable {
     let result: SearchTrackResult
     let artworkRequest: ArtworkRequest?
+    /// Готовое presentation-состояние бейджа обложки.
+    let artworkBadgeState: TrackArtworkBadgeState
     let title: String?
     let artist: String?
     let duration: Double?

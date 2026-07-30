@@ -25,6 +25,8 @@ final class SearchViewModel: ObservableObject {
     private let runtimeController: LibraryTrackRuntimeController
     /// Даёт настройки отображения строк, общие для фонотеки и поиска.
     private let settingsManager: any SettingsManaging
+    /// Даёт единый published-снимок «Избранного» без подписки на доменные события во ViewModel поиска.
+    private let favoriteTrackIdsProvider: any FavoriteTrackIdsProviding
     /// Показывает ошибки чтения пользователю.
     private let toastPresenter: any ToastPresenting
     /// Собирает отображаемое состояние из результатов поиска.
@@ -48,16 +50,19 @@ final class SearchViewModel: ObservableObject {
         searchService: any SearchServicing,
         runtimeController: LibraryTrackRuntimeController,
         settingsManager: any SettingsManaging,
+        favoriteTrackIdsProvider: any FavoriteTrackIdsProviding,
         toastPresenter: any ToastPresenting,
         presenter: SearchPresenter = SearchPresenter()
     ) {
         self.searchService = searchService
         self.runtimeController = runtimeController
         self.settingsManager = settingsManager
+        self.favoriteTrackIdsProvider = favoriteTrackIdsProvider
         self.toastPresenter = toastPresenter
         self.presenter = presenter
         self.state = presenter.empty()
         observeDisplaySettings()
+        observeFavoriteTrackIds()
     }
 
     deinit {
@@ -228,8 +233,17 @@ final class SearchViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 
+    /// Пересобирает только видимую выдачу после изменения единого состояния «Избранного».
+    private func observeFavoriteTrackIds() {
+        favoriteTrackIdsProvider.favoriteTrackIdsPublisher
+            .sink { [weak self] _ in
+                self?.refreshDisplayedResults()
+            }
+            .store(in: &cancellables)
+    }
+
     /// Не запускает новый поиск, если настройка влияет только на отображение уже полученных строк.
-    private func refreshDisplayedResults(using settings: AppSettings) {
+    private func refreshDisplayedResults(using settings: AppSettings? = nil) {
         switch state.contentState {
         case .results, .noResults:
             state = makeResultsState(
@@ -318,6 +332,7 @@ final class SearchViewModel: ObservableObject {
             selectedTrackFilterField: selectedTrackFilterField,
             selectedSortMode: selectedSortMode,
             snapshotsByTrackId: runtimeController.snapshotsByTrackId,
+            favoriteTrackIds: favoriteTrackIdsProvider.favoriteTrackIds,
             displaySettings: displaySettings
         )
     }

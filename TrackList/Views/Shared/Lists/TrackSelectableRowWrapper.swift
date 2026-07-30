@@ -14,55 +14,35 @@ struct TrackSelectableRowWrapper: View {
     
     // MARK: - Input
     
-    let track: LibraryTrack
-    let isSelected: Bool
-    let metadataProvider: TrackMetadataProviding
+    let state: TrackSelectableRowState
     let onToggleSelection: () -> Void
-
-    @ObservedObject private var settingsManager = AppSettingsManager.shared
-    
-    // MARK: - Snapshot
-    
-    /// Runtime snapshot трека (единый источник метаданных)
-    private var snapshot: TrackRuntimeSnapshot? {
-        metadataProvider.snapshot(for: track.trackId)
-    }
-    
-    /// Лёгкий запрос обложки строится из snapshot без запуска подготовки во View.
-    private var artworkRequest: ArtworkRequest? {
-        return ArtworkRequest(
-            trackId: track.trackId,
-            snapshot: snapshot,
-            purpose: .trackList
-        )
-    }
+    let onRequestSnapshot: (UUID) -> Void
     
     // MARK: - UI
     
     var body: some View {
-        let shouldShowFileFormat = settingsManager.settings.visible.library.isFileFormatVisible
-
         TrackRowView(
-            track: track,
+            track: state.track,
             isCurrent: false,
             isPlaying: false,
             isHighlighted: false,
-            artworkRequest: artworkRequest,
-            title: snapshot?.title ?? track.title,
-            artist: snapshot?.artist ?? track.artist ?? "",
-            duration: snapshot?.duration ?? track.duration,
+            artworkRequest: state.artworkRequest,
+            artworkBadgeState: state.artworkBadgeState,
+            title: state.title,
+            artist: state.artist,
+            duration: state.duration,
             onRowTap: {
                 onToggleSelection()
             },
             showsSelection: true,
-            isSelected: isSelected,
+            isSelected: state.isSelected,
             onToggleSelection: onToggleSelection,
             selectionPlacement: .trailing,
-            showsFileFormat: shouldShowFileFormat
+            showsFileFormat: state.showsFileFormat
         )
         .listRowInsets(EdgeInsets(top: 12, leading: 0, bottom: 12, trailing: 0))
-        .task(id: track.trackId) {
-            metadataProvider.requestSnapshotIfNeeded(for: track.trackId)
+        .task(id: state.track.trackId) {
+            onRequestSnapshot(state.track.trackId)
         }
     }
 }

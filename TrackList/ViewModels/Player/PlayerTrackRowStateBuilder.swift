@@ -17,9 +17,16 @@ import Foundation
 @MainActor
 final class PlayerTrackRowStateBuilder {
 
+    /// Фабрика централизует сопоставление источника и «Избранного» с бейджем.
+    private let artworkBadgeStateFactory: any TrackArtworkBadgeStateBuilding
+
     // MARK: - Инициализация
 
-    init() {}
+    init(
+        artworkBadgeStateFactory: any TrackArtworkBadgeStateBuilding = TrackArtworkBadgeStateFactory()
+    ) {
+        self.artworkBadgeStateFactory = artworkBadgeStateFactory
+    }
 
     // MARK: - Public API
 
@@ -28,6 +35,7 @@ final class PlayerTrackRowStateBuilder {
         tracks: [PlayerTrack],
         currentQueueItemId: UUID?,
         isPlaying: Bool,
+        favoriteTrackIds: Set<UUID>,
         snapshotsByTrackId: [UUID: TrackRuntimeSnapshot],
         collectionNavigationTargetsByTrackId: [UUID: TrackCollectionNavigationTarget],
         highlightedRowId: UUID?,
@@ -50,6 +58,10 @@ final class PlayerTrackRowStateBuilder {
                     trackId: track.trackId,
                     snapshot: snapshot,
                     shouldShowTags: shouldShowTags
+                ),
+                artworkBadgeState: artworkBadgeStateFactory.makeState(
+                    source: track.source,
+                    isFavorite: favoriteTrackIds.contains(track.trackId)
                 ),
                 collectionNavigationTarget: collectionNavigationTargetsByTrackId[track.trackId],
                 title: makeTitle(

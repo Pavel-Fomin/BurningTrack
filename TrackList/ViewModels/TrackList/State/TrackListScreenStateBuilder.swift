@@ -43,6 +43,7 @@ struct TrackListScreenStateBuilder {
     ///   - currentContext: Контекст текущего воспроизведения.
     ///   - isPlaying: Идёт ли воспроизведение.
     ///   - highlightedRowId: Идентификатор подсвеченной строки.
+    ///   - favoriteTrackIds: Подтверждённые идентификаторы треков из единого состояния «Избранного».
     ///   - settings: Снимок настроек отображения строк.
     /// - Returns: Готовое состояние экрана.
     func build(
@@ -57,6 +58,7 @@ struct TrackListScreenStateBuilder {
         currentContext: PlaybackContext?,
         isPlaying: Bool,
         highlightedRowId: UUID?,
+        favoriteTrackIds: Set<UUID>,
         settings: AppSettings,
         collectionNavigationTargetsByTrackId: [UUID: TrackCollectionNavigationTarget]
     ) -> TrackListScreenState {
@@ -69,6 +71,7 @@ struct TrackListScreenStateBuilder {
                 isCurrent: isCurrent,
                 isPlaying: isCurrent && isPlaying,
                 isHighlighted: highlightedRowId == track.id,
+                isFavorite: favoriteTrackIds.contains(track.trackId),
                 settings: settings,
                 collectionNavigationTarget: collectionNavigationTargetsByTrackId[track.trackId]
             )

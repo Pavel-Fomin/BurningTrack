@@ -53,6 +53,8 @@ final class TrackListViewModel: ObservableObject {
     private let settingsManager: any SettingsManaging
     /// Предоставляет playback-состояние без прямой подписки View на PlayerViewModel.
     private let playbackStateProvider: any PlaybackStateProviding
+    /// Предоставляет published-снимок «Избранного» без доступа к FavoritesService.
+    private let favoriteTrackIdsProvider: any FavoriteTrackIdsProviding
     /// Предоставляет сохранённые runtime snapshot треков.
     private let runtimeSnapshotProvider: any TrackRuntimeSnapshotProviding
     /// Создаёт runtime snapshot треков.
@@ -101,6 +103,7 @@ final class TrackListViewModel: ObservableObject {
         eventProvider: any TrackListEventProviding,
         settingsManager: any SettingsManaging,
         playbackStateProvider: any PlaybackStateProviding,
+        favoriteTrackIdsProvider: any FavoriteTrackIdsProviding,
         runtimeSnapshotProvider: any TrackRuntimeSnapshotProviding,
         runtimeSnapshotBuilder: any TrackRuntimeSnapshotBuilding,
         summaryProvider: any TrackCollectionSummaryProviding
@@ -113,6 +116,7 @@ final class TrackListViewModel: ObservableObject {
         self.eventProvider = eventProvider
         self.settingsManager = settingsManager
         self.playbackStateProvider = playbackStateProvider
+        self.favoriteTrackIdsProvider = favoriteTrackIdsProvider
         self.runtimeSnapshotProvider = runtimeSnapshotProvider
         self.runtimeSnapshotBuilder = runtimeSnapshotBuilder
         self.summaryProvider = summaryProvider
@@ -131,6 +135,16 @@ final class TrackListViewModel: ObservableObject {
 
                 Task { @MainActor in
                     self.applyPlaybackState(playbackState)
+                }
+            }
+            .store(in: &cancellables)
+
+        favoriteTrackIdsProvider.favoriteTrackIdsPublisher
+            .sink { [weak self] _ in
+                guard let self else { return }
+
+                Task { @MainActor in
+                    self.rebuildScreenState()
                 }
             }
             .store(in: &cancellables)
@@ -320,6 +334,7 @@ final class TrackListViewModel: ObservableObject {
             currentContext: currentContext,
             isPlaying: isPlaybackActive,
             highlightedRowId: highlightedRowId,
+            favoriteTrackIds: favoriteTrackIdsProvider.favoriteTrackIds,
             settings: rowPresentationSettings,
             collectionNavigationTargetsByTrackId: collectionNavigationTargetsByTrackId
         )

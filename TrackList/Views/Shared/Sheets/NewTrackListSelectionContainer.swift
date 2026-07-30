@@ -16,6 +16,9 @@ struct NewTrackListSelectionContainer: View {
     /// Общий обработчик переименования файлов треков.
     let renameActionHandler: TrackFileRenameActionHandler
 
+    /// Передаёт published-снимок «Избранного» в готовое состояние строк выбора.
+    @ObservedObject var playerViewModel: PlayerViewModel
+
     // MARK: - State
 
     /// Количество выбранных треков.
@@ -62,7 +65,8 @@ struct NewTrackListSelectionContainer: View {
                 NewTrackListSelectionFolderListView(
                     folders: MusicLibraryManager.shared.attachedFolders,
                     renameActionHandler: renameActionHandler,
-                    selectionViewModel: viewModel
+                    selectionViewModel: viewModel,
+                    playerViewModel: playerViewModel
                 )
             }
             

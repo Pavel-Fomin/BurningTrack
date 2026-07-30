@@ -50,6 +50,14 @@ final class FavoritesService: FavoritesServicing {
         self.favoritesEvents = favoritesEvents
     }
 
+    /// Возвращает множество логических идентификаторов системного треклиста без дублирующих listItemId.
+    func loadFavoriteTrackIds() throws -> Set<UUID> {
+        let favorites = try resolvedFavoritesTrackList()
+        let tracks = try trackListManager.loadTracks(for: favorites.id)
+
+        return Set(tracks.map(\.trackId))
+    }
+
     /// Возвращает true, если в системном треклисте есть хотя бы одна строка с переданным trackId.
     func isFavorite(trackId: UUID) throws -> Bool {
         let favorites = try resolvedFavoritesTrackList()

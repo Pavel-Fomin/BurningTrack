@@ -25,7 +25,7 @@ struct LibraryTrackSectionView: View {
 
     let trackListMembershipsById: [UUID: [TrackListMembership]]
 
-    let playerViewModel: PlayerViewModel
+    @ObservedObject var playerViewModel: PlayerViewModel
     
     let metadataProvider: TrackMetadataProviding
     let cloudAvailabilityStateStore: (UUID) -> CloudTrackAvailabilityRowStateStore
@@ -93,6 +93,8 @@ struct LibraryTrackSectionView: View {
             isCurrent: playbackStateController.isCurrent(track),
             isPlaying: playbackStateController.isPlaying(track),
             isHighlighted: isRevealed || rowId == highlightedTrackID,
+            // Published-состояние обновляется единым потоком FavoritesChangeEvent.
+            favoriteTrackIds: playerViewModel.favoriteTrackIds,
             trackListMemberships: trackListMembershipsById[track.trackId] ?? [],
             showsSelection: isSelecting,
             isSelected: isSelected,

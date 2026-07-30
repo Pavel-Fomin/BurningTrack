@@ -45,7 +45,8 @@ struct TrackListScreen: View {
             wrappedValue: Self.viewModelFactory.make(
                 trackList: trackList,
                 playerManager: playerViewModel.fileOperationPlayerManager,
-                playbackStateProvider: playerViewModel
+                playbackStateProvider: playerViewModel,
+                favoriteTrackIdsProvider: playerViewModel
             )
         )
     }

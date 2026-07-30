@@ -24,6 +24,8 @@ struct TrackRowView<ActionMenuContent: View>: View {
     let isPlaying: Bool
     let isHighlighted: Bool
     let artworkRequest: ArtworkRequest?
+    /// Готовое presentation-состояние бейджа поверх обложки.
+    let artworkBadgeState: TrackArtworkBadgeState
     let title: String?
     let artist: String?
     let duration: Double?
@@ -49,6 +51,7 @@ struct TrackRowView<ActionMenuContent: View>: View {
         isPlaying: Bool,
         isHighlighted: Bool,
         artworkRequest: ArtworkRequest?,
+        artworkBadgeState: TrackArtworkBadgeState,
         title: String?,
         artist: String?,
         duration: Double?,
@@ -70,6 +73,7 @@ struct TrackRowView<ActionMenuContent: View>: View {
             isPlaying: isPlaying,
             isHighlighted: isHighlighted,
             artworkRequest: artworkRequest,
+            artworkBadgeState: artworkBadgeState,
             title: title,
             artist: artist,
             duration: duration,
@@ -93,6 +97,7 @@ struct TrackRowView<ActionMenuContent: View>: View {
         isPlaying: Bool,
         isHighlighted: Bool,
         artworkRequest: ArtworkRequest?,
+        artworkBadgeState: TrackArtworkBadgeState,
         title: String?,
         artist: String?,
         duration: Double?,
@@ -113,6 +118,7 @@ struct TrackRowView<ActionMenuContent: View>: View {
         self.isPlaying = isPlaying
         self.isHighlighted = isHighlighted
         self.artworkRequest = artworkRequest
+        self.artworkBadgeState = artworkBadgeState
         self.title = title
         self.artist = artist
         self.duration = duration
@@ -263,22 +269,28 @@ struct TrackRowView<ActionMenuContent: View>: View {
 
     /// Статичная круглая обложка трека с индикатором текущего воспроизведения.
     private var artworkView: some View {
-        ZStack {
-            ArtworkPreparationView(request: artworkRequest) { image in
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-            } placeholder: {
-                Circle()
-                    .fill(Color.gray.opacity(0.3))
-            }
+        ZStack(alignment: .bottomTrailing) {
+            ZStack {
+                ArtworkPreparationView(request: artworkRequest) { image in
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                } placeholder: {
+                    Circle()
+                        .fill(Color.gray.opacity(0.3))
+                }
 
-            if isCurrent {
-                ActiveArtworkOverlayView(isPlaying: isPlaying)
+                if isCurrent {
+                    ActiveArtworkOverlayView(isPlaying: isPlaying)
+                }
             }
+            .clipShape(Circle())
+
+            // Бейдж находится вне круглой маски и остаётся выше индикатора воспроизведения.
+            TrackArtworkBadgeView(state: artworkBadgeState)
+                .offset(x: 2, y: 2)
         }
         .frame(width: 48, height: 48)
-        .clipShape(Circle())
     }
 
     // MARK: - Информация о треке
@@ -367,6 +379,7 @@ extension TrackRowView where ActionMenuContent == EmptyView {
         isPlaying: Bool,
         isHighlighted: Bool,
         artworkRequest: ArtworkRequest?,
+        artworkBadgeState: TrackArtworkBadgeState,
         title: String?,
         artist: String?,
         duration: Double?,
@@ -386,6 +399,7 @@ extension TrackRowView where ActionMenuContent == EmptyView {
             isPlaying: isPlaying,
             isHighlighted: isHighlighted,
             artworkRequest: artworkRequest,
+            artworkBadgeState: artworkBadgeState,
             title: title,
             artist: artist,
             duration: duration,
