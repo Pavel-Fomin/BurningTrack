@@ -10,7 +10,7 @@ struct LibraryTrackRowStateBuilder {
     ///   - isCurrent: Является ли трек текущим.
     ///   - isPlaying: Играет ли текущий трек.
     ///   - isHighlighted: Нужно ли подсветить строку.
-    ///   - trackListNames: Названия треклистов, где уже есть трек.
+    ///   - trackListMemberships: Семантические принадлежности треклиста, где уже есть трек.
     ///   - showsSelection: Показывать ли режим выбора.
     ///   - isSelected: Выбрана ли строка.
     ///   - shouldShowTags: Показывать ли теги.
@@ -23,7 +23,7 @@ struct LibraryTrackRowStateBuilder {
         isPlaying: Bool,
         isHighlighted: Bool,
         collectionNavigationTarget: TrackCollectionNavigationTarget?,
-        trackListNames: [String],
+        trackListMemberships: [TrackListMembership],
         showsSelection: Bool,
         isSelected: Bool,
         shouldShowTags: Bool,
@@ -51,7 +51,9 @@ struct LibraryTrackRowStateBuilder {
             showsSelection: showsSelection,
             isSelected: isSelected,
             showsFileFormat: shouldShowFileFormat,
-            trackListNames: shouldShowTrackListMembership ? trackListNames : nil,
+            trackListNames: shouldShowTrackListMembership
+                ? TrackListPresentationText.membershipTitles(for: trackListMemberships)
+                : nil,
             cloudAvailabilityState: cloudAvailabilityState,
             // Неопределённое iCloud-состояние сохраняет прежнюю доступность модели трека.
             isContentAvailable: cloudAvailabilityState?.isContentAvailable ?? track.isAvailable

@@ -235,7 +235,7 @@ struct LibraryCollectionTracksView: View {
                     allTracks: allVisibleTracks,
                     playbackSource: playbackSource,
                     currentCollectionCategory: source.collectionCategory,
-                    trackListNamesById: tracksViewModel.trackListNamesById,
+                    trackListMembershipsById: tracksViewModel.trackListMembershipsById,
                     metadataProvider: tracksViewModel,
                     cloudAvailabilityStateStore: cloudAvailabilityController.stateStore(for:),
                     cloudAvailabilityActionHandler: cloudAvailabilityActionHandler,

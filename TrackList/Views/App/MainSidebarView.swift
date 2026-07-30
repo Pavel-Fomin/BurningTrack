@@ -72,7 +72,12 @@ struct MainSidebarView: View {
 
                     ForEach(trackListsViewModel.trackLists) { trackList in
                         NavigationLink(value: MainSidebarSelection.trackList(trackList.id)) {
-                            Text(trackList.name)
+                            Text(
+                                TrackListPresentationText.title(
+                                    for: trackList.kind,
+                                    storedName: trackList.name
+                                )
+                            )
                         }
                     }
                 }

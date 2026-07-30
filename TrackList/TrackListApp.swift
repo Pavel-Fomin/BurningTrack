@@ -3,7 +3,7 @@
 //  TrackList
 //
 //  файл запуска SwiftUI-приложения
-//  PlayerViewModel() — управляет воспроизведением
+//  PlayerViewModel — управляет воспроизведением
 //
 //  Created by Pavel Fomin on 28.04.2025.
 //
@@ -28,7 +28,16 @@ struct TrackListApp: App {
             preconditionFailure("Не удалось подготовить SQLite-хранилище: \(error.localizedDescription)")
         }
 
-        let playerVM = PlayerViewModel() // без аргументов
+        let favoritesEventCenter = FavoritesEventCenter.shared
+        let favoritesService = FavoritesService(
+            trackListsManager: TrackListsManager.shared,
+            trackListManager: TrackListManager.shared,
+            favoritesEvents: favoritesEventCenter
+        )
+        let playerVM = PlayerViewModel(
+            favoritesService: favoritesService,
+            favoritesEvents: favoritesEventCenter
+        )
         self.playerViewModel = playerVM
         // Фабрика скрывает внутреннюю последовательность сборки export feature.
         let exportFeatureFactory = ExportFeatureFactory()

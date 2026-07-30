@@ -5,7 +5,7 @@
 //  Индекс бейджей треклистов.
 //
 //  Роль:
-//  - хранит быстрый доступ к названиям треклистов по trackId;
+//  - хранит быстрый доступ к семантическим принадлежностям треклистов по trackId;
 //  - централизует расчёт membership-бейджей;
 //  - убирает повторный обход треклистов из provider;
 //  - перестраивается при изменении списка треклистов или состава треков.
@@ -21,14 +21,25 @@ final class TrackListBadgeIndex {
 
     // MARK: - State
 
-    private var badgesByTrackId: [UUID: [String]] = [:]
+    private var badgesByTrackId: [UUID: [TrackListMembership]] = [:]
     private var observers: [NSObjectProtocol] = []
+    private let trackListsManager: TrackListsManager
+    private let trackListManager: TrackListManager
 
     // MARK: - Init
 
-    private init() {
+    /// Создаёт индекс с явными зависимостями, чтобы поиск использовал тот же источник треклистов, что и фонотека.
+    init(
+        trackListsManager: TrackListsManager = .shared,
+        trackListManager: TrackListManager = .shared,
+        observesTrackListChanges: Bool = true
+    ) {
+        self.trackListsManager = trackListsManager
+        self.trackListManager = trackListManager
         rebuild()
-        observeTrackListChanges()
+        if observesTrackListChanges {
+            observeTrackListChanges()
+        }
     }
 
     deinit {
@@ -39,8 +50,8 @@ final class TrackListBadgeIndex {
 
     // MARK: - Public
 
-    func badges(for trackIds: [UUID]) -> [UUID: [String]] {
-        var result: [UUID: [String]] = [:]
+    func badges(for trackIds: [UUID]) -> [UUID: [TrackListMembership]] {
+        var result: [UUID: [TrackListMembership]] = [:]
 
         for trackId in trackIds {
             result[trackId] = badgesByTrackId[trackId] ?? []
@@ -50,20 +61,27 @@ final class TrackListBadgeIndex {
     }
 
     func rebuild() {
-        var nextIndex: [UUID: Set<String>] = [:]
+        var nextIndex: [UUID: Set<TrackListMembership>] = [:]
 
-        let metas = (try? TrackListsManager.shared.loadTrackListMetas()) ?? []
+        let metas = (try? trackListsManager.loadTrackListMetas()) ?? []
 
         for meta in metas {
-            let tracks = (try? TrackListManager.shared.loadTracks(for: meta.id)) ?? []
+            let tracks = (try? trackListManager.loadTracks(for: meta.id)) ?? []
 
             for track in tracks {
-                nextIndex[track.trackId, default: []].insert(meta.name)
+                nextIndex[track.trackId, default: []].insert(
+                    TrackListMembership(
+                        storedName: meta.name,
+                        kind: meta.kind
+                    )
+                )
             }
         }
 
         badgesByTrackId = nextIndex.reduce(into: [:]) { result, item in
-            result[item.key] = Array(item.value).sorted()
+            result[item.key] = item.value.sorted {
+                $0.storedName.localizedCaseInsensitiveCompare($1.storedName) == .orderedAscending
+            }
         }
     }
 

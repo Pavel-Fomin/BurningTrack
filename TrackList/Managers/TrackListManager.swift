@@ -20,13 +20,31 @@ final class TrackListManager {
     
     static let shared = TrackListManager()
     private let databaseStore: TrackListDatabaseStore
+    /// Передаёт точечные изменения состава системного треклиста без зависимости от ViewModel.
+    private let favoritesEvents: any FavoritesEventsPublishing
 
     private init() {
         do {
             self.databaseStore = try TrackListDatabaseStore()
+            self.favoritesEvents = FavoritesEventCenter.shared
         } catch {
             preconditionFailure("Не удалось создать TrackListDatabaseStore: \(error)")
         }
+    }
+
+    /// Инициализатор для изолированных сценариев и тестов с переданным SQLite-фасадом.
+    init(databaseStore: TrackListDatabaseStore) {
+        self.databaseStore = databaseStore
+        self.favoritesEvents = FavoritesEventCenter.shared
+    }
+
+    /// Инициализатор для изолированных сценариев и тестов с явным каналом событий Favorites.
+    init(
+        databaseStore: TrackListDatabaseStore,
+        favoritesEvents: any FavoritesEventsPublishing
+    ) {
+        self.databaseStore = databaseStore
+        self.favoritesEvents = favoritesEvents
     }
     
     
@@ -49,10 +67,30 @@ final class TrackListManager {
     func saveTracks(
         _ tracks: [Track],
         for id: UUID,
-        postTrackListsDidChange: Bool = true
+        postTrackListsDidChange: Bool = true,
+        publishesFavoritesEvents: Bool = true
     ) -> Bool {
         do {
+            let isFavoritesTrackList: Bool
+            if publishesFavoritesEvents {
+                isFavoritesTrackList = try databaseStore.fetchMeta(id: id).kind == .favorites
+            } else {
+                isFavoritesTrackList = false
+            }
+            let favoritesTracksBeforeSaving: [Track]
+            if isFavoritesTrackList {
+                favoritesTracksBeforeSaving = try databaseStore.fetchTracks(for: id)
+            } else {
+                favoritesTracksBeforeSaving = []
+            }
+
             try databaseStore.replaceTracks(tracks, for: id)
+            if isFavoritesTrackList {
+                publishFavoritesChanges(
+                    from: favoritesTracksBeforeSaving,
+                    to: tracks
+                )
+            }
             NotificationCenter.default.post(
                 name: .trackListTracksDidChange,
                 object: id
@@ -68,6 +106,40 @@ final class TrackListManager {
         } catch {
             PersistentLogger.log("❌ TrackListManager: SQLite saveTracks failed id=\(id) tracks=\(tracks.count) error=\(error)")
             return false
+        }
+    }
+
+    /// Публикует изменения множества trackId системного треклиста, не реагируя на порядок и обновление snapshot.
+    private func publishFavoritesChanges(
+        from previousTracks: [Track],
+        to updatedTracks: [Track]
+    ) {
+        guard previousTracks.isEmpty == false || updatedTracks.isEmpty == false else {
+            return
+        }
+
+        let previousTrackIds = Set(previousTracks.map(\.trackId))
+        let updatedTrackIds = Set(updatedTracks.map(\.trackId))
+        var publishedTrackIds = Set<UUID>()
+
+        for track in previousTracks
+        where updatedTrackIds.contains(track.trackId) == false && publishedTrackIds.insert(track.trackId).inserted {
+            favoritesEvents.publish(
+                FavoritesChangeEvent(
+                    trackId: track.trackId,
+                    isFavorite: false
+                )
+            )
+        }
+
+        for track in updatedTracks
+        where previousTrackIds.contains(track.trackId) == false && publishedTrackIds.insert(track.trackId).inserted {
+            favoritesEvents.publish(
+                FavoritesChangeEvent(
+                    trackId: track.trackId,
+                    isFavorite: true
+                )
+            )
         }
     }
     
@@ -127,7 +199,22 @@ extension TrackListManager: TrackListManaging {
         saveTracks(
             tracks,
             for: id,
-            postTrackListsDidChange: true
+            postTrackListsDidChange: true,
+            publishesFavoritesEvents: true
+        )
+    }
+
+    /// Сохраняет треки с возможностью передать публикацию точечного события вызывающему сервису.
+    nonisolated func saveTracks(
+        _ tracks: [Track],
+        for id: UUID,
+        publishesFavoritesEvents: Bool
+    ) -> Bool {
+        saveTracks(
+            tracks,
+            for: id,
+            postTrackListsDidChange: true,
+            publishesFavoritesEvents: publishesFavoritesEvents
         )
     }
 }

@@ -173,8 +173,14 @@ struct AddToTrackListContainer: View {
 
     /// Возвращает имя треклиста для итогового toast.
     private func trackListName(for trackListId: UUID) -> String {
-        trackLists.first { $0.id == trackListId }?.name ??
-            TrackListPresentationText.defaultTrackListName
+        guard let trackList = trackLists.first(where: { $0.id == trackListId }) else {
+            return TrackListPresentationText.defaultTrackListName
+        }
+
+        return TrackListPresentationText.title(
+            for: trackList.kind,
+            storedName: trackList.name
+        )
     }
 
     /// Показывает один итоговый toast для batch-добавления.

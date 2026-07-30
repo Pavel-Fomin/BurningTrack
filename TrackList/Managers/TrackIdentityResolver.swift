@@ -7,7 +7,8 @@
 //  ВАЖНО:
 //  - trackId создаётся только здесь
 //  - trackId больше не зависит от тегов, размера файла и байтов содержимого
-//  - для фонотеки identity строится из SQLite-записи tracks(root_folder_id, relative_path)
+//  - для фонотеки канонический trackId является UUID строки tracks в SQLite
+//  - root_folder_id и relative_path используются только для поиска существующей строки при синхронизации
 //  - для одиночных импортов identity строится из нормализованного пути файла
 //
 //  Created by Pavel Fomin on 30.12.2025.
@@ -30,8 +31,8 @@ actor TrackIdentityResolver {
 
     // MARK: - Публичный API
 
-    /// Возвращает постоянный trackId для трека фонотеки.
-    /// SQLite tracks(root_folder_id, relative_path) теперь является источником library identity.
+    /// Возвращает канонический trackId для трека фонотеки.
+    /// Путь ищет уже существующую SQLite-строку, но не заменяет её UUID в доменной модели.
     func trackId(
         forRootFolderId rootFolderId: UUID,
         relativePath: String,

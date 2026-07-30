@@ -26,6 +26,16 @@ final class TrackListViewModel: ObservableObject {
     @Published private(set) var snapshotsByTrackId: [UUID: TrackRuntimeSnapshot] = [:] /// Runtime snapshot треков по id
     /// Готовое состояние экрана одного треклиста.
     @Published private(set) var screenState: TrackListScreenState?
+    /// Назначение текущего треклиста для построения доступных действий detail-экрана.
+    private var kind: TrackListKind = .regular
+
+    /// Локализованное название системного треклиста или сохранённое имя пользовательского.
+    var displayName: String {
+        TrackListPresentationText.title(
+            for: kind,
+            storedName: name
+        )
+    }
 
     /// Запускает общий rename-flow файлов треков.
     private let fileRenamer: any TrackFileRenaming
@@ -111,6 +121,7 @@ final class TrackListViewModel: ObservableObject {
         self.rowPresentationSettings = settingsManager.settings
         self.currentListId = trackList.id
         self.name = trackList.name
+        self.kind = trackList.kind
         self.tracks = trackList.tracks
         applyPlaybackState(playbackStateProvider.playbackState)
 
@@ -300,6 +311,8 @@ final class TrackListViewModel: ObservableObject {
         screenState = screenStateBuilder.build(
             id: id,
             title: name,
+            kind: kind,
+            canRenameTrackList: kind.canRename,
             summary: summary,
             tracks: tracks,
             snapshotsByTrackId: snapshotsByTrackId,
@@ -535,8 +548,9 @@ final class TrackListViewModel: ObservableObject {
 
         guard let meta = metas.first(where: { $0.id == id }) else { return }
 
-        if name != meta.name {
+        if name != meta.name || kind != meta.kind {
             name = meta.name
+            kind = meta.kind
             rebuildScreenState()
         }
     }

@@ -21,13 +21,22 @@ import Foundation
 import AVFoundation
 import UIKit
 import QuartzCore
+import Combine
 
 @MainActor
 final class PlayerViewModel: ObservableObject {
     
     // MARK: - Публичные состояния
     
-    @Published var currentTrackDisplayable: (any TrackDisplayable)?  /// Текущий воспроизводимый трек
+    @Published var currentTrackDisplayable: (any TrackDisplayable)? { /// Текущий воспроизводимый трек
+        didSet {
+            guard oldValue?.trackId != currentTrackDisplayable?.trackId else {
+                return
+            }
+
+            refreshCurrentTrackFavoriteState()
+        }
+    }
     @Published var isPlaying: Bool = false                           /// Воспроизводится ли сейчас аудио
     @Published var currentTime: TimeInterval = 0.0                   /// Текущее время воспроизведения
     @Published var trackDuration: TimeInterval = 0.0                 /// Длительность текущего трека
@@ -39,6 +48,12 @@ final class PlayerViewModel: ObservableObject {
     /// Разрешает переход к следующему треку только после проверки готового playback-контекста.
     @Published private(set) var canPlayNextTrack = false
     @Published private(set) var snapshotsByTrackId: [UUID: TrackRuntimeSnapshot] = [:] /// Runtime snapshot треков по id
+    /// Показывает состояние «Избранного» только для текущего трека плеера.
+    @Published private(set) var isCurrentTrackFavorite: Bool = false {
+        didSet {
+            updateFavoriteCommandState()
+        }
+    }
 
     /// Текущий режим читается из хранилища playback-контекста.
     var playbackMode: PlaybackMode {
@@ -70,6 +85,10 @@ final class PlayerViewModel: ObservableObject {
     private let nowPlayingSnapshotBuilder: any NowPlayingSnapshotBuilding
     private let runtimeSnapshotController: PlayerRuntimeSnapshotController
     private let eventObserver: any PlayerEventObserving
+    /// Выполняет доменные операции «Избранного», не раскрывая ViewModel работу с треклистами.
+    private let favoritesService: any FavoritesServicing
+    /// Передаёт точечные изменения «Избранного» для уже выбранного трека.
+    private let favoritesEvents: any FavoritesEventsObserving
     /// Показывает пользовательские ошибки без прямой зависимости от ToastManager.shared.
     private let toastPresenter: any ToastPresenting
     /// Изолирует постоянное состояние выбранного трека от playback- и UI-логики.
@@ -92,6 +111,8 @@ final class PlayerViewModel: ObservableObject {
     private var currentPlaybackContextSource: PlaybackContextSource = .playerQueue
     /// Наблюдатель нужен для повторной попытки восстановления локального трека после открытия bookmark-доступа.
     private var libraryAccessRestoredObserver: NSObjectProtocol?
+    /// Хранит Combine-подписки PlayerViewModel на протяжении её жизненного цикла.
+    private var cancellables = Set<AnyCancellable>()
 
     /// Хранит только незавершённое стартовое восстановление, не дублируя данные в SQLite или отдельном кэше.
     private struct PendingLastTrackRestoration {
@@ -196,7 +217,9 @@ final class PlayerViewModel: ObservableObject {
         libraryContextLoader: (any LibraryPlaybackContextLoading)? = nil,
         fastLibraryTrackProvider: (any FastLibraryTrackProviding)? = nil,
         isLibraryAccessRestored: (@MainActor () -> Bool)? = nil,
-        waveformGenerator: (any WaveformGenerating)? = nil
+        waveformGenerator: (any WaveformGenerating)? = nil,
+        favoritesService: any FavoritesServicing,
+        favoritesEvents: any FavoritesEventsObserving
     ) {
         let resolvedPlaylistManager = playlistManager ?? PlaylistManager.shared
 
@@ -206,6 +229,8 @@ final class PlayerViewModel: ObservableObject {
         self.nowPlayingSnapshotBuilder = nowPlayingSnapshotBuilder
         self.runtimeSnapshotController = runtimeSnapshotController
         self.eventObserver = eventObserver
+        self.favoritesService = favoritesService
+        self.favoritesEvents = favoritesEvents
         self.toastPresenter = toastPresenter ?? ToastManager.shared
         self.statePersistence = statePersistence ?? (try? PlayerStatePersistence())
         self.playlistManager = resolvedPlaylistManager
@@ -294,13 +319,68 @@ final class PlayerViewModel: ObservableObject {
                 }
             }
         )
+        playerManager.configureFavoriteCommand { [weak self] isFavorite in
+            guard let self else {
+                return .commandFailed
+            }
+
+            return self.setCurrentTrackFavorite(isFavorite)
+                ? .success
+                : .commandFailed
+        }
+        updateFavoriteCommandState()
         updateTrackNavigationAvailability()
 
         // Стартовое восстановление готовит только состояние мини-плеера и не запускает AVPlayer.
+        observeFavoritesChanges()
         startLastTrackRestoration()
     }
 
     // MARK: - Состояние выбранного трека
+
+    /// Синхронно получает состояние «Избранного» при фактической смене текущего trackId.
+    private func refreshCurrentTrackFavoriteState() {
+        guard let currentTrack = currentTrackDisplayable else {
+            isCurrentTrackFavorite = false
+            return
+        }
+
+        do {
+            isCurrentTrackFavorite = try favoritesService.isFavorite(
+                trackId: currentTrack.trackId
+            )
+        } catch {
+            // Ошибка чтения не должна оставлять состояние предыдущего трека в интерфейсной модели.
+            isCurrentTrackFavorite = false
+            PersistentLogger.log(
+                "PlayerViewModel: ошибка проверки избранного trackId=\(currentTrack.trackId) error=\(error)"
+            )
+        }
+    }
+
+    /// Синхронизирует системную команду с наличием текущего трека и подтверждённым состоянием «Избранного».
+    private func updateFavoriteCommandState() {
+        let isEnabled = currentTrackDisplayable != nil
+        playerManager.updateFavoriteCommand(
+            isEnabled: isEnabled,
+            isActive: isEnabled && isCurrentTrackFavorite
+        )
+    }
+
+    /// Подписывается на единый поток точечных изменений «Избранного» только один раз при создании ViewModel.
+    private func observeFavoritesChanges() {
+        favoritesEvents.events
+            .sink { [weak self] event in
+                guard let self,
+                      event.trackId == self.currentTrackDisplayable?.trackId
+                else {
+                    return
+                }
+
+                self.isCurrentTrackFavorite = event.isFavorite
+            }
+            .store(in: &cancellables)
+    }
 
     /// Сохраняет новый текущий трек и источник контекста после фактической смены selection.
     private func persistCurrentTrack(
@@ -1621,6 +1701,53 @@ final class PlayerViewModel: ObservableObject {
 
     // MARK: - Управление воспроизведением
 
+    /// Переключает состояние текущего трека через доменный сервис без оптимистического изменения ViewModel.
+    func toggleCurrentTrackFavorite() {
+        guard let currentTrack = currentTrackDisplayable else {
+            return
+        }
+
+        do {
+            _ = try favoritesService.toggle(
+                FavoriteTrackInput(playerTrack: currentTrack)
+            )
+        } catch {
+            // Состояние меняет только успешно доставленное FavoritesChangeEvent.
+            PersistentLogger.log(
+                "PlayerViewModel: ошибка переключения избранного trackId=\(currentTrack.trackId) error=\(error)"
+            )
+        }
+    }
+
+    /// Применяет итоговое состояние системной команды через идемпотентные операции доменного сервиса.
+    ///
+    /// - Returns: `true`, если операция была принята сервисом без ошибки сохранения.
+    @discardableResult
+    func setCurrentTrackFavorite(_ isFavorite: Bool) -> Bool {
+        guard let currentTrack = currentTrackDisplayable else {
+            return false
+        }
+
+        do {
+            if isFavorite {
+                _ = try favoritesService.add(
+                    FavoriteTrackInput(playerTrack: currentTrack)
+                )
+            } else {
+                _ = try favoritesService.remove(trackId: currentTrack.trackId)
+            }
+
+            return true
+        } catch {
+            // Состояние интерфейса и системной команды меняет только успешно доставленное событие Favorites.
+            PersistentLogger.log(
+                "PlayerViewModel: ошибка установки избранного trackId=\(currentTrack.trackId) " +
+                    "isFavorite=\(isFavorite) error=\(error)"
+            )
+            return false
+        }
+    }
+
     func togglePlayPause() {
         if isPlaying {
             playerManager.pause()
@@ -1791,6 +1918,7 @@ final class PlayerViewModel: ObservableObject {
             NotificationCenter.default.removeObserver(libraryAccessRestoredObserver)
         }
         playerManager.removeTimeObserver()
+        playerManager.removeFavoriteCommandHandler()
     }
 }
 

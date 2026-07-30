@@ -33,7 +33,9 @@ extension DatabaseMigration {
         .libraryPlaybackContextSource,
         .libraryCollectionPlaybackContextSource,
         .playerQueueAndStateAllowExternalTrackIds,
-        .purchasedITunesSortModeSetting
+        .purchasedITunesSortModeSetting,
+        .trackListKind,
+        .trackListFavoritesUniqueness
     ]
 
     // Первая миграция фиксирует стартовую версию схемы без создания бизнес-таблиц.
@@ -928,6 +930,78 @@ extension DatabaseMigration {
             """,
             database: database
         )
+    }
+
+    // Девятнадцатая миграция сохраняет назначение каждого треклиста.
+    static let trackListKind = DatabaseMigration(
+        identifier: "019_tracklist_kind"
+    ) { database in
+        try ensureColumn(
+            "kind",
+            in: "tracklists",
+            definition: "TEXT NOT NULL DEFAULT 'regular' CHECK (kind IN ('regular', 'favorites'))",
+            database: database
+        )
+    }
+
+    // Двадцатая миграция оставляет только один активный системный треклист и закрепляет это ограничение индексом.
+    static let trackListFavoritesUniqueness = DatabaseMigration(
+        identifier: "020_tracklist_favorites_uniqueness"
+    ) { database in
+        #if DEBUG
+        let duplicateFavoritesTracksCount = try duplicateFavoritesTracksCount(database: database)
+        if duplicateFavoritesTracksCount > 0 {
+            PersistentLogger.log(
+                "DatabaseMigration: лишние активные записи «Избранное» будут помечены удалёнными; " +
+                "\(duplicateFavoritesTracksCount) строк треков сохранено без объединения"
+            )
+        }
+        #endif
+
+        // При повреждённых исторических данных сохраняем первичную запись по дате и UUID,
+        // а остальные только помечаем удалёнными, не затрагивая tracklist_tracks.
+        try database.executeScript(
+            """
+            UPDATE tracklists
+            SET is_deleted = 1
+            WHERE id IN (
+                SELECT id
+                FROM tracklists
+                WHERE kind = 'favorites' AND is_deleted = 0
+                ORDER BY created_at ASC, id ASC
+                LIMIT -1 OFFSET 1
+            );
+
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_tracklists_one_active_favorites
+            ON tracklists(kind)
+            WHERE kind = 'favorites' AND is_deleted = 0;
+            """
+        )
+    }
+
+    /// Возвращает число строк треков у дублирующих активных системных треклистов для DEBUG-диагностики.
+    private static func duplicateFavoritesTracksCount(
+        database: DatabaseConnection
+    ) throws -> Int {
+        let statement = try database.prepare(
+            """
+            SELECT COUNT(*)
+            FROM tracklist_tracks
+            WHERE tracklist_id IN (
+                SELECT id
+                FROM tracklists
+                WHERE kind = 'favorites' AND is_deleted = 0
+                ORDER BY created_at ASC, id ASC
+                LIMIT -1 OFFSET 1
+            );
+            """
+        )
+
+        guard try statement.step() == .row else {
+            throw DatabaseError.missingRequiredColumn(name: "duplicate_favorites_tracks_count")
+        }
+
+        return try statement.rowReader().requiredInt(at: 0)
     }
 
     private static func ensureColumn(

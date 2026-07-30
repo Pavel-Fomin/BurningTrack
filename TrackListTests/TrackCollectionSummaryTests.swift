@@ -611,6 +611,7 @@ final class TrackCollectionSummaryTests: XCTestCase {
             TrackListDatabaseModel(
                 id: id,
                 name: "Тестовый треклист",
+                kind: .regular,
                 createdAt: now,
                 updatedAt: now,
                 sortOrder: nil,

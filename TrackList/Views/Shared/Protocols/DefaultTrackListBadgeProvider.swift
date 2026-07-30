@@ -5,7 +5,7 @@
 //  Провайдер бейджей треклистов.
 //
 //  Роль:
-//  - предоставляет названия треклистов по trackId;
+//  - предоставляет семантические принадлежности треклистов по trackId;
 //  - использует централизованный индекс TrackListBadgeIndex;
 //  - не обращается к SQLite напрямую из UI-слоя.
 //
@@ -18,7 +18,7 @@ final class DefaultTrackListBadgeProvider: TrackListBadgeProvider {
 
     // MARK: - Public
 
-    func badges(for trackIds: [UUID]) -> [UUID: [String]] {
+    func badges(for trackIds: [UUID]) -> [UUID: [TrackListMembership]] {
         TrackListBadgeIndex.shared.badges(for: trackIds)
     }
 }

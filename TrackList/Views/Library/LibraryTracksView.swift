@@ -218,7 +218,7 @@ struct LibraryTracksView: View {
                     allTracks: allVisibleTracks,
                     playbackSource: .libraryFolder(id: folder.id),
                     currentCollectionCategory: nil,
-                    trackListNamesById: tracksViewModel.trackListNamesById,
+                    trackListMembershipsById: tracksViewModel.trackListMembershipsById,
                     metadataProvider: tracksViewModel,
                     cloudAvailabilityStateStore: cloudAvailabilityController.stateStore(for:),
                     cloudAvailabilityActionHandler: cloudAvailabilityActionHandler,

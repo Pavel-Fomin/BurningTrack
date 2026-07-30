@@ -348,7 +348,9 @@ final class PlayerViewModelWaveformTests: XCTestCase {
             toastPresenter: ToastPresenterSpy(),
             statePersistence: PlayerStatePersistenceSpy(),
             playlistManager: playlistManager,
-            waveformGenerator: waveformGenerator
+            waveformGenerator: waveformGenerator,
+            favoritesService: PlayerFavoritesServiceSpy(),
+            favoritesEvents: PlayerFavoritesEventsSubject()
         )
 
         return PlayerViewModelWaveformHarness(

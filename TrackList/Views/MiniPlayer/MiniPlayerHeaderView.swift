@@ -6,7 +6,7 @@
 //
 //  Роль:
 //  - отображает обложку и информацию о треке;
-//  - содержит основные кнопки управления воспроизведением.
+//  - содержит действие изменения состояния «Избранного».
 //
 //  Created by Pavel Fomin on 08.02.2026.
 //
@@ -15,7 +15,7 @@ import SwiftUI
 
 struct MiniPlayerHeaderView: View {
 
-    /// Смещение даёт обратную связь о направлении свайпа, не меняя компоновку кнопок.
+    /// Смещение даёт обратную связь о направлении свайпа, не меняя компоновку заголовка.
     @State private var contentDragOffset: CGFloat = 0
 
     // MARK: - Input
@@ -24,41 +24,52 @@ struct MiniPlayerHeaderView: View {
     let title: String
     let artist: String
     let isPlaying: Bool
-    let isPreviousEnabled: Bool
-    let isNextEnabled: Bool
+    /// Отражает подтверждённое состояние текущего трека в системном треклисте «Избранное».
+    let isFavorite: Bool
+    /// Не позволяет изменять избранное, пока у плеера нет конкретного трека.
+    let isFavoriteEnabled: Bool
     /// Переопределение цвета заголовка для специальных состояний мини-плеера.
     let titleColorOverride: Color?
 
     let onContentTap: () -> Void
     let onContentSwipePrevious: () -> Void
     let onContentSwipeNext: () -> Void
-    let onPrevious: () -> Void
-    let onPlayPause: () -> Void
-    let onNext: () -> Void
+    let onFavorite: () -> Void
 
     // MARK: - UI
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(alignment: .center, spacing: 12) {
             informationArea
 
-            MiniPlayerTransportControlsView(
-                isPlaying: isPlaying,
-                isPreviousEnabled: isPreviousEnabled,
-                isNextEnabled: isNextEnabled,
-                onPrevious: onPrevious,
-                onPlayPause: onPlayPause,
-                onNext: onNext
-            )
-            // Сохраняем ширину зон управления при сжатии текста.
-            .layoutPriority(1)
+            // Кнопка остаётся по центру строки с обложкой и метаданными трека.
+            favoriteButton
         }
         .frame(minHeight: 40)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Now Playing")
     }
 
-    /// Объединяет обложку и метаданные в единую область управления без транспортных кнопок.
+    /// Переключает состояние текущего трека, не изменяя жесты управления воспроизведением.
+    private var favoriteButton: some View {
+        Button(action: onFavorite) {
+            Image(systemName: isFavorite ? "heart.fill" : "heart")
+                .font(.system(size: 18, weight: .semibold))
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!isFavoriteEnabled)
+        .foregroundStyle(isFavorite ? Color.red : Color.primary.opacity(0.65))
+        .accessibilityLabel(
+            isFavorite
+                ? "Удалить из Избранного"
+                : "Добавить в Избранное"
+        )
+        .accessibilityValue(isFavorite ? "В Избранном" : "Не в Избранном")
+    }
+
+    /// Объединяет обложку и метаданные в единую область управления воспроизведением.
     private var informationArea: some View {
         HStack(spacing: 12) {
             artworkView
@@ -81,7 +92,7 @@ struct MiniPlayerHeaderView: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
-            // Текст занимает только оставшееся место и не вытесняет кнопки.
+            // Текст занимает только оставшееся место и не вытесняет кнопку избранного.
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -109,7 +120,7 @@ struct MiniPlayerHeaderView: View {
                     return
                 }
 
-                // Ограничиваем визуальное смещение порогом действия, чтобы не перекрывать кнопки.
+                // Ограничиваем визуальное смещение порогом действия, чтобы не перекрывать кнопку избранного.
                 contentDragOffset = min(max(horizontalDistance, -48), 48)
             }
             .onEnded { value in

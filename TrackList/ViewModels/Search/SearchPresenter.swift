@@ -149,7 +149,9 @@ struct SearchPresenter {
                     : "",
                 duration: snapshot?.duration ?? result.duration,
                 trackListNames: displaySettings.shouldShowTrackListMembership
-                    ? result.trackListNames
+                    ? TrackListPresentationText.membershipTitles(
+                        for: result.trackListMemberships
+                    )
                     : nil,
                 showsFileFormat: displaySettings.shouldShowFileFormat
             )

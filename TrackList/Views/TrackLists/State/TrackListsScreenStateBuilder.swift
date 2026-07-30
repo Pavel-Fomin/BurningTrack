@@ -19,9 +19,14 @@ struct TrackListsScreenStateBuilder {
             TrackListsRowState(
                 id: trackList.id,
                 trackList: trackList,
-                title: trackList.name,
+                title: TrackListPresentationText.title(
+                    for: trackList.kind,
+                    storedName: trackList.name
+                ),
                 createdAt: trackList.createdAt,
-                tracksCount: trackList.tracks.count
+                tracksCount: trackList.tracks.count,
+                canDelete: trackList.kind.canDelete,
+                canReorder: trackList.kind.canReorder
             )
         }
 

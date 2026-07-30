@@ -17,4 +17,23 @@ protocol TrackListManaging {
 
     /// Сохраняет треки конкретного треклиста.
     func saveTracks(_ tracks: [Track], for id: UUID) -> Bool
+
+    /// Сохраняет треки конкретного треклиста с явным выбором публикации точечных событий Favorites.
+    func saveTracks(
+        _ tracks: [Track],
+        for id: UUID,
+        publishesFavoritesEvents: Bool
+    ) -> Bool
+}
+
+extension TrackListManaging {
+
+    /// Сохраняет содержимое через базовый контракт, если подмена не поддерживает отдельную публикацию Favorites.
+    func saveTracks(
+        _ tracks: [Track],
+        for id: UUID,
+        publishesFavoritesEvents: Bool
+    ) -> Bool {
+        saveTracks(tracks, for: id)
+    }
 }

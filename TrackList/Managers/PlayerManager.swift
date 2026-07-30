@@ -33,6 +33,10 @@ final class PlayerManager {
     private var currentAccessedURL: URL?
     /// URL сохраняется после успешной подготовки AVPlayerItem и используется только связанными runtime-сценариями.
     private var currentPreparedURL: URL?
+    /// Target-ы системных playback-команд, принадлежащие этому экземпляру PlayerManager.
+    private var remoteCommandTargets: [(command: MPRemoteCommand, token: Any)] = []
+    /// Target системной команды «Избранное», который удаляется отдельно при повторной настройке.
+    private var favoriteCommandTarget: Any?
 
     // MARK: - Состояние трека
 
@@ -53,6 +57,13 @@ final class PlayerManager {
             name: .AVPlayerItemDidPlayToEndTime,
             object: nil
         )
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+        removeTimeObserver()
+        removeRemoteCommandTargets()
+        removeFavoriteCommandHandler()
     }
 
     // MARK: - Finish Notification
@@ -284,39 +295,128 @@ final class PlayerManager {
         onNext: @escaping () -> Void,
         onPrevious: @escaping () -> Void
     ) {
+        removeRemoteCommandTargets()
+
         let center = MPRemoteCommandCenter.shared()
 
-        center.playCommand.addTarget { _ in
-            onPlay()
-            return .success
-        }
+        remoteCommandTargets = [
+            (
+                command: center.playCommand,
+                token: center.playCommand.addTarget { _ in
+                    onPlay()
+                    return .success
+                }
+            ),
+            (
+                command: center.pauseCommand,
+                token: center.pauseCommand.addTarget { _ in
+                    onPause()
+                    return .success
+                }
+            ),
+            (
+                command: center.nextTrackCommand,
+                token: center.nextTrackCommand.addTarget { _ in
+                    onNext()
+                    return .success
+                }
+            ),
+            (
+                command: center.previousTrackCommand,
+                token: center.previousTrackCommand.addTarget { _ in
+                    onPrevious()
+                    return .success
+                }
+            ),
+            (
+                command: center.changePlaybackPositionCommand,
+                token: center.changePlaybackPositionCommand.addTarget { [weak self] event in
+                    guard
+                        let self,
+                        let event = event as? MPChangePlaybackPositionCommandEvent
+                    else { return .commandFailed }
 
-        center.pauseCommand.addTarget { _ in
-            onPause()
-            return .success
-        }
+                    self.seek(to: event.positionTime)
 
-        center.nextTrackCommand.addTarget { _ in
-            onNext()
-            return .success
-        }
+                    return .success
+                }
+            )
+        ]
+    }
 
-        center.previousTrackCommand.addTarget { _ in
-            onPrevious()
-            return .success
-        }
-        
-        center.changePlaybackPositionCommand.addTarget { [weak self] event in
+    /// Настраивает системную команду «Избранное» и заменяет только собственный прежний target.
+    func configureFavoriteCommand(
+        handler: @escaping @MainActor (Bool) -> MPRemoteCommandHandlerStatus
+    ) {
+        removeFavoriteCommandHandler()
+
+        let command = MPRemoteCommandCenter.shared().likeCommand
+        command.localizedTitle = String(localized: "tracklist.favorites.title")
+        command.localizedShortTitle = String(localized: "tracklist.favorites.title")
+        favoriteCommandTarget = command.addTarget { [weak self] event in
             guard
                 let self,
-                let event = event as? MPChangePlaybackPositionCommandEvent
-            else { return .commandFailed }
-            
-            let time = event.positionTime
-            self.seek(to: time)
-            
-            return .success
+                let feedbackEvent = event as? MPFeedbackCommandEvent
+            else {
+                return .commandFailed
+            }
+
+            // MPFeedbackCommandEvent передаёт отрицательное действие для отмены ранее активированной обратной связи.
+            return self.handleFavoriteCommand(
+                isFavorite: feedbackEvent.isNegative == false,
+                handler: handler
+            )
         }
+    }
+
+    /// Синхронизирует системный индикатор с подтверждённым состоянием текущего трека.
+    func updateFavoriteCommand(
+        isEnabled: Bool,
+        isActive: Bool
+    ) {
+        let command = MPRemoteCommandCenter.shared().likeCommand
+        command.isEnabled = isEnabled
+        command.isActive = isEnabled && isActive
+    }
+
+    /// Удаляет target только этой команды и возвращает системный элемент в отключённое неактивное состояние.
+    func removeFavoriteCommandHandler() {
+        let command = MPRemoteCommandCenter.shared().likeCommand
+
+        if let favoriteCommandTarget {
+            command.removeTarget(favoriteCommandTarget)
+            self.favoriteCommandTarget = nil
+        }
+
+        command.isEnabled = false
+        command.isActive = false
+    }
+
+    /// Выполняет доменное действие на MainActor, сохраняя синхронный статус, который требует Remote Command Center.
+    private func handleFavoriteCommand(
+        isFavorite: Bool,
+        handler: @escaping @MainActor (Bool) -> MPRemoteCommandHandlerStatus
+    ) -> MPRemoteCommandHandlerStatus {
+        if Thread.isMainThread {
+            return MainActor.assumeIsolated {
+                handler(isFavorite)
+            }
+        }
+
+        return DispatchQueue.main.sync {
+            MainActor.assumeIsolated {
+                handler(isFavorite)
+            }
+        }
+    }
+
+    /// Удаляет только target-ы, добавленные этим экземпляром, перед повторной настройкой или освобождением.
+    private func removeRemoteCommandTargets() {
+        for target in remoteCommandTargets {
+            target.command.removeTarget(target.token)
+        }
+
+        remoteCommandTargets.removeAll()
     }
 
     /// Временно выключает системные команды перехода, пока ViewModel не получила достоверный playback-контекст.

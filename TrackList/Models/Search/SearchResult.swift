@@ -45,7 +45,7 @@ struct SearchTrackResult: Identifiable, Equatable, TrackDisplayable {
     let label: String?
     let genre: String?
     let comment: String?
-    var trackListNames: [String]
+    let trackListMemberships: [TrackListMembership]
     let isAvailable: Bool
 
     /// Физический идентификатор трека совпадает с id результата поиска.

@@ -413,7 +413,9 @@ final class PlayerViewModelRestorationTests: XCTestCase {
             ),
             libraryContextLoader: libraryContextLoader,
             fastLibraryTrackProvider: fastTrackProvider,
-            isLibraryAccessRestored: { libraryAccessState.isRestored }
+            isLibraryAccessRestored: { libraryAccessState.isRestored },
+            favoritesService: PlayerFavoritesServiceSpy(),
+            favoritesEvents: PlayerFavoritesEventsSubject()
         )
     }
 

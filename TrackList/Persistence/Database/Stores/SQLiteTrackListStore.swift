@@ -95,13 +95,22 @@ final class SQLiteTrackListStore: TrackListDatabaseReading, TrackListDatabaseWri
     }
 
     private static func map(_ row: DatabaseRowReader) throws -> TrackListDatabaseModel {
-        TrackListDatabaseModel(
+        let kindRawValue = try row.requiredString(at: 2)
+        guard let kind = DatabaseTrackListKind(rawValue: kindRawValue) else {
+            throw DatabaseError.invalidColumnValue(
+                column: DatabaseSchema.TrackLists.kind,
+                value: kindRawValue
+            )
+        }
+
+        return TrackListDatabaseModel(
             id: try row.requiredUUID(at: 0),
             name: try row.requiredString(at: 1),
-            createdAt: try row.requiredDate(at: 2),
-            updatedAt: try row.requiredDate(at: 3),
-            sortOrder: row.int(at: 4),
-            isDeleted: try row.requiredBool(at: 5)
+            kind: kind,
+            createdAt: try row.requiredDate(at: 3),
+            updatedAt: try row.requiredDate(at: 4),
+            sortOrder: row.int(at: 5),
+            isDeleted: try row.requiredBool(at: 6)
         )
     }
 
@@ -112,10 +121,11 @@ final class SQLiteTrackListStore: TrackListDatabaseReading, TrackListDatabaseWri
         // Порядок bind соответствует INSERT/UPSERT-запросу tracklists.
         try statement.bind(model.id, at: 1)
         try statement.bind(model.name, at: 2)
-        try statement.bind(model.createdAt, at: 3)
-        try statement.bind(model.updatedAt, at: 4)
-        try statement.bind(model.sortOrder, at: 5)
-        try statement.bind(model.isDeleted, at: 6)
+        try statement.bind(model.kind.rawValue, at: 3)
+        try statement.bind(model.createdAt, at: 4)
+        try statement.bind(model.updatedAt, at: 5)
+        try statement.bind(model.sortOrder, at: 6)
+        try statement.bind(model.isDeleted, at: 7)
     }
 
     private static func bindUpdate(
@@ -124,10 +134,11 @@ final class SQLiteTrackListStore: TrackListDatabaseReading, TrackListDatabaseWri
     ) throws {
         // UPDATE держит id последним, чтобы изменяемые поля шли в порядке схемы.
         try statement.bind(model.name, at: 1)
-        try statement.bind(model.createdAt, at: 2)
-        try statement.bind(model.updatedAt, at: 3)
-        try statement.bind(model.sortOrder, at: 4)
-        try statement.bind(model.isDeleted, at: 5)
-        try statement.bind(model.id, at: 6)
+        try statement.bind(model.kind.rawValue, at: 2)
+        try statement.bind(model.createdAt, at: 3)
+        try statement.bind(model.updatedAt, at: 4)
+        try statement.bind(model.sortOrder, at: 5)
+        try statement.bind(model.isDeleted, at: 6)
+        try statement.bind(model.id, at: 7)
     }
 }

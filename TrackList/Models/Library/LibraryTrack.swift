@@ -9,7 +9,9 @@
 import Foundation
 struct LibraryTrack: Identifiable, TrackDisplayable {
     // MARK: - Identity
-    let id: UUID              // trackId в TrackRegistry
+    /// Канонический идентификатор локального трека: первичный ключ строки tracks в SQLite.
+    let id: UUID
+    /// Псевдоним канонического идентификатора для общих моделей трека.
     var trackId: UUID { id }
     // MARK: - Файл
     let fileURL: URL          // фактический URL

@@ -71,7 +71,7 @@ final class SearchService: SearchServicing {
             }
         let trackIds = tracks.map(\.id)
         let cachedMetadataByTrackId = await trackRegistry.cachedMetadata(forTrackIds: trackIds)
-        let trackListNamesByTrackId = trackListBadgeIndex.badges(for: trackIds)
+        let trackListMembershipsByTrackId = trackListBadgeIndex.badges(for: trackIds)
         let folderResults = folderEntries.compactMap(Self.folderResult)
         let trackListResults = try trackListSearchResults()
 
@@ -106,7 +106,7 @@ final class SearchService: SearchServicing {
                 label: metadata?.label,
                 genre: metadata?.genre,
                 comment: metadata?.comment,
-                trackListNames: trackListNamesByTrackId[track.id] ?? [],
+                trackListMemberships: trackListMembershipsByTrackId[track.id] ?? [],
                 isAvailable: track.isAvailable
             )
         }
@@ -127,6 +127,7 @@ final class SearchService: SearchServicing {
                     id: meta.id,
                     name: meta.name,
                     createdAt: meta.createdAt,
+                    kind: meta.kind,
                     tracks: tracks
                 )
 

@@ -87,6 +87,7 @@ enum DatabaseSchema {
 
         static let id = "id"
         static let name = "name"
+        static let kind = "kind"
         static let createdAt = "created_at"
         static let updatedAt = "updated_at"
         static let sortOrder = "sort_order"

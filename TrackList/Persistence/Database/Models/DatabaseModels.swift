@@ -28,6 +28,7 @@ struct FolderDatabaseModel: Equatable, Identifiable {
 
 // Строка таблицы tracks.
 struct TrackDatabaseModel: Equatable, Identifiable {
+    /// Канонический UUID локального трека, на который ссылаются доменные модели.
     let id: UUID
     var source: DatabaseTrackSource
     var folderId: UUID?
@@ -77,10 +78,11 @@ struct TrackIdentityKeyDatabaseModel: Equatable, Identifiable {
     var updatedAt: Date
 }
 
-// Строка таблицы tracklists.
+// Строка таблицы tracklists вместе с назначением треклиста.
 struct TrackListDatabaseModel: Equatable, Identifiable {
     let id: UUID
     var name: String
+    var kind: DatabaseTrackListKind
     var createdAt: Date
     var updatedAt: Date
     var sortOrder: Int?
@@ -91,6 +93,7 @@ struct TrackListDatabaseModel: Equatable, Identifiable {
 struct TrackListTrackDatabaseModel: Equatable, Identifiable {
     let id: UUID
     var trackListId: UUID
+    /// Идентификатор исходного трека: локальный tracks.id или устойчивый внешний ID iTunes.
     var trackId: UUID
     var position: Int
     var sourceSnapshot: DatabaseTrackSource
@@ -106,7 +109,9 @@ struct TrackListTrackDatabaseModel: Equatable, Identifiable {
 
 // Строка таблицы player_queue.
 struct PlayerQueueItemDatabaseModel: Equatable, Identifiable {
+    /// Идентификатор конкретного вхождения в очереди, отличающий повторные добавления одного трека.
     let id: UUID
+    /// Идентификатор исходного трека: локальный tracks.id или устойчивый внешний ID iTunes.
     var trackId: UUID
     var position: Int
     var sourceSnapshot: DatabaseTrackSource

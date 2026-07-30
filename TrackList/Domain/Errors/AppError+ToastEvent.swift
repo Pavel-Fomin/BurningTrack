@@ -128,6 +128,21 @@ extension AppError {
                 message: TrackListPresentationText.invalidNameMessage
             )
 
+        case .trackListRenameNotAllowed:
+            return .operationFailed(
+                message: TrackListPresentationText.favoritesRenameNotAllowedMessage
+            )
+
+        case .trackListDeletionNotAllowed:
+            return .operationFailed(
+                message: TrackListPresentationText.favoritesDeletionNotAllowedMessage
+            )
+
+        case .trackListReorderNotAllowed:
+            return .operationFailed(
+                message: TrackListPresentationText.favoritesReorderNotAllowedMessage
+            )
+
         // MARK: - Плеер
 
         case .playlistLoadFailed:

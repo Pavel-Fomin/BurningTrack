@@ -12,6 +12,12 @@ import Foundation
 @MainActor
 protocol TrackListsManaging {
 
+    /// Гарантирует наличие единственного активного системного треклиста «Избранное».
+    func ensureFavoritesTrackList() throws -> TrackListMeta
+
+    /// Возвращает активный системный треклист без создания новой записи.
+    func favoritesTrackList() throws -> TrackListMeta?
+
     /// Загружает метаинформацию всех треклистов.
     func loadTrackListMetas() throws -> [TrackListMeta]
 
@@ -21,6 +27,6 @@ protocol TrackListsManaging {
     /// Переименовывает треклист.
     func renameTrackList(id: UUID, to newName: String) throws
 
-    /// Сохраняет пользовательский порядок активных треклистов.
+    /// Проверяет полный отображаемый порядок и сохраняет только порядок активных обычных треклистов.
     func updateTrackListsOrder(_ orderedIds: [UUID]) throws
 }

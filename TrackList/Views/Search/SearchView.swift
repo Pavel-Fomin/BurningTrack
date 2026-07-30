@@ -213,9 +213,13 @@ private struct SearchTrackListRowView: View {
     /// Треклист поиска отображается тем же компонентом, что и список треклистов.
     var body: some View {
         TrackListsRowView(
-            title: row.result.trackList.name,
+            title: TrackListPresentationText.title(
+                for: row.result.trackList.kind,
+                storedName: row.result.trackList.name
+            ),
             createdAtText: TrackListPresentationText.createdAt(
-                row.result.trackList.createdAt
+                for: row.result.trackList.kind,
+                date: row.result.trackList.createdAt
             ),
             tracksCountText: TrackListPresentationText.trackCount(
                 row.result.trackList.tracks.count

@@ -332,35 +332,36 @@ enum TrackIdentityKeyDatabaseQueries {
 // SQL для таблицы tracklists.
 enum TrackListDatabaseQueries {
     static let fetch = """
-    SELECT id, name, created_at, updated_at, sort_order, is_deleted
+    SELECT id, name, kind, created_at, updated_at, sort_order, is_deleted
     FROM tracklists
     WHERE id = ?;
     """
 
     static let fetchAll = """
-    SELECT id, name, created_at, updated_at, sort_order, is_deleted
+    SELECT id, name, kind, created_at, updated_at, sort_order, is_deleted
     FROM tracklists
     ORDER BY sort_order ASC, created_at DESC;
     """
 
     static let insert = """
     INSERT INTO tracklists (
-        id, name, created_at, updated_at, sort_order, is_deleted
-    ) VALUES (?, ?, ?, ?, ?, ?);
+        id, name, kind, created_at, updated_at, sort_order, is_deleted
+    ) VALUES (?, ?, ?, ?, ?, ?, ?);
     """
 
     static let update = """
     UPDATE tracklists
-    SET name = ?, created_at = ?, updated_at = ?, sort_order = ?, is_deleted = ?
+    SET name = ?, kind = ?, created_at = ?, updated_at = ?, sort_order = ?, is_deleted = ?
     WHERE id = ?;
     """
 
     static let upsert = """
     INSERT INTO tracklists (
-        id, name, created_at, updated_at, sort_order, is_deleted
-    ) VALUES (?, ?, ?, ?, ?, ?)
+        id, name, kind, created_at, updated_at, sort_order, is_deleted
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
         name = excluded.name,
+        kind = excluded.kind,
         created_at = excluded.created_at,
         updated_at = excluded.updated_at,
         sort_order = excluded.sort_order,

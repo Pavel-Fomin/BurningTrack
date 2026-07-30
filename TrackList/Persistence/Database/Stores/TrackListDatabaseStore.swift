@@ -2,16 +2,20 @@
 //  TrackListDatabaseStore.swift
 //  TrackList
 //
-//  Фасад SQLite-хранилища пользовательских треклистов.
+//  Фасад SQLite-хранилища треклистов.
 //
 //  Created by Pavel Fomin on 05.07.2026.
 //
 
 import Foundation
 
-// Ошибки фасада треклистов, которые manager-слой преобразует в пользовательские AppError.
+// Ошибки фасада треклистов, доступные manager-слою для преобразования в пользовательские AppError.
 enum TrackListDatabaseStoreError: Error {
     case trackListNotFound(UUID)
+    /// Полное сохранение не может изменить защищённые метаданные системного треклиста.
+    case protectedTrackListMetadataModification(UUID)
+    /// Передан неполный, повторяющийся или содержащий системный треклист пользовательский порядок.
+    case invalidRegularTrackListsOrder
 }
 
 // Фасад треклистов скрывает SQLite-модели и низкоуровневые Store от manager-слоя.
@@ -38,6 +42,35 @@ final class TrackListDatabaseStore {
             .map(TrackListMetaDatabaseMapper.trackListMeta)
     }
 
+    /// Возвращает метаданные активного треклиста по идентификатору.
+    func fetchMeta(id: UUID) throws -> TrackListMeta {
+        guard let metaModel = try activeMetaModel(id: id) else {
+            throw TrackListDatabaseStoreError.trackListNotFound(id)
+        }
+
+        return TrackListMetaDatabaseMapper.trackListMeta(from: metaModel)
+    }
+
+    /// Возвращает метаданные активных треклистов указанного назначения.
+    func fetchActiveMetas(kind: TrackListKind) throws -> [TrackListMeta] {
+        try trackListStore.fetchAll()
+            .filter {
+                $0.isDeleted == false &&
+                TrackListKindDatabaseMapper.trackListKind(from: $0.kind) == kind
+            }
+            .map(TrackListMetaDatabaseMapper.trackListMeta)
+    }
+
+    /// Возвращает метаданные логически удалённых треклистов указанного назначения.
+    func fetchDeletedMetas(kind: TrackListKind) throws -> [TrackListMeta] {
+        try trackListStore.fetchAll()
+            .filter {
+                $0.isDeleted &&
+                TrackListKindDatabaseMapper.trackListKind(from: $0.kind) == kind
+            }
+            .map(TrackListMetaDatabaseMapper.trackListMeta)
+    }
+
     /// Возвращает треклист вместе с его строками, сохраняя порядок по position.
     func fetchTrackList(id: UUID) throws -> TrackList {
         guard let metaModel = try activeMetaModel(id: id) else {
@@ -51,6 +84,7 @@ final class TrackListDatabaseStore {
             id: meta.id,
             name: meta.name,
             createdAt: meta.createdAt,
+            kind: meta.kind,
             tracks: tracks
         )
     }
@@ -71,11 +105,12 @@ final class TrackListDatabaseStore {
 
     // MARK: - Write
 
-    /// Создаёт треклист и все его строки в одной транзакции.
+    /// Создаёт треклист с заданным назначением и все его строки в одной транзакции.
     @discardableResult
     func createTrackList(
         id: UUID,
         name: String,
+        kind: TrackListKind,
         createdAt: Date,
         tracks: [Track]
     ) throws -> TrackList {
@@ -83,15 +118,19 @@ final class TrackListDatabaseStore {
             id: id,
             name: name,
             createdAt: createdAt,
+            kind: kind,
             tracks: tracks
         )
 
         try executor.transaction { _ in
-            try shiftActiveTrackListsDown(updatedAt: createdAt)
+            if kind.canReorder {
+                try shiftActiveRegularTrackListsDown(updatedAt: createdAt)
+            }
             try trackListStore.upsert(
                 TrackListDatabaseModel(
                     id: id,
                     name: name,
+                    kind: TrackListKindDatabaseMapper.databaseKind(from: trackList.kind),
                     createdAt: createdAt,
                     updatedAt: createdAt,
                     sortOrder: 0,
@@ -118,13 +157,14 @@ final class TrackListDatabaseStore {
         }
     }
 
-    /// Полностью заменяет набор треклистов, сохраняя строки каждого списка.
+    /// Полностью заменяет переданные треклисты, сохраняя строки каждого списка и отсутствующий системный треклист.
     func replaceTrackLists(_ trackLists: [TrackList]) throws {
         try replaceTrackListsDirect(trackLists)
     }
 
     /// Создаёт или обновляет метаданные одного треклиста.
     func saveMeta(_ meta: TrackListMeta) throws {
+        try validateMetadataWrite(meta)
         try saveMetaDirect(meta, updatedAt: Date())
     }
 
@@ -148,14 +188,54 @@ final class TrackListDatabaseStore {
         try trackListStore.delete(id: id)
     }
 
-    /// Сохраняет порядок активных треклистов в sort_order.
-    func updateTrackListsOrder(_ orderedIds: [UUID]) throws {
+    /// Помечает активный треклист удалённым, не затрагивая строки его треков.
+    func markTrackListDeleted(id: UUID, updatedAt: Date) throws {
+        guard try activeMetaModel(id: id) != nil else {
+            throw TrackListDatabaseStoreError.trackListNotFound(id)
+        }
+
+        try trackListStore.markDeleted(id: id, updatedAt: updatedAt)
+    }
+
+    /// Восстанавливает ранее логически удалённый треклист с тем же идентификатором и составом треков.
+    func restoreTrackList(id: UUID, updatedAt: Date) throws {
+        guard var model = try trackListStore.fetch(id: id), model.isDeleted else {
+            throw TrackListDatabaseStoreError.trackListNotFound(id)
+        }
+
+        model.isDeleted = false
+        model.updatedAt = updatedAt
+        try trackListStore.upsert(model)
+    }
+
+    /// Выполняет несколько операций фасада в одной SQLite-транзакции.
+    func transaction<T>(_ body: () throws -> T) throws -> T {
+        try executor.transaction { _ in
+            try body()
+        }
+    }
+
+    /// Сохраняет порядок активных обычных треклистов в sort_order.
+    func updateTrackListsOrder(_ orderedRegularIds: [UUID]) throws {
         let updatedAt = Date()
+        let activeRegularModels = try fetchActiveMetaModels().filter {
+            TrackListKindDatabaseMapper.trackListKind(from: $0.kind) == .regular
+        }
+        let activeRegularModelsByID = Dictionary(
+            uniqueKeysWithValues: activeRegularModels.map { ($0.id, $0) }
+        )
+        let expectedRegularIds = Set(activeRegularModelsByID.keys)
+
+        guard Set(orderedRegularIds).count == orderedRegularIds.count,
+              Set(orderedRegularIds) == expectedRegularIds
+        else {
+            throw TrackListDatabaseStoreError.invalidRegularTrackListsOrder
+        }
 
         try executor.transaction { _ in
-            for (index, id) in orderedIds.enumerated() {
-                guard var model = try activeMetaModel(id: id) else {
-                    throw TrackListDatabaseStoreError.trackListNotFound(id)
+            for (index, id) in orderedRegularIds.enumerated() {
+                guard var model = activeRegularModelsByID[id] else {
+                    throw TrackListDatabaseStoreError.invalidRegularTrackListsOrder
                 }
 
                 model.sortOrder = index
@@ -194,21 +274,20 @@ final class TrackListDatabaseStore {
         updatedAt: Date
     ) throws {
         let existing = try trackListStore.fetch(id: meta.id)
-        let model = TrackListDatabaseModel(
-            id: meta.id,
-            name: meta.name,
-            createdAt: meta.createdAt,
-            updatedAt: updatedAt,
-            sortOrder: existing?.sortOrder,
-            isDeleted: false
+        var model = TrackListMetaDatabaseMapper.databaseModel(
+            from: meta,
+            updatedAt: updatedAt
         )
+        model.sortOrder = existing?.sortOrder
 
         try trackListStore.upsert(model)
     }
 
-    /// Сдвигает активные треклисты вниз перед вставкой нового элемента наверх.
-    private func shiftActiveTrackListsDown(updatedAt: Date) throws {
-        let activeModels = try fetchActiveMetaModels()
+    /// Сдвигает активные обычные треклисты вниз перед вставкой нового обычного элемента наверх.
+    private func shiftActiveRegularTrackListsDown(updatedAt: Date) throws {
+        let activeModels = try fetchActiveMetaModels().filter {
+            TrackListKindDatabaseMapper.trackListKind(from: $0.kind) == .regular
+        }
 
         for (index, var model) in activeModels.enumerated() {
             // Текущий fetchAll-порядок становится базовым порядком для старых записей без sort_order.
@@ -247,9 +326,29 @@ final class TrackListDatabaseStore {
         let incomingIds = Set(trackLists.map(\.id))
 
         try executor.transaction { _ in
-            let existingIds = try trackListStore.fetchAll().map(\.id)
-            for id in existingIds where incomingIds.contains(id) == false {
-                try trackListStore.delete(id: id)
+            let existingModels = try trackListStore.fetchAll()
+            let existingModelsByID = Dictionary(
+                uniqueKeysWithValues: existingModels.map { ($0.id, $0) }
+            )
+
+            for list in trackLists {
+                try validateMetadataWrite(
+                    TrackListMeta(
+                        id: list.id,
+                        name: list.name,
+                        createdAt: list.createdAt,
+                        kind: list.kind
+                    ),
+                    existingModel: existingModelsByID[list.id]
+                )
+            }
+
+            for model in existingModels where incomingIds.contains(model.id) == false {
+                guard TrackListKindDatabaseMapper.trackListKind(from: model.kind) != .favorites else {
+                    continue
+                }
+
+                try trackListStore.delete(id: model.id)
             }
 
             for list in trackLists {
@@ -257,7 +356,8 @@ final class TrackListDatabaseStore {
                     TrackListMeta(
                         id: list.id,
                         name: list.name,
-                        createdAt: list.createdAt
+                        createdAt: list.createdAt,
+                        kind: list.kind
                     ),
                     updatedAt: updatedAt
                 )
@@ -267,6 +367,39 @@ final class TrackListDatabaseStore {
                     updatedAt: updatedAt
                 )
             }
+        }
+    }
+
+    /// Проверяет, что полное сохранение не меняет назначение или название защищённого треклиста.
+    private func validateMetadataWrite(
+        _ meta: TrackListMeta,
+        existingModel: TrackListDatabaseModel? = nil
+    ) throws {
+        let resolvedExistingModel: TrackListDatabaseModel?
+        if let existingModel {
+            resolvedExistingModel = existingModel
+        } else {
+            resolvedExistingModel = try trackListStore.fetch(id: meta.id)
+        }
+        let incomingKind = TrackListKindDatabaseMapper.databaseKind(from: meta.kind)
+
+        guard let resolvedExistingModel else {
+            guard meta.kind != .favorites else {
+                throw TrackListDatabaseStoreError.protectedTrackListMetadataModification(meta.id)
+            }
+            return
+        }
+
+        let existingKind = TrackListKindDatabaseMapper.trackListKind(from: resolvedExistingModel.kind)
+        guard existingKind != .favorites else {
+            guard incomingKind == resolvedExistingModel.kind, meta.name == resolvedExistingModel.name else {
+                throw TrackListDatabaseStoreError.protectedTrackListMetadataModification(meta.id)
+            }
+            return
+        }
+
+        guard meta.kind != .favorites else {
+            throw TrackListDatabaseStoreError.protectedTrackListMetadataModification(meta.id)
         }
     }
 }

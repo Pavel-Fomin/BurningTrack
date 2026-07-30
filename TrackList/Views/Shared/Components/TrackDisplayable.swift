@@ -9,7 +9,9 @@
 import Foundation
 // MARK: -  Протокол
 protocol TrackDisplayable: Identifiable {
+    /// Идентификатор конкретной display-модели; у строк очереди и треклиста это не обязательно trackId.
     var id: UUID { get }
+    /// Логический идентификатор трека: для локального источника равен первичному ключу tracks.id в SQLite.
     var trackId: UUID { get }
     // Показываемое имя файла
     var fileName: String { get }

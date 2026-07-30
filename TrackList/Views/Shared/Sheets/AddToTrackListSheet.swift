@@ -57,7 +57,12 @@ struct AddToTrackListSheet: View {
             } label: {
                 HStack(spacing: 12) {
                     
-                    Text(meta.name)
+                    Text(
+                        TrackListPresentationText.title(
+                            for: meta.kind,
+                            storedName: meta.name
+                        )
+                    )
                         .lineLimit(1)
                     
                     Spacer()

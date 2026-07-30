@@ -122,6 +122,27 @@ enum PlaybackContextSourceDatabaseMapper {
     }
 }
 
+// Преобразует назначение треклиста между бизнес-моделью и SQLite-представлением.
+enum TrackListKindDatabaseMapper {
+    static func databaseKind(from kind: TrackListKind) -> DatabaseTrackListKind {
+        switch kind {
+        case .regular:
+            return .regular
+        case .favorites:
+            return .favorites
+        }
+    }
+
+    static func trackListKind(from kind: DatabaseTrackListKind) -> TrackListKind {
+        switch kind {
+        case .regular:
+            return .regular
+        case .favorites:
+            return .favorites
+        }
+    }
+}
+
 // Преобразует метаданные треклиста между SQLite и бизнес-моделью.
 enum TrackListMetaDatabaseMapper {
     static func databaseModel(from meta: TrackListMeta, updatedAt: Date) -> TrackListDatabaseModel {
@@ -129,6 +150,7 @@ enum TrackListMetaDatabaseMapper {
         TrackListDatabaseModel(
             id: meta.id,
             name: meta.name,
+            kind: TrackListKindDatabaseMapper.databaseKind(from: meta.kind),
             createdAt: meta.createdAt,
             updatedAt: updatedAt,
             sortOrder: nil,
@@ -137,11 +159,12 @@ enum TrackListMetaDatabaseMapper {
     }
 
     static func trackListMeta(from model: TrackListDatabaseModel) -> TrackListMeta {
-        // Текущая бизнес-модель метаинформации не знает о soft-delete и порядке сортировки.
+        // Бизнес-модель по-прежнему не содержит soft-delete и порядок сортировки.
         TrackListMeta(
             id: model.id,
             name: model.name,
-            createdAt: model.createdAt
+            createdAt: model.createdAt,
+            kind: TrackListKindDatabaseMapper.trackListKind(from: model.kind)
         )
     }
 }

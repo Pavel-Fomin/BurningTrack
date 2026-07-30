@@ -93,6 +93,8 @@ final class TrackListsViewModel: ObservableObject {
     private func loadTrackLists() -> [TrackList] {
         let metas: [TrackListMeta]
         do {
+            // Системный треклист должен существовать до публикации итогового списка в интерфейс.
+            _ = try trackListsManager.ensureFavoritesTrackList()
             metas = try trackListsManager.loadTrackListMetas()
         } catch let appError as AppError {
             toastPresenter.handle(appError)
@@ -121,6 +123,7 @@ final class TrackListsViewModel: ObservableObject {
                 id: meta.id,
                 name: meta.name,
                 createdAt: meta.createdAt,
+                kind: meta.kind,
                 tracks: tracks
             )
         }
@@ -129,7 +132,7 @@ final class TrackListsViewModel: ObservableObject {
             toastPresenter.handle(trackLoadError ?? AppError.trackListLoadFailed)
         }
 
-        return loadedTrackLists
+        return displayOrderedTrackLists(from: loadedTrackLists)
     }
 
     func refresh() {
@@ -185,18 +188,21 @@ final class TrackListsViewModel: ObservableObject {
     /// Сортирует треклисты, сохраняет новый фактический порядок в SQLite и показывает caption режима.
     func setSortMode(_ mode: TrackListsSortMode) {
         let previousSortMode = sortMode
-        var updatedTrackLists = trackLists
+        let favorites = trackLists.filter { $0.kind == .favorites }
+        var regularTrackLists = trackLists.filter { $0.kind == .regular }
 
         switch mode {
         case .createdAt:
-            updatedTrackLists.sort {
+            regularTrackLists.sort {
                 $0.createdAt > $1.createdAt
             }
         case .name:
-            updatedTrackLists.sort {
+            regularTrackLists.sort {
                 $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
             }
         }
+
+        let updatedTrackLists = favorites + regularTrackLists
 
         do {
             try settingsManager.setTrackListsSortMode(mode)
@@ -219,9 +225,24 @@ final class TrackListsViewModel: ObservableObject {
 
     /// Сохраняет новый порядок треклистов в SQLite и обновляет состояние экрана.
     func moveTrackList(from source: IndexSet, to destination: Int) {
+        let favoritesCount = trackLists.filter { $0.kind == .favorites }.count
+        guard source.isEmpty == false,
+              source.allSatisfy({ trackLists.indices.contains($0) }),
+              source.allSatisfy({ trackLists[$0].kind.canReorder }),
+              destination >= favoritesCount,
+              destination <= trackLists.count
+        else {
+            toastPresenter.handle(AppError.trackListReorderNotAllowed)
+            return
+        }
+
         let previousSortMode = sortMode
-        var updatedTrackLists = trackLists
-        updatedTrackLists.move(fromOffsets: source, toOffset: destination)
+        let favorites = trackLists.filter { $0.kind == .favorites }
+        var regularTrackLists = trackLists.filter { $0.kind == .regular }
+        let regularSource = IndexSet(source.map { $0 - favoritesCount })
+        let regularDestination = destination - favoritesCount
+        regularTrackLists.move(fromOffsets: regularSource, toOffset: regularDestination)
+        let updatedTrackLists = favorites + regularTrackLists
 
         do {
             try settingsManager.setTrackListsSortMode(nil)
@@ -240,11 +261,27 @@ final class TrackListsViewModel: ObservableObject {
         }
     }
 
+    /// Формирует единственный порядок отображения: системный треклист, затем сохранённый порядок обычных.
+    private func displayOrderedTrackLists(from trackLists: [TrackList]) -> [TrackList] {
+        let favorites = trackLists.filter { $0.kind == .favorites }
+        let regular = trackLists.filter { $0.kind == .regular }
+        return favorites + regular
+    }
+
 
     // MARK: - Удаление
 
     /// Запрашивает подтверждение удаления треклиста.
     func requestDeleteTrackList(id: UUID) {
+        guard let trackList = trackLists.first(where: { $0.id == id }) else {
+            toastPresenter.handle(AppError.trackListNotFound)
+            return
+        }
+        guard trackList.kind.canDelete else {
+            toastPresenter.handle(AppError.trackListDeletionNotAllowed)
+            return
+        }
+
         pendingDeleteTrackListId = id
         updateScreenState()
     }

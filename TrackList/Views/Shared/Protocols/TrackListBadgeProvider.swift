@@ -9,5 +9,5 @@ import Foundation
 
 
 protocol TrackListBadgeProvider {
-    func badges(for trackIds: [UUID]) -> [UUID: [String]]
+    func badges(for trackIds: [UUID]) -> [UUID: [TrackListMembership]]
 }

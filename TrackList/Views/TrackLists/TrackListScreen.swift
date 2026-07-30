@@ -64,12 +64,12 @@ struct TrackListScreen: View {
                 )
             }
         }
-        .navigationTitle(viewModel.screenState?.title ?? viewModel.name)
+        .navigationTitle(viewModel.screenState?.title ?? viewModel.displayName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .principal) {
                 ScreenToolbarTitleView(
-                    title: viewModel.screenState?.title ?? viewModel.name,
+                    title: viewModel.screenState?.title ?? viewModel.displayName,
                     subtitle: viewModel.screenState?.summary.map(
                         SharedPresentationText.trackCollectionSummary
                     )
@@ -90,10 +90,12 @@ struct TrackListScreen: View {
                         Label("Export", systemImage: "externaldrive")
                     }
 
-                    Button {
-                        actionHandler.handle(.renameTrackList)
-                    } label: {
-                        Label("Rename", systemImage: "textformat")
+                    if viewModel.screenState?.canRenameTrackList == true {
+                        Button {
+                            actionHandler.handle(.renameTrackList)
+                        } label: {
+                            Label("Rename", systemImage: "textformat")
+                        }
                     }
                 } label: {
                     Image(systemName: "ellipsis")

@@ -33,7 +33,9 @@ struct TrackListScreenStateBuilder {
     ///
     /// - Parameters:
     ///   - id: Идентификатор треклиста.
-    ///   - title: Название треклиста.
+    ///   - title: Сохранённое название треклиста.
+    ///   - kind: Назначение треклиста для выбора системного заголовка.
+    ///   - canRenameTrackList: Доступно ли переименование треклиста.
     ///   - summary: Семантическая статистика для преобразования во View.
     ///   - tracks: Треки треклиста.
     ///   - snapshotsByTrackId: Runtime snapshots треков по физическому id трека.
@@ -46,6 +48,8 @@ struct TrackListScreenStateBuilder {
     func build(
         id: UUID,
         title: String,
+        kind: TrackListKind,
+        canRenameTrackList: Bool,
         summary: TrackCollectionSummary?,
         tracks: [Track],
         snapshotsByTrackId: [UUID: TrackRuntimeSnapshot],
@@ -74,7 +78,11 @@ struct TrackListScreenStateBuilder {
 
         return TrackListScreenState(
             id: id,
-            title: title,
+            title: TrackListPresentationText.title(
+                for: kind,
+                storedName: title
+            ),
+            canRenameTrackList: canRenameTrackList,
             summary: summary,
             rows: rows,
             scrollTargetRowId: scrollTargetRowId

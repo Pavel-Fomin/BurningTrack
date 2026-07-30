@@ -19,6 +19,9 @@ struct TrackListScreenState {
     /// Название треклиста для заголовка.
     let title: String
 
+    /// Доступно ли переименование треклиста из меню detail-экрана.
+    let canRenameTrackList: Bool
+
     /// Семантическая статистика треклиста или nil при недоступных данных.
     let summary: TrackCollectionSummary?
 

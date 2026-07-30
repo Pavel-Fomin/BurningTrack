@@ -32,4 +32,8 @@ struct TrackListsRowState: Identifiable {
     let createdAt: Date
     /// Количество треков в треклисте.
     let tracksCount: Int
+    /// Доступно ли удаление треклиста из списка.
+    let canDelete: Bool
+    /// Доступно ли изменение позиции треклиста в списке.
+    let canReorder: Bool
 }

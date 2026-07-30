@@ -19,7 +19,7 @@ struct LibraryTrackSectionsListView: View {
     /// Текущая категория коллекции, переданная из типизированного источника списка.
     let currentCollectionCategory: LibraryCollectionCategory?
 
-    let trackListNamesById: [UUID: [String]]
+    let trackListMembershipsById: [UUID: [TrackListMembership]]
     
     let metadataProvider: TrackMetadataProviding
     let cloudAvailabilityStateStore: (UUID) -> CloudTrackAvailabilityRowStateStore
@@ -50,7 +50,7 @@ struct LibraryTrackSectionsListView: View {
                 allTracks: allTracks,
                 playbackSource: playbackSource,
                 currentCollectionCategory: currentCollectionCategory,
-                trackListNamesById: trackListNamesById,
+                trackListMembershipsById: trackListMembershipsById,
                 playerViewModel: playerViewModel,
                 metadataProvider: metadataProvider,
                 cloudAvailabilityStateStore: cloudAvailabilityStateStore,

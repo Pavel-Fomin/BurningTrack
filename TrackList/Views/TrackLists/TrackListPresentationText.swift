@@ -12,6 +12,37 @@ import Foundation
 /// Преобразует смысловые данные треклистов в локализованные подписи интерфейса.
 enum TrackListPresentationText {
 
+    /// Возвращает локализованное системное название или сохранённое пользовательское имя треклиста.
+    static func title(
+        for kind: TrackListKind,
+        storedName: String
+    ) -> String {
+        switch kind {
+        case .regular:
+            return storedName
+        case .favorites:
+            return String(localized: "tracklist.favorites.title")
+        }
+    }
+
+    /// Возвращает названия только пользовательских треклистов для дополнительной строки трека.
+    ///
+    /// Системное «Избранное» не является пользовательской меткой трека и не показывается в строках фонотеки и поиска.
+    static func membershipTitles(
+        for memberships: [TrackListMembership]
+    ) -> [String] {
+        memberships.compactMap { membership in
+            guard membership.kind == .regular else {
+                return nil
+            }
+
+            return title(
+                for: membership.kind,
+                storedName: membership.storedName
+            )
+        }
+    }
+
     static var goToArtist: String {
         String(localized: "Go to Artist")
     }
@@ -52,6 +83,21 @@ enum TrackListPresentationText {
     /// Форматирует дату создания треклиста без времени.
     static func createdAt(_ date: Date) -> String {
         createdAtFormatter.string(from: date)
+    }
+
+    /// Возвращает дату создания только для пользовательского треклиста.
+    ///
+    /// Системный треклист «Избранное» определяется по назначению, а не по сохранённому имени,
+    /// поэтому его служебная дата создания не показывается в интерфейсе.
+    static func createdAt(
+        for kind: TrackListKind,
+        date: Date
+    ) -> String? {
+        guard kind == .regular else {
+            return nil
+        }
+
+        return createdAt(date)
     }
 
     /// Форматирует количество треков через общий plural-ключ статистики.
@@ -123,6 +169,21 @@ enum TrackListPresentationText {
         String(localized: "toast.tracklist.invalidName")
     }
 
+    /// Возвращает сообщение о запрете переименования системного треклиста.
+    static var favoritesRenameNotAllowedMessage: String {
+        String(localized: "toast.tracklist.favoritesRenameNotAllowed")
+    }
+
+    /// Возвращает сообщение о запрете удаления системного треклиста.
+    static var favoritesDeletionNotAllowedMessage: String {
+        String(localized: "toast.tracklist.favoritesDeletionNotAllowed")
+    }
+
+    /// Возвращает сообщение о запрете перемещения системного треклиста.
+    static var favoritesReorderNotAllowedMessage: String {
+        String(localized: "toast.tracklist.favoritesReorderNotAllowed")
+    }
+
     static var defaultTrackListName: String {
         String(localized: "Tracklist")
     }
@@ -130,9 +191,12 @@ enum TrackListPresentationText {
 
 extension TrackListsRowState {
 
-    /// Совместимые подписи для уже существующих потребителей строки треклиста.
-    var createdAtText: String {
-        TrackListPresentationText.createdAt(createdAt)
+    /// Дата создания показывается только у пользовательского треклиста.
+    var createdAtText: String? {
+        TrackListPresentationText.createdAt(
+            for: trackList.kind,
+            date: createdAt
+        )
     }
 
     /// Количество треков формируется только в presentation-слое.

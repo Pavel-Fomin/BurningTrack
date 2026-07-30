@@ -8,6 +8,7 @@
 //
 
 import Foundation
+import MediaPlayer
 
 /// Одноразово сообщает MainActor о подготовленном локальном файле, не передавая AVPlayer или внутреннее состояние менеджера.
 typealias PlayerPreparedLocalFileHandler = @MainActor (PlayerPreparedLocalFile) -> Void
@@ -53,6 +54,20 @@ protocol PlayerManaging: AnyObject {
         onPrevious: @escaping () -> Void
     )
 
+    /// Настраивает единственный обработчик системной команды «Избранное».
+    func configureFavoriteCommand(
+        handler: @escaping @MainActor (Bool) -> MPRemoteCommandHandlerStatus
+    )
+
+    /// Синхронизирует доступность и подтверждённое состояние системной команды «Избранное».
+    func updateFavoriteCommand(
+        isEnabled: Bool,
+        isActive: Bool
+    )
+
+    /// Удаляет обработчик системной команды «Избранное» при освобождении её владельца.
+    func removeFavoriteCommandHandler()
+
     /// Синхронизирует системные команды перехода с опубликованной готовностью playback-контекста.
     func setTrackNavigationCommandsEnabled(
         isNextEnabled: Bool,
@@ -72,6 +87,20 @@ extension PlayerManaging {
         isNextEnabled: Bool,
         isPreviousEnabled: Bool
     ) {}
+
+    /// Подмены PlayerManager в изолированных тестах не обязаны регистрировать глобальную системную команду.
+    func configureFavoriteCommand(
+        handler: @escaping @MainActor (Bool) -> MPRemoteCommandHandlerStatus
+    ) {}
+
+    /// Подмены PlayerManager в изолированных тестах не обязаны хранить состояние глобальной системной команды.
+    func updateFavoriteCommand(
+        isEnabled: Bool,
+        isActive: Bool
+    ) {}
+
+    /// Подмены PlayerManager в изолированных тестах не обязаны удалять глобальную системную команду.
+    func removeFavoriteCommandHandler() {}
 }
 
 extension PlayerManager: PlayerManaging {}

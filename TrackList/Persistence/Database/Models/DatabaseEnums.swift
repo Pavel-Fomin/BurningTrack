@@ -16,6 +16,15 @@ enum DatabaseTrackSource: String, Equatable {
     case purchasedITunes
 }
 
+// Тип хранит назначение строки таблицы tracklists независимо от бизнес-модели.
+enum DatabaseTrackListKind: String, Equatable {
+    // Обычный пользовательский треклист.
+    case regular
+
+    // Единственный системный треклист «Избранное».
+    case favorites
+}
+
 // Режим повтора, сохранённый в player_state.
 enum DatabaseRepeatMode: String, Equatable {
     case off

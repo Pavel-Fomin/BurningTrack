@@ -10,7 +10,7 @@ import SwiftUI
 
 struct TrackListsRowView: View {
     let title: String
-    let createdAtText: String
+    let createdAtText: String?
     let tracksCountText: String
     let onTap: () -> Void
 
@@ -19,14 +19,14 @@ struct TrackListsRowView: View {
         onTap: @escaping () -> Void
     ) {
         self.title = row.title
-        self.createdAtText = TrackListPresentationText.createdAt(row.createdAt)
+        self.createdAtText = row.createdAtText
         self.tracksCountText = TrackListPresentationText.trackCount(row.tracksCount)
         self.onTap = onTap
     }
 
     init(
         title: String,
-        createdAtText: String,
+        createdAtText: String?,
         tracksCountText: String,
         onTap: @escaping () -> Void
     ) {
@@ -48,10 +48,12 @@ struct TrackListsRowView: View {
                         .foregroundStyle(.primary)
                         .lineLimit(1)
 
-                    Text(createdAtText)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                    if let createdAtText {
+                        Text(createdAtText)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
                 }
 
                 Spacer()

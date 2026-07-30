@@ -68,11 +68,14 @@ struct TrackListsListView: View {
         TrackListsRowView(row: row) {
             onAction(.openTrackList(row.id))
         }
+        .moveDisabled(row.canReorder == false)
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            Button(role: .destructive) {
-                onAction(.requestDeleteTrackList(row.id))
-            } label: {
-                Label("Delete", systemImage: "trash")
+            if row.canDelete {
+                Button(role: .destructive) {
+                    onAction(.requestDeleteTrackList(row.id))
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
             }
         }
     }

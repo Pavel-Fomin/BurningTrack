@@ -23,7 +23,7 @@ struct LibraryTrackSectionView: View {
     /// Текущая категория коллекции для пунктов меню строк выбранного значения.
     let currentCollectionCategory: LibraryCollectionCategory?
 
-    let trackListNamesById: [UUID: [String]]
+    let trackListMembershipsById: [UUID: [TrackListMembership]]
 
     let playerViewModel: PlayerViewModel
     
@@ -93,7 +93,7 @@ struct LibraryTrackSectionView: View {
             isCurrent: playbackStateController.isCurrent(track),
             isPlaying: playbackStateController.isPlaying(track),
             isHighlighted: isRevealed || rowId == highlightedTrackID,
-            trackListNames: trackListNamesById[track.trackId] ?? [],
+            trackListMemberships: trackListMembershipsById[track.trackId] ?? [],
             showsSelection: isSelecting,
             isSelected: isSelected,
             shouldShowTags: shouldShowTags,

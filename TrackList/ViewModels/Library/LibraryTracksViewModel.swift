@@ -24,7 +24,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
     // MARK: - Состояние списка
 
     @Published private(set) var trackSections: [TrackSection] = []
-    @Published private(set) var trackListNamesById: [UUID: [String]] = [:]
+    @Published private(set) var trackListMembershipsById: [UUID: [TrackListMembership]] = [:]
     @Published private(set) var isLoading = false
     @Published private(set) var didLoad = false
     @Published private(set) var sortMode: LibraryTrackSortMode
@@ -359,7 +359,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
     /// Не перезагружает сами треки и не меняет секции.
     private func reloadTrackListBadges() {
         let ids = trackSections.flatMap { $0.tracks }.map { $0.trackId }
-        trackListNamesById = badgeProvider.badges(for: ids)
+        trackListMembershipsById = badgeProvider.badges(for: ids)
     }
 
     // MARK: - Выбор

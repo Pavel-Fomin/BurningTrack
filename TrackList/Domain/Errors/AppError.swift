@@ -31,6 +31,12 @@ enum AppError: Error {
     case trackListLoadFailed
     case trackListSaveFailed
     case trackListNameInvalid
+    /// Системный треклист нельзя переименовывать.
+    case trackListRenameNotAllowed
+    /// Системный треклист нельзя удалять.
+    case trackListDeletionNotAllowed
+    /// Системный треклист нельзя перемещать в пользовательском порядке.
+    case trackListReorderNotAllowed
     case playlistLoadFailed
     case playlistSaveFailed
     case importFailed
