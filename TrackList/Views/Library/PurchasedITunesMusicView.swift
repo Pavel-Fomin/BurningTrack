@@ -15,6 +15,10 @@ struct PurchasedITunesMusicView: View {
     // MARK: - Входные данные
 
     @ObservedObject var playerViewModel: PlayerViewModel
+    /// Одноразовый intent прокрутки к треку, полученный из общего сценария фонотеки.
+    let revealRequest: LibraryRevealRequest?
+    /// Подтверждает владельцу общего reveal-intent завершение обработки прокрутки.
+    let onRevealHandled: (UUID) -> Void
     /// Передаёт действия всего экрана в экранный action handler.
     let onAction: (PurchasedITunesMusicAction) -> Void
     @Environment(\.scenePhase) private var scenePhase
@@ -140,6 +144,16 @@ struct PurchasedITunesMusicView: View {
                     tracks: tracks,
                     animated: false
                 )
+                revealTrackIfNeeded(
+                    using: proxy,
+                    tracks: tracks
+                )
+            }
+            .onChange(of: revealRequest?.requestId) { _, _ in
+                revealTrackIfNeeded(
+                    using: proxy,
+                    tracks: tracks
+                )
             }
             .onChange(of: playerViewModel.currentTrackDisplayable?.trackId) { _, _ in
                 scrollToCurrentTrackIfNeeded(
@@ -205,6 +219,29 @@ struct PurchasedITunesMusicView: View {
             }
         } else {
             proxy.scrollTo(targetTrackId, anchor: .center)
+        }
+    }
+
+    /// Прокручивает открытый раздел к запрошенному iTunes-треку и завершает общий reveal-intent.
+    private func revealTrackIfNeeded(
+        using proxy: ScrollViewProxy,
+        tracks: [PurchasedITunesPlayableTrack]
+    ) {
+        guard let revealRequest,
+              revealRequest.destination == .purchasedITunes else {
+            return
+        }
+
+        defer {
+            onRevealHandled(revealRequest.requestId)
+        }
+
+        guard tracks.contains(where: { $0.trackId == revealRequest.targetTrackId }) else {
+            return
+        }
+
+        withAnimation(.easeInOut(duration: 0.25)) {
+            proxy.scrollTo(revealRequest.targetTrackId, anchor: .center)
         }
     }
 }

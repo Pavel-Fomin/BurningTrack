@@ -176,7 +176,7 @@ final class LibraryScreenViewModel: ObservableObject {
 
     private func observeDependencies() {
         // Отложенный переход нужно обработать и тогда, когда вкладка фонотеки уже открыта.
-        navigationCoordinator.$pendingShowTrackId
+        navigationCoordinator.$pendingShowInLibraryRequest
             .compactMap { $0 }
             .sink { [weak self] _ in
                 Task { @MainActor in

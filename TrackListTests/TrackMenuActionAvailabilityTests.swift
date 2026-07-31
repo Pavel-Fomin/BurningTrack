@@ -37,6 +37,31 @@ final class TrackMenuActionAvailabilityTests: XCTestCase {
         )
     }
 
+    /// iTunes-трек можно показать из плеера и треклиста, но не повторно из открытого раздела iTunes.
+    func testPurchasedITunesTrackShowInLibraryIsAvailableOutsidePurchasedITunesSection() {
+        XCTAssertTrue(
+            TrackMenuActionAvailability.isAvailable(
+                .showInLibrary,
+                source: .purchasedITunes,
+                context: .player
+            )
+        )
+        XCTAssertTrue(
+            TrackMenuActionAvailability.isAvailable(
+                .showInLibrary,
+                source: .purchasedITunes,
+                context: .trackList
+            )
+        )
+        XCTAssertFalse(
+            TrackMenuActionAvailability.isAvailable(
+                .showInLibrary,
+                source: .purchasedITunes,
+                context: .purchasedITunes
+            )
+        )
+    }
+
     /// Сверяет наличие общего действия без привязки к конкретной SwiftUI-разметке.
     private func assertShareAvailability(
         source: TrackSource,

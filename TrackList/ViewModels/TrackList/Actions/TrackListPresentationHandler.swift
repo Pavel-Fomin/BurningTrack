@@ -113,7 +113,7 @@ final class TrackListPresentationHandler {
     /// Показывает трек из строки треклиста в фонотеке.
     func showInLibrary(rowId: UUID) {
         guard let track = reader.tracks.first(where: { $0.id == rowId }) else { return }
-        guard canUseFileActions(track) else { return }
+        guard canShowInLibrary(track) else { return }
 
         presenter.showInLibrary(track)
     }
@@ -160,5 +160,16 @@ final class TrackListPresentationHandler {
             )
         )
         return false
+    }
+
+    /// Сверяет showInLibrary с едиными правилами меню, не относя его к файловым операциям.
+    private func canShowInLibrary(
+        _ track: Track
+    ) -> Bool {
+        TrackMenuActionAvailability.isAvailable(
+            .showInLibrary,
+            source: track.source,
+            context: .trackList
+        )
     }
 }

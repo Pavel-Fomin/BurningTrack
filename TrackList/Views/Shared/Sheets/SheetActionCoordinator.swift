@@ -59,7 +59,7 @@ final class SheetActionCoordinator {
 
         case .showInLibrary:
             // Переходим к треку в фонотеке
-            navigationCoordinator.showTrackInLibrary(trackId: track.trackId)
+            navigationCoordinator.showInLibrary(track)
 
             // Закрываем текущий sheet
             sheetManager.closeActive()

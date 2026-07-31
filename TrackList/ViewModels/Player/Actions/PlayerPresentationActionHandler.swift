@@ -61,7 +61,7 @@ final class PlayerPresentationActionHandler {
     /// Открывает расположение элемента очереди плеера в фонотеке.
     func showInLibrary(queueItemId: UUID) {
         guard let track = track(queueItemId: queueItemId) else { return }
-        guard canUseFileActions(track) else { return }
+        guard canShowInLibrary(track) else { return }
 
         sheetActionCoordinator.handle(
             action: .showInLibrary,
@@ -160,5 +160,16 @@ final class PlayerPresentationActionHandler {
             )
         )
         return false
+    }
+
+    /// Сверяет showInLibrary с едиными правилами меню, не относя его к файловым операциям.
+    private func canShowInLibrary(
+        _ track: PlayerTrack
+    ) -> Bool {
+        TrackMenuActionAvailability.isAvailable(
+            .showInLibrary,
+            source: track.source,
+            context: .player
+        )
     }
 }

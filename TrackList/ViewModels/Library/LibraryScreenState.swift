@@ -33,7 +33,7 @@ struct LibraryScreenState {
 enum LibraryScreenDestinationState {
     case root
     /// Экран виртуального источника iTunes, который не является папкой фонотеки.
-    case purchasedITunes
+    case purchasedITunes(revealRequest: LibraryRevealRequest?)
     /// Экран полного списка треков фонотеки из режима корня "Треки".
     case allLibraryTracks
     /// Экран значений выбранного раздела музыкальной коллекции.

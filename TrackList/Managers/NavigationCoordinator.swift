@@ -6,9 +6,9 @@
 //
 //  - Управляет только стеком маршрутов фонотеки (libraryPath)
 //  - Умеет переключать вкладки через ScenePhaseHandler
-//  - Принимает событие "показать трек во фонотеке" (showTrackInLibrary)
-//    и отдаёт его на потребление через consumePendingShowTrackId()
-//  - Хранит одноразовый reveal intent отдельно от маршрута папки
+//  - Принимает событие "показать трек во фонотеке" (showInLibrary)
+//    и отдаёт его на потребление через consumePendingShowInLibraryRequest()
+//  - Хранит одноразовый reveal intent отдельно от маршрута назначения
 //
 //  Created by Pavel Fomin on 16.10.2025.
 //
@@ -16,8 +16,30 @@
 import SwiftUI
 import Foundation
 
+/// Назначение внутри фонотеки, где должна быть найдена строка трека.
+enum LibraryRevealDestination: Equatable {
+    /// Обычная папка фонотеки приложения.
+    case folder(UUID)
+    /// Виртуальный раздел купленных треков iTunes.
+    case purchasedITunes
+}
+
+/// Единый intent показа трека в фонотеке до определения конечного маршрута.
+struct ShowInLibraryRequest: Equatable {
+    enum Source: Equatable {
+        /// Обычный трек, расположение которого определяется через TrackRegistry.
+        case library
+        /// Runtime-трек из системной медиатеки iTunes.
+        case purchasedITunes
+    }
+
+    let trackId: UUID
+    let source: Source
+}
+
+/// Одноразовый intent прокрутки к треку после открытия конечного раздела.
 struct LibraryRevealRequest: Equatable {
-    let folderId: UUID
+    let destination: LibraryRevealDestination
     let targetTrackId: UUID
     let requestId: UUID
 }
@@ -40,10 +62,10 @@ final class NavigationCoordinator: ObservableObject {
     /// Пустой массив = корень фонотеки.
     @Published var libraryPath: [LibraryRoute] = []
 
-    /// Отложенное событие "показать трек во фонотеке".
-    @Published private(set) var pendingShowTrackId: UUID? = nil
+    /// Отложенное событие "показать трек во фонотеке" с типизированным источником.
+    @Published private(set) var pendingShowInLibraryRequest: ShowInLibraryRequest?
 
-    /// Одноразовый intent подсветки трека внутри открытой папки.
+    /// Одноразовый intent подсветки и прокрутки внутри открытого раздела фонотеки.
     @Published private(set) var pendingRevealRequest: LibraryRevealRequest?
     /// Одноразовый intent открытия треклиста из другого раздела приложения.
     @Published private(set) var pendingTrackListOpenRequest: TrackListOpenRequest?
@@ -155,19 +177,28 @@ final class NavigationCoordinator: ObservableObject {
 
     // MARK: - Переадресация "показать трек во фонотеке"
 
-    func showTrackInLibrary(trackId: UUID) {
-        pendingShowTrackId = trackId
+    /// Запускает общий сценарий показа трека в фонотеке с учётом его источника.
+    func showInLibrary(_ track: any TrackDisplayable) {
+        pendingShowInLibraryRequest = ShowInLibraryRequest(
+            trackId: track.trackId,
+            source: showInLibrarySource(for: track)
+        )
         setTab(.library)
     }
 
-    func consumePendingShowTrackId() -> UUID? {
-        defer { pendingShowTrackId = nil }
-        return pendingShowTrackId
+    /// Возвращает и очищает ожидающий сценарий показа трека в фонотеке.
+    func consumePendingShowInLibraryRequest() -> ShowInLibraryRequest? {
+        defer { pendingShowInLibraryRequest = nil }
+        return pendingShowInLibraryRequest
     }
 
-    func setPendingRevealRequest(folderId: UUID, targetTrackId: UUID) {
+    /// Создаёт одноразовый запрос прокрутки для уже выбранного назначения фонотеки.
+    func setPendingRevealRequest(
+        destination: LibraryRevealDestination,
+        targetTrackId: UUID
+    ) {
         pendingRevealRequest = LibraryRevealRequest(
-            folderId: folderId,
+            destination: destination,
             targetTrackId: targetTrackId,
             requestId: UUID()
         )
@@ -181,6 +212,18 @@ final class NavigationCoordinator: ObservableObject {
     func clearTrackListOpenRequest(requestId: UUID) {
         guard pendingTrackListOpenRequest?.requestId == requestId else { return }
         pendingTrackListOpenRequest = nil
+    }
+
+    /// Определяет источник по типизированной runtime-модели без эвристик по названию или идентификатору.
+    private func showInLibrarySource(
+        for track: any TrackDisplayable
+    ) -> ShowInLibraryRequest.Source {
+        guard let sourceTrack = track as? any PurchasedITunesTrackRepresentable,
+              sourceTrack.source == .purchasedITunes else {
+            return .library
+        }
+
+        return .purchasedITunes
     }
 
     // MARK: - Маршруты

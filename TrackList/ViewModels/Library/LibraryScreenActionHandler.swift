@@ -37,7 +37,7 @@ final class LibraryScreenActionHandler {
     func handle(_ action: LibraryScreenAction) {
         switch action {
         case .appeared:
-            handlePendingShowTrack()
+            handlePendingShowInLibraryRequest()
         case .collectionRootItemSelected(let item):
             handleCollectionRootItemSelected(item)
         case .collectionValueSelected(let value):
@@ -67,9 +67,27 @@ final class LibraryScreenActionHandler {
         }
     }
 
-    private func handlePendingShowTrack() {
-        guard let trackId = navigationCoordinator.consumePendingShowTrackId() else { return }
+    /// Обрабатывает единый intent показа трека, уже содержащий его типизированный источник.
+    private func handlePendingShowInLibraryRequest() {
+        guard let request = navigationCoordinator.consumePendingShowInLibraryRequest() else {
+            return
+        }
 
+        switch request.source {
+        case .library:
+            showLibraryTrack(request.trackId)
+
+        case .purchasedITunes:
+            navigationCoordinator.setPendingRevealRequest(
+                destination: .purchasedITunes,
+                targetTrackId: request.trackId
+            )
+            navigationCoordinator.openPurchasedITunes()
+        }
+    }
+
+    /// Находит папку обычного трека и передаёт общий reveal-механизм в её destination.
+    private func showLibraryTrack(_ trackId: UUID) {
         Task { @MainActor in
             guard let entry = await trackRegistry.entry(for: trackId) else {
                 toastPresenter.handle(.showInLibraryTargetMissing)
@@ -87,7 +105,7 @@ final class LibraryScreenActionHandler {
             }
 
             navigationCoordinator.setPendingRevealRequest(
-                folderId: folderId,
+                destination: .folder(folderId),
                 targetTrackId: trackId
             )
             navigationCoordinator.openFolder(folderId)

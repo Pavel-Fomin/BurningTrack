@@ -62,7 +62,7 @@ final class MiniPlayerActionHandler {
 
     // MARK: - Приватные методы
 
-    /// Передаёт локальный текущий трек в существующий координатор перехода к фонотеке.
+    /// Передаёт текущий трек в существующий координатор перехода к фонотеке.
     private func showCurrentTrackInLibrary() {
         guard let track = playerViewModel.currentTrackDisplayable,
               canShowInLibrary(track) else {
@@ -76,21 +76,14 @@ final class MiniPlayerActionHandler {
         )
     }
 
-    /// Исключает неподдерживаемые модели и повторно использует правила меню плеера.
+    /// Принимает типизированные модели очереди и повторно использует правила меню плеера.
     private func canShowInLibrary(_ track: any TrackDisplayable) -> Bool {
-        guard !track.isPurchasedITunesRuntimeTrack else {
-            return false
-        }
-
         switch track {
         case is LibraryTrack:
             return true
 
-        case let playerTrack as PlayerTrack:
-            return canShowInLibrary(source: playerTrack.source)
-
-        case let track as Track:
-            return canShowInLibrary(source: track.source)
+        case let sourceTrack as any PurchasedITunesTrackRepresentable:
+            return canShowInLibrary(source: sourceTrack.source)
 
         default:
             return false

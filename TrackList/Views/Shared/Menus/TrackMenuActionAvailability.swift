@@ -169,6 +169,7 @@ struct TrackMenuActionAvailability {
                 .details,
                 .share,
                 .copy,
+                .showInLibrary,
                 .addToTrackList,
                 .deleteFromPlayer
             ]
@@ -178,6 +179,7 @@ struct TrackMenuActionAvailability {
                 .details,
                 .share,
                 .copy,
+                .showInLibrary,
                 .addToPlayer,
                 .deleteFromTrackList
             ]

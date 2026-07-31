@@ -19,7 +19,12 @@ struct LibraryScreenStateBuilder {
         var destinations: [NavigationCoordinator.LibraryRoute: LibraryScreenDestinationState] = [
             .root: .root,
             // Виртуальный источник всегда доступен в корне и не зависит от списка папок.
-            .purchasedITunes: .purchasedITunes,
+            .purchasedITunes: .purchasedITunes(
+                revealRequest: revealRequest(
+                    for: .purchasedITunes,
+                    pendingRevealRequest: navigationCoordinator.pendingRevealRequest
+                )
+            ),
             // Полный список треков всегда доступен в корне режима "Треки".
             .allLibraryTracks: .allLibraryTracks
         ]
@@ -51,7 +56,7 @@ struct LibraryScreenStateBuilder {
         destinations: inout [NavigationCoordinator.LibraryRoute: LibraryScreenDestinationState]
     ) {
         let revealRequest = revealRequest(
-            for: folder.id,
+            for: .folder(folder.id),
             pendingRevealRequest: pendingRevealRequest
         )
 
@@ -72,10 +77,10 @@ struct LibraryScreenStateBuilder {
     }
 
     private func revealRequest(
-        for folderId: UUID,
+        for destination: LibraryRevealDestination,
         pendingRevealRequest: LibraryRevealRequest?
     ) -> LibraryRevealRequest? {
-        guard pendingRevealRequest?.folderId == folderId else { return nil }
+        guard pendingRevealRequest?.destination == destination else { return nil }
         return pendingRevealRequest
     }
 }

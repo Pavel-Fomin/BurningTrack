@@ -220,9 +220,13 @@ struct LibraryScreen: View {
             rootContent
                 .navigationTitle("Library")
 
-        case .purchasedITunes:
+        case .purchasedITunes(let revealRequest):
             PurchasedITunesMusicView(
                 playerViewModel: playerViewModel,
+                revealRequest: revealRequest,
+                onRevealHandled: { requestId in
+                    viewModel.handle(.revealHandled(requestId))
+                },
                 onAction: { action in
                     purchasedITunesActionHandler.handle(action)
                 }
