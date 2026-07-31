@@ -46,7 +46,7 @@ struct MiniPlayerProgressView: View {
         MiniPlayerWaveformPresentation(waveformState: waveformState)
     }
 
-    /// Готовая waveform поддерживает перемотку, а все отсутствующие состояния используют одну неинтерактивную заглушку.
+    /// Выбирает визуальное представление прогресса; seek доступен независимо от наличия готовой waveform.
     @ViewBuilder
     private var playbackIndicator: some View {
         switch waveformPresentation {
@@ -62,12 +62,19 @@ struct MiniPlayerProgressView: View {
                 onSeek: seek
             )
         case .placeholder:
-            MiniPlayerWaveformPlaceholderView()
+            MiniPlayerWaveformPlaceholderView(
+                currentTime: currentTime,
+                duration: duration,
+                onSeek: seek
+            )
         }
     }
 
-    /// Переводит выбранную позицию готовой waveform в секунды трека.
+    /// Переводит выбранную позицию индикатора в секунды трека.
     private func seek(to ratio: Double) {
-        onSeek(ratio * duration)
+        guard MiniPlayerWaveformLayout.isSeekAvailable(for: duration) else { return }
+
+        let normalizedRatio = MiniPlayerWaveformLayout.normalizedProgress(ratio)
+        onSeek(normalizedRatio * duration)
     }
 }

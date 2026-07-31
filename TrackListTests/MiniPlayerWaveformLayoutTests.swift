@@ -137,6 +137,15 @@ final class MiniPlayerWaveformLayoutTests: XCTestCase {
         XCTAssertEqual(zeroWidthLayout.progress(forHorizontalLocation: 20), 0)
     }
 
+    /// Seek доступен только для конечной положительной длительности трека.
+    func testSeekAvailabilityRequiresFinitePositiveDuration() {
+        XCTAssertTrue(MiniPlayerWaveformLayout.isSeekAvailable(for: 100))
+        XCTAssertFalse(MiniPlayerWaveformLayout.isSeekAvailable(for: 0))
+        XCTAssertFalse(MiniPlayerWaveformLayout.isSeekAvailable(for: -1))
+        XCTAssertFalse(MiniPlayerWaveformLayout.isSeekAvailable(for: .infinity))
+        XCTAssertFalse(MiniPlayerWaveformLayout.isSeekAvailable(for: .nan))
+    }
+
     /// Появление готовых samples использует уже рассчитанную фактическую долю трека.
     func testReadyWaveformKeepsActualProgress() {
         let actualProgress = MiniPlayerWaveformLayout.progress(

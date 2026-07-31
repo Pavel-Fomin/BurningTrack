@@ -65,10 +65,14 @@ struct MiniPlayerWaveformLayout {
         return normalizedProgress(Double(locationX / availableWidth))
     }
 
+    /// Возвращает доступность seek только по корректной длительности трека.
+    static func isSeekAvailable(for duration: TimeInterval) -> Bool {
+        duration.isFinite && duration > 0
+    }
+
     /// Нормализует время трека для окрашивания пройденной части waveform.
     static func progress(currentTime: TimeInterval, duration: TimeInterval) -> Double {
-        guard duration.isFinite,
-              duration > 0,
+        guard isSeekAvailable(for: duration),
               currentTime.isFinite
         else {
             return 0

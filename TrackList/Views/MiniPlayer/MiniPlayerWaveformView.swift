@@ -53,7 +53,6 @@ struct MiniPlayerWaveformView: View {
         static let maximumBarHeight: CGFloat = 20
         static let waveformHeight: CGFloat = 20
         static let preferredBarSpacing: CGFloat = 1
-        static let tapMaximumDistance: CGFloat = 8
     }
 
     var body: some View {
@@ -85,29 +84,16 @@ struct MiniPlayerWaveformView: View {
             }
             .frame(width: layout.waveformWidth, height: geometry.size.height)
             .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { value in
-                        guard isHorizontalDrag(value.translation) else { return }
-
-                        dragPreviewProgress = layout.progress(
-                            forHorizontalLocation: value.location.x
-                        )
-                    }
-                    .onEnded { value in
-                        defer { dragPreviewProgress = nil }
-
-                        guard isTap(value.translation) || isHorizontalDrag(value.translation) else {
-                            return
-                        }
-
-                        // Координата жеста переводится в долю ширины и далее существующий callback — в секунды трека.
-                        onSeek(
-                            layout.progress(
-                                forHorizontalLocation: value.location.x
-                            )
-                        )
-                    }
+            .miniPlayerWaveformSeekGesture(
+                duration: duration,
+                availableWidth: geometry.size.width,
+                onProgressChanged: { ratio in
+                    dragPreviewProgress = ratio
+                },
+                onSeek: onSeek,
+                onEnded: {
+                    dragPreviewProgress = nil
+                }
             )
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Now Playing")
@@ -149,6 +135,63 @@ struct MiniPlayerWaveformView: View {
         }
     }
 
+}
+
+/// Добавляет единый горизонтальный seek-жест к готовой waveform и её заглушке.
+struct MiniPlayerWaveformSeekGesture: ViewModifier {
+
+    let duration: TimeInterval
+    let availableWidth: CGFloat
+    let onProgressChanged: (Double) -> Void
+    let onSeek: (Double) -> Void
+    let onEnded: () -> Void
+
+    private enum Metrics {
+        static let tapMaximumDistance: CGFloat = 8
+    }
+
+    func body(content: Content) -> some View {
+        content.gesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { value in
+                    guard isHorizontalDrag(value.translation),
+                          let ratio = progress(forHorizontalLocation: value.location.x)
+                    else {
+                        return
+                    }
+
+                    onProgressChanged(ratio)
+                }
+                .onEnded { value in
+                    defer { onEnded() }
+
+                    guard isTap(value.translation) || isHorizontalDrag(value.translation),
+                          let ratio = progress(forHorizontalLocation: value.location.x)
+                    else {
+                        return
+                    }
+
+                    // Координата жеста переводится в долю ширины и далее существующий callback — в секунды трека.
+                    onSeek(ratio)
+                }
+        )
+    }
+
+    /// Не допускает seek при некорректной длительности или отсутствии ширины для расчёта координаты.
+    private func progress(forHorizontalLocation locationX: CGFloat) -> Double? {
+        guard MiniPlayerWaveformLayout.isSeekAvailable(for: duration),
+              availableWidth > 0
+        else {
+            return nil
+        }
+
+        return MiniPlayerWaveformLayout(
+            sampleCount: 0,
+            availableWidth: availableWidth
+        )
+        .progress(forHorizontalLocation: locationX)
+    }
+
     /// Вертикальный жест остаётся у карточки мини-плеера и не запускает перемотку waveform.
     private func isHorizontalDrag(_ translation: CGSize) -> Bool {
         abs(translation.width) > abs(translation.height)
@@ -157,5 +200,27 @@ struct MiniPlayerWaveformView: View {
     /// Неподвижное касание считается seek, а заметное вертикальное движение остаётся у карточки мини-плеера.
     private func isTap(_ translation: CGSize) -> Bool {
         max(abs(translation.width), abs(translation.height)) <= Metrics.tapMaximumDistance
+    }
+}
+
+extension View {
+
+    /// Подключает общий seek-жест к индикаторам прогресса мини-плеера.
+    func miniPlayerWaveformSeekGesture(
+        duration: TimeInterval,
+        availableWidth: CGFloat,
+        onProgressChanged: @escaping (Double) -> Void,
+        onSeek: @escaping (Double) -> Void,
+        onEnded: @escaping () -> Void
+    ) -> some View {
+        modifier(
+            MiniPlayerWaveformSeekGesture(
+                duration: duration,
+                availableWidth: availableWidth,
+                onProgressChanged: onProgressChanged,
+                onSeek: onSeek,
+                onEnded: onEnded
+            )
+        )
     }
 }
