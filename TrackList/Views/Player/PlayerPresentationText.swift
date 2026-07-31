@@ -11,6 +11,10 @@ import Foundation
 
 /// Преобразует данные плеера в локализованные подписи без изменения playback-логики.
 enum PlayerPresentationText {
+    static var goTo: String {
+        String(localized: "Go to")
+    }
+
     static var goToArtist: String {
         String(localized: "Go to Artist")
     }

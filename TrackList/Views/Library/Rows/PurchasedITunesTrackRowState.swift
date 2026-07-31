@@ -16,5 +16,7 @@ struct PurchasedITunesTrackRowState {
     let title: String?
     let artist: String
     let duration: Double
+    /// Текущее подтверждённое состояние «Избранного» для меню строки.
+    let isFavorite: Bool
     let artworkBadgeState: TrackArtworkBadgeState
 }

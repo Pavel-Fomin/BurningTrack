@@ -45,6 +45,7 @@ final class PlayerTrackRowStateBuilder {
         tracks.map { track in
             let snapshot = snapshotsByTrackId[track.trackId]
             let isCurrent = track.id == currentQueueItemId
+            let isFavorite = favoriteTrackIds.contains(track.trackId)
 
             return PlayerTrackRowState(
                 id: track.id,
@@ -53,6 +54,7 @@ final class PlayerTrackRowStateBuilder {
                 isCurrent: isCurrent,
                 isPlaying: isCurrent && isPlaying,
                 isHighlighted: highlightedRowId == track.id,
+                isFavorite: isFavorite,
                 artworkRequest: makeArtworkRequest(
                     track: track,
                     trackId: track.trackId,
@@ -61,7 +63,7 @@ final class PlayerTrackRowStateBuilder {
                 ),
                 artworkBadgeState: artworkBadgeStateFactory.makeState(
                     source: track.source,
-                    isFavorite: favoriteTrackIds.contains(track.trackId)
+                    isFavorite: isFavorite
                 ),
                 collectionNavigationTarget: collectionNavigationTargetsByTrackId[track.trackId],
                 title: makeTitle(

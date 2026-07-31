@@ -25,6 +25,8 @@ final class TrackListPresentationHandler {
     private let commandExecutor: AppCommandExecutor
     /// Обработчик переходов к значениям музыкальной коллекции.
     private let collectionNavigationHandler: TrackCollectionNavigationHandler
+    /// Общий обработчик «Избранного» выполняет сохранение вне UI и списка.
+    private let favoriteActionHandler: FavoriteTrackActionHandler
 
     /// Создаёт обработчик presentation-действий одного треклиста.
     init(
@@ -32,13 +34,15 @@ final class TrackListPresentationHandler {
         presenter: any TrackListPresenting,
         toastPresenter: any ToastPresenting,
         commandExecutor: AppCommandExecutor = .shared,
-        collectionNavigationHandler: TrackCollectionNavigationHandler
+        collectionNavigationHandler: TrackCollectionNavigationHandler,
+        favoriteActionHandler: FavoriteTrackActionHandler? = nil
     ) {
         self.reader = reader
         self.presenter = presenter
         self.toastPresenter = toastPresenter
         self.commandExecutor = commandExecutor
         self.collectionNavigationHandler = collectionNavigationHandler
+        self.favoriteActionHandler = favoriteActionHandler ?? FavoriteTrackActionHandler()
     }
 
     /// Открывает выбор трека для добавления в текущий треклист.
@@ -100,6 +104,13 @@ final class TrackListPresentationHandler {
                 )
             }
         }
+    }
+
+    /// Передаёт строку треклиста в общий доменный маршрут «Избранного».
+    func toggleFavorite(rowId: UUID) {
+        guard let track = reader.tracks.first(where: { $0.id == rowId }) else { return }
+
+        favoriteActionHandler.toggle(FavoriteTrackInput(track: track))
     }
 
     /// Открывает редактирование тегов строки треклиста.

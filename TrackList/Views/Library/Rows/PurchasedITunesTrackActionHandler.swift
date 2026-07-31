@@ -22,6 +22,8 @@ struct PurchasedITunesTrackActionHandler {
     private let commandExecutor: AppCommandExecutor
     /// Презентер пользовательских сообщений.
     private let toastPresenter: any ToastPresenting
+    /// Общий обработчик «Избранного» использует тот же сервис, что и остальные источники треков.
+    private let favoriteActionHandler: FavoriteTrackActionHandler
 
     // MARK: - Инициализация
 
@@ -30,12 +32,14 @@ struct PurchasedITunesTrackActionHandler {
         playerViewModel: PlayerViewModel,
         sheetManager: SheetManager? = nil,
         commandExecutor: AppCommandExecutor = .shared,
-        toastPresenter: (any ToastPresenting)? = nil
+        toastPresenter: (any ToastPresenting)? = nil,
+        favoriteActionHandler: FavoriteTrackActionHandler? = nil
     ) {
         self.playerViewModel = playerViewModel
         self.sheetManager = sheetManager ?? SheetManager.shared
         self.commandExecutor = commandExecutor
         self.toastPresenter = toastPresenter ?? ToastManager.shared
+        self.favoriteActionHandler = favoriteActionHandler ?? FavoriteTrackActionHandler()
     }
 
     // MARK: - Состояние строки
@@ -72,6 +76,11 @@ struct PurchasedITunesTrackActionHandler {
 
         case .addToPlayer(let track):
             addToPlayer(track)
+
+        case .toggleFavorite(let track):
+            favoriteActionHandler.toggle(
+                FavoriteTrackInput(purchasedITunesTrack: track)
+            )
         }
     }
 

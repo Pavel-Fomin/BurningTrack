@@ -23,6 +23,7 @@ enum SearchAction: Equatable {
     case moveToFolder(SearchTrackResult)
     case addToPlayer(UUID)
     case addToTrackList(SearchTrackResult)
+    case toggleFavorite(SearchTrackResult)
     case renameFile(SearchTrackResult, FileRenameStrategy)
     case editTags(SearchTrackResult)
 }

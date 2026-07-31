@@ -38,6 +38,7 @@ struct PurchasedITunesTrackRowStateBuilder {
             title: track.title,
             artist: track.artist ?? String(localized: "Unknown Artist"),
             duration: track.duration,
+            isFavorite: favoriteTrackIds.contains(track.trackId),
             artworkBadgeState: artworkBadgeStateFactory.makeState(
                 source: .purchasedITunes,
                 isFavorite: favoriteTrackIds.contains(track.trackId)

@@ -21,6 +21,8 @@ enum TrackMenuAction: Hashable {
     case addToTrackList
     /// Добавить трек в очередь плеера.
     case addToPlayer
+    /// Переключить состояние трека в системном треклисте «Избранное».
+    case toggleFavorite
     /// Открыть артиста трека в музыкальной коллекции.
     case goToArtist
     /// Открыть альбом трека в музыкальной коллекции.

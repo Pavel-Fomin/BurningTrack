@@ -7,6 +7,8 @@ struct LibraryTrackRowState {
     let isCurrent: Bool
     let isPlaying: Bool
     let isHighlighted: Bool
+    /// Текущее подтверждённое состояние «Избранного» для меню строки.
+    let isFavorite: Bool
     let artworkRequest: ArtworkRequest?
     /// Готовое presentation-состояние бейджа обложки.
     let artworkBadgeState: TrackArtworkBadgeState
@@ -31,6 +33,7 @@ struct LibraryTrackRowState {
             isCurrent: isCurrent,
             isPlaying: isPlaying,
             isHighlighted: isHighlighted,
+            isFavorite: isFavorite,
             artworkRequest: artworkRequest,
             artworkBadgeState: artworkBadgeState,
             collectionNavigationTarget: collectionNavigationTarget,

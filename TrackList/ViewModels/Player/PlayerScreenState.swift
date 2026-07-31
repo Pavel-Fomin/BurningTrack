@@ -49,6 +49,9 @@ struct PlayerTrackRowState: Identifiable {
     /// Определяет, должна ли строка отображаться выделенной.
     let isHighlighted: Bool
 
+    /// Текущее подтверждённое состояние «Избранного» для меню строки.
+    let isFavorite: Bool
+
     /// Лёгкий запрос обложки трека для общей асинхронной подсистемы.
     let artworkRequest: ArtworkRequest?
 

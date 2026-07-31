@@ -34,6 +34,8 @@ final class PlayerPresentationActionHandler {
     private let toastPresenter: any ToastPresenting
     /// Обработчик переходов к значениям музыкальной коллекции.
     private let collectionNavigationHandler: TrackCollectionNavigationHandler
+    /// Общий обработчик «Избранного» выполняет сохранение ниже Player-flow.
+    private let favoriteActionHandler: FavoriteTrackActionHandler
 
     // MARK: - Инициализация
 
@@ -42,13 +44,15 @@ final class PlayerPresentationActionHandler {
         sheetManager: SheetManager,
         sheetActionCoordinator: SheetActionCoordinator,
         toastPresenter: any ToastPresenting,
-        collectionNavigationHandler: TrackCollectionNavigationHandler
+        collectionNavigationHandler: TrackCollectionNavigationHandler,
+        favoriteActionHandler: FavoriteTrackActionHandler? = nil
     ) {
         self.playlistManager = playlistManager
         self.sheetManager = sheetManager
         self.sheetActionCoordinator = sheetActionCoordinator
         self.toastPresenter = toastPresenter
         self.collectionNavigationHandler = collectionNavigationHandler
+        self.favoriteActionHandler = favoriteActionHandler ?? FavoriteTrackActionHandler()
     }
 
     // MARK: - Actions
@@ -87,6 +91,13 @@ final class PlayerPresentationActionHandler {
         guard let track = track(queueItemId: queueItemId) else { return }
 
         sheetManager.presentAddToTrackList(for: track)
+    }
+
+    /// Передаёт элемент очереди в общий доменный маршрут «Избранного».
+    func toggleFavorite(queueItemId: UUID) {
+        guard let track = track(queueItemId: queueItemId) else { return }
+
+        favoriteActionHandler.toggle(FavoriteTrackInput(track: track.asTrack()))
     }
 
     /// Открывает артиста обычного локального элемента очереди.

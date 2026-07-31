@@ -276,6 +276,7 @@ private struct SearchTrackRowView: View {
     private var searchActionMenuContent: some View {
         LibraryTrackActionMenuContent(
             labels: SearchPresentationText.trackActionLabels,
+            isFavorite: row.isFavorite,
             onDetails: {
                 onAction(.showDetails(row.result))
             },
@@ -290,6 +291,9 @@ private struct SearchTrackRowView: View {
             },
             onAddToTrackList: {
                 onAction(.addToTrackList(row.result))
+            },
+            onToggleFavorite: {
+                onAction(.toggleFavorite(row.result))
             },
             collectionNavigationTarget: nil,
             currentCollectionCategory: nil,

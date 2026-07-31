@@ -55,6 +55,7 @@ struct LibraryTrackRowStateBuilder {
             isCurrent: isCurrent,
             isPlaying: isPlaying,
             isHighlighted: isHighlighted,
+            isFavorite: isFavorite,
             artworkRequest: artworkRequest,
             artworkBadgeState: artworkBadgeStateFactory.makeState(
                 source: .library,

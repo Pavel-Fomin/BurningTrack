@@ -28,6 +28,9 @@ enum TrackListAction {
     /// Пользователь запросил добавление iTunes-трека в плеер.
     case addToPlayer(rowId: UUID)
 
+    /// Пользователь запросил переключение трека в системном треклисте «Избранное».
+    case toggleFavorite(rowId: UUID)
+
     /// Пользователь изменил порядок строк.
     case moveTrack(from: IndexSet, to: Int)
 

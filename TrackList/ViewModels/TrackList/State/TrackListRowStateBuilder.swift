@@ -86,6 +86,7 @@ struct TrackListRowStateBuilder {
                 isCurrent: isCurrent,
                 isPlaying: isPlaying,
                 isHighlighted: isHighlighted,
+                isFavorite: isFavorite,
                 artworkRequest: ArtworkRequest(
                     trackId: track.trackId,
                     artworkData: track.artworkData,
@@ -130,6 +131,7 @@ struct TrackListRowStateBuilder {
             isCurrent: isCurrent,
             isPlaying: isPlaying,
             isHighlighted: isHighlighted,
+            isFavorite: isFavorite,
             artworkRequest: artworkRequest,
             artworkBadgeState: artworkBadgeStateFactory.makeState(
                 source: track.source,

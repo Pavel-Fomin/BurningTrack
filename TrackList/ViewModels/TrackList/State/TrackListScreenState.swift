@@ -69,6 +69,9 @@ struct TrackListRowState: Identifiable {
     /// Нужно ли подсветить строку.
     let isHighlighted: Bool
 
+    /// Текущее подтверждённое состояние «Избранного» для меню строки.
+    let isFavorite: Bool
+
     /// Лёгкий запрос обложки для асинхронного отображения.
     let artworkRequest: ArtworkRequest?
 

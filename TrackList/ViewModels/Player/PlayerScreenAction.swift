@@ -50,6 +50,11 @@ enum PlayerScreenAction {
         queueItemId: UUID
     )
 
+    /// Переключает состояние элемента очереди в системном треклисте «Избранное».
+    case toggleFavorite(
+        queueItemId: UUID
+    )
+
     /// Открывает артиста элемента очереди в музыкальной коллекции.
     case goToArtist(
         queueItemId: UUID

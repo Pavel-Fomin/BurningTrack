@@ -89,6 +89,8 @@ final class PlayerViewModel: ObservableObject {
     private let eventObserver: any PlayerEventObserving
     /// Выполняет доменные операции «Избранного», не раскрывая ViewModel работу с треклистами.
     private let favoritesService: any FavoritesServicing
+    /// Общий маршрут toggle используется мини-плеером и меню треков.
+    private let favoriteActionHandler: FavoriteTrackActionHandler
     /// Передаёт точечные изменения «Избранного» для presentation-состояния приложения.
     private let favoritesEvents: any FavoritesEventsObserving
     /// Показывает пользовательские ошибки без прямой зависимости от ToastManager.shared.
@@ -232,6 +234,9 @@ final class PlayerViewModel: ObservableObject {
         self.runtimeSnapshotController = runtimeSnapshotController
         self.eventObserver = eventObserver
         self.favoritesService = favoritesService
+        self.favoriteActionHandler = FavoriteTrackActionHandler(
+            favoritesService: favoritesService
+        )
         self.favoritesEvents = favoritesEvents
         self.toastPresenter = toastPresenter ?? ToastManager.shared
         self.statePersistence = statePersistence ?? (try? PlayerStatePersistence())
@@ -1751,16 +1756,9 @@ final class PlayerViewModel: ObservableObject {
             return
         }
 
-        do {
-            _ = try favoritesService.toggle(
-                FavoriteTrackInput(playerTrack: currentTrack)
-            )
-        } catch {
-            // Состояние меняет только успешно доставленное FavoritesChangeEvent.
-            PersistentLogger.log(
-                "PlayerViewModel: ошибка переключения избранного trackId=\(currentTrack.trackId) error=\(error)"
-            )
-        }
+        favoriteActionHandler.toggle(
+            FavoriteTrackInput(playerTrack: currentTrack)
+        )
     }
 
     /// Применяет итоговое состояние системной команды через идемпотентные операции доменного сервиса.

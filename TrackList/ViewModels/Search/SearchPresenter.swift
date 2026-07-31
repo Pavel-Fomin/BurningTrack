@@ -145,6 +145,7 @@ struct SearchPresenter {
         results.map { result in
             let snapshot = snapshotsByTrackId[result.trackId]
             let displayFileName = nonEmpty(snapshot?.fileName) ?? result.fileName
+            let isFavorite = favoriteTrackIds.contains(result.trackId)
 
             return SearchTrackRowState(
                 result: result,
@@ -153,10 +154,11 @@ struct SearchPresenter {
                     snapshot: snapshot,
                     shouldShowTags: displaySettings.shouldShowTags
                 ),
+                isFavorite: isFavorite,
                 // Поиск читает SQLite-фонотеку, поэтому его результаты имеют локальный источник.
                 artworkBadgeState: artworkBadgeStateFactory.makeState(
                     source: .library,
-                    isFavorite: favoriteTrackIds.contains(result.trackId)
+                    isFavorite: isFavorite
                 ),
                 title: displaySettings.shouldShowTags
                     ? (nonEmpty(snapshot?.title) ?? nonEmpty(result.title) ?? displayFileName)

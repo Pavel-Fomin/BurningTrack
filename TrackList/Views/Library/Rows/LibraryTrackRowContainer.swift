@@ -140,6 +140,7 @@ struct LibraryTrackRowContainer: View {
     private var libraryActionMenuContent: some View {
         LibraryTrackActionMenuContent(
             labels: LibraryPresentationText.trackActionMenuLabels,
+            isFavorite: rowState.isFavorite,
             onDetails: {
                 commandHandler.handle(
                     .tapArtwork(track: rowState.track)
@@ -163,6 +164,11 @@ struct LibraryTrackRowContainer: View {
             onAddToTrackList: {
                 commandHandler.handle(
                     .addToTrackList(track: rowState.track)
+                )
+            },
+            onToggleFavorite: {
+                commandHandler.handle(
+                    .toggleFavorite(track: rowState.track)
                 )
             },
             collectionNavigationTarget: rowState.collectionNavigationTarget,

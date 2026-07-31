@@ -76,6 +76,7 @@ struct TrackMenuActionAvailability {
             return [
                 .details,
                 .share,
+                .toggleFavorite,
                 .addToPlayer,
                 .addToTrackList,
                 .goToArtist,
@@ -89,6 +90,7 @@ struct TrackMenuActionAvailability {
             return [
                 .details,
                 .share,
+                .toggleFavorite,
                 .showInLibrary,
                 .moveToFolder,
                 .addToTrackList,
@@ -103,6 +105,7 @@ struct TrackMenuActionAvailability {
             return [
                 .details,
                 .share,
+                .toggleFavorite,
                 .showInLibrary,
                 .moveToFolder,
                 .goToArtist,
@@ -129,6 +132,7 @@ struct TrackMenuActionAvailability {
             return [
                 .details,
                 .share,
+                .toggleFavorite,
                 .addToTrackList,
                 .editTags,
                 .renameFile,
@@ -139,6 +143,7 @@ struct TrackMenuActionAvailability {
             return [
                 .details,
                 .share,
+                .toggleFavorite,
                 .addToPlayer,
                 .editTags,
                 .renameFile,
@@ -160,6 +165,7 @@ struct TrackMenuActionAvailability {
                 .details,
                 .share,
                 .copy,
+                .toggleFavorite,
                 .addToTrackList,
                 .addToPlayer
             ]
@@ -169,6 +175,7 @@ struct TrackMenuActionAvailability {
                 .details,
                 .share,
                 .copy,
+                .toggleFavorite,
                 .showInLibrary,
                 .addToTrackList,
                 .deleteFromPlayer
@@ -179,6 +186,7 @@ struct TrackMenuActionAvailability {
                 .details,
                 .share,
                 .copy,
+                .toggleFavorite,
                 .showInLibrary,
                 .addToPlayer,
                 .deleteFromTrackList

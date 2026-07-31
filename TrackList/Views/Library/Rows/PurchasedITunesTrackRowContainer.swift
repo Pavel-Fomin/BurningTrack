@@ -113,6 +113,15 @@ struct PurchasedITunesTrackRowContainer: View {
             }
         }
 
+        if isMenuActionAvailable(.toggleFavorite) {
+            TrackFavoriteMenuContent(
+                isFavorite: state.isFavorite,
+                onToggle: {
+                    actionHandler.handle(.toggleFavorite(track: state.track))
+                }
+            )
+        }
+
         if isMenuActionAvailable(.share) {
             Button {
                 actionHandler.handle(.share(track: state.track))
@@ -132,21 +141,19 @@ struct PurchasedITunesTrackRowContainer: View {
             }
         }
 
-        if isMenuActionAvailable(.addToTrackList) {
-            Button {
-                actionHandler.handle(.addToTrackList(track: state.track))
-            } label: {
-                Label("Add to Tracklist", systemImage: "list.star")
-            }
-        }
-
-        if isMenuActionAvailable(.addToPlayer) {
-            Button {
+        TrackAddDestinationMenuContent(
+            canAddToPlayer: isMenuActionAvailable(.addToPlayer),
+            canAddToTrackList: isMenuActionAvailable(.addToTrackList),
+            addToTitle: String(localized: "Add to"),
+            addToPlayerTitle: String(localized: "Add to Player"),
+            addToTrackListTitle: String(localized: "Add to Tracklist"),
+            onAddToPlayer: {
                 actionHandler.handle(.addToPlayer(track: state.track))
-            } label: {
-                Label("Add to Player", systemImage: "waveform")
+            },
+            onAddToTrackList: {
+                actionHandler.handle(.addToTrackList(track: state.track))
             }
-        }
+        )
     }
 
     /// Передаёт iTunes-трек в общий механизм воспроизведения вместе со всем контекстом списка.

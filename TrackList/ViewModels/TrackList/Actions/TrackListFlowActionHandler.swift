@@ -86,6 +86,9 @@ final class TrackListFlowActionHandler {
         case .addToPlayer(let rowId):
             presentationHandler.addToPlayer(rowId: rowId)
 
+        case .toggleFavorite(let rowId):
+            presentationHandler.toggleFavorite(rowId: rowId)
+
         case .moveTrack(let source, let destination):
             mutationHandler.moveTrack(from: source, to: destination)
 

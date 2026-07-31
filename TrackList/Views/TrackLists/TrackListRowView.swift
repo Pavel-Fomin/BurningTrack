@@ -24,6 +24,7 @@ struct TrackListRowView: View {
     let onShareTrack: () -> Void /// Отправка аудиофайла трека
     let onCopyTrack: () -> Void  /// Копирование iTunes-трека
     let onAddToPlayer: () -> Void /// Добавление iTunes-трека в плеер
+    let onToggleFavorite: () -> Void /// Переключение трека в «Избранном»
     let onRenameTrack: (FileRenameStrategy) -> Void /// Переименование файла трека
     let onEditTags: () -> Void    /// Редактирование тегов трека
     let onArtworkTap: () -> Void /// Открытие карточки трека из меню
@@ -89,6 +90,13 @@ struct TrackListRowView: View {
             }
         }
 
+        if isMenuActionAvailable(.toggleFavorite) {
+            TrackFavoriteMenuContent(
+                isFavorite: state.isFavorite,
+                onToggle: onToggleFavorite
+            )
+        }
+
         if isMenuActionAvailable(.share) {
             Button {
                 onShareTrack()
@@ -132,29 +140,17 @@ struct TrackListRowView: View {
             }
         }
 
-        if isMenuActionAvailable(.goToArtist),
-           state.collectionNavigationTarget?.artist != nil {
-            Button {
-                onGoToArtist()
-            } label: {
-                Label(
-                    TrackListPresentationText.goToArtist,
-                    systemImage: LibraryCollectionCategory.artists.systemImage
-                )
-            }
-        }
-
-        if isMenuActionAvailable(.goToAlbum),
-           state.collectionNavigationTarget?.album != nil {
-            Button {
-                onGoToAlbum()
-            } label: {
-                Label(
-                    TrackListPresentationText.goToAlbum,
-                    systemImage: LibraryCollectionCategory.albums.systemImage
-                )
-            }
-        }
+        TrackGoToDestinationMenuContent(
+            canGoToArtist: isMenuActionAvailable(.goToArtist) &&
+                state.collectionNavigationTarget?.artist != nil,
+            canGoToAlbum: isMenuActionAvailable(.goToAlbum) &&
+                state.collectionNavigationTarget?.album != nil,
+            goToTitle: TrackListPresentationText.goTo,
+            goToArtistTitle: TrackListPresentationText.goToArtist,
+            goToAlbumTitle: TrackListPresentationText.goToAlbum,
+            onGoToArtist: onGoToArtist,
+            onGoToAlbum: onGoToAlbum
+        )
 
         if isMenuActionAvailable(.editTags) ||
             isMenuActionAvailable(.renameFile) {

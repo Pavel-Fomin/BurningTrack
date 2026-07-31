@@ -58,6 +58,13 @@ struct PlayerPlaylistView: View {
                     )
                 )
             },
+            onToggleFavorite: { queueItemId in
+                screenViewModel.handle(
+                    .toggleFavorite(
+                        queueItemId: queueItemId
+                    )
+                )
+            },
             onGoToArtist: { queueItemId in
                 screenViewModel.handle(
                     .goToArtist(

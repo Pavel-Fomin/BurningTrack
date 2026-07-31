@@ -43,6 +43,10 @@ enum TrackListPresentationText {
         }
     }
 
+    static var goTo: String {
+        String(localized: "Go to")
+    }
+
     static var goToArtist: String {
         String(localized: "Go to Artist")
     }

@@ -68,6 +68,8 @@ final class PlayerFlowActionHandler {
             presentationActionHandler.moveToFolder(queueItemId: queueItemId)
         case .addToTrackList(let queueItemId):
             presentationActionHandler.addToTrackList(queueItemId: queueItemId)
+        case .toggleFavorite(let queueItemId):
+            presentationActionHandler.toggleFavorite(queueItemId: queueItemId)
         case .goToArtist(let queueItemId):
             presentationActionHandler.goToArtist(queueItemId: queueItemId)
         case .goToAlbum(let queueItemId):

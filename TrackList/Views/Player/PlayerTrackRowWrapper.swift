@@ -17,6 +17,7 @@ struct PlayerTrackRowWrapper: View {
     let onShowInLibrary: (UUID) -> Void                  /// Обработчик показа элемента очереди в фонотеке
     let onMoveToFolder: (UUID) -> Void                   /// Обработчик перемещения элемента очереди в папку
     let onAddToTrackList: (UUID) -> Void                 /// Обработчик добавления элемента очереди в треклист
+    let onToggleFavorite: (UUID) -> Void                 /// Обработчик переключения избранного элемента очереди
     let onGoToArtist: (UUID) -> Void                     /// Обработчик перехода к артисту элемента очереди
     let onGoToAlbum: (UUID) -> Void                      /// Обработчик перехода к альбому элемента очереди
     let onShareTrack: (UUID) -> Void                     /// Обработчик отправки аудиофайла
@@ -105,6 +106,15 @@ struct PlayerTrackRowWrapper: View {
             }
         }
 
+        if isMenuActionAvailable(.toggleFavorite) {
+            TrackFavoriteMenuContent(
+                isFavorite: row.isFavorite,
+                onToggle: {
+                    onToggleFavorite(row.id)
+                }
+            )
+        }
+
         if isMenuActionAvailable(.share) {
             Button {
                 onShareTrack(row.id)
@@ -149,29 +159,21 @@ struct PlayerTrackRowWrapper: View {
             }
         }
 
-        if isMenuActionAvailable(.goToArtist),
-           row.collectionNavigationTarget?.artist != nil {
-            Button {
+        TrackGoToDestinationMenuContent(
+            canGoToArtist: isMenuActionAvailable(.goToArtist) &&
+                row.collectionNavigationTarget?.artist != nil,
+            canGoToAlbum: isMenuActionAvailable(.goToAlbum) &&
+                row.collectionNavigationTarget?.album != nil,
+            goToTitle: PlayerPresentationText.goTo,
+            goToArtistTitle: PlayerPresentationText.goToArtist,
+            goToAlbumTitle: PlayerPresentationText.goToAlbum,
+            onGoToArtist: {
                 onGoToArtist(row.id)
-            } label: {
-                Label(
-                    PlayerPresentationText.goToArtist,
-                    systemImage: LibraryCollectionCategory.artists.systemImage
-                )
-            }
-        }
-
-        if isMenuActionAvailable(.goToAlbum),
-           row.collectionNavigationTarget?.album != nil {
-            Button {
+            },
+            onGoToAlbum: {
                 onGoToAlbum(row.id)
-            } label: {
-                Label(
-                    PlayerPresentationText.goToAlbum,
-                    systemImage: LibraryCollectionCategory.albums.systemImage
-                )
             }
-        }
+        )
 
         if isMenuActionAvailable(.editTags) ||
             isMenuActionAvailable(.renameFile) {

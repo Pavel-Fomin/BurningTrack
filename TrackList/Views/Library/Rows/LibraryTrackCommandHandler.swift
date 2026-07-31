@@ -8,6 +8,8 @@ struct LibraryTrackCommandHandler {
     let presentationHandler: LibraryTrackPresentationHandler
     let cloudAvailabilityActionHandler: LibraryCloudAvailabilityActionHandler
     let collectionNavigationHandler: TrackCollectionNavigationHandler
+    /// Общий обработчик «Избранного» сохраняет состояние и публикует подтверждённое событие.
+    private let favoriteActionHandler: FavoriteTrackActionHandler
     let onToggleSelection: () -> Void
     let onRenameTrack: (UUID, FileRenameStrategy) -> Void
 
@@ -24,6 +26,8 @@ struct LibraryTrackCommandHandler {
             addToPlayer(trackId: trackId)
         case .addToTrackList(let track):
             sheetManager.presentAddToTrackList(for: track)
+        case .toggleFavorite(let track):
+            favoriteActionHandler.toggle(FavoriteTrackInput(libraryTrack: track))
         case .goToArtist(let trackId):
             collectionNavigationHandler.openArtist(trackId: trackId)
         case .goToAlbum(let trackId):
@@ -55,6 +59,27 @@ struct LibraryTrackCommandHandler {
                 .retryDownload(trackId: trackId)
             )
         }
+    }
+
+    /// Создаёт обработчик строки с единым доменным маршрутом «Избранного».
+    init(
+        sheetManager: SheetManager,
+        playbackHandler: LibraryTrackPlaybackHandler,
+        presentationHandler: LibraryTrackPresentationHandler,
+        cloudAvailabilityActionHandler: LibraryCloudAvailabilityActionHandler,
+        collectionNavigationHandler: TrackCollectionNavigationHandler,
+        favoriteActionHandler: FavoriteTrackActionHandler? = nil,
+        onToggleSelection: @escaping () -> Void,
+        onRenameTrack: @escaping (UUID, FileRenameStrategy) -> Void
+    ) {
+        self.sheetManager = sheetManager
+        self.playbackHandler = playbackHandler
+        self.presentationHandler = presentationHandler
+        self.cloudAvailabilityActionHandler = cloudAvailabilityActionHandler
+        self.collectionNavigationHandler = collectionNavigationHandler
+        self.favoriteActionHandler = favoriteActionHandler ?? FavoriteTrackActionHandler()
+        self.onToggleSelection = onToggleSelection
+        self.onRenameTrack = onRenameTrack
     }
 
     /// Добавляет трек в плеер через общий executor приложения.

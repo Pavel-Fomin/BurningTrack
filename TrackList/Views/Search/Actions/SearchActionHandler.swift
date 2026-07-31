@@ -16,6 +16,8 @@ final class SearchActionHandler {
     private let sheetManager: SheetManager
     private let sheetActionCoordinator: SheetActionCoordinator
     private let fileRenamer: TrackFileRenameActionHandler
+    /// Общий обработчик «Избранного» не зависит от состояния конкретного экрана поиска.
+    private let favoriteActionHandler: FavoriteTrackActionHandler
 
     init(
         viewModel: SearchViewModel,
@@ -23,7 +25,8 @@ final class SearchActionHandler {
         navigationCoordinator: NavigationCoordinator,
         sheetManager: SheetManager,
         sheetActionCoordinator: SheetActionCoordinator,
-        fileRenamer: TrackFileRenameActionHandler
+        fileRenamer: TrackFileRenameActionHandler,
+        favoriteActionHandler: FavoriteTrackActionHandler? = nil
     ) {
         self.viewModel = viewModel
         self.playerViewModel = playerViewModel
@@ -31,6 +34,7 @@ final class SearchActionHandler {
         self.sheetManager = sheetManager
         self.sheetActionCoordinator = sheetActionCoordinator
         self.fileRenamer = fileRenamer
+        self.favoriteActionHandler = favoriteActionHandler ?? FavoriteTrackActionHandler()
     }
 
     /// Передаёт действия View в SearchViewModel без бизнес-логики в SwiftUI.
@@ -83,6 +87,11 @@ final class SearchActionHandler {
 
         case .addToTrackList(let result):
             sheetManager.presentAddToTrackList(for: result)
+
+        case .toggleFavorite(let result):
+            favoriteActionHandler.toggle(
+                FavoriteTrackInput(playerTrack: result)
+            )
 
         case .renameFile(let result, let strategy):
             renameFile(result, strategy: strategy)

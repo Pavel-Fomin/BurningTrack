@@ -110,6 +110,16 @@
         }
       }
     },
+    "Add to" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add to"
+          }
+        }
+      }
+    },
     "Add to Tracklist" : {
       "localizations" : {
         "en" : {
@@ -972,6 +982,17 @@
         }
       }
     },
+    "Favorite" : {
+      "comment" : "A stable label for the menu action that toggles a track's favorite state.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Favorite"
+          }
+        }
+      }
+    },
     "export.bytesProgress" : {
       "comment" : "Сопоставление уже скопированного и общего размера экспорта.",
       "localizations" : {
@@ -1216,6 +1237,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Go to Album"
+          }
+        }
+      }
+    },
+    "Go to" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Go to"
           }
         }
       }

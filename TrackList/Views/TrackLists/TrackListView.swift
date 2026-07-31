@@ -56,6 +56,9 @@ struct TrackListView: View {
                             onAddToPlayer: { rowId in
                                 onAction(.addToPlayer(rowId: rowId))
                             },
+                            onToggleFavorite: { rowId in
+                                onAction(.toggleFavorite(rowId: rowId))
+                            },
                             onRenameTrack: { rowId, strategy in
                                 onAction(
                                     .renameFile(
@@ -134,6 +137,7 @@ struct TrackListView: View {
                 let onShareTrack: (UUID) -> Void
                 let onCopyTrack: (UUID) -> Void
                 let onAddToPlayer: (UUID) -> Void
+                let onToggleFavorite: (UUID) -> Void
                 let onRenameTrack: (UUID, FileRenameStrategy) -> Void
                 let onEditTags: (UUID) -> Void
                 let onArtworkTap: (UUID) -> Void
@@ -173,6 +177,9 @@ struct TrackListView: View {
                             },
                             onAddToPlayer: {
                                 onAddToPlayer(row.id)
+                            },
+                            onToggleFavorite: {
+                                onToggleFavorite(row.id)
                             },
                             onRenameTrack: { strategy in
                                 onRenameTrack(row.id, strategy)

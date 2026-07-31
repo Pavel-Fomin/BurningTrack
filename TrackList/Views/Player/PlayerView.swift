@@ -19,6 +19,7 @@ struct PlayerView: View {
     let onShowInLibrary: (UUID) -> Void
     let onMoveToFolder: (UUID) -> Void
     let onAddToTrackList: (UUID) -> Void  /// Добавление элемента очереди в треклист
+    let onToggleFavorite: (UUID) -> Void  /// Переключение избранного элемента очереди
     let onGoToArtist: (UUID) -> Void      /// Переход к артисту элемента очереди
     let onGoToAlbum: (UUID) -> Void       /// Переход к альбому элемента очереди
     let onShareTrack: (UUID) -> Void      /// Отправка аудиофайла элемента очереди
@@ -46,6 +47,7 @@ struct PlayerView: View {
                         onShowInLibrary: onShowInLibrary,
                         onMoveToFolder: onMoveToFolder,
                         onAddToTrackList: onAddToTrackList,
+                        onToggleFavorite: onToggleFavorite,
                         onGoToArtist: onGoToArtist,
                         onGoToAlbum: onGoToAlbum,
                         onShareTrack: onShareTrack,
@@ -94,6 +96,7 @@ struct PlayerView: View {
         let onShowInLibrary: (UUID) -> Void
         let onMoveToFolder: (UUID) -> Void
         let onAddToTrackList: (UUID) -> Void  /// Добавление элемента очереди в треклист
+        let onToggleFavorite: (UUID) -> Void  /// Переключение избранного элемента очереди
         let onGoToArtist: (UUID) -> Void      /// Переход к артисту элемента очереди
         let onGoToAlbum: (UUID) -> Void       /// Переход к альбому элемента очереди
         let onShareTrack: (UUID) -> Void      /// Отправка аудиофайла элемента очереди
@@ -113,6 +116,7 @@ struct PlayerView: View {
                     onShowInLibrary: onShowInLibrary,
                     onMoveToFolder: onMoveToFolder,
                     onAddToTrackList: onAddToTrackList,
+                    onToggleFavorite: onToggleFavorite,
                     onGoToArtist: onGoToArtist,
                     onGoToAlbum: onGoToAlbum,
                     onShareTrack: onShareTrack,

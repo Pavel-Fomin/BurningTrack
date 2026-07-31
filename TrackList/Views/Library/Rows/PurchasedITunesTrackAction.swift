@@ -27,4 +27,6 @@ enum PurchasedITunesTrackAction {
     case addToTrackList(track: PurchasedITunesPlayableTrack)
     /// Пользователь запросил добавление iTunes-трека в очередь плеера.
     case addToPlayer(track: PurchasedITunesPlayableTrack)
+    /// Пользователь запросил переключение iTunes-трека в системном треклисте «Избранное».
+    case toggleFavorite(track: PurchasedITunesPlayableTrack)
 }
