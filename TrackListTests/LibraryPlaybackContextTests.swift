@@ -50,7 +50,8 @@ final class LibraryPlaybackContextTests: XCTestCase {
                 category: .genres,
                 rawValue: "House",
                 artistKey: nil
-            )
+            ),
+            .purchasedITunes
         ]
 
         for source in sources {

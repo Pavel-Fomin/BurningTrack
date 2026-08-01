@@ -9,20 +9,6 @@
 
 import Foundation
 
-/// Узкий контракт настройки сортировки не раскрывает ViewModel остальные настройки приложения.
-@MainActor
-protocol PurchasedITunesTrackSortModePersisting: AnyObject {
-    var purchasedITunesTrackSortMode: PurchasedITunesTrackSortMode { get }
-    func setPurchasedITunesTrackSortMode(_ mode: PurchasedITunesTrackSortMode) throws
-}
-
-extension AppSettingsManager: PurchasedITunesTrackSortModePersisting {
-    /// Возвращает восстановленный из SQLite режим runtime-источника iTunes.
-    var purchasedITunesTrackSortMode: PurchasedITunesTrackSortMode {
-        settings.internalSettings.purchasedITunesTrackSortMode
-    }
-}
-
 @MainActor
 final class PurchasedITunesMusicViewModel: ObservableObject {
 

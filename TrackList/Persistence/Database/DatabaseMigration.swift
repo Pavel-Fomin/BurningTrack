@@ -35,7 +35,8 @@ extension DatabaseMigration {
         .playerQueueAndStateAllowExternalTrackIds,
         .purchasedITunesSortModeSetting,
         .trackListKind,
-        .trackListFavoritesUniqueness
+        .trackListFavoritesUniqueness,
+        .playerStateAllowsPurchasedITunesContext
     ]
 
     // Первая миграция фиксирует стартовую версию схемы без создания бизнес-таблиц.
@@ -975,6 +976,55 @@ extension DatabaseMigration {
             CREATE UNIQUE INDEX IF NOT EXISTS idx_tracklists_one_active_favorites
             ON tracklists(kind)
             WHERE kind = 'favorites' AND is_deleted = 0;
+            """
+        )
+    }
+
+    // Двадцать первая миграция разрешает player_state сохранять самостоятельный источник Purchased iTunes.
+    static let playerStateAllowsPurchasedITunesContext = DatabaseMigration(
+        identifier: "021_player_state_purchased_itunes_context"
+    ) { database in
+        // SQLite не позволяет изменить CHECK-ограничение колонки, поэтому пересоздаём только единственную таблицу состояния.
+        try database.executeScript(
+            """
+            CREATE TABLE player_state_backup AS SELECT * FROM player_state;
+
+            DROP TABLE player_state;
+
+            CREATE TABLE player_state (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                current_queue_item_id TEXT,
+                current_track_id TEXT,
+                context_type TEXT NOT NULL DEFAULT 'playerQueue'
+                    CHECK (context_type IN (
+                        'playerQueue', 'trackList', 'libraryFolder', 'libraryRoot',
+                        'libraryCollection', 'purchasedITunes'
+                    )),
+                context_id TEXT,
+                collection_category TEXT,
+                collection_value TEXT,
+                collection_artist_key TEXT,
+                playback_time REAL NOT NULL DEFAULT 0,
+                duration REAL,
+                is_playing INTEGER NOT NULL DEFAULT 0 CHECK (is_playing IN (0, 1)),
+                repeat_mode TEXT NOT NULL DEFAULT 'off' CHECK (repeat_mode IN ('off', 'one', 'all')),
+                shuffle_enabled INTEGER NOT NULL DEFAULT 0 CHECK (shuffle_enabled IN (0, 1)),
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY (current_queue_item_id) REFERENCES player_queue(id) ON DELETE SET NULL
+            );
+
+            INSERT INTO player_state (
+                id, current_queue_item_id, current_track_id, context_type, context_id,
+                collection_category, collection_value, collection_artist_key,
+                playback_time, duration, is_playing, repeat_mode, shuffle_enabled, updated_at
+            )
+            SELECT
+                id, current_queue_item_id, current_track_id, context_type, context_id,
+                collection_category, collection_value, collection_artist_key,
+                playback_time, duration, is_playing, repeat_mode, shuffle_enabled, updated_at
+            FROM player_state_backup;
+
+            DROP TABLE player_state_backup;
             """
         )
     }

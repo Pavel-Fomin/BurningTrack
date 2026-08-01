@@ -25,4 +25,6 @@ enum PlaybackContextSource: Equatable {
         rawValue: String,
         artistKey: String?
     )
+    /// Раздел купленных iTunes-треков, чей порядок строится из системной медиатеки.
+    case purchasedITunes
 }

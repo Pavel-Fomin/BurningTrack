@@ -29,7 +29,11 @@ extension Notification.Name {
     static let trackDidMove = Notification.Name("trackDidMove")                   /// Перемещение трека
     static let libraryDataDidChange = Notification.Name("libraryDataDidChange")   /// Завершено изменение состава фонотеки в SQLite
     static let libraryAccessRestored = Notification.Name("libraryAccessRestored") /// Доступ к прикреплённым папкам восстановлен (root-scope открыт)
-    
+
+    // MARK: - Purchased iTunes
+
+    static let purchasedITunesMediaLibraryAccessDidChange = Notification.Name("purchasedITunesMediaLibraryAccessDidChange") /// Системный запрос MediaPlayer завершился и можно повторить отложенное восстановление
+
     // MARK: - Player
     
     static let trackDidFinish = Notification.Name("trackDidFinish")              /// Трек доиграл до конца (AVPlayerItem → PlayerManager → PlayerViewModel)

@@ -152,6 +152,29 @@ final class PurchasedITunesTrackSorterTests: XCTestCase {
 
 @MainActor
 final class PurchasedITunesMusicViewModelTests: XCTestCase {
+    /// Загрузчик контекста использует тот же сохранённый режим и сортировщик, что и экран «Куплено в iTunes».
+    func testPlaybackContextLoaderUsesSavedSortMode() async {
+        let provider = PurchasedITunesMusicProviderStub(
+            tracks: [
+                makeTrack(id: 1, title: "Beta", artist: "Artist"),
+                makeTrack(id: 2, title: "Alpha", artist: "Artist")
+            ]
+        )
+        let persistence = PurchasedITunesSortModePersistenceStub(mode: .titleAsc)
+        let loader = PurchasedITunesPlaybackContextLoader(
+            provider: provider,
+            sortModePersistence: persistence
+        )
+
+        let result = await loader.loadPlaybackContext()
+
+        guard case .loaded(let tracks) = result else {
+            return XCTFail("Ожидался загруженный iTunes-контекст")
+        }
+
+        XCTAssertEqual(tracks.map(\.title), ["Alpha", "Beta"])
+    }
+
     /// Проверяет, что смена режима пересортировывает кэш и не вызывает provider повторно.
     func testSelectSortModeReusesLoadedTracksAndPersistsSelection() async {
         let provider = PurchasedITunesMusicProviderStub(
@@ -215,6 +238,10 @@ private final class PurchasedITunesMusicProviderStub: PurchasedITunesMusicProvid
 
     init(tracks: [PurchasedITunesTrack]) {
         self.tracks = tracks
+    }
+
+    func accessState() -> PurchasedITunesMusicAccessState {
+        .authorized
     }
 
     func requestAccessIfNeeded() async -> PurchasedITunesMusicAccessState {

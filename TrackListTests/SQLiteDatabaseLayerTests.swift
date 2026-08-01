@@ -927,6 +927,32 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
         XCTAssertNil(try persistence.loadState())
     }
 
+    /// iTunes trackId не принадлежит tracks, но после миграции сохраняется в player_state вместе с отдельным источником.
+    func testPlayerStatePersistenceStoresPurchasedITunesTrackIdAndSource() throws {
+        let database = try makeDatabase()
+        let executor = try database.databaseExecutor()
+        let externalTrackId = UUID()
+        let persistence = PlayerStatePersistence(
+            databaseStore: PlayerDatabaseStore(
+                queueStore: SQLitePlayerQueueStore(executor: executor),
+                stateStore: SQLitePlayerStateStore(executor: executor)
+            )
+        )
+
+        try persistence.saveCurrentTrack(
+            trackId: externalTrackId,
+            queueItemId: nil,
+            duration: 180,
+            playbackMode: .defaultValue,
+            contextSource: .purchasedITunes
+        )
+
+        let state = try XCTUnwrap(persistence.loadState())
+        XCTAssertEqual(state.currentTrackId, externalTrackId)
+        XCTAssertEqual(state.contextType, .purchasedITunes)
+        XCTAssertNil(state.currentQueueItemId)
+    }
+
     func testSQLitePlayerStateStoreUpsertsEveryPlaybackContext() throws {
         let database = try makeDatabase()
         let executor = try database.databaseExecutor()
@@ -966,7 +992,8 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
                 category: .genres,
                 rawValue: "House",
                 artistKey: nil
-            )
+            ),
+            .purchasedITunes
         ]
 
         for source in sources {

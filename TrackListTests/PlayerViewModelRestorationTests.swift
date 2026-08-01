@@ -521,16 +521,454 @@ final class PlayerViewModelRestorationTests: XCTestCase {
         }
     }
 
+    /// После запуска приложение восстанавливает текущий iTunes-трек вместе с полным сохранённым порядком.
+    func testPurchasedITunesContextRestoresAfterRestart() async {
+        let firstTrack = makePurchasedITunesTrack(id: 1, title: "Alpha")
+        let middleTrack = makePurchasedITunesTrack(id: 2, title: "Middle")
+        let lastTrack = makePurchasedITunesTrack(id: 3, title: "Zulu")
+        let statePersistence = RestorationStatePersistenceSpy(
+            state: makePurchasedITunesState(trackId: middleTrack.trackId)
+        )
+        let viewModel = makeViewModel(
+            statePersistence: statePersistence,
+            purchasedITunesContextLoader: PurchasedITunesContextLoaderSpy(
+                result: .loaded([firstTrack, middleTrack, lastTrack])
+            ),
+            fastTrackProvider: FastLibraryTrackProviderSpy(track: nil),
+            libraryAccessState: LibraryAccessState(isRestored: false)
+        )
+
+        await waitUntil {
+            viewModel.isPlaybackContextReady
+        }
+
+        XCTAssertEqual(viewModel.currentTrackDisplayable?.trackId, middleTrack.trackId)
+        XCTAssertTrue(viewModel.canPlayPreviousTrack)
+        XCTAssertTrue(viewModel.canPlayNextTrack)
+        XCTAssertEqual(statePersistence.clearCallsCount, 0)
+    }
+
+    /// Средний элемент восстановленного iTunes-порядка разрешает оба направления без открытия раздела фонотеки.
+    func testPurchasedITunesMiddleTrackEnablesPreviousAndNext() async {
+        let firstTrack = makePurchasedITunesTrack(id: 11, title: "Alpha")
+        let middleTrack = makePurchasedITunesTrack(id: 12, title: "Middle")
+        let lastTrack = makePurchasedITunesTrack(id: 13, title: "Zulu")
+        let viewModel = makePurchasedITunesRestorationViewModel(
+            currentTrack: middleTrack,
+            context: [firstTrack, middleTrack, lastTrack]
+        )
+
+        await waitUntil {
+            viewModel.isPlaybackContextReady
+        }
+
+        XCTAssertTrue(viewModel.canPlayPreviousTrack)
+        XCTAssertTrue(viewModel.canPlayNextTrack)
+    }
+
+    /// Первый элемент iTunes-порядка не создаёт несуществующий переход назад.
+    func testPurchasedITunesFirstTrackEnablesOnlyNext() async {
+        let firstTrack = makePurchasedITunesTrack(id: 21, title: "Alpha")
+        let secondTrack = makePurchasedITunesTrack(id: 22, title: "Zulu")
+        let viewModel = makePurchasedITunesRestorationViewModel(
+            currentTrack: firstTrack,
+            context: [firstTrack, secondTrack]
+        )
+
+        await waitUntil {
+            viewModel.isPlaybackContextReady
+        }
+
+        XCTAssertFalse(viewModel.canPlayPreviousTrack)
+        XCTAssertTrue(viewModel.canPlayNextTrack)
+    }
+
+    /// Последний элемент iTunes-порядка не создаёт несуществующий переход вперёд.
+    func testPurchasedITunesLastTrackEnablesOnlyPrevious() async {
+        let firstTrack = makePurchasedITunesTrack(id: 31, title: "Alpha")
+        let lastTrack = makePurchasedITunesTrack(id: 32, title: "Zulu")
+        let viewModel = makePurchasedITunesRestorationViewModel(
+            currentTrack: lastTrack,
+            context: [firstTrack, lastTrack]
+        )
+
+        await waitUntil {
+            viewModel.isPlaybackContextReady
+        }
+
+        XCTAssertTrue(viewModel.canPlayPreviousTrack)
+        XCTAssertFalse(viewModel.canPlayNextTrack)
+    }
+
+    /// Восстановление готового iTunes-контекста не создаёт неявный вызов PlayerManager.play.
+    func testPurchasedITunesRestorationDoesNotStartPlayback() async {
+        let track = makePurchasedITunesTrack(id: 41, title: "Paused")
+        let playerManager = RestorationPlayerManagerSpy()
+        let viewModel = makeViewModel(
+            playerManager: playerManager,
+            statePersistence: RestorationStatePersistenceSpy(
+                state: makePurchasedITunesState(trackId: track.trackId)
+            ),
+            purchasedITunesContextLoader: PurchasedITunesContextLoaderSpy(result: .loaded([track])),
+            fastTrackProvider: FastLibraryTrackProviderSpy(track: nil),
+            libraryAccessState: LibraryAccessState(isRestored: false)
+        )
+
+        await waitUntil {
+            viewModel.isPlaybackContextReady
+        }
+
+        XCTAssertFalse(viewModel.isPlaying)
+        XCTAssertEqual(playerManager.playCallsCount, 0)
+    }
+
+    /// PlayerViewModel сохраняет порядок, уже построенный общим iTunes-сортировщиком загрузчика.
+    func testPurchasedITunesRestorationUsesSavedSorting() async {
+        let alphaTrack = makePurchasedITunesTrack(id: 51, title: "Alpha")
+        let middleTrack = makePurchasedITunesTrack(id: 52, title: "Middle")
+        let zuluTrack = makePurchasedITunesTrack(id: 53, title: "Zulu")
+        let playerManager = RestorationPlayerManagerSpy()
+        let viewModel = makeViewModel(
+            playerManager: playerManager,
+            statePersistence: RestorationStatePersistenceSpy(
+                state: makePurchasedITunesState(trackId: middleTrack.trackId)
+            ),
+            purchasedITunesContextLoader: PurchasedITunesContextLoaderSpy(
+                result: .loaded([alphaTrack, middleTrack, zuluTrack])
+            ),
+            fastTrackProvider: FastLibraryTrackProviderSpy(track: nil),
+            libraryAccessState: LibraryAccessState(isRestored: false)
+        )
+
+        await waitUntil {
+            viewModel.isPlaybackContextReady && viewModel.canPlayNextTrack
+        }
+
+        viewModel.playNextTrack()
+
+        await waitUntil {
+            playerManager.playedTrackIds == [zuluTrack.trackId]
+        }
+
+        XCTAssertEqual(viewModel.currentTrackDisplayable?.trackId, zuluTrack.trackId)
+    }
+
+    /// Успешно прочитанный список без сохранённого iTunes-трека очищает только устаревшее player_state.
+    func testPurchasedITunesMissingCurrentTrackClearsRestoredState() async {
+        let missingTrack = makePurchasedITunesTrack(id: 61, title: "Missing")
+        let availableTrack = makePurchasedITunesTrack(id: 62, title: "Available")
+        let statePersistence = RestorationStatePersistenceSpy(
+            state: makePurchasedITunesState(trackId: missingTrack.trackId)
+        )
+        let viewModel = makeViewModel(
+            statePersistence: statePersistence,
+            purchasedITunesContextLoader: PurchasedITunesContextLoaderSpy(result: .loaded([availableTrack])),
+            fastTrackProvider: FastLibraryTrackProviderSpy(track: nil),
+            libraryAccessState: LibraryAccessState(isRestored: false)
+        )
+
+        await waitUntil {
+            statePersistence.clearCallsCount == 1
+        }
+
+        XCTAssertEqual(viewModel.miniPlayerState, .empty)
+        XCTAssertNil(viewModel.currentTrackDisplayable)
+        XCTAssertFalse(viewModel.isPlaybackContextReady)
+    }
+
+    /// Временная недоступность MediaPlayer не выдаёт отсутствие списка за удаление сохранённого трека.
+    func testPurchasedITunesTemporaryUnavailableDoesNotClearState() async {
+        let track = makePurchasedITunesTrack(id: 71, title: "Deferred")
+        let statePersistence = RestorationStatePersistenceSpy(
+            state: makePurchasedITunesState(trackId: track.trackId)
+        )
+        let loader = PurchasedITunesContextLoaderSpy(result: .temporarilyUnavailable)
+        let viewModel = makeViewModel(
+            statePersistence: statePersistence,
+            purchasedITunesContextLoader: loader,
+            fastTrackProvider: FastLibraryTrackProviderSpy(track: nil),
+            libraryAccessState: LibraryAccessState(isRestored: false)
+        )
+
+        await waitUntil {
+            loader.loadCallsCount == 1
+        }
+
+        XCTAssertEqual(statePersistence.clearCallsCount, 0)
+        XCTAssertNil(viewModel.currentTrackDisplayable)
+        XCTAssertFalse(viewModel.isPlaybackContextReady)
+        XCTAssertEqual(viewModel.miniPlayerState, .loading(staticState: nil))
+
+        loader.setResult(.loaded([track]))
+        NotificationCenter.default.post(
+            name: .purchasedITunesMediaLibraryAccessDidChange,
+            object: nil
+        )
+
+        await waitUntil {
+            viewModel.isPlaybackContextReady && loader.loadCallsCount == 2
+        }
+
+        XCTAssertEqual(statePersistence.clearCallsCount, 0)
+        XCTAssertEqual(viewModel.currentTrackDisplayable?.trackId, track.trackId)
+    }
+
+    /// Запрет MediaPlayer оставляет iTunes-восстановление отдельным от fallback очереди и не запускает навигацию.
+    func testPurchasedITunesDeniedAccessDoesNotFallbackToPlayerQueue() async {
+        let track = makePurchasedITunesTrack(id: 81, title: "Denied")
+        let statePersistence = RestorationStatePersistenceSpy(
+            state: makePurchasedITunesState(trackId: track.trackId)
+        )
+        let loader = PurchasedITunesContextLoaderSpy(result: .accessDenied)
+        let playerManager = RestorationPlayerManagerSpy()
+        let viewModel = makeViewModel(
+            playerManager: playerManager,
+            statePersistence: statePersistence,
+            purchasedITunesContextLoader: loader,
+            fastTrackProvider: FastLibraryTrackProviderSpy(track: nil),
+            libraryAccessState: LibraryAccessState(isRestored: false)
+        )
+
+        await waitUntil {
+            loader.loadCallsCount == 1
+        }
+
+        viewModel.playNextTrack()
+
+        XCTAssertEqual(statePersistence.clearCallsCount, 0)
+        XCTAssertTrue(statePersistence.savedContextSources.isEmpty)
+        XCTAssertNil(viewModel.currentTrackDisplayable)
+        XCTAssertFalse(viewModel.isPlaybackContextReady)
+        XCTAssertEqual(playerManager.playCallsCount, 0)
+    }
+
+    /// Поздний результат iTunes-загрузчика не возвращает старый контекст после ручного выбора другого трека.
+    func testStalePurchasedITunesRestorationDoesNotReplaceUserSelection() async {
+        let restoredTrack = makePurchasedITunesTrack(id: 91, title: "Restored")
+        let selectedTrack = makeLibraryTrack(fileName: "Selected.m4a")
+        let contextLoader = PurchasedITunesContextLoaderSpy(
+            result: .loaded([restoredTrack]),
+            delaysFirstLoad: true
+        )
+        let viewModel = makeViewModel(
+            statePersistence: RestorationStatePersistenceSpy(
+                state: makePurchasedITunesState(trackId: restoredTrack.trackId)
+            ),
+            purchasedITunesContextLoader: contextLoader,
+            fastTrackProvider: FastLibraryTrackProviderSpy(track: nil),
+            libraryAccessState: LibraryAccessState(isRestored: false)
+        )
+
+        await waitUntil {
+            contextLoader.loadCallsCount == 1
+        }
+
+        viewModel.play(
+            track: selectedTrack,
+            context: [selectedTrack],
+            source: .libraryRoot
+        )
+        await waitUntil {
+            viewModel.currentTrackDisplayable?.trackId == selectedTrack.trackId
+        }
+
+        contextLoader.completeLoad()
+        await Task.yield()
+
+        XCTAssertEqual(viewModel.currentTrackDisplayable?.trackId, selectedTrack.trackId)
+        XCTAssertEqual(viewModel.currentContext, .library)
+    }
+
+    /// Переход Next сохраняет iTunes-источник, чтобы следующий запуск снова загрузил системный порядок.
+    func testPurchasedITunesSourcePersistsAfterNext() async {
+        let firstTrack = makePurchasedITunesTrack(id: 101, title: "Alpha")
+        let secondTrack = makePurchasedITunesTrack(id: 102, title: "Zulu")
+        let statePersistence = RestorationStatePersistenceSpy(
+            state: makePurchasedITunesState(trackId: firstTrack.trackId)
+        )
+        let playerManager = RestorationPlayerManagerSpy()
+        let viewModel = makeViewModel(
+            playerManager: playerManager,
+            statePersistence: statePersistence,
+            purchasedITunesContextLoader: PurchasedITunesContextLoaderSpy(
+                result: .loaded([firstTrack, secondTrack])
+            ),
+            fastTrackProvider: FastLibraryTrackProviderSpy(track: nil),
+            libraryAccessState: LibraryAccessState(isRestored: false)
+        )
+
+        await waitUntil {
+            viewModel.isPlaybackContextReady && viewModel.canPlayNextTrack
+        }
+
+        viewModel.playNextTrack()
+
+        await waitUntil {
+            playerManager.playedTrackIds == [secondTrack.trackId]
+        }
+
+        XCTAssertEqual(statePersistence.savedContextSources.last, .purchasedITunes)
+    }
+
+    /// Переход Previous сохраняет iTunes-источник, не превращая восстановленный порядок в очередь плеера.
+    func testPurchasedITunesSourcePersistsAfterPrevious() async {
+        let firstTrack = makePurchasedITunesTrack(id: 111, title: "Alpha")
+        let lastTrack = makePurchasedITunesTrack(id: 112, title: "Zulu")
+        let statePersistence = RestorationStatePersistenceSpy(
+            state: makePurchasedITunesState(trackId: lastTrack.trackId)
+        )
+        let playerManager = RestorationPlayerManagerSpy()
+        let viewModel = makeViewModel(
+            playerManager: playerManager,
+            statePersistence: statePersistence,
+            purchasedITunesContextLoader: PurchasedITunesContextLoaderSpy(
+                result: .loaded([firstTrack, lastTrack])
+            ),
+            fastTrackProvider: FastLibraryTrackProviderSpy(track: nil),
+            libraryAccessState: LibraryAccessState(isRestored: false)
+        )
+
+        await waitUntil {
+            viewModel.isPlaybackContextReady && viewModel.canPlayPreviousTrack
+        }
+
+        viewModel.playPreviousTrack()
+
+        await waitUntil {
+            playerManager.playedTrackIds == [firstTrack.trackId]
+        }
+
+        XCTAssertEqual(statePersistence.savedContextSources.last, .purchasedITunes)
+    }
+
+    /// Общий play-маршрут распознаёт iTunes runtime-контекст по TrackSource и сохраняет его без специального метода воспроизведения.
+    func testSharedPlayDetectsPurchasedITunesContextSource() {
+        let firstTrack = makePurchasedITunesTrack(id: 121, title: "Alpha")
+        let secondTrack = makePurchasedITunesTrack(id: 122, title: "Zulu")
+        let statePersistence = RestorationStatePersistenceSpy(state: nil)
+        let viewModel = makeViewModel(
+            statePersistence: statePersistence,
+            fastTrackProvider: FastLibraryTrackProviderSpy(track: nil),
+            libraryAccessState: LibraryAccessState(isRestored: false)
+        )
+
+        viewModel.play(track: firstTrack, context: [firstTrack, secondTrack])
+
+        XCTAssertEqual(statePersistence.savedContextSources.last, .purchasedITunes)
+    }
+
+    /// Прямой запуск Purchased iTunes сохраняет тот же runtime-идентификатор и не создаёт идентификатор очереди.
+    func testPlayingPurchasedITunesTrackPersistsItsTrackIdAndSource() {
+        let firstTrack = makePurchasedITunesTrack(id: 131, title: "Alpha")
+        let secondTrack = makePurchasedITunesTrack(id: 132, title: "Zulu")
+        let statePersistence = RestorationStatePersistenceSpy(state: nil)
+        let viewModel = makeViewModel(
+            statePersistence: statePersistence,
+            fastTrackProvider: FastLibraryTrackProviderSpy(track: nil),
+            libraryAccessState: LibraryAccessState(isRestored: false)
+        )
+
+        viewModel.play(track: firstTrack, context: [firstTrack, secondTrack])
+
+        let savedWrite = statePersistence.savedWrites.last
+        XCTAssertEqual(savedWrite?.trackId, firstTrack.trackId)
+        XCTAssertEqual(savedWrite?.source, .purchasedITunes)
+        XCTAssertNil(savedWrite?.queueItemId)
+        XCTAssertEqual(savedWrite?.duration, firstTrack.duration)
+    }
+
+    /// Событие готовности локальной фонотеки не запускает её восстановление поверх сохранённого Purchased iTunes.
+    func testPurchasedITunesRestorationIsNotReplacedByLastLibraryTrack() async {
+        let purchasedTrack = makePurchasedITunesTrack(id: 141, title: "Purchased")
+        let lastLibraryTrack = makeLibraryTrack(fileName: "Last Local.m4a")
+        let accessState = LibraryAccessState(isRestored: false)
+        let purchasedLoader = PurchasedITunesContextLoaderSpy(
+            result: .loaded([purchasedTrack]),
+            delaysFirstLoad: true
+        )
+        let libraryLoader = LibraryContextLoaderSpy(tracks: [lastLibraryTrack])
+        let viewModel = makeViewModel(
+            statePersistence: RestorationStatePersistenceSpy(
+                state: makePurchasedITunesState(trackId: purchasedTrack.trackId)
+            ),
+            libraryContextLoader: libraryLoader,
+            purchasedITunesContextLoader: purchasedLoader,
+            fastTrackProvider: FastLibraryTrackProviderSpy(track: lastLibraryTrack),
+            libraryAccessState: accessState
+        )
+
+        await waitUntil {
+            purchasedLoader.loadCallsCount == 1
+        }
+
+        accessState.isRestored = true
+        NotificationCenter.default.post(name: .libraryAccessRestored, object: nil)
+        await Task.yield()
+
+        XCTAssertEqual(libraryLoader.loadRootCallsCount, 0)
+
+        purchasedLoader.completeLoad()
+        await waitUntil {
+            viewModel.currentTrackDisplayable?.trackId == purchasedTrack.trackId
+        }
+
+        NotificationCenter.default.post(name: .libraryAccessRestored, object: nil)
+        await Task.yield()
+
+        XCTAssertEqual(viewModel.currentTrackDisplayable?.trackId, purchasedTrack.trackId)
+        XCTAssertEqual(viewModel.currentContext, .purchasedITunes)
+    }
+
+    /// Поздний local-контекст не может примениться после ручного выбора Purchased iTunes.
+    func testLateLibraryRestorationCannotReplacePurchasedITunesTrack() async {
+        let lastLibraryTrack = makeLibraryTrack(fileName: "Last Local.m4a")
+        let purchasedTrack = makePurchasedITunesTrack(id: 151, title: "Purchased")
+        let accessState = LibraryAccessState(isRestored: false)
+        let libraryLoader = DelayedLibraryContextLoaderSpy(tracks: [lastLibraryTrack])
+        let viewModel = makeViewModel(
+            statePersistence: RestorationStatePersistenceSpy(
+                state: makeLibraryState(trackId: lastLibraryTrack.trackId)
+            ),
+            libraryContextLoader: libraryLoader,
+            fastTrackProvider: FastLibraryTrackProviderSpy(track: lastLibraryTrack),
+            libraryAccessState: accessState
+        )
+
+        await waitUntil {
+            viewModel.isPlaybackContextReady
+        }
+
+        accessState.isRestored = true
+        NotificationCenter.default.post(name: .libraryAccessRestored, object: nil)
+        await waitUntil {
+            libraryLoader.loadRootCallsCount == 2
+        }
+
+        viewModel.play(track: purchasedTrack, context: [purchasedTrack])
+        await waitUntil {
+            viewModel.currentTrackDisplayable?.trackId == purchasedTrack.trackId
+        }
+
+        libraryLoader.completeLoad()
+        await Task.yield()
+
+        XCTAssertEqual(viewModel.currentTrackDisplayable?.trackId, purchasedTrack.trackId)
+        XCTAssertEqual(viewModel.currentContext, .purchasedITunes)
+    }
+
     /// Собирает ViewModel только с изолированными зависимостями, чтобы тесты не обращались к SQLite, bookmark и AVPlayer.
     private func makeViewModel(
         playerManager: RestorationPlayerManagerSpy = RestorationPlayerManagerSpy(),
         eventObserver: RestorationPlayerEventObserverSpy? = nil,
         statePersistence: RestorationStatePersistenceSpy,
         libraryContextLoader: (any LibraryPlaybackContextLoading)? = nil,
+        purchasedITunesContextLoader: (any PurchasedITunesPlaybackContextLoading)? = nil,
         fastTrackProvider: any FastLibraryTrackProviding,
         libraryAccessState: LibraryAccessState
     ) -> PlayerViewModel {
         let resolvedLibraryContextLoader = libraryContextLoader ?? LibraryContextLoaderSpy(tracks: [])
+        let resolvedPurchasedITunesContextLoader = purchasedITunesContextLoader ??
+            PurchasedITunesContextLoaderSpy(result: .temporarilyUnavailable)
 
         return PlayerViewModel(
             playerManager: playerManager,
@@ -545,6 +983,7 @@ final class PlayerViewModelRestorationTests: XCTestCase {
                 loadsInitialQueue: false
             ),
             libraryContextLoader: resolvedLibraryContextLoader,
+            purchasedITunesContextLoader: resolvedPurchasedITunesContextLoader,
             fastLibraryTrackProvider: fastTrackProvider,
             isLibraryAccessRestored: { libraryAccessState.isRestored },
             favoritesService: PlayerFavoritesServiceSpy(),
@@ -572,6 +1011,41 @@ final class PlayerViewModelRestorationTests: XCTestCase {
         )
     }
 
+    /// Формирует сохранённое состояние iTunes без очереди и локального bookmark-контекста.
+    private func makePurchasedITunesState(trackId: UUID) -> PlayerStateDatabaseModel {
+        PlayerStateDatabaseModel(
+            id: 1,
+            currentQueueItemId: nil,
+            currentTrackId: trackId,
+            contextType: .purchasedITunes,
+            contextId: nil,
+            collectionCategory: nil,
+            collectionValue: nil,
+            collectionArtistKey: nil,
+            playbackTime: 0,
+            duration: 180,
+            isPlaying: false,
+            repeatMode: .off,
+            shuffleEnabled: false,
+            updatedAt: Date()
+        )
+    }
+
+    /// Создаёт PlayerViewModel для восстановленного iTunes-порядка без доступа к системной медиатеке.
+    private func makePurchasedITunesRestorationViewModel(
+        currentTrack: PurchasedITunesPlayableTrack,
+        context: [PurchasedITunesPlayableTrack]
+    ) -> PlayerViewModel {
+        makeViewModel(
+            statePersistence: RestorationStatePersistenceSpy(
+                state: makePurchasedITunesState(trackId: currentTrack.trackId)
+            ),
+            purchasedITunesContextLoader: PurchasedITunesContextLoaderSpy(result: .loaded(context)),
+            fastTrackProvider: FastLibraryTrackProviderSpy(track: nil),
+            libraryAccessState: LibraryAccessState(isRestored: false)
+        )
+    }
+
     /// Создаёт display-модель без физического файла: PlayerManager в этих проверках её не использует.
     private func makeLibraryTrack(
         fileName: String,
@@ -586,6 +1060,27 @@ final class PlayerViewModelRestorationTests: XCTestCase {
             duration: 180,
             addedDate: Date(),
             isAvailable: false
+        )
+    }
+
+    /// Создаёт runtime-адаптер с тем же стабильным UUID.v5, который production-код строит из persistentID MediaPlayer.
+    private func makePurchasedITunesTrack(
+        id: UInt64,
+        title: String
+    ) -> PurchasedITunesPlayableTrack {
+        PurchasedITunesPlayableTrack(
+            track: PurchasedITunesTrack(
+                id: id,
+                title: title,
+                artist: "Artist",
+                album: "Album",
+                year: nil,
+                genre: nil,
+                dateAdded: Date(timeIntervalSince1970: 0),
+                artworkData: nil,
+                duration: 180,
+                assetURL: URL(fileURLWithPath: "/tmp/purchased-\(id).m4a")
+            )
         )
     }
 
@@ -702,6 +1197,8 @@ private final class FastLibraryTrackProviderSpy: FastLibraryTrackProviding {
 private final class RestorationStatePersistenceSpy: PlayerStatePersisting {
     private var state: PlayerStateDatabaseModel?
     private(set) var clearCallsCount = 0
+    private(set) var savedContextSources: [PlaybackContextSource] = []
+    private(set) var savedWrites: [SavedPlayerStateWrite] = []
 
     init(state: PlayerStateDatabaseModel?) {
         self.state = state
@@ -717,11 +1214,69 @@ private final class RestorationStatePersistenceSpy: PlayerStatePersisting {
         duration: TimeInterval,
         playbackMode: PlaybackMode,
         contextSource: PlaybackContextSource
-    ) throws {}
+    ) throws {
+        savedContextSources.append(contextSource)
+        savedWrites.append(
+            SavedPlayerStateWrite(
+                trackId: trackId,
+                queueItemId: queueItemId,
+                duration: duration,
+                source: contextSource
+            )
+        )
+    }
 
     func clearState() throws {
         clearCallsCount += 1
         state = nil
+    }
+}
+
+/// Сохраняет параметры одной записи spy, чтобы проверять инвариант trackId и источника без SQLite.
+private struct SavedPlayerStateWrite {
+    let trackId: UUID
+    let queueItemId: UUID?
+    let duration: TimeInterval
+    let source: PlaybackContextSource
+}
+
+/// Возвращает управляемый результат загрузки iTunes-контекста и может задержать первый ответ для проверки устаревшей асинхронной операции.
+@MainActor
+private final class PurchasedITunesContextLoaderSpy: PurchasedITunesPlaybackContextLoading {
+    private var result: PurchasedITunesPlaybackContextLoadResult
+    private let delaysFirstLoad: Bool
+    private var loadContinuation: CheckedContinuation<PurchasedITunesPlaybackContextLoadResult, Never>?
+    private(set) var loadCallsCount = 0
+
+    init(
+        result: PurchasedITunesPlaybackContextLoadResult,
+        delaysFirstLoad: Bool = false
+    ) {
+        self.result = result
+        self.delaysFirstLoad = delaysFirstLoad
+    }
+
+    func loadPlaybackContext() async -> PurchasedITunesPlaybackContextLoadResult {
+        loadCallsCount += 1
+
+        guard delaysFirstLoad, loadCallsCount == 1 else {
+            return result
+        }
+
+        return await withCheckedContinuation { continuation in
+            loadContinuation = continuation
+        }
+    }
+
+    /// Завершает первую удерживаемую загрузку тем же результатом, который был задан для теста.
+    func completeLoad() {
+        loadContinuation?.resume(returning: result)
+        loadContinuation = nil
+    }
+
+    /// Меняет следующий ответ, чтобы проверить повторную попытку только после события готовности MediaPlayer.
+    func setResult(_ result: PurchasedITunesPlaybackContextLoadResult) {
+        self.result = result
     }
 }
 

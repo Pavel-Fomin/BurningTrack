@@ -24,6 +24,8 @@ enum PurchasedITunesMusicAccessState: Equatable {
 
 /// Контракт чтения системной медиатеки позволяет ViewModel тестировать сортировку без MediaPlayer.
 protocol PurchasedITunesMusicProviding {
+    /// Возвращает текущий статус без неявного системного запроса доступа.
+    func accessState() -> PurchasedITunesMusicAccessState
     func requestAccessIfNeeded() async -> PurchasedITunesMusicAccessState
     func loadTracks() -> [PurchasedITunesTrack]
 }
@@ -32,11 +34,9 @@ final class PurchasedITunesMusicProvider: PurchasedITunesMusicProviding {
 
     // MARK: - Доступ
 
-    /// Запрашивает доступ к системной медиатеке только при первом обращении.
-    func requestAccessIfNeeded() async -> PurchasedITunesMusicAccessState {
-        let currentStatus = MPMediaLibrary.authorizationStatus()
-
-        switch currentStatus {
+    /// Читает состояние разрешения так, чтобы фоновое восстановление плеера не открывало системный alert.
+    func accessState() -> PurchasedITunesMusicAccessState {
+        switch MPMediaLibrary.authorizationStatus() {
         case .authorized:
             return .authorized
 
@@ -44,7 +44,26 @@ final class PurchasedITunesMusicProvider: PurchasedITunesMusicProviding {
             return .denied
 
         case .notDetermined:
-            return await withCheckedContinuation { continuation in
+            return .notDetermined
+
+        @unknown default:
+            return .denied
+        }
+    }
+
+    /// Запрашивает доступ к системной медиатеке только при первом обращении.
+    func requestAccessIfNeeded() async -> PurchasedITunesMusicAccessState {
+        let resolvedState: PurchasedITunesMusicAccessState
+
+        switch accessState() {
+        case .authorized:
+            resolvedState = .authorized
+
+        case .denied:
+            resolvedState = .denied
+
+        case .notDetermined:
+            resolvedState = await withCheckedContinuation { continuation in
                 MPMediaLibrary.requestAuthorization { status in
                     // Возвращаем внутреннее состояние экрана без протекания типов MediaPlayer наружу.
                     switch status {
@@ -59,10 +78,14 @@ final class PurchasedITunesMusicProvider: PurchasedITunesMusicProviding {
                     }
                 }
             }
-
-        @unknown default:
-            return .denied
         }
+
+        // Плеер повторяет отложенное восстановление только после явного обращения к тому же MediaPlayer-источнику.
+        NotificationCenter.default.post(
+            name: .purchasedITunesMediaLibraryAccessDidChange,
+            object: nil
+        )
+        return resolvedState
     }
 
     // MARK: - Треки

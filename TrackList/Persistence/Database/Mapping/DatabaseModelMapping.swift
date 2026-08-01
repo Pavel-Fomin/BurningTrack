@@ -48,6 +48,8 @@ enum PlaybackContextSourceDatabaseMapper {
             return .libraryRoot
         case .libraryCollection:
             return .libraryCollection
+        case .purchasedITunes:
+            return .purchasedITunes
         }
     }
 
@@ -62,6 +64,8 @@ enum PlaybackContextSourceDatabaseMapper {
         case .libraryRoot:
             return nil
         case .libraryCollection:
+            return nil
+        case .purchasedITunes:
             return nil
         }
     }
@@ -118,6 +122,16 @@ enum PlaybackContextSourceDatabaseMapper {
                 rawValue: collectionValue,
                 artistKey: collectionArtistKey
             )
+        case .purchasedITunes:
+            guard contextId == nil,
+                  collectionCategory == nil,
+                  collectionValue == nil,
+                  collectionArtistKey == nil
+            else {
+                return nil
+            }
+
+            return .purchasedITunes
         }
     }
 }

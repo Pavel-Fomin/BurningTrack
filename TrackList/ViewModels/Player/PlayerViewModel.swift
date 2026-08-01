@@ -101,6 +101,8 @@ final class PlayerViewModel: ObservableObject {
     private let playlistManager: PlaylistManager
     /// Загружает актуальные списки фонотеки без переноса SQLite-логики в PlayerViewModel.
     private let libraryContextLoader: any LibraryPlaybackContextLoading
+    /// Загружает полный отсортированный контекст системной медиатеки без зависимости от экранной ViewModel.
+    private let purchasedITunesContextLoader: any PurchasedITunesPlaybackContextLoading
     /// Быстро получает один display-трек из SQLite-реестра без открытия файла и bookmark-доступа.
     private let fastLibraryTrackProvider: any FastLibraryTrackProviding
     /// Показывает, завершена ли окончательная синхронизация фонотеки.
@@ -116,6 +118,8 @@ final class PlayerViewModel: ObservableObject {
     private var currentPlaybackContextSource: PlaybackContextSource = .playerQueue
     /// Наблюдатель нужен для повторной попытки восстановления локального трека после открытия bookmark-доступа.
     private var libraryAccessRestoredObserver: NSObjectProtocol?
+    /// Наблюдатель повторяет только отложенное восстановление iTunes после ответа на системный запрос MediaPlayer.
+    private var purchasedITunesAccessChangedObserver: NSObjectProtocol?
     /// Хранит Combine-подписки PlayerViewModel на протяжении её жизненного цикла.
     private var cancellables = Set<AnyCancellable>()
 
@@ -133,8 +137,8 @@ final class PlayerViewModel: ObservableObject {
         let identifier: UUID
         /// Стабильный id сохранённого трека для быстрой и полной проверок.
         let trackId: UUID
-        /// Исходный контекст нужен позднему восстановлению порядка Next/Previous.
-        let source: PlaybackContextSource
+        /// Исходный контекст нужен позднему восстановлению порядка Next/Previous и уточняется только для распознанного старого iTunes-состояния.
+        var source: PlaybackContextSource
         /// Queue item сохраняет точную позицию среди повторных вхождений одного trackId.
         let queueItemId: UUID?
         /// Сохранённая длительность применяется только как UI fallback до загрузки runtime-данных.
@@ -148,6 +152,8 @@ final class PlayerViewModel: ObservableObject {
         /// Показывает, что предварительный контекст уже построен из SQLite,
         /// но ещё не проверен после окончательной синхронизации фонотеки.
         var hasPreliminaryLibraryContext = false
+        /// Запоминает единственное событие готовности MediaPlayer, пришедшее во время чтения старого iTunes-контекста.
+        var shouldRetryPurchasedITunesContext = false
     }
 
     /// Ненулевое значение означает, что отображение, предварительный или окончательный контекст стартового трека ещё восстанавливаются.
@@ -231,6 +237,7 @@ final class PlayerViewModel: ObservableObject {
         statePersistence: (any PlayerStatePersisting)? = nil,
         playlistManager: PlaylistManager? = nil,
         libraryContextLoader: (any LibraryPlaybackContextLoading)? = nil,
+        purchasedITunesContextLoader: (any PurchasedITunesPlaybackContextLoading)? = nil,
         fastLibraryTrackProvider: (any FastLibraryTrackProviding)? = nil,
         isLibraryAccessRestored: (@MainActor () -> Bool)? = nil,
         waveformGenerator: (any WaveformGenerating)? = nil,
@@ -254,6 +261,7 @@ final class PlayerViewModel: ObservableObject {
         self.statePersistence = statePersistence ?? (try? PlayerStatePersistence())
         self.playlistManager = resolvedPlaylistManager
         self.libraryContextLoader = libraryContextLoader ?? LibraryPlaybackContextLoader()
+        self.purchasedITunesContextLoader = purchasedITunesContextLoader ?? PurchasedITunesPlaybackContextLoader()
         self.fastLibraryTrackProvider = fastLibraryTrackProvider ?? FastLibraryTracksProvider()
         // Singleton читается внутри MainActor-init, а тесты передают изолированный источник готовности.
         self.isLibraryAccessRestored = isLibraryAccessRestored ?? {
@@ -282,6 +290,17 @@ final class PlayerViewModel: ObservableObject {
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.resumeLastTrackRestorationAfterLibraryAccess()
+            }
+        }
+
+        purchasedITunesAccessChangedObserver = NotificationCenter.default.addObserver(
+            forName: .purchasedITunesMediaLibraryAccessDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.resumeLastTrackRestorationAfterPurchasedITunesAccessChange()
             }
         }
 
@@ -451,9 +470,12 @@ final class PlayerViewModel: ObservableObject {
         guard let statePersistence else { return }
 
         let queueItemId = (track as? PlayerTrack)?.queueItemId
-        PersistentLogger.log(
-            "Player state save begin: trackId=\(track.trackId) " +
-            "source=\(playbackSourceLogDescription(source))"
+        logPlayerStateDebug(
+            "PLAYER STATE WRITE source=\(playbackSourceLogDescription(source)) " +
+            "trackId=\(track.trackId) queueItemId=\(queueItemId?.uuidString ?? "nil") " +
+            "position=0 duration=\(track.duration) " +
+            "currentRuntimeTrackId=\(currentTrackDisplayable?.trackId.uuidString ?? "nil") " +
+            "currentRuntimeSource=\(playbackSourceLogDescription(currentPlaybackContextSource))"
         )
 
         do {
@@ -464,9 +486,9 @@ final class PlayerViewModel: ObservableObject {
                 playbackMode: playbackMode,
                 contextSource: source
             )
-            PersistentLogger.log(
-                "Player state save success: trackId=\(track.trackId) " +
-                "source=\(playbackSourceLogDescription(source))"
+            logPlayerStateDebug(
+                "PLAYER STATE WRITE SUCCESS source=\(playbackSourceLogDescription(source)) " +
+                "trackId=\(track.trackId) queueItemId=\(queueItemId?.uuidString ?? "nil")"
             )
         } catch {
             // Ошибка постоянного состояния не должна прерывать запуск воспроизведения.
@@ -514,8 +536,8 @@ final class PlayerViewModel: ObservableObject {
             return
         }
 
-        PersistentLogger.log(
-            "Player state load: \(playerStateLogDescription(state))"
+        logPlayerStateDebug(
+            "PLAYER STATE READ \(playerStateLogDescription(state))"
         )
 
         guard let trackId = state.currentTrackId else {
@@ -543,6 +565,13 @@ final class PlayerViewModel: ObservableObject {
             return
         }
 
+        let savedDuration = state.duration.map { String($0) } ?? "nil"
+        logPlayerStateDebug(
+            "PLAYER STATE READ SOURCE source=\(playbackSourceLogDescription(source)) " +
+            "trackId=\(trackId) queueItemId=\(state.currentQueueItemId?.uuidString ?? "nil") " +
+            "position=\(state.playbackTime) duration=\(savedDuration)"
+        )
+
         let restoration = PendingLastTrackRestoration(
             identifier: UUID(),
             trackId: trackId,
@@ -565,6 +594,8 @@ final class PlayerViewModel: ObservableObject {
              .libraryCollection:
             // Для UI достаточно записи реестра; контекст строится отдельной двухстадийной цепочкой.
             restoreLibraryTrackForDisplay(restorationIdentifier: restoration.identifier)
+        case .purchasedITunes:
+            restorePurchasedITunesPlaybackContext(restorationIdentifier: restoration.identifier)
         }
     }
 
@@ -593,6 +624,108 @@ final class PlayerViewModel: ObservableObject {
         case .trackList:
             // Треклист не зависит от bookmark-доступа; незавершённая задача сама проверяет свой идентификатор.
             return
+        case .purchasedITunes:
+            // iTunes использует отдельное событие MediaPlayer и не зависит от bookmark-доступа фонотеки.
+            return
+        }
+    }
+
+    /// Повторяет отложенное iTunes-восстановление только после нового результата системного запроса MediaPlayer.
+    private func resumeLastTrackRestorationAfterPurchasedITunesAccessChange() {
+        guard var restoration = pendingLastTrackRestoration,
+              restoration.source == .purchasedITunes
+        else {
+            return
+        }
+
+        if restoration.isContextRestoreInFlight {
+            // Готовность, пришедшая во время чтения, будет обработана после окончания именно этого запроса.
+            restoration.shouldRetryPurchasedITunesContext = true
+            pendingLastTrackRestoration = restoration
+            return
+        }
+
+        restorePurchasedITunesPlaybackContext(restorationIdentifier: restoration.identifier)
+    }
+
+    /// Восстанавливает полный отсортированный контекст Purchased iTunes без обращения к очереди, фонотеке или экранной ViewModel.
+    private func restorePurchasedITunesPlaybackContext(restorationIdentifier: UUID) {
+        guard var restoration = pendingRestoration(with: restorationIdentifier),
+              restoration.source == .purchasedITunes,
+              restoration.isContextRestoreInFlight == false,
+              currentTrackDisplayable == nil
+        else {
+            return
+        }
+
+        restoration.isContextRestoreInFlight = true
+        restoration.shouldRetryPurchasedITunesContext = false
+        pendingLastTrackRestoration = restoration
+        // До полного результата сохраняем распознанный источник и не превращаем iTunes-состояние в очередь плеера.
+        currentPlaybackContextSource = .purchasedITunes
+        PersistentLogger.log(
+            "Player restore purchased iTunes context started trackId=\(restoration.trackId)"
+        )
+
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            defer {
+                self.finishContextRestoreAttempt(restorationIdentifier)
+
+                if var updatedRestoration = self.pendingRestoration(with: restorationIdentifier),
+                   updatedRestoration.shouldRetryPurchasedITunesContext {
+                    updatedRestoration.shouldRetryPurchasedITunesContext = false
+                    self.pendingLastTrackRestoration = updatedRestoration
+                    self.restorePurchasedITunesPlaybackContext(restorationIdentifier: restorationIdentifier)
+                }
+            }
+
+            let result = await self.purchasedITunesContextLoader.loadPlaybackContext()
+
+            guard let activeRestoration = self.pendingRestoration(with: restorationIdentifier),
+                  activeRestoration.source == .purchasedITunes,
+                  self.currentTrackDisplayable == nil,
+                  self.currentPlaybackContextSource == .purchasedITunes
+            else {
+                // Устаревший результат не может заменить новый выбор пользователя или его контекст.
+                return
+            }
+
+            switch result {
+            case .loaded(let tracks):
+                guard let restoredTrack = tracks.first(where: {
+                    $0.trackId == activeRestoration.trackId
+                }) else {
+                    self.confirmPendingTrackMissing(
+                        restorationIdentifier,
+                        reason: "currentTrackId отсутствует в актуальном Purchased iTunes-контексте " +
+                            "trackId=\(activeRestoration.trackId)"
+                    )
+                    return
+                }
+
+                let context: [any TrackDisplayable] = tracks
+                self.applyRestoredTrack(
+                    restoredTrack,
+                    context: context,
+                    source: .purchasedITunes
+                )
+                self.completePendingRestoration(restorationIdentifier)
+
+            case .temporarilyUnavailable:
+                // Временная недоступность не доказывает удаление трека и оставляет сохранённое состояние до события MediaPlayer.
+                PersistentLogger.log(
+                    "Player restore purchased iTunes deferred: MediaPlayer временно недоступен " +
+                        "trackId=\(activeRestoration.trackId)"
+                )
+
+            case .accessDenied:
+                // Запрет доступа не является основанием подменять источник очередью или очищать сохранённый iTunes-трек.
+                PersistentLogger.log(
+                    "Player restore purchased iTunes deferred: доступ MediaPlayer запрещён " +
+                        "trackId=\(activeRestoration.trackId)"
+                )
+            }
         }
     }
 
@@ -930,7 +1063,8 @@ final class PlayerViewModel: ObservableObject {
                 artistKey: artistKey
             )
         case .playerQueue,
-             .trackList:
+             .trackList,
+             .purchasedITunes:
             return []
         }
     }
@@ -1024,6 +1158,15 @@ final class PlayerViewModel: ObservableObject {
             guard self.currentTrackDisplayable == nil else {
                 return
             }
+
+            if restoredTrack.isPurchasedITunesRuntimeTrack {
+                // Старые версии записывали прямой iTunes-запуск как playerQueue; после распознавания нельзя оставлять одиночный fallback-контекст.
+                activeRestoration.source = .purchasedITunes
+                self.pendingLastTrackRestoration = activeRestoration
+                self.restorePurchasedITunesPlaybackContext(restorationIdentifier: restorationIdentifier)
+                return
+            }
+
             self.applyRestoredTrack(
                 restoredTrack,
                 context: [restoredTrack],
@@ -1175,9 +1318,13 @@ final class PlayerViewModel: ObservableObject {
         requestSnapshotIfNeeded(for: track)
         updateMiniPlayerStaticState(for: track)
         updateMiniPlayerProgressState()
-        PersistentLogger.log(
-            "Player state restore success: trackId=\(track.trackId) " +
-            "source=\(playbackSourceLogDescription(source)) contextCount=\(context.count)"
+        logPlayerStateDebug(
+            "RESTORE APPLY restorationType=\(playbackSourceLogDescription(source)) " +
+            "restorationIdentifier=\(pendingLastTrackRestoration?.identifier.uuidString ?? "nil") " +
+            "savedSource=\(playbackSourceLogDescription(pendingLastTrackRestoration?.source ?? source)) " +
+            "savedTrackId=\(pendingLastTrackRestoration?.trackId.uuidString ?? "nil") " +
+            "appliedTrackId=\(track.trackId) " +
+            "appliedTrackSource=\(playbackSourceLogDescription(source)) contextCount=\(context.count)"
         )
     }
 
@@ -1255,7 +1402,16 @@ final class PlayerViewModel: ObservableObject {
         case .libraryCollection(let category, let rawValue, let artistKey):
             return "libraryCollection category=\(category.rawValue) " +
                 "rawValue=\(rawValue) artistKey=\(artistKey ?? "nil")"
+        case .purchasedITunes:
+            return "purchasedITunes"
         }
+    }
+
+    /// Записывает подробную диагностику восстановления только в DEBUG-сборках.
+    private func logPlayerStateDebug(_ message: @autoclosure () -> String) {
+        #if DEBUG
+        PersistentLogger.log(message())
+        #endif
     }
 
     /// Формирует полное безопасное описание сохранённого состояния без URL и bookmark-данных.
@@ -1628,6 +1784,11 @@ final class PlayerViewModel: ObservableObject {
         
         // Определяем контекст воспроизведения
         let contextType = PlaybackContext.detect(from: context)
+        let resolvedSource = playbackContextSource(
+            for: context,
+            contextType: contextType,
+            requestedSource: source
+        )
         let isSameContext = playbackContextStore.isCurrentContext(context)
         let isSameTrack: Bool
         if let current = currentTrackDisplayable {
@@ -1635,13 +1796,13 @@ final class PlayerViewModel: ObservableObject {
                 type(of: current) == type(of: track) &&
                 currentContext == contextType &&
                 isSameContext &&
-                currentPlaybackContextSource == source
+                currentPlaybackContextSource == resolvedSource
         } else {
             isSameTrack = false
         }
 
         currentContext = contextType
-        currentPlaybackContextSource = source
+        currentPlaybackContextSource = resolvedSource
 
         // Обновляем контекст до проверки текущего трека, чтобы не потерять его позицию.
         _ = playbackContextStore.updateContext(
@@ -1672,6 +1833,12 @@ final class PlayerViewModel: ObservableObject {
         invalidatePendingLastTrackRestoration()
         playerManager.stopAccessingCurrentTrack()
         resetWaveformState()
+        logPlayerStateDebug(
+            "CURRENT TRACK REPLACED oldTrackId=\(currentTrackDisplayable?.trackId.uuidString ?? "nil") " +
+            "oldSource=\(playbackSourceLogDescription(currentPlaybackContextSource)) " +
+            "newTrackId=\(track.trackId) " +
+            "newSource=\(playbackSourceLogDescription(resolvedSource)) caller=userPlay"
+        )
         currentTrackDisplayable = track
         setPlaybackContextReady(hasConfirmedPlaybackContext)
         miniPlayerStaticState = nil
@@ -1679,7 +1846,7 @@ final class PlayerViewModel: ObservableObject {
         trackDuration = 0
         isCurrentTrackPreparedForPlayback = false
         isPreparingCurrentTrackForPlayback = true
-        persistCurrentTrack(track, source: source)
+        persistCurrentTrack(track, source: resolvedSource)
         requestSnapshotIfNeeded(for: track)
         
         updateMiniPlayerStaticState(for: track)
@@ -1736,6 +1903,22 @@ final class PlayerViewModel: ObservableObject {
         for track: any TrackDisplayable
     ) -> any TrackDisplayable {
         track.asPurchasedITunesPlayableTrack() ?? track
+    }
+
+    /// Определяет постоянный источник по общему контексту, сохраняя явный источник очереди для любых иных runtime-моделей.
+    private func playbackContextSource(
+        for context: [any TrackDisplayable],
+        contextType: PlaybackContext,
+        requestedSource: PlaybackContextSource
+    ) -> PlaybackContextSource {
+        guard contextType == .purchasedITunes,
+              context.isEmpty == false,
+              context.allSatisfy({ $0.isPurchasedITunesRuntimeTrack })
+        else {
+            return requestedSource
+        }
+
+        return .purchasedITunes
     }
 
     /// Подключает единственное наблюдение прогресса для обычного и восстановленного запуска.
@@ -2028,6 +2211,9 @@ final class PlayerViewModel: ObservableObject {
         if let libraryAccessRestoredObserver {
             NotificationCenter.default.removeObserver(libraryAccessRestoredObserver)
         }
+        if let purchasedITunesAccessChangedObserver {
+            NotificationCenter.default.removeObserver(purchasedITunesAccessChangedObserver)
+        }
         playerManager.removeTimeObserver()
         playerManager.removeFavoriteCommandHandler()
     }
@@ -2043,7 +2229,8 @@ private extension PlaybackContextSource {
              .libraryCollection:
             return true
         case .playerQueue,
-             .trackList:
+             .trackList,
+             .purchasedITunes:
             return false
         }
     }
