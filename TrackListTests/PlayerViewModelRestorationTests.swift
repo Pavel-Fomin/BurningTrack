@@ -108,30 +108,84 @@ final class PlayerViewModelRestorationTests: XCTestCase {
         XCTAssertNil(miniPlayerStaticState(in: viewModel.miniPlayerState)?.artist)
     }
 
-    /// До загрузки полного context оба перехода недоступны и прямые вызовы не создают ложное воспроизведение.
-    func testEarlyLibraryTrackDisablesNavigationUntilContextIsRestored() async {
-        let track = makeLibraryTrack(fileName: "Early Navigation.m4a")
+    /// Локальный контекст строится из SQLite до окончания синхронизации фонотеки.
+    func testLibraryContextBecomesReadyBeforeLibraryAccessRestored() async {
+        let firstTrack = makeLibraryTrack(fileName: "Early First.m4a")
+        let secondTrack = makeLibraryTrack(fileName: "Early Second.m4a")
         let playerManager = RestorationPlayerManagerSpy()
+        let contextLoader = LibraryContextLoaderSpy(tracks: [firstTrack, secondTrack])
         let viewModel = makeViewModel(
             playerManager: playerManager,
             statePersistence: RestorationStatePersistenceSpy(
-                state: makeLibraryState(trackId: track.trackId)
+                state: makeLibraryState(trackId: firstTrack.trackId)
             ),
-            fastTrackProvider: FastLibraryTrackProviderSpy(track: track),
+            libraryContextLoader: contextLoader,
+            fastTrackProvider: FastLibraryTrackProviderSpy(track: firstTrack),
             libraryAccessState: LibraryAccessState(isRestored: false)
         )
 
         await waitUntil {
-            viewModel.currentTrackDisplayable?.trackId == track.trackId
+            viewModel.isPlaybackContextReady
         }
 
-        viewModel.playPreviousTrack()
-        viewModel.playNextTrack()
-        await Task.yield()
-
-        XCTAssertFalse(viewModel.isPlaybackContextReady)
+        XCTAssertEqual(viewModel.currentTrackDisplayable?.trackId, firstTrack.trackId)
+        XCTAssertEqual(contextLoader.loadRootCallsCount, 1)
+        XCTAssertTrue(viewModel.isPlaybackContextReady)
         XCTAssertFalse(viewModel.canPlayPreviousTrack)
-        XCTAssertFalse(viewModel.canPlayNextTrack)
+        XCTAssertTrue(viewModel.canPlayNextTrack)
+        XCTAssertFalse(viewModel.isPlaying)
+        XCTAssertEqual(playerManager.playCallsCount, 0)
+    }
+
+    /// Предварительный SQLite-контекст разрешает переход Next до полной синхронизации.
+    func testPreliminaryLibraryContextAllowsNextBeforeLibraryAccessRestored() async {
+        let firstTrack = makeLibraryTrack(fileName: "Preliminary First.m4a")
+        let secondTrack = makeLibraryTrack(fileName: "Preliminary Second.m4a")
+        let playerManager = RestorationPlayerManagerSpy()
+        let viewModel = makeViewModel(
+            playerManager: playerManager,
+            statePersistence: RestorationStatePersistenceSpy(
+                state: makeLibraryState(trackId: firstTrack.trackId)
+            ),
+            libraryContextLoader: LibraryContextLoaderSpy(tracks: [firstTrack, secondTrack]),
+            fastTrackProvider: FastLibraryTrackProviderSpy(track: firstTrack),
+            libraryAccessState: LibraryAccessState(isRestored: false)
+        )
+
+        await waitUntil {
+            viewModel.isPlaybackContextReady && viewModel.canPlayNextTrack
+        }
+
+        viewModel.playNextTrack()
+
+        await waitUntil {
+            playerManager.playedTrackIds == [secondTrack.trackId]
+        }
+
+        XCTAssertEqual(viewModel.currentTrackDisplayable?.trackId, secondTrack.trackId)
+        XCTAssertEqual(playerManager.playCallsCount, 1)
+    }
+
+    /// Предварительный контекст не запускает воспроизведение без явного действия пользователя.
+    func testPreliminaryLibraryContextDoesNotStartPlayAutomatically() async {
+        let firstTrack = makeLibraryTrack(fileName: "No Auto Play First.m4a")
+        let secondTrack = makeLibraryTrack(fileName: "No Auto Play Second.m4a")
+        let playerManager = RestorationPlayerManagerSpy()
+        let viewModel = makeViewModel(
+            playerManager: playerManager,
+            statePersistence: RestorationStatePersistenceSpy(
+                state: makeLibraryState(trackId: firstTrack.trackId)
+            ),
+            libraryContextLoader: LibraryContextLoaderSpy(tracks: [firstTrack, secondTrack]),
+            fastTrackProvider: FastLibraryTrackProviderSpy(track: firstTrack),
+            libraryAccessState: LibraryAccessState(isRestored: false)
+        )
+
+        await waitUntil {
+            viewModel.isPlaybackContextReady
+        }
+
+        XCTAssertFalse(viewModel.isPlaying)
         XCTAssertEqual(playerManager.playCallsCount, 0)
     }
 
@@ -210,6 +264,44 @@ final class PlayerViewModelRestorationTests: XCTestCase {
         XCTAssertEqual(playerManager.playedTrackIds, [secondTrack.trackId])
     }
 
+    /// Окончательная стадия заменяет предварительный порядок после синхронизации, не меняя текущий трек и не запуская воспроизведение.
+    func testFinalLibraryContextUpdatesPreliminaryContextAfterLibraryAccessRestored() async {
+        let firstTrack = makeLibraryTrack(fileName: "Final First.m4a")
+        let preliminarySecondTrack = makeLibraryTrack(fileName: "Final Preliminary Second.m4a")
+        let playerManager = RestorationPlayerManagerSpy()
+        let accessState = LibraryAccessState(isRestored: false)
+        let contextLoader = SequencedLibraryContextLoaderSpy(
+            contexts: [[firstTrack, preliminarySecondTrack], [firstTrack]]
+        )
+        let viewModel = makeViewModel(
+            playerManager: playerManager,
+            statePersistence: RestorationStatePersistenceSpy(
+                state: makeLibraryState(trackId: firstTrack.trackId)
+            ),
+            libraryContextLoader: contextLoader,
+            fastTrackProvider: FastLibraryTrackProviderSpy(track: firstTrack),
+            libraryAccessState: accessState
+        )
+
+        await waitUntil {
+            viewModel.isPlaybackContextReady && viewModel.canPlayNextTrack
+        }
+
+        accessState.isRestored = true
+        NotificationCenter.default.post(name: .libraryAccessRestored, object: nil)
+
+        await waitUntil {
+            contextLoader.loadRootCallsCount == 2 && viewModel.canPlayNextTrack == false
+        }
+
+        XCTAssertEqual(viewModel.currentTrackDisplayable?.trackId, firstTrack.trackId)
+        XCTAssertTrue(viewModel.isPlaybackContextReady)
+        XCTAssertFalse(viewModel.canPlayPreviousTrack)
+        XCTAssertFalse(viewModel.canPlayNextTrack)
+        XCTAssertFalse(viewModel.isPlaying)
+        XCTAssertEqual(playerManager.playCallsCount, 0)
+    }
+
     /// Последний трек линейного context разрешает только переход назад после позднего восстановления.
     func testLastTrackEnablesOnlyPreviousAfterContextIsRestored() async {
         let firstTrack = makeLibraryTrack(fileName: "First.m4a")
@@ -267,7 +359,7 @@ final class PlayerViewModelRestorationTests: XCTestCase {
         XCTAssertFalse(viewModel.canPlayNextTrack)
     }
 
-    /// Поздний context не возвращает прежний трек, если пользователь уже выбрал другой готовый context.
+    /// Поздний окончательный контекст не возвращает прежний трек, если пользователь уже выбрал другой готовый контекст.
     func testLateContextDoesNotReplaceUserSelectedTrack() async {
         let restoredTrack = makeLibraryTrack(fileName: "Restored.m4a")
         let selectedTrack = makeLibraryTrack(fileName: "Selected.m4a")
@@ -286,11 +378,15 @@ final class PlayerViewModelRestorationTests: XCTestCase {
             viewModel.currentTrackDisplayable?.trackId == restoredTrack.trackId
         }
 
+        await waitUntil {
+            viewModel.isPlaybackContextReady
+        }
+
         accessState.isRestored = true
         NotificationCenter.default.post(name: .libraryAccessRestored, object: nil)
 
         await waitUntil {
-            contextLoader.loadRootCallsCount == 1
+            contextLoader.loadRootCallsCount == 2
         }
 
         viewModel.play(
@@ -309,6 +405,41 @@ final class PlayerViewModelRestorationTests: XCTestCase {
         XCTAssertTrue(viewModel.isPlaybackContextReady)
         XCTAssertFalse(viewModel.canPlayPreviousTrack)
         XCTAssertFalse(viewModel.canPlayNextTrack)
+    }
+
+    /// Повторные события до завершения предварительной загрузки не создают параллельные запросы контекста.
+    func testRepeatedLibraryAccessEventsDoNotStartParallelContextLoads() async {
+        let firstTrack = makeLibraryTrack(fileName: "Repeated First.m4a")
+        let secondTrack = makeLibraryTrack(fileName: "Repeated Second.m4a")
+        let accessState = LibraryAccessState(isRestored: false)
+        let contextLoader = DelayedLibraryContextLoaderSpy(
+            tracks: [firstTrack, secondTrack],
+            delaysFirstLoad: true
+        )
+        let viewModel = makeViewModel(
+            statePersistence: RestorationStatePersistenceSpy(
+                state: makeLibraryState(trackId: firstTrack.trackId)
+            ),
+            libraryContextLoader: contextLoader,
+            fastTrackProvider: FastLibraryTrackProviderSpy(track: firstTrack),
+            libraryAccessState: accessState
+        )
+
+        await waitUntil {
+            contextLoader.loadRootCallsCount == 1
+        }
+
+        NotificationCenter.default.post(name: .libraryAccessRestored, object: nil)
+        NotificationCenter.default.post(name: .libraryAccessRestored, object: nil)
+        await Task.yield()
+
+        XCTAssertEqual(contextLoader.loadRootCallsCount, 1)
+
+        contextLoader.completeLoad()
+
+        await waitUntil {
+            viewModel.isPlaybackContextReady
+        }
     }
 
     /// Поздний runtime snapshot может добавить artwork, не заменяя сохранённые ранние теги fallback-значениями.
@@ -399,7 +530,9 @@ final class PlayerViewModelRestorationTests: XCTestCase {
         fastTrackProvider: any FastLibraryTrackProviding,
         libraryAccessState: LibraryAccessState
     ) -> PlayerViewModel {
-        PlayerViewModel(
+        let resolvedLibraryContextLoader = libraryContextLoader ?? LibraryContextLoaderSpy(tracks: [])
+
+        return PlayerViewModel(
             playerManager: playerManager,
             playbackContextStore: PlayerPlaybackContextStore(
                 playbackModePersistence: RestorationPlaybackModePersistenceSpy()
@@ -411,7 +544,7 @@ final class PlayerViewModelRestorationTests: XCTestCase {
                 databaseStore: RestorationPlayerQueuePersistenceSpy(),
                 loadsInitialQueue: false
             ),
-            libraryContextLoader: libraryContextLoader,
+            libraryContextLoader: resolvedLibraryContextLoader,
             fastLibraryTrackProvider: fastTrackProvider,
             isLibraryAccessRestored: { libraryAccessState.isRestored },
             favoritesService: PlayerFavoritesServiceSpy(),
@@ -620,15 +753,49 @@ private final class LibraryContextLoaderSpy: LibraryPlaybackContextLoading {
     }
 }
 
-/// Удерживает позднюю загрузку context до явного завершения, чтобы проверить приоритет пользовательского выбора.
+/// Возвращает контексты по порядку запросов, чтобы проверить замену предварительного состояния окончательным.
+@MainActor
+private final class SequencedLibraryContextLoaderSpy: LibraryPlaybackContextLoading {
+    private let contexts: [[LibraryTrack]]
+    private(set) var loadRootCallsCount = 0
+
+    init(contexts: [[LibraryTrack]]) {
+        self.contexts = contexts
+    }
+
+    func loadFolderContext(folderId: UUID) async throws -> [LibraryTrack] {
+        []
+    }
+
+    func loadRootContext() async throws -> [LibraryTrack] {
+        let contextIndex = min(loadRootCallsCount, contexts.count - 1)
+        loadRootCallsCount += 1
+        return contexts[contextIndex]
+    }
+
+    func loadCollectionContext(
+        category: LibraryCollectionCategory,
+        rawValue: String,
+        artistKey: String?
+    ) async throws -> [LibraryTrack] {
+        []
+    }
+}
+
+/// Удерживает выбранную загрузку контекста до явного завершения, чтобы проверить приоритет пользовательского выбора и защиту от параллельных запросов.
 @MainActor
 private final class DelayedLibraryContextLoaderSpy: LibraryPlaybackContextLoading {
     private let tracks: [LibraryTrack]
+    private let delayedLoadNumber: Int
     private var loadContinuation: CheckedContinuation<[LibraryTrack], Never>?
     private(set) var loadRootCallsCount = 0
 
-    init(tracks: [LibraryTrack]) {
+    init(
+        tracks: [LibraryTrack],
+        delaysFirstLoad: Bool = false
+    ) {
         self.tracks = tracks
+        self.delayedLoadNumber = delaysFirstLoad ? 1 : 2
     }
 
     func loadFolderContext(folderId: UUID) async throws -> [LibraryTrack] {
@@ -637,6 +804,11 @@ private final class DelayedLibraryContextLoaderSpy: LibraryPlaybackContextLoadin
 
     func loadRootContext() async throws -> [LibraryTrack] {
         loadRootCallsCount += 1
+
+        guard loadRootCallsCount == delayedLoadNumber else {
+            return tracks
+        }
+
         return await withCheckedContinuation { continuation in
             loadContinuation = continuation
         }

@@ -103,7 +103,8 @@ final class PlayerViewModel: ObservableObject {
     private let libraryContextLoader: any LibraryPlaybackContextLoading
     /// Быстро получает один display-трек из SQLite-реестра без открытия файла и bookmark-доступа.
     private let fastLibraryTrackProvider: any FastLibraryTrackProviding
-    /// Позволяет отложить полный контекст до готовности фонотеки и подменить состояние в изолированных тестах.
+    /// Показывает, завершена ли окончательная синхронизация фонотеки.
+    /// Используется только для подтверждения отсутствия трека и финальной проверки контекста.
     private let isLibraryAccessRestored: @MainActor () -> Bool
     /// Слой генерации скрывает AVAssetReader и файловый кэш от ViewModel.
     private let waveformGenerator: any WaveformGenerating
@@ -117,6 +118,14 @@ final class PlayerViewModel: ObservableObject {
     private var libraryAccessRestoredObserver: NSObjectProtocol?
     /// Хранит Combine-подписки PlayerViewModel на протяжении её жизненного цикла.
     private var cancellables = Set<AnyCancellable>()
+
+    /// Определяет назначение загрузки локального контекста воспроизведения.
+    private enum LibraryContextRestorationStage {
+        /// Ранний контекст строится из SQLite до завершения синхронизации.
+        case preliminary
+        /// Окончательный контекст повторно проверяется после libraryAccessRestored.
+        case final
+    }
 
     /// Хранит только незавершённое стартовое восстановление, не дублируя данные в SQLite или отдельном кэше.
     private struct PendingLastTrackRestoration {
@@ -134,11 +143,14 @@ final class PlayerViewModel: ObservableObject {
         var isFastLookupInFlight = false
         /// Не допускает параллельные fallback-проверки очереди через bookmark-путь.
         var isFallbackTrackRestoreInFlight = false
-        /// Не допускает параллельные загрузки полного контекста после libraryAccessRestored.
+        /// Не допускает параллельные загрузки локального контекста воспроизведения.
         var isContextRestoreInFlight = false
+        /// Показывает, что предварительный контекст уже построен из SQLite,
+        /// но ещё не проверен после окончательной синхронизации фонотеки.
+        var hasPreliminaryLibraryContext = false
     }
 
-    /// Ненулевое значение означает, что отображение или полный контекст стартового трека ещё восстанавливаются.
+    /// Ненулевое значение означает, что отображение, предварительный или окончательный контекст стартового трека ещё восстанавливаются.
     private var pendingLastTrackRestoration: PendingLastTrackRestoration?
 
     /// Конкретный PlayerManager нужен сценариям файловых операций,
@@ -551,7 +563,7 @@ final class PlayerViewModel: ObservableObject {
         case .libraryFolder,
              .libraryRoot,
              .libraryCollection:
-            // Для UI достаточно записи реестра; полный контекст по-прежнему ждёт готовности фонотеки.
+            // Для UI достаточно записи реестра; контекст строится отдельной двухстадийной цепочкой.
             restoreLibraryTrackForDisplay(restorationIdentifier: restoration.identifier)
         }
     }
@@ -748,9 +760,13 @@ final class PlayerViewModel: ObservableObject {
                 return
             }
 
-            if self.isLibraryAccessRestored() {
-                self.restoreLibraryPlaybackContext(restorationIdentifier: restorationIdentifier)
-            }
+            let stage: LibraryContextRestorationStage = self.isLibraryAccessRestored()
+                ? .final
+                : .preliminary
+            self.restoreLibraryPlaybackContext(
+                restorationIdentifier: restorationIdentifier,
+                stage: stage
+            )
         }
     }
 
@@ -788,7 +804,7 @@ final class PlayerViewModel: ObservableObject {
         miniPlayerStaticState = nil
         resetWaveformState()
         // Стартовый UI не запускает runtime snapshot: его builder открывает bookmark и читает аудиофайл.
-        // Обложка и отсутствующие уточнения metadata будут запрошены только после готовности полного контекста или при Play.
+        // Обложка и отсутствующие уточнения metadata будут запрошены только после final-стадии или при Play.
         updateMiniPlayerStaticState(for: displayTrack)
         updateMiniPlayerProgressState()
         PersistentLogger.log(
@@ -797,20 +813,43 @@ final class PlayerViewModel: ObservableObject {
         )
     }
 
-    /// Загружает полный актуальный контекст только после готовности фонотеки, сохраняя уже показанный трек.
-    private func restoreLibraryPlaybackContext(restorationIdentifier: UUID) {
-        guard isLibraryAccessRestored(),
-              var restoration = pendingRestoration(with: restorationIdentifier),
+    /// Загружает локальный контекст воспроизведения из SQLite.
+    /// Предварительная стадия разрешает навигацию до окончания синхронизации,
+    /// окончательная — повторно проверяет порядок после libraryAccessRestored.
+    private func restoreLibraryPlaybackContext(
+        restorationIdentifier: UUID,
+        stage: LibraryContextRestorationStage
+    ) {
+        guard var restoration = pendingRestoration(with: restorationIdentifier),
               restoration.source.isLibrarySource,
               restoration.isContextRestoreInFlight == false,
               currentTrackDisplayable?.trackId == restoration.trackId
         else {
             return
         }
+
+        if case .final = stage,
+           isLibraryAccessRestored() == false {
+            return
+        }
+
+        if case .preliminary = stage,
+           restoration.hasPreliminaryLibraryContext {
+            return
+        }
+
+        let stageDescription: String
+        switch stage {
+        case .preliminary:
+            stageDescription = "preliminary"
+        case .final:
+            stageDescription = "final"
+        }
+
         restoration.isContextRestoreInFlight = true
         pendingLastTrackRestoration = restoration
         PersistentLogger.log(
-            "Player restore full context started source=" +
+            "Player restore library context started stage=\(stageDescription) source=" +
                 "\(playbackSourceLogDescription(restoration.source)) trackId=\(restoration.trackId)"
         )
 
@@ -818,6 +857,15 @@ final class PlayerViewModel: ObservableObject {
             guard let self else { return }
             defer {
                 self.finishContextRestoreAttempt(restorationIdentifier)
+
+                if case .preliminary = stage,
+                   self.isLibraryAccessRestored() {
+                    // Окончательная стадия не должна потеряться, если синхронизация завершилась во время SQLite-загрузки.
+                    self.restoreLibraryPlaybackContext(
+                        restorationIdentifier: restorationIdentifier,
+                        stage: .final
+                    )
+                }
             }
 
             guard let activeRestoration = self.pendingRestoration(with: restorationIdentifier) else {
@@ -836,25 +884,32 @@ final class PlayerViewModel: ObservableObject {
                 guard tracks.contains(where: { $0.trackId == activeRestoration.trackId }) else {
                     // Трек остался в реестре и уже показан; исчезновение только контекста не доказывает удаление файла.
                     PersistentLogger.log(
-                        "Player restore full context has no current track source=" +
+                        "Player restore library context has no current track stage=\(stageDescription) source=" +
                             "\(self.playbackSourceLogDescription(activeRestoration.source)) " +
                             "trackId=\(activeRestoration.trackId)"
                     )
-                    self.completePendingRestoration(restorationIdentifier)
+
+                    if case .final = stage {
+                        self.completePendingRestoration(restorationIdentifier)
+                    }
                     return
                 }
 
                 self.applyRestoredLibraryPlaybackContext(
                     tracks,
-                    restorationIdentifier: restorationIdentifier
+                    restorationIdentifier: restorationIdentifier,
+                    stage: stage
                 )
             } catch {
                 // Ошибка контекста не очищает ранний UI-трек: его существование подтверждает отдельный реестр.
                 PersistentLogger.log(
-                    "Player restore full context failed source=" +
+                    "Player restore library context failed stage=\(stageDescription) source=" +
                         "\(self.playbackSourceLogDescription(activeRestoration.source)) error=\(error)"
                 )
-                self.completePendingRestoration(restorationIdentifier)
+
+                if case .final = stage {
+                    self.completePendingRestoration(restorationIdentifier)
+                }
             }
         }
     }
@@ -883,7 +938,8 @@ final class PlayerViewModel: ObservableObject {
     /// Обновляет только playback-контекст; ранняя display-модель остаётся на месте без мигания мини-плеера.
     private func applyRestoredLibraryPlaybackContext(
         _ tracks: [LibraryTrack],
-        restorationIdentifier: UUID
+        restorationIdentifier: UUID,
+        stage: LibraryContextRestorationStage
     ) {
         guard let restoration = pendingRestoration(with: restorationIdentifier),
               let currentTrack = currentTrackDisplayable,
@@ -893,6 +949,8 @@ final class PlayerViewModel: ObservableObject {
         }
 
         let context: [any TrackDisplayable] = tracks
+        let sourceDescription = playbackSourceLogDescription(restoration.source)
+        let currentTrackId = currentTrack.trackId
         currentPlaybackContextSource = restoration.source
         currentContext = PlaybackContext.detect(from: context)
         _ = playbackContextStore.updateContext(
@@ -900,14 +958,25 @@ final class PlayerViewModel: ObservableObject {
             context: context
         )
         setPlaybackContextReady(true)
-        // Теперь bookmark-доступ уже восстановлен, поэтому вторичные runtime-данные можно догрузить отдельно от UI.
-        requestSnapshotIfNeeded(for: currentTrack)
-        completePendingRestoration(restorationIdentifier)
+
+        let stageDescription: String
+        switch stage {
+        case .preliminary:
+            var updatedRestoration = restoration
+            updatedRestoration.hasPreliminaryLibraryContext = true
+            pendingLastTrackRestoration = updatedRestoration
+            stageDescription = "preliminary"
+        case .final:
+            // После синхронизации bookmark-доступ уже восстановлен, поэтому вторичные runtime-данные можно догрузить отдельно от UI.
+            requestSnapshotIfNeeded(for: currentTrack)
+            stageDescription = "final"
+            completePendingRestoration(restorationIdentifier)
+        }
+
         updateMiniPlayerProgressState()
         PersistentLogger.log(
-            "Player restore full context completed source=" +
-                "\(playbackSourceLogDescription(restoration.source)) " +
-                "trackId=\(currentTrack.trackId) contextCount=\(context.count)"
+            "Player restore library context completed stage=\(stageDescription) source=" +
+                "\(sourceDescription) trackId=\(currentTrackId) contextCount=\(context.count)"
         )
     }
 
