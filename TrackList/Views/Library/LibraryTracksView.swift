@@ -24,9 +24,10 @@ struct LibraryTracksView: View {
     let onExportTracks: ([LibraryTrack]) -> Void
     let revealRequest: LibraryRevealRequest?
     let onRevealHandled: (UUID) -> Void
-    @Binding var selectionActionBarConfig: SelectionActionBarConfig?
-
     let playerViewModel: PlayerViewModel
+    /// Единый обработчик «Избранного» передаётся в строки треков папки.
+    let favoriteTrackActionHandler: FavoriteTrackActionHandler
+    @Binding var selectionActionBarConfig: SelectionActionBarConfig?
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject var sheetManager: SheetManager
     @StateObject private var tracksViewModel: LibraryTracksViewModel
@@ -77,6 +78,7 @@ struct LibraryTracksView: View {
         revealRequest: LibraryRevealRequest? = nil,
         onRevealHandled: @escaping (UUID) -> Void = { _ in },
         playerViewModel: PlayerViewModel,
+        favoriteTrackActionHandler: FavoriteTrackActionHandler,
         selectionActionBarConfig: Binding<SelectionActionBarConfig?> = .constant(nil)
     ) {
         self.folder = folder
@@ -87,6 +89,7 @@ struct LibraryTracksView: View {
         self.revealRequest = revealRequest
         self.onRevealHandled = onRevealHandled
         self.playerViewModel = playerViewModel
+        self.favoriteTrackActionHandler = favoriteTrackActionHandler
         self._selectionActionBarConfig = selectionActionBarConfig
         self._playbackStateController = StateObject(
             wrappedValue: LibraryTrackPlaybackStateController(
@@ -223,6 +226,7 @@ struct LibraryTracksView: View {
                     cloudAvailabilityStateStore: cloudAvailabilityController.stateStore(for:),
                     cloudAvailabilityActionHandler: cloudAvailabilityActionHandler,
                     playerViewModel: playerViewModel,
+                    favoriteTrackActionHandler: favoriteTrackActionHandler,
                     playbackStateController: playbackStateController,
                     sheetManager: sheetManager,
                     revealedTrackID: revealCoordinator.revealedTrackID,

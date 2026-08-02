@@ -14,6 +14,8 @@ struct TrackListScreen: View {
     let trackList: TrackList
     let playerViewModel: PlayerViewModel
     @ObservedObject var exportProgressViewModel: ExportProgressViewModel
+    /// Единый обработчик «Избранного» передаётся в фабрику detail-flow.
+    let favoriteTrackActionHandler: FavoriteTrackActionHandler
     @StateObject private var viewModel: TrackListViewModel
 
     /// Фабрика production ViewModel для detail-flow одного треклиста.
@@ -29,18 +31,21 @@ struct TrackListScreen: View {
             playbackManager: playerViewModel,
             mutator: viewModel,
             renamer: viewModel,
-            exportProgressViewModel: exportProgressViewModel
+            exportProgressViewModel: exportProgressViewModel,
+            favoriteTrackActionHandler: favoriteTrackActionHandler
         )
     }
 
     init(
         trackList: TrackList,
         playerViewModel: PlayerViewModel,
-        exportProgressViewModel: ExportProgressViewModel
+        exportProgressViewModel: ExportProgressViewModel,
+        favoriteTrackActionHandler: FavoriteTrackActionHandler
     ) {
         self.trackList = trackList
         self.playerViewModel = playerViewModel
         self.exportProgressViewModel = exportProgressViewModel
+        self.favoriteTrackActionHandler = favoriteTrackActionHandler
         _viewModel = StateObject(
             wrappedValue: Self.viewModelFactory.make(
                 trackList: trackList,

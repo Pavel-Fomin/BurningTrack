@@ -19,20 +19,26 @@ struct ExportFeatureFactory {
     /// Единый получатель пользовательских сообщений экспортного сценария.
     private let toastPresenter: any ToastPresenting
 
+    /// Маршрут открытия и закрытия подробностей экспорта.
+    private let detailsRouter: any ExportDetailsRouting
+
     /// Создаёт фабрику с явно переданными production- или тестовыми зависимостями.
     init(
         exporter: any TrackExporting,
-        toastPresenter: any ToastPresenting
+        toastPresenter: any ToastPresenting,
+        detailsRouter: any ExportDetailsRouting
     ) {
         self.exporter = exporter
         self.toastPresenter = toastPresenter
+        self.detailsRouter = detailsRouter
     }
 
     /// Создаёт фабрику с общими production-зависимостями приложения.
     init() {
         self.init(
             exporter: ExportManager.shared,
-            toastPresenter: ToastManager.shared
+            toastPresenter: ToastManager.shared,
+            detailsRouter: SheetManager.shared
         )
     }
 
@@ -49,7 +55,8 @@ struct ExportFeatureFactory {
 
         return ExportProgressViewModel(
             coordinator: coordinator,
-            toastPresenter: toastPresenter
+            toastPresenter: toastPresenter,
+            detailsRouter: detailsRouter
         )
     }
 }

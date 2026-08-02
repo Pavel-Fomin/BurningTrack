@@ -339,6 +339,7 @@ final class PlayerViewModelWaveformTests: XCTestCase {
             databaseStore: PlayerQueuePersistenceSpy(),
             loadsInitialQueue: false
         )
+        let favoritesService = PlayerFavoritesServiceSpy()
         let viewModel = PlayerViewModel(
             playerManager: playerManager,
             playbackContextStore: PlayerPlaybackContextStore(
@@ -349,7 +350,10 @@ final class PlayerViewModelWaveformTests: XCTestCase {
             statePersistence: PlayerStatePersistenceSpy(),
             playlistManager: playlistManager,
             waveformGenerator: waveformGenerator,
-            favoritesService: PlayerFavoritesServiceSpy(),
+            favoritesService: favoritesService,
+            favoriteActionHandler: FavoriteTrackActionHandler(
+                favoritesService: favoritesService
+            ),
             favoritesEvents: PlayerFavoritesEventsSubject()
         )
 

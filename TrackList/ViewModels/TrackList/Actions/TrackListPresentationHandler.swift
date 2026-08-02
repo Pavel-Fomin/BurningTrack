@@ -35,14 +35,14 @@ final class TrackListPresentationHandler {
         toastPresenter: any ToastPresenting,
         commandExecutor: AppCommandExecutor = .shared,
         collectionNavigationHandler: TrackCollectionNavigationHandler,
-        favoriteActionHandler: FavoriteTrackActionHandler? = nil
+        favoriteActionHandler: FavoriteTrackActionHandler
     ) {
         self.reader = reader
         self.presenter = presenter
         self.toastPresenter = toastPresenter
         self.commandExecutor = commandExecutor
         self.collectionNavigationHandler = collectionNavigationHandler
-        self.favoriteActionHandler = favoriteActionHandler ?? FavoriteTrackActionHandler()
+        self.favoriteActionHandler = favoriteActionHandler
     }
 
     /// Открывает выбор трека для добавления в текущий треклист.

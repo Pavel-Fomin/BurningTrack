@@ -17,6 +17,8 @@ struct LibraryCollectionTracksView: View {
     let source: LibraryTrackListSource
     /// ViewModel плеера для воспроизведения и текущего состояния строки.
     let playerViewModel: PlayerViewModel
+    /// Единый обработчик «Избранного» передаётся в строки выбранной коллекции.
+    let favoriteTrackActionHandler: FavoriteTrackActionHandler
     /// Конфигурация нижней панели массового выбора в общем host фонотеки.
     @Binding var selectionActionBarConfig: SelectionActionBarConfig?
     /// Передаёт действия общего списка в отдельный обработчик экспорта.
@@ -51,12 +53,14 @@ struct LibraryCollectionTracksView: View {
     init(
         source: LibraryTrackListSource,
         playerViewModel: PlayerViewModel,
+        favoriteTrackActionHandler: FavoriteTrackActionHandler,
         selectionActionBarConfig: Binding<SelectionActionBarConfig?> = .constant(nil),
         onAllTracksAction: ((LibraryAllTracksAction) -> Void)? = nil,
         onCollectionTracksAction: ((LibraryCollectionTracksAction) -> Void)? = nil
     ) {
         self.source = source
         self.playerViewModel = playerViewModel
+        self.favoriteTrackActionHandler = favoriteTrackActionHandler
         self._selectionActionBarConfig = selectionActionBarConfig
         self.onAllTracksAction = onAllTracksAction
         self.onCollectionTracksAction = onCollectionTracksAction
@@ -240,6 +244,7 @@ struct LibraryCollectionTracksView: View {
                     cloudAvailabilityStateStore: cloudAvailabilityController.stateStore(for:),
                     cloudAvailabilityActionHandler: cloudAvailabilityActionHandler,
                     playerViewModel: playerViewModel,
+                    favoriteTrackActionHandler: favoriteTrackActionHandler,
                     playbackStateController: playbackStateController,
                     sheetManager: sheetManager,
                     revealedTrackID: nil,

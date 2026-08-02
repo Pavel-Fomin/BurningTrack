@@ -178,7 +178,11 @@ final class ExportProgressViewModelTests: XCTestCase {
         let exporter = ExportingSpy()
         exporter.holdsOperation = true
         exporter.snapshots = [makeProgress(state: .copying)]
-        let viewModel = makeViewModel(exporter: exporter)
+        let detailsRouter = ExportDetailsRouterSpy()
+        let viewModel = makeViewModel(
+            exporter: exporter,
+            detailsRouter: detailsRouter
+        )
 
         viewModel.startExport(
             tracks: [makeTrack()],
@@ -201,7 +205,11 @@ final class ExportProgressViewModelTests: XCTestCase {
         let exporter = ExportingSpy()
         exporter.holdsOperation = true
         exporter.snapshots = [makeProgress(state: .copying)]
-        let viewModel = makeViewModel(exporter: exporter)
+        let detailsRouter = ExportDetailsRouterSpy()
+        let viewModel = makeViewModel(
+            exporter: exporter,
+            detailsRouter: detailsRouter
+        )
 
         viewModel.startExport(
             tracks: [makeTrack()],
@@ -212,10 +220,10 @@ final class ExportProgressViewModelTests: XCTestCase {
         await yieldToExportTask()
 
         viewModel.presentDetails()
-        XCTAssertEqual(SheetManager.shared.activeSheet, .exportProgress)
+        XCTAssertEqual(detailsRouter.presentDetailsCallCount, 1)
 
         XCTAssertTrue(viewModel.cancelExport())
-        XCTAssertNil(SheetManager.shared.activeSheet)
+        XCTAssertEqual(detailsRouter.closeDetailsCallCount, 1)
 
         await yieldToExportTask()
 
@@ -729,9 +737,11 @@ final class ExportProgressViewModelTests: XCTestCase {
     /// Создаёт ViewModel с тестовыми зависимостями.
     private func makeViewModel(
         exporter: ExportingSpy,
-        toastPresenter: ToastPresenterSpy? = nil
+        toastPresenter: ToastPresenterSpy? = nil,
+        detailsRouter: ExportDetailsRouterSpy? = nil
     ) -> ExportProgressViewModel {
         let toastPresenter = toastPresenter ?? ToastPresenterSpy()
+        let detailsRouter = detailsRouter ?? ExportDetailsRouterSpy()
         return ExportProgressViewModel(
             coordinator: ExportOperationCoordinator(
                 actionHandler: ExportActionHandler(
@@ -739,7 +749,8 @@ final class ExportProgressViewModelTests: XCTestCase {
                     toastPresenter: toastPresenter
                 )
             ),
-            toastPresenter: toastPresenter
+            toastPresenter: toastPresenter,
+            detailsRouter: detailsRouter
         )
     }
 

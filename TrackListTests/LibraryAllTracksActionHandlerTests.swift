@@ -137,7 +137,8 @@ final class LibraryAllTracksActionHandlerTests: XCTestCase {
                     toastPresenter: toastPresenter
                 )
             ),
-            toastPresenter: toastPresenter
+            toastPresenter: toastPresenter,
+            detailsRouter: ExportDetailsRouterSpy()
         )
     }
 

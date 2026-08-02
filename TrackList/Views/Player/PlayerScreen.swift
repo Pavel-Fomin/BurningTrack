@@ -13,6 +13,8 @@ struct PlayerScreen: View {
 
     @ObservedObject var playerViewModel: PlayerViewModel
     @ObservedObject var exportProgressViewModel: ExportProgressViewModel
+    /// Единый обработчик «Избранного» передаётся в фабрику Player-flow.
+    let favoriteTrackActionHandler: FavoriteTrackActionHandler
 
     @StateObject private var screenViewModel: PlayerScreenViewModel
 
@@ -21,14 +23,17 @@ struct PlayerScreen: View {
 
     init(
         playerViewModel: PlayerViewModel,
-        exportProgressViewModel: ExportProgressViewModel
+        exportProgressViewModel: ExportProgressViewModel,
+        favoriteTrackActionHandler: FavoriteTrackActionHandler
     ) {
         self.playerViewModel = playerViewModel
         self.exportProgressViewModel = exportProgressViewModel
+        self.favoriteTrackActionHandler = favoriteTrackActionHandler
         _screenViewModel = StateObject(
             wrappedValue: Self.viewModelFactory.make(
                 playerViewModel: playerViewModel,
-                exportProgressViewModel: exportProgressViewModel
+                exportProgressViewModel: exportProgressViewModel,
+                favoriteTrackActionHandler: favoriteTrackActionHandler
             )
         )
     }

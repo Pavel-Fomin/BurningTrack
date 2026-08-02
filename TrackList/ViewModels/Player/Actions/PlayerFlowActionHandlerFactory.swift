@@ -14,7 +14,8 @@ struct PlayerFlowActionHandlerFactory {
     /// Создаёт production action handler для экрана плеера.
     func make(
         playerViewModel: PlayerViewModel,
-        exportProgressViewModel: ExportProgressViewModel
+        exportProgressViewModel: ExportProgressViewModel,
+        favoriteTrackActionHandler: FavoriteTrackActionHandler
     ) -> PlayerFlowActionHandler {
         let trackFileRenameActionHandler = TrackFileRenameActionHandler(
             playerManager: playerViewModel.fileOperationPlayerManager,
@@ -37,7 +38,8 @@ struct PlayerFlowActionHandlerFactory {
             sheetManager: SheetManager.shared,
             sheetActionCoordinator: SheetActionCoordinator.shared,
             toastPresenter: ToastManager.shared,
-            collectionNavigationHandler: .shared
+            collectionNavigationHandler: .shared,
+            favoriteActionHandler: favoriteTrackActionHandler
         )
         let viewControllerProvider = ApplicationViewControllerProvider()
         let exportActionHandler = PlayerExportActionHandler(

@@ -16,11 +16,9 @@ struct FavoriteTrackActionHandler {
     /// Общий сервис хранит состояние в существующем системном треклисте и публикует подтверждённое изменение.
     private let favoritesService: any FavoritesServicing
 
-    /// Создаёт обработчик с production-сервисом или явной зависимостью для изолированных сценариев.
-    init(
-        favoritesService: (any FavoritesServicing)? = nil
-    ) {
-        self.favoritesService = favoritesService ?? FavoritesService()
+    /// Создаёт обработчик с явно переданным production- или тестовым сервисом.
+    init(favoritesService: any FavoritesServicing) {
+        self.favoritesService = favoritesService
     }
 
     /// Передаёт переключение в доменный сервис и оставляет обновление интерфейса его событию.

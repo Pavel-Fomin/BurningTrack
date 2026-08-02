@@ -969,6 +969,7 @@ final class PlayerViewModelRestorationTests: XCTestCase {
         let resolvedLibraryContextLoader = libraryContextLoader ?? LibraryContextLoaderSpy(tracks: [])
         let resolvedPurchasedITunesContextLoader = purchasedITunesContextLoader ??
             PurchasedITunesContextLoaderSpy(result: .temporarilyUnavailable)
+        let favoritesService = PlayerFavoritesServiceSpy()
 
         return PlayerViewModel(
             playerManager: playerManager,
@@ -986,7 +987,10 @@ final class PlayerViewModelRestorationTests: XCTestCase {
             purchasedITunesContextLoader: resolvedPurchasedITunesContextLoader,
             fastLibraryTrackProvider: fastTrackProvider,
             isLibraryAccessRestored: { libraryAccessState.isRestored },
-            favoritesService: PlayerFavoritesServiceSpy(),
+            favoritesService: favoritesService,
+            favoriteActionHandler: FavoriteTrackActionHandler(
+                favoritesService: favoritesService
+            ),
             favoritesEvents: PlayerFavoritesEventsSubject()
         )
     }

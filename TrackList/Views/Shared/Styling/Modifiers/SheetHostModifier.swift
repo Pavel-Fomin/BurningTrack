@@ -19,8 +19,12 @@ struct SheetHostModifier: ViewModifier {
 
     @ObservedObject private var sheetManager = SheetManager.shared
 
-    /// Единая PlayerViewModel передаёт player backend и published-состояние «Избранного» в sheet-flow.
+    /// Единая PlayerViewModel нужна sheet выбора треков для playback- и presentation-состояния.
     @ObservedObject var playerViewModel: PlayerViewModel
+    /// Тот же менеджер передан PlayerViewModel при корневой сборке приложения.
+    let playerManager: PlayerManager
+    /// Готовый обработчик переименования файла для sheet выбора треков.
+    let renameActionHandler: TrackFileRenameActionHandler
 
     func body(content: Content) -> some View {
         content
@@ -47,7 +51,7 @@ struct SheetHostModifier: ViewModifier {
             case .renameTrackFile(let data):
                 RenameTrackFileContainer(
                     data: data,
-                    playerManager: playerViewModel.fileOperationPlayerManager
+                    playerManager: playerManager
                 )
                 .appSheet(detents: [.fraction(0.45), .medium])
                 .toastHost()
@@ -56,7 +60,7 @@ struct SheetHostModifier: ViewModifier {
             case .moveToFolder(let data):
                 MoveToFolderContainer(
                     data: data,
-                    playerManager: playerViewModel.fileOperationPlayerManager
+                    playerManager: playerManager
                 )
                 .appSheet(detents: [.fraction(0.6), .medium])
                 
@@ -64,7 +68,7 @@ struct SheetHostModifier: ViewModifier {
             case .trackDetail(let track):
                     TrackDetailContainer(
                         track: track,
-                        playerManager: playerViewModel.fileOperationPlayerManager
+                        playerManager: playerManager
                     )
                     .appSheet(detents: [.large])
                     .toastHost()
@@ -73,7 +77,7 @@ struct SheetHostModifier: ViewModifier {
             case .trackDetailEdit(let track):
                     TrackDetailContainer(
                         track: track,
-                        playerManager: playerViewModel.fileOperationPlayerManager,
+                        playerManager: playerManager,
                         initialMode: .edit
                     )
                     .appSheet(detents: [.large])
@@ -94,13 +98,7 @@ struct SheetHostModifier: ViewModifier {
             case .newTrackListSelection(let data):
                 NewTrackListSelectionContainer(
                     data: data,
-                    renameActionHandler: TrackFileRenameActionHandler(
-                        playerManager: playerViewModel.fileOperationPlayerManager,
-                        sheetManager: SheetManager.shared,
-                        commandExecutor: AppCommandExecutor.shared,
-                        toastManager: ToastManager.shared,
-                        proposalBuilder: FileRenameProposalBuilder()
-                    ),
+                    renameActionHandler: renameActionHandler,
                     playerViewModel: playerViewModel
                 )
                     .appSheet(detents: [.large])
@@ -148,7 +146,17 @@ extension View {
 
     /// Подключает централизованный SheetHost к экрану.
     /// Используется один раз в корне приложения.
-    func sheetHost(playerViewModel: PlayerViewModel) -> some View {
-        modifier(SheetHostModifier(playerViewModel: playerViewModel))
+    func sheetHost(
+        playerViewModel: PlayerViewModel,
+        playerManager: PlayerManager,
+        renameActionHandler: TrackFileRenameActionHandler
+    ) -> some View {
+        modifier(
+            SheetHostModifier(
+                playerViewModel: playerViewModel,
+                playerManager: playerManager,
+                renameActionHandler: renameActionHandler
+            )
+        )
     }
 }

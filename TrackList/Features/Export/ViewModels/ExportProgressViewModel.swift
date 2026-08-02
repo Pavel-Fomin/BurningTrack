@@ -37,6 +37,9 @@ final class ExportProgressViewModel: ObservableObject {
     /// Сообщает о повторном запуске, который отклоняется жизненным циклом ViewModel.
     private let toastPresenter: any ToastPresenting
 
+    /// Маршрутизирует подробности экспорта без знания глобального менеджера sheet.
+    private let detailsRouter: any ExportDetailsRouting
+
     /// Преобразует внутренние данные операции в единый снимок интерфейса.
     private let exportPresenter = ExportPresenter()
 
@@ -45,10 +48,12 @@ final class ExportProgressViewModel: ObservableObject {
     /// Создаёт ViewModel с координатором операции и сообщением повторного запуска.
     init(
         coordinator: ExportOperationCoordinator,
-        toastPresenter: any ToastPresenting
+        toastPresenter: any ToastPresenting,
+        detailsRouter: any ExportDetailsRouting
     ) {
         self.coordinator = coordinator
         self.toastPresenter = toastPresenter
+        self.detailsRouter = detailsRouter
 
         coordinator.onExportAccepted = { [weak self] in
             self?.exportWasAccepted()
@@ -143,12 +148,12 @@ final class ExportProgressViewModel: ObservableObject {
         return true
     }
 
-    /// Открывает подробный результат через существующий глобальный SheetManager.
+    /// Открывает подробный результат через явный маршрут Export-feature.
     func presentDetails() {
         guard progress != nil else { return }
 
         isShowingDetails = true
-        SheetManager.shared.present(.exportProgress)
+        detailsRouter.presentExportDetails()
     }
 
     /// Закрывает подробный экран, не меняя результат операции.
@@ -196,10 +201,6 @@ final class ExportProgressViewModel: ObservableObject {
 
     /// Закрывает только открытый экран деталей экспорта.
     private func closeDetailsSheetIfNeeded() {
-        guard case .exportProgress = SheetManager.shared.activeSheet else {
-            return
-        }
-
-        SheetManager.shared.closeActive()
+        detailsRouter.closeExportDetailsIfNeeded()
     }
 }

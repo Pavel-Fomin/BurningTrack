@@ -20,6 +20,8 @@ struct LibraryFolderContainer: View {
     let onRevealHandled: (UUID) -> Void
     let playerViewModel: PlayerViewModel
     let exportProgressViewModel: ExportProgressViewModel
+    /// Единый обработчик «Избранного» передаётся в содержимое папки.
+    let favoriteTrackActionHandler: FavoriteTrackActionHandler
     @Binding var selectionActionBarConfig: SelectionActionBarConfig?
 
     // MARK: - Init
@@ -30,6 +32,7 @@ struct LibraryFolderContainer: View {
         onRevealHandled: @escaping (UUID) -> Void = { _ in },
         playerViewModel: PlayerViewModel,
         exportProgressViewModel: ExportProgressViewModel,
+        favoriteTrackActionHandler: FavoriteTrackActionHandler,
         selectionActionBarConfig: Binding<SelectionActionBarConfig?>
     ) {
         self.folder = folder
@@ -37,6 +40,7 @@ struct LibraryFolderContainer: View {
         self.onRevealHandled = onRevealHandled
         self.playerViewModel = playerViewModel
         self.exportProgressViewModel = exportProgressViewModel
+        self.favoriteTrackActionHandler = favoriteTrackActionHandler
         self._selectionActionBarConfig = selectionActionBarConfig
     }
 
@@ -49,6 +53,7 @@ struct LibraryFolderContainer: View {
             onRevealHandled: onRevealHandled,
             playerViewModel: playerViewModel,
             exportProgressViewModel: exportProgressViewModel,
+            favoriteTrackActionHandler: favoriteTrackActionHandler,
             selectionActionBarConfig: $selectionActionBarConfig
         )
         .id(folder.id)
@@ -64,6 +69,8 @@ private struct LibraryFolderContent: View {
     let onRevealHandled: (UUID) -> Void
     let playerViewModel: PlayerViewModel
     let exportProgressViewModel: ExportProgressViewModel
+    /// Единый обработчик «Избранного» передаётся в экран папки.
+    let favoriteTrackActionHandler: FavoriteTrackActionHandler
     @Binding var selectionActionBarConfig: SelectionActionBarConfig?
 
     // MARK: - ViewModel
@@ -78,6 +85,7 @@ private struct LibraryFolderContent: View {
         onRevealHandled: @escaping (UUID) -> Void,
         playerViewModel: PlayerViewModel,
         exportProgressViewModel: ExportProgressViewModel,
+        favoriteTrackActionHandler: FavoriteTrackActionHandler,
         selectionActionBarConfig: Binding<SelectionActionBarConfig?>
     ) {
         self.folder = folder
@@ -85,6 +93,7 @@ private struct LibraryFolderContent: View {
         self.onRevealHandled = onRevealHandled
         self.playerViewModel = playerViewModel
         self.exportProgressViewModel = exportProgressViewModel
+        self.favoriteTrackActionHandler = favoriteTrackActionHandler
         self._selectionActionBarConfig = selectionActionBarConfig
         // Сохраняем Binding локально, чтобы action handler очищал текущую панель выбора.
         let selectionActionBarConfig = selectionActionBarConfig
@@ -107,6 +116,7 @@ private struct LibraryFolderContent: View {
             revealRequest: revealRequest,
             onRevealHandled: onRevealHandled,
             playerViewModel: playerViewModel,
+            favoriteTrackActionHandler: favoriteTrackActionHandler,
             selectionActionBarConfig: $selectionActionBarConfig,
             onAction: viewModel.handle
         )

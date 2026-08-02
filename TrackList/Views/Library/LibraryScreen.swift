@@ -51,6 +51,8 @@ struct LibraryScreen: View {
 
     let playerViewModel: PlayerViewModel
     @ObservedObject var exportProgressViewModel: ExportProgressViewModel
+    /// Единый обработчик «Избранного» передаётся в строки всех источников фонотеки.
+    let favoriteTrackActionHandler: FavoriteTrackActionHandler
 
     // MARK: - ViewModels
 
@@ -69,10 +71,12 @@ struct LibraryScreen: View {
 
     init(
         playerViewModel: PlayerViewModel,
-        exportProgressViewModel: ExportProgressViewModel
+        exportProgressViewModel: ExportProgressViewModel,
+        favoriteTrackActionHandler: FavoriteTrackActionHandler
     ) {
         self.playerViewModel = playerViewModel
         self.exportProgressViewModel = exportProgressViewModel
+        self.favoriteTrackActionHandler = favoriteTrackActionHandler
         self._viewModel = StateObject(
             wrappedValue: LibraryScreenViewModelFactory.make()
         )
@@ -223,6 +227,7 @@ struct LibraryScreen: View {
         case .purchasedITunes(let revealRequest):
             PurchasedITunesMusicView(
                 playerViewModel: playerViewModel,
+                favoriteTrackActionHandler: favoriteTrackActionHandler,
                 revealRequest: revealRequest,
                 onRevealHandled: { requestId in
                     viewModel.handle(.revealHandled(requestId))
@@ -239,6 +244,7 @@ struct LibraryScreen: View {
             LibraryCollectionTracksView(
                 source: .allLibraryTracks,
                 playerViewModel: playerViewModel,
+                favoriteTrackActionHandler: favoriteTrackActionHandler,
                 selectionActionBarConfig: $selectionActionBarConfig,
                 onAllTracksAction: { action in
                     allTracksActionHandler.handle(action)
@@ -268,6 +274,7 @@ struct LibraryScreen: View {
                     artistKey: artistKey
                 ),
                 playerViewModel: playerViewModel,
+                favoriteTrackActionHandler: favoriteTrackActionHandler,
                 selectionActionBarConfig: $selectionActionBarConfig,
                 onCollectionTracksAction: { action in
                     collectionTracksActionHandler(
@@ -293,6 +300,7 @@ struct LibraryScreen: View {
                 },
                 playerViewModel: playerViewModel,
                 exportProgressViewModel: exportProgressViewModel,
+                favoriteTrackActionHandler: favoriteTrackActionHandler,
                 selectionActionBarConfig: $selectionActionBarConfig
             )
 

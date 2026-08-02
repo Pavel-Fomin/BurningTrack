@@ -26,6 +26,8 @@ struct LibraryTrackSectionsListView: View {
     let cloudAvailabilityActionHandler: LibraryCloudAvailabilityActionHandler
     
     let playerViewModel: PlayerViewModel
+    /// Единый обработчик «Избранного» передаётся в обработчик команды строки.
+    let favoriteTrackActionHandler: FavoriteTrackActionHandler
     let playbackStateController: LibraryTrackPlaybackStateController
     let sheetManager: SheetManager
     
@@ -56,6 +58,7 @@ struct LibraryTrackSectionsListView: View {
                 cloudAvailabilityStateStore: cloudAvailabilityStateStore,
                 cloudAvailabilityActionHandler: cloudAvailabilityActionHandler,
                 sheetManager: sheetManager,
+                favoriteTrackActionHandler: favoriteTrackActionHandler,
                 playbackStateController: playbackStateController,
                 revealedTrackID: revealedTrackID,
                 highlightedTrackID: highlightedTrackID,

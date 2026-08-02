@@ -563,3 +563,22 @@ private extension AppSheet {
 // MARK: - TrackListsPresenting
 
 extension SheetManager: TrackListsPresenting {}
+
+// MARK: - ExportDetailsRouting
+
+extension SheetManager: ExportDetailsRouting {
+
+    /// Открывает глобальный sheet с подробностями текущего экспорта.
+    func presentExportDetails() {
+        present(.exportProgress)
+    }
+
+    /// Закрывает только открытый sheet подробностей экспорта.
+    func closeExportDetailsIfNeeded() {
+        guard case .exportProgress = activeSheet else {
+            return
+        }
+
+        closeActive()
+    }
+}

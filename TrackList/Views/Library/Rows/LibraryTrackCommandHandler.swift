@@ -68,7 +68,7 @@ struct LibraryTrackCommandHandler {
         presentationHandler: LibraryTrackPresentationHandler,
         cloudAvailabilityActionHandler: LibraryCloudAvailabilityActionHandler,
         collectionNavigationHandler: TrackCollectionNavigationHandler,
-        favoriteActionHandler: FavoriteTrackActionHandler? = nil,
+        favoriteActionHandler: FavoriteTrackActionHandler,
         onToggleSelection: @escaping () -> Void,
         onRenameTrack: @escaping (UUID, FileRenameStrategy) -> Void
     ) {
@@ -77,7 +77,7 @@ struct LibraryTrackCommandHandler {
         self.presentationHandler = presentationHandler
         self.cloudAvailabilityActionHandler = cloudAvailabilityActionHandler
         self.collectionNavigationHandler = collectionNavigationHandler
-        self.favoriteActionHandler = favoriteActionHandler ?? FavoriteTrackActionHandler()
+        self.favoriteActionHandler = favoriteActionHandler
         self.onToggleSelection = onToggleSelection
         self.onRenameTrack = onRenameTrack
     }

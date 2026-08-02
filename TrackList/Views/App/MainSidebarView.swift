@@ -16,6 +16,8 @@ struct MainSidebarView: View {
 
     @ObservedObject var playerViewModel: PlayerViewModel
     @ObservedObject var exportProgressViewModel: ExportProgressViewModel
+    /// Единый обработчик «Избранного» передаётся в detail-сценарии без глобального доступа из View.
+    let favoriteTrackActionHandler: FavoriteTrackActionHandler
     @ObservedObject var trackListsViewModel: TrackListsViewModel
     @ObservedObject var navigationViewModel: MainNavigationViewModel
     @Binding var isSearchActive: Bool
@@ -116,16 +118,19 @@ struct MainSidebarView: View {
         case .player:
             PlayerScreen(
                 playerViewModel: playerViewModel,
-                exportProgressViewModel: exportProgressViewModel
+                exportProgressViewModel: exportProgressViewModel,
+                favoriteTrackActionHandler: favoriteTrackActionHandler
             )
         case .library:
             LibraryScreen(
                 playerViewModel: playerViewModel,
-                exportProgressViewModel: exportProgressViewModel
+                exportProgressViewModel: exportProgressViewModel,
+                favoriteTrackActionHandler: favoriteTrackActionHandler
             )
         case .search:
             SearchScreen(
                 playerViewModel: playerViewModel,
+                favoriteTrackActionHandler: favoriteTrackActionHandler,
                 isSearchActive: $isSearchActive
             )
         case .settings:
@@ -136,14 +141,16 @@ struct MainSidebarView: View {
             TrackListsScreen(
                 trackListsViewModel: trackListsViewModel,
                 playerViewModel: playerViewModel,
-                exportProgressViewModel: exportProgressViewModel
+                exportProgressViewModel: exportProgressViewModel,
+                favoriteTrackActionHandler: favoriteTrackActionHandler
             )
         case .trackList(let id):
             if let trackList = trackListsViewModel.trackList(for: id) {
                 TrackListScreen(
                     trackList: trackList,
                     playerViewModel: playerViewModel,
-                    exportProgressViewModel: exportProgressViewModel
+                    exportProgressViewModel: exportProgressViewModel,
+                    favoriteTrackActionHandler: favoriteTrackActionHandler
                 )
             } else {
                 ContentUnavailableView(

@@ -36,13 +36,15 @@ final class TrackListFlowActionHandler {
         presenter: any TrackListPresenting,
         exportProgressViewModel: ExportProgressViewModel,
         viewControllerProvider: any ViewControllerProviding,
-        toastPresenter: any ToastPresenting
+        toastPresenter: any ToastPresenting,
+        favoriteTrackActionHandler: FavoriteTrackActionHandler
     ) {
         self.presentationHandler = TrackListPresentationHandler(
             reader: reader,
             presenter: presenter,
             toastPresenter: toastPresenter,
-            collectionNavigationHandler: .shared
+            collectionNavigationHandler: .shared,
+            favoriteActionHandler: favoriteTrackActionHandler
         )
         self.playbackHandler = TrackListPlaybackHandler(
             reader: reader,

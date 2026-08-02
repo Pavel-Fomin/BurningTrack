@@ -242,6 +242,7 @@ final class PlayerViewModel: ObservableObject {
         isLibraryAccessRestored: (@MainActor () -> Bool)? = nil,
         waveformGenerator: (any WaveformGenerating)? = nil,
         favoritesService: any FavoritesServicing,
+        favoriteActionHandler: FavoriteTrackActionHandler,
         favoritesEvents: any FavoritesEventsObserving
     ) {
         let resolvedPlaylistManager = playlistManager ?? PlaylistManager.shared
@@ -253,9 +254,7 @@ final class PlayerViewModel: ObservableObject {
         self.runtimeSnapshotController = runtimeSnapshotController
         self.eventObserver = eventObserver
         self.favoritesService = favoritesService
-        self.favoriteActionHandler = FavoriteTrackActionHandler(
-            favoritesService: favoritesService
-        )
+        self.favoriteActionHandler = favoriteActionHandler
         self.favoritesEvents = favoritesEvents
         self.toastPresenter = toastPresenter ?? ToastManager.shared
         self.statePersistence = statePersistence ?? (try? PlayerStatePersistence())

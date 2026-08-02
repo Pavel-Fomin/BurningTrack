@@ -45,14 +45,14 @@ final class PlayerPresentationActionHandler {
         sheetActionCoordinator: SheetActionCoordinator,
         toastPresenter: any ToastPresenting,
         collectionNavigationHandler: TrackCollectionNavigationHandler,
-        favoriteActionHandler: FavoriteTrackActionHandler? = nil
+        favoriteActionHandler: FavoriteTrackActionHandler
     ) {
         self.playlistManager = playlistManager
         self.sheetManager = sheetManager
         self.sheetActionCoordinator = sheetActionCoordinator
         self.toastPresenter = toastPresenter
         self.collectionNavigationHandler = collectionNavigationHandler
-        self.favoriteActionHandler = favoriteActionHandler ?? FavoriteTrackActionHandler()
+        self.favoriteActionHandler = favoriteActionHandler
     }
 
     // MARK: - Actions

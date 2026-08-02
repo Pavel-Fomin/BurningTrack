@@ -25,6 +25,8 @@ struct LibraryFolderView: View {
     let revealRequest: LibraryRevealRequest?
     let onRevealHandled: (UUID) -> Void
     let playerViewModel: PlayerViewModel
+    /// Единый обработчик «Избранного» передаётся в список треков папки.
+    let favoriteTrackActionHandler: FavoriteTrackActionHandler
     @Binding var selectionActionBarConfig: SelectionActionBarConfig?
 
     // MARK: - Actions
@@ -51,6 +53,7 @@ struct LibraryFolderView: View {
                     revealRequest: revealRequest,
                     onRevealHandled: onRevealHandled,
                     playerViewModel: playerViewModel,
+                    favoriteTrackActionHandler: favoriteTrackActionHandler,
                     selectionActionBarConfig: $selectionActionBarConfig
                 )
 

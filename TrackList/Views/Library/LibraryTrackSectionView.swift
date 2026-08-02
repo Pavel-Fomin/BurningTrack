@@ -31,6 +31,8 @@ struct LibraryTrackSectionView: View {
     let cloudAvailabilityStateStore: (UUID) -> CloudTrackAvailabilityRowStateStore
     let cloudAvailabilityActionHandler: LibraryCloudAvailabilityActionHandler
     let sheetManager: SheetManager
+    /// Единый обработчик «Избранного» передаётся в командный слой строки.
+    let favoriteTrackActionHandler: FavoriteTrackActionHandler
     let playbackStateController: LibraryTrackPlaybackStateController
 
     let revealedTrackID: UUID?
@@ -110,6 +112,7 @@ struct LibraryTrackSectionView: View {
             presentationHandler: presentationHandler,
             cloudAvailabilityActionHandler: cloudAvailabilityActionHandler,
             collectionNavigationHandler: .shared,
+            favoriteActionHandler: favoriteTrackActionHandler,
             onToggleSelection: onToggleSelection,
             onRenameTrack: onRenameTrack
         )

@@ -26,7 +26,7 @@ final class SearchActionHandler {
         sheetManager: SheetManager,
         sheetActionCoordinator: SheetActionCoordinator,
         fileRenamer: TrackFileRenameActionHandler,
-        favoriteActionHandler: FavoriteTrackActionHandler? = nil
+        favoriteActionHandler: FavoriteTrackActionHandler
     ) {
         self.viewModel = viewModel
         self.playerViewModel = playerViewModel
@@ -34,7 +34,7 @@ final class SearchActionHandler {
         self.sheetManager = sheetManager
         self.sheetActionCoordinator = sheetActionCoordinator
         self.fileRenamer = fileRenamer
-        self.favoriteActionHandler = favoriteActionHandler ?? FavoriteTrackActionHandler()
+        self.favoriteActionHandler = favoriteActionHandler
     }
 
     /// Передаёт действия View в SearchViewModel без бизнес-логики в SwiftUI.

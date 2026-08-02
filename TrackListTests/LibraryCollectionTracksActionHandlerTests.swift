@@ -160,7 +160,8 @@ final class LibraryCollectionTracksActionHandlerTests: XCTestCase {
                     toastPresenter: toastPresenter
                 )
             ),
-            toastPresenter: toastPresenter
+            toastPresenter: toastPresenter,
+            detailsRouter: ExportDetailsRouterSpy()
         )
     }
 

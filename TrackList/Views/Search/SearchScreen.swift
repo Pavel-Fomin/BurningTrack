@@ -13,6 +13,8 @@ struct SearchScreen: View {
     // MARK: - Dependencies
 
     @ObservedObject var playerViewModel: PlayerViewModel
+    /// Единый обработчик «Избранного» передаётся в ActionHandler поиска.
+    let favoriteTrackActionHandler: FavoriteTrackActionHandler
     /// MainTabView использует состояние для синхронного скрытия MiniPlayer и резерва.
     @Binding private var isSearchActive: Bool
 
@@ -24,9 +26,11 @@ struct SearchScreen: View {
 
     init(
         playerViewModel: PlayerViewModel,
+        favoriteTrackActionHandler: FavoriteTrackActionHandler,
         isSearchActive: Binding<Bool>
     ) {
         self.playerViewModel = playerViewModel
+        self.favoriteTrackActionHandler = favoriteTrackActionHandler
         self._isSearchActive = isSearchActive
         self._viewModel = StateObject(
             wrappedValue: SearchViewModelFactory.make(
@@ -49,7 +53,8 @@ struct SearchScreen: View {
                 commandExecutor: AppCommandExecutor.shared,
                 toastManager: ToastManager.shared,
                 proposalBuilder: FileRenameProposalBuilder()
-            )
+            ),
+            favoriteActionHandler: favoriteTrackActionHandler
         )
     }
 

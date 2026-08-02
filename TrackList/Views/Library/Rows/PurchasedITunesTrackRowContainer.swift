@@ -17,13 +17,16 @@ struct PurchasedITunesTrackRowContainer: View {
     let state: PurchasedITunesTrackRowState
     let context: [PurchasedITunesPlayableTrack]
     @ObservedObject var playerViewModel: PlayerViewModel
+    /// Единый обработчик «Избранного» передаётся в ActionHandler строки.
+    let favoriteTrackActionHandler: FavoriteTrackActionHandler
 
     // MARK: - Обработчик действий
 
     /// Обработчик пользовательских действий строки iTunes.
     private var actionHandler: PurchasedITunesTrackActionHandler {
         PurchasedITunesTrackActionHandler(
-            playerViewModel: playerViewModel
+            playerViewModel: playerViewModel,
+            favoriteActionHandler: favoriteTrackActionHandler
         )
     }
 

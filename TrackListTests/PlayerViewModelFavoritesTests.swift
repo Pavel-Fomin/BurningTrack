@@ -403,6 +403,9 @@ final class PlayerViewModelFavoritesTests: XCTestCase {
             fastLibraryTrackProvider: fastLibraryTrackProvider,
             isLibraryAccessRestored: isLibraryAccessRestored,
             favoritesService: favoritesService,
+            favoriteActionHandler: FavoriteTrackActionHandler(
+                favoritesService: favoritesService
+            ),
             favoritesEvents: favoritesEvents
         )
     }

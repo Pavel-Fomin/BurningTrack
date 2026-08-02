@@ -90,6 +90,27 @@ final class ExportRequestToastPresenterSpy: ToastPresenting {
     }
 }
 
+/// Сохраняет запросы маршрутизации подробностей без использования глобального SheetManager.
+@MainActor
+final class ExportDetailsRouterSpy: ExportDetailsRouting {
+
+    /// Количество запросов открытия подробностей экспорта.
+    private(set) var presentDetailsCallCount = 0
+
+    /// Количество запросов точечного закрытия подробностей экспорта.
+    private(set) var closeDetailsCallCount = 0
+
+    /// Сохраняет запрос открытия подробностей.
+    func presentExportDetails() {
+        presentDetailsCallCount += 1
+    }
+
+    /// Сохраняет запрос закрытия подробностей.
+    func closeExportDetailsIfNeeded() {
+        closeDetailsCallCount += 1
+    }
+}
+
 /// Возвращает заранее подготовленный presenter системного picker-а.
 @MainActor
 final class ExportRequestViewControllerProviderSpy: ViewControllerProviding {
@@ -120,6 +141,7 @@ func makeExportProgressViewModelForRequestTests(
                 toastPresenter: toastPresenter
             )
         ),
-        toastPresenter: toastPresenter
+        toastPresenter: toastPresenter,
+        detailsRouter: ExportDetailsRouterSpy()
     )
 }

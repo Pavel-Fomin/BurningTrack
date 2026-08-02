@@ -27,19 +27,19 @@ struct PurchasedITunesTrackActionHandler {
 
     // MARK: - Инициализация
 
-    /// Создаёт обработчик строки iTunes с production-зависимостями по умолчанию.
+    /// Создаёт обработчик строки iTunes с явным маршрутом «Избранного».
     init(
         playerViewModel: PlayerViewModel,
         sheetManager: SheetManager? = nil,
         commandExecutor: AppCommandExecutor = .shared,
         toastPresenter: (any ToastPresenting)? = nil,
-        favoriteActionHandler: FavoriteTrackActionHandler? = nil
+        favoriteActionHandler: FavoriteTrackActionHandler
     ) {
         self.playerViewModel = playerViewModel
         self.sheetManager = sheetManager ?? SheetManager.shared
         self.commandExecutor = commandExecutor
         self.toastPresenter = toastPresenter ?? ToastManager.shared
-        self.favoriteActionHandler = favoriteActionHandler ?? FavoriteTrackActionHandler()
+        self.favoriteActionHandler = favoriteActionHandler
     }
 
     // MARK: - Состояние строки

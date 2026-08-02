@@ -17,6 +17,8 @@ struct TrackListsScreen: View {
     @ObservedObject var trackListsViewModel: TrackListsViewModel
     @ObservedObject var playerViewModel: PlayerViewModel
     @ObservedObject var exportProgressViewModel: ExportProgressViewModel
+    /// Единый обработчик «Избранного» передаётся в detail-flow треклистов.
+    let favoriteTrackActionHandler: FavoriteTrackActionHandler
     @ObservedObject private var navigationCoordinator = NavigationCoordinator.shared
 
     /// Фабрика production action handler для master-flow списка треклистов.
@@ -45,7 +47,8 @@ struct TrackListsScreen: View {
                     TrackListScreen(
                         trackList: trackList,
                         playerViewModel: playerViewModel,
-                        exportProgressViewModel: exportProgressViewModel
+                        exportProgressViewModel: exportProgressViewModel,
+                        favoriteTrackActionHandler: favoriteTrackActionHandler
                     )
                 }
             }

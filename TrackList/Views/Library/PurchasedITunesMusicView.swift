@@ -15,6 +15,8 @@ struct PurchasedITunesMusicView: View {
     // MARK: - Входные данные
 
     @ObservedObject var playerViewModel: PlayerViewModel
+    /// Единый обработчик «Избранного» передаётся в контейнеры строк iTunes.
+    let favoriteTrackActionHandler: FavoriteTrackActionHandler
     /// Одноразовый intent прокрутки к треку, полученный из общего сценария фонотеки.
     let revealRequest: LibraryRevealRequest?
     /// Подтверждает владельцу общего reveal-intent завершение обработки прокрутки.
@@ -129,7 +131,8 @@ struct PurchasedITunesMusicView: View {
                         PurchasedITunesTrackRowContainer(
                             state: rowState,
                             context: tracks,
-                            playerViewModel: playerViewModel
+                            playerViewModel: playerViewModel,
+                            favoriteTrackActionHandler: favoriteTrackActionHandler
                         )
                         .id(track.trackId)
                     }

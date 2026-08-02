@@ -23,6 +23,9 @@ struct MainTabView: View {
     /// Глобальная ViewModel экспорта передаётся в обе точки запуска операции.
     @ObservedObject var exportProgressViewModel: ExportProgressViewModel
 
+    /// Единый обработчик «Избранного» передаётся во все корневые feature-сценарии.
+    let favoriteTrackActionHandler: FavoriteTrackActionHandler
+
     /// Общая ViewModel master-flow треклистов, которой владеет корневой контейнер.
     @ObservedObject var trackListsViewModel: TrackListsViewModel
     /// ViewModel хранит и синхронизирует выбор корневой навигации.
@@ -56,7 +59,8 @@ struct MainTabView: View {
             ) {
                 PlayerScreen(
                     playerViewModel: playerViewModel,
-                    exportProgressViewModel: exportProgressViewModel
+                    exportProgressViewModel: exportProgressViewModel,
+                    favoriteTrackActionHandler: favoriteTrackActionHandler
                 )
                 .globalBottomPanelsHost(
                     playerViewModel: playerViewModel,
@@ -74,7 +78,8 @@ struct MainTabView: View {
             ) {
                 LibraryScreen(
                     playerViewModel: playerViewModel,
-                    exportProgressViewModel: exportProgressViewModel
+                    exportProgressViewModel: exportProgressViewModel,
+                    favoriteTrackActionHandler: favoriteTrackActionHandler
                 )
                 .globalBottomPanelsHost(
                     playerViewModel: playerViewModel,
@@ -93,7 +98,8 @@ struct MainTabView: View {
                 TrackListsScreen(
                     trackListsViewModel: trackListsViewModel,
                     playerViewModel: playerViewModel,
-                    exportProgressViewModel: exportProgressViewModel
+                    exportProgressViewModel: exportProgressViewModel,
+                    favoriteTrackActionHandler: favoriteTrackActionHandler
                 )
                 .globalBottomPanelsHost(
                     playerViewModel: playerViewModel,
@@ -129,6 +135,7 @@ struct MainTabView: View {
             ) {
                 SearchScreen(
                     playerViewModel: playerViewModel,
+                    favoriteTrackActionHandler: favoriteTrackActionHandler,
                     isSearchActive: $isSearchActive
                 )
                 .globalBottomPanelsHost(
