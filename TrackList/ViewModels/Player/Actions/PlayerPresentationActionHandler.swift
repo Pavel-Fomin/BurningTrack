@@ -34,6 +34,8 @@ final class PlayerPresentationActionHandler {
     private let toastPresenter: any ToastPresenting
     /// Обработчик переходов к значениям музыкальной коллекции.
     private let collectionNavigationHandler: TrackCollectionNavigationHandler
+    /// Общий action flow отправки трека.
+    private let trackShareActionHandler: TrackShareActionHandler
     /// Общий обработчик «Избранного» выполняет сохранение ниже Player-flow.
     private let favoriteActionHandler: FavoriteTrackActionHandler
 
@@ -45,6 +47,7 @@ final class PlayerPresentationActionHandler {
         sheetActionCoordinator: SheetActionCoordinator,
         toastPresenter: any ToastPresenting,
         collectionNavigationHandler: TrackCollectionNavigationHandler,
+        trackShareActionHandler: TrackShareActionHandler,
         favoriteActionHandler: FavoriteTrackActionHandler
     ) {
         self.playlistManager = playlistManager
@@ -52,6 +55,7 @@ final class PlayerPresentationActionHandler {
         self.sheetActionCoordinator = sheetActionCoordinator
         self.toastPresenter = toastPresenter
         self.collectionNavigationHandler = collectionNavigationHandler
+        self.trackShareActionHandler = trackShareActionHandler
         self.favoriteActionHandler = favoriteActionHandler
     }
 
@@ -139,7 +143,7 @@ final class PlayerPresentationActionHandler {
     func shareTrack(queueItemId: UUID) {
         guard let track = track(queueItemId: queueItemId) else { return }
 
-        TrackShareActionHandler.shared.share(track)
+        trackShareActionHandler.share(track)
     }
 
     /// Открывает сценарий копирования iTunes-трека из очереди плеера.

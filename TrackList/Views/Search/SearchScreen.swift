@@ -12,9 +12,10 @@ struct SearchScreen: View {
 
     // MARK: - Dependencies
 
-    @ObservedObject var playerViewModel: PlayerViewModel
     /// Единый обработчик «Избранного» передаётся в ActionHandler поиска.
     let favoriteTrackActionHandler: FavoriteTrackActionHandler
+    /// Готовая фабрика ViewModel поиска с явными production-зависимостями.
+    let viewModelFactory: SearchViewModelFactory
     /// MainTabView использует состояние для синхронного скрытия MiniPlayer и резерва.
     @Binding private var isSearchActive: Bool
 
@@ -25,35 +26,22 @@ struct SearchScreen: View {
     // MARK: - Init
 
     init(
-        playerViewModel: PlayerViewModel,
         favoriteTrackActionHandler: FavoriteTrackActionHandler,
+        viewModelFactory: SearchViewModelFactory,
         isSearchActive: Binding<Bool>
     ) {
-        self.playerViewModel = playerViewModel
         self.favoriteTrackActionHandler = favoriteTrackActionHandler
+        self.viewModelFactory = viewModelFactory
         self._isSearchActive = isSearchActive
         self._viewModel = StateObject(
-            wrappedValue: SearchViewModelFactory.make(
-                favoriteTrackIdsProvider: playerViewModel
-            )
+            wrappedValue: viewModelFactory.make()
         )
     }
 
     /// Обработчик действий экрана поиска.
     private var actionHandler: SearchActionHandler {
-        SearchActionHandler(
+        viewModelFactory.makeActionHandler(
             viewModel: viewModel,
-            playerViewModel: playerViewModel,
-            navigationCoordinator: NavigationCoordinator.shared,
-            sheetManager: SheetManager.shared,
-            sheetActionCoordinator: SheetActionCoordinator.shared,
-            fileRenamer: TrackFileRenameActionHandler(
-                playerManager: playerViewModel.fileOperationPlayerManager,
-                sheetManager: SheetManager.shared,
-                commandExecutor: AppCommandExecutor.shared,
-                toastManager: ToastManager.shared,
-                proposalBuilder: FileRenameProposalBuilder()
-            ),
             favoriteActionHandler: favoriteTrackActionHandler
         )
     }
@@ -76,7 +64,6 @@ struct SearchScreen: View {
         NavigationStack {
             SearchView(
                 state: viewModel.state,
-                playerViewModel: playerViewModel,
                 onSearchActivityChanged: { isActive in
                     isSearchActive = isActive
                 },

@@ -44,6 +44,9 @@ final class PlayerScreenViewModel: ObservableObject {
     /// Менеджер настроек приложения.
     private let appSettingsManager: AppSettingsManager
 
+    /// Источник сохранённых metadata для presentation состояния строк плеера.
+    private let trackRegistry: TrackRegistry
+
     /// Builder состояния строк плеера.
     private let rowStateBuilder: PlayerTrackRowStateBuilder
 
@@ -67,6 +70,7 @@ final class PlayerScreenViewModel: ObservableObject {
         sheetManager: SheetManager,
         playlistManager: PlaylistManager,
         appSettingsManager: AppSettingsManager,
+        trackRegistry: TrackRegistry,
         rowStateBuilder: PlayerTrackRowStateBuilder
     ) {
         self.playerViewModel = playerViewModel
@@ -74,6 +78,7 @@ final class PlayerScreenViewModel: ObservableObject {
         self.sheetManager = sheetManager
         self.playlistManager = playlistManager
         self.appSettingsManager = appSettingsManager
+        self.trackRegistry = trackRegistry
         self.rowStateBuilder = rowStateBuilder
         self.state = PlayerScreenState(
             rows: [],
@@ -151,7 +156,7 @@ final class PlayerScreenViewModel: ObservableObject {
         collectionNavigationTargetLoadTask?.cancel()
 
         collectionNavigationTargetLoadTask = Task { [weak self] in
-            let metadataByTrackId = await TrackRegistry.shared.cachedMetadata(
+            let metadataByTrackId = await trackRegistry.cachedMetadata(
                 forTrackIds: Array(trackIds)
             )
             guard Task.isCancelled == false,

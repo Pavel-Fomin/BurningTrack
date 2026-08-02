@@ -30,6 +30,18 @@ struct MainTabView: View {
     @ObservedObject var trackListsViewModel: TrackListsViewModel
     /// ViewModel хранит и синхронизирует выбор корневой навигации.
     @ObservedObject var navigationViewModel: MainNavigationViewModel
+    /// Готовая фабрика экранного flow плеера.
+    let playerScreenViewModelFactory: PlayerScreenViewModelFactory
+    /// Готовые фабрики feature фонотеки.
+    let libraryFeatureDependencies: LibraryFeatureDependencies
+    /// Готовая фабрика ViewModel поиска.
+    let searchViewModelFactory: SearchViewModelFactory
+    /// Готовые фабрики detail-flow одного треклиста.
+    let trackListFeatureDependencies: TrackListFeatureDependencies
+    /// Единый ActionHandler master-flow треклистов.
+    let trackListsActionHandler: TrackListsActionHandler
+    /// Единый координатор межэкранной навигации.
+    let navigationCoordinator: NavigationCoordinator
 
     /// Состояние системного поиска управляет только глобальной нижней геометрией.
     @Binding var isSearchActive: Bool
@@ -60,7 +72,8 @@ struct MainTabView: View {
                 PlayerScreen(
                     playerViewModel: playerViewModel,
                     exportProgressViewModel: exportProgressViewModel,
-                    favoriteTrackActionHandler: favoriteTrackActionHandler
+                    favoriteTrackActionHandler: favoriteTrackActionHandler,
+                    viewModelFactory: playerScreenViewModelFactory
                 )
                 .globalBottomPanelsHost(
                     playerViewModel: playerViewModel,
@@ -77,9 +90,9 @@ struct MainTabView: View {
                 value: ScenePhaseHandler.Tab.library
             ) {
                 LibraryScreen(
-                    playerViewModel: playerViewModel,
                     exportProgressViewModel: exportProgressViewModel,
-                    favoriteTrackActionHandler: favoriteTrackActionHandler
+                    favoriteTrackActionHandler: favoriteTrackActionHandler,
+                    dependencies: libraryFeatureDependencies
                 )
                 .globalBottomPanelsHost(
                     playerViewModel: playerViewModel,
@@ -97,9 +110,11 @@ struct MainTabView: View {
             ) {
                 TrackListsScreen(
                     trackListsViewModel: trackListsViewModel,
-                    playerViewModel: playerViewModel,
                     exportProgressViewModel: exportProgressViewModel,
-                    favoriteTrackActionHandler: favoriteTrackActionHandler
+                    favoriteTrackActionHandler: favoriteTrackActionHandler,
+                    actionHandler: trackListsActionHandler,
+                    navigationCoordinator: navigationCoordinator,
+                    trackListFeatureDependencies: trackListFeatureDependencies
                 )
                 .globalBottomPanelsHost(
                     playerViewModel: playerViewModel,
@@ -115,9 +130,7 @@ struct MainTabView: View {
                 systemImage: "gear",
                 value: ScenePhaseHandler.Tab.settings
             ) {
-                SettingsScreen(
-                    playerViewModel: playerViewModel
-                )
+                SettingsScreen()
                 .globalBottomPanelsHost(
                     playerViewModel: playerViewModel,
                     exportProgressViewModel: exportProgressViewModel,
@@ -134,8 +147,8 @@ struct MainTabView: View {
                 role: .search
             ) {
                 SearchScreen(
-                    playerViewModel: playerViewModel,
                     favoriteTrackActionHandler: favoriteTrackActionHandler,
+                    viewModelFactory: searchViewModelFactory,
                     isSearchActive: $isSearchActive
                 )
                 .globalBottomPanelsHost(

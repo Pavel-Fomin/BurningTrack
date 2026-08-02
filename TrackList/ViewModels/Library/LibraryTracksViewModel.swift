@@ -550,9 +550,9 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         return .titleAsc
     }
 
-    /// Применяет массовое переименование файлов через batch rename handler.
-    func applyBatchFilenameRename(using playerManager: PlayerManager) async {
-        await batchRenameHandler.applyRename(using: playerManager)
+    /// Применяет массовое переименование файлов через capability проверки занятости.
+    func applyBatchFilenameRename(using fileBusyChecker: any TrackFileBusyChecking) async {
+        await batchRenameHandler.applyRename(using: fileBusyChecker)
     }
 
     // MARK: - Runtime-снимки

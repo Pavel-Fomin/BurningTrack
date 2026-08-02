@@ -61,6 +61,8 @@ final class TrackListViewModel: ObservableObject {
     private let runtimeSnapshotBuilder: any TrackRuntimeSnapshotBuilding
     /// Получает SQLite-статистику отдельно от массива отображаемых строк.
     private let summaryProvider: any TrackCollectionSummaryProviding
+    /// Даёт сохранённые metadata локальных треков для переходов к коллекции.
+    private let trackRegistry: TrackRegistry
     /// Собирает готовое состояние экрана одного треклиста.
     private let screenStateBuilder = TrackListScreenStateBuilder()
     /// Готовый вторичный текст заголовка, не зависящий от runtime snapshot строк.
@@ -106,7 +108,8 @@ final class TrackListViewModel: ObservableObject {
         favoriteTrackIdsProvider: any FavoriteTrackIdsProviding,
         runtimeSnapshotProvider: any TrackRuntimeSnapshotProviding,
         runtimeSnapshotBuilder: any TrackRuntimeSnapshotBuilding,
-        summaryProvider: any TrackCollectionSummaryProviding
+        summaryProvider: any TrackCollectionSummaryProviding,
+        trackRegistry: TrackRegistry
     ) {
         self.fileRenamer = fileRenamer
         self.trackListManager = trackListManager
@@ -120,6 +123,7 @@ final class TrackListViewModel: ObservableObject {
         self.runtimeSnapshotProvider = runtimeSnapshotProvider
         self.runtimeSnapshotBuilder = runtimeSnapshotBuilder
         self.summaryProvider = summaryProvider
+        self.trackRegistry = trackRegistry
         self.lastTagReadingEnabled = settingsManager.settings.visible.metadata.isTagReadingEnabled
         self.lastFileFormatVisible = settingsManager.settings.visible.library.isFileFormatVisible
         self.rowPresentationSettings = settingsManager.settings
@@ -307,7 +311,7 @@ final class TrackListViewModel: ObservableObject {
     // MARK: - Screen State
 
     /// Применяет playback-состояние к локальному состоянию экрана.
-    private func applyPlaybackState(_ playbackState: PlaybackState) {
+    private func applyPlaybackState(_ playbackState: PlaybackStateSnapshot) {
         currentTrackId = playbackState.currentDisplayableId
         currentContext = playbackState.currentContext
         isPlaybackActive = playbackState.isPlaying
@@ -350,7 +354,7 @@ final class TrackListViewModel: ObservableObject {
         collectionNavigationTargetLoadTask?.cancel()
 
         collectionNavigationTargetLoadTask = Task { [weak self] in
-            let metadataByTrackId = await TrackRegistry.shared.cachedMetadata(
+            let metadataByTrackId = await trackRegistry.cachedMetadata(
                 forTrackIds: Array(trackIds)
             )
             guard Task.isCancelled == false,
@@ -528,14 +532,17 @@ final class TrackListViewModel: ObservableObject {
 
         Task {
             do {
-                try await commandExecutor.removeTrackFromTrackList(
+                let result = try await commandExecutor.removeTrackFromTrackList(
                     listItemId: listItemId,
                     trackListId: listId
                 )
+                await AppCommandToastPresenter(
+                    toastPresenter: toastPresenter
+                ).present(result)
             } catch let appError as AppError {
-                await MainActor.run {
-                    toastPresenter.handle(appError)
-                }
+                AppCommandToastPresenter(
+                    toastPresenter: toastPresenter
+                ).present(appError)
             } catch {
                 await MainActor.run {
                     toastPresenter.handle(AppError.trackListSaveFailed)

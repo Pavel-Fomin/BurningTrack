@@ -22,7 +22,9 @@ struct NewTrackListSelectionFolderView: View {
 
     @ObservedObject var selectionViewModel: NewTrackListSelectionViewModel
     /// Published-состояние «Избранного» используется только как вход state builder-а.
-    @ObservedObject var playerViewModel: PlayerViewModel
+    let favoriteTrackIdsProvider: any FavoriteTrackIdsProviding
+    /// Локально опубликованный снимок сохраняет реактивное обновление готовых строк без PlayerViewModel.
+    @State private var favoriteTrackIds: Set<UUID>
 
     /// ViewModel для загрузки треков папки
     @StateObject private var tracksViewModel: LibraryTracksViewModel
@@ -33,12 +35,15 @@ struct NewTrackListSelectionFolderView: View {
         folder: LibraryFolder,
         selectionViewModel: NewTrackListSelectionViewModel,
         renameActionHandler: TrackFileRenameActionHandler,
-        playerViewModel: PlayerViewModel
+        favoriteTrackIdsProvider: any FavoriteTrackIdsProviding
     ) {
         self.folder = folder
         self.selectionViewModel = selectionViewModel
         self.renameActionHandler = renameActionHandler
-        self.playerViewModel = playerViewModel
+        self.favoriteTrackIdsProvider = favoriteTrackIdsProvider
+        self._favoriteTrackIds = State(
+            initialValue: favoriteTrackIdsProvider.favoriteTrackIds
+        )
 
         _tracksViewModel = StateObject(
             wrappedValue: LibraryTracksViewModel(
@@ -57,7 +62,7 @@ struct NewTrackListSelectionFolderView: View {
     /// Готовые секции не оставляют View вычислять источник или принадлежность к «Избранному».
     private var selectableTrackSections: [TrackSelectableSectionState] {
         tracksViewModel.makeSelectableTrackSections(
-            favoriteTrackIds: playerViewModel.favoriteTrackIds,
+            favoriteTrackIds: favoriteTrackIds,
             selectedTrackIds: Set(selectionViewModel.selectedTracksById.keys)
         )
     }
@@ -75,7 +80,7 @@ struct NewTrackListSelectionFolderView: View {
                                     folder: subfolder,
                                     selectionViewModel: selectionViewModel,
                                     renameActionHandler: renameActionHandler,
-                                    playerViewModel: playerViewModel
+                                    favoriteTrackIdsProvider: favoriteTrackIdsProvider
                                 )
                             } label: {
                                 HStack(spacing: 12) {
@@ -150,6 +155,9 @@ struct NewTrackListSelectionFolderView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task {
             await tracksViewModel.refresh()
+        }
+        .onReceive(favoriteTrackIdsProvider.favoriteTrackIdsPublisher) { favoriteTrackIds in
+            self.favoriteTrackIds = favoriteTrackIds
         }
     }
 }

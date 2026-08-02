@@ -10,7 +10,6 @@ import SwiftUI
 
 struct SearchView: View {
     let state: SearchScreenState
-    @ObservedObject var playerViewModel: PlayerViewModel
     let onSearchActivityChanged: (Bool) -> Void
     let onAction: (SearchAction) -> Void
 
@@ -98,7 +97,6 @@ struct SearchView: View {
                 ForEach(state.tracks) { row in
                     SearchTrackRowView(
                         row: row,
-                        playerViewModel: playerViewModel,
                         onAction: onAction
                     )
                 }
@@ -232,20 +230,14 @@ private struct SearchTrackListRowView: View {
 
 private struct SearchTrackRowView: View {
     let row: SearchTrackRowState
-    @ObservedObject var playerViewModel: PlayerViewModel
     let onAction: (SearchAction) -> Void
-
-    /// Найденный трек считается текущим по стабильному trackId, без сравнения названия или артиста.
-    private var isCurrent: Bool {
-        playerViewModel.currentTrackDisplayable?.trackId == row.result.trackId
-    }
 
     /// Трек поиска остаётся обычной строкой TrackRowView.
     var body: some View {
         TrackRowView(
             track: row.result,
-            isCurrent: isCurrent,
-            isPlaying: isCurrent && playerViewModel.isPlaying,
+            isCurrent: row.isCurrent,
+            isPlaying: row.isPlaying,
             isHighlighted: false,
             artworkRequest: row.artworkRequest,
             artworkBadgeState: row.artworkBadgeState,

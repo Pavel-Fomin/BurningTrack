@@ -25,7 +25,12 @@ struct LibraryTrackSectionView: View {
 
     let trackListMembershipsById: [UUID: [TrackListMembership]]
 
-    @ObservedObject var playerViewModel: PlayerViewModel
+    /// Проверяет текущее playback-состояние при обработке тапа строки.
+    let playbackStateProvider: any PlaybackStateProviding
+    /// Выполняет команды запуска строки фонотеки.
+    let playbackController: any TrackPlaybackControlling
+    /// Готовый снимок «Избранного» для presentation state строк.
+    let favoriteTrackIds: Set<UUID>
     
     let metadataProvider: TrackMetadataProviding
     let cloudAvailabilityStateStore: (UUID) -> CloudTrackAvailabilityRowStateStore
@@ -83,7 +88,8 @@ struct LibraryTrackSectionView: View {
             selection.toggle(rowId)
         }
         let playbackHandler = LibraryTrackPlaybackHandler(
-            playerViewModel: playerViewModel,
+            playbackStateProvider: playbackStateProvider,
+            playbackController: playbackController,
             source: playbackSource
         )
         let presentationHandler = LibraryTrackPresentationHandler(
@@ -96,7 +102,7 @@ struct LibraryTrackSectionView: View {
             isPlaying: playbackStateController.isPlaying(track),
             isHighlighted: isRevealed || rowId == highlightedTrackID,
             // Published-состояние обновляется единым потоком FavoritesChangeEvent.
-            favoriteTrackIds: playerViewModel.favoriteTrackIds,
+            favoriteTrackIds: favoriteTrackIds,
             trackListMemberships: trackListMembershipsById[track.trackId] ?? [],
             showsSelection: isSelecting,
             isSelected: isSelected,

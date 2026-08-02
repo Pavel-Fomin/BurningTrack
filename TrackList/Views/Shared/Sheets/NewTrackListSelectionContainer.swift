@@ -17,7 +17,7 @@ struct NewTrackListSelectionContainer: View {
     let renameActionHandler: TrackFileRenameActionHandler
 
     /// Передаёт published-снимок «Избранного» в готовое состояние строк выбора.
-    @ObservedObject var playerViewModel: PlayerViewModel
+    let favoriteTrackIdsProvider: any FavoriteTrackIdsProviding
 
     // MARK: - State
 
@@ -66,7 +66,7 @@ struct NewTrackListSelectionContainer: View {
                     folders: MusicLibraryManager.shared.attachedFolders,
                     renameActionHandler: renameActionHandler,
                     selectionViewModel: viewModel,
-                    playerViewModel: playerViewModel
+                    favoriteTrackIdsProvider: favoriteTrackIdsProvider
                 )
             }
             

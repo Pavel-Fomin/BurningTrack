@@ -14,23 +14,33 @@ struct LibraryCollectionValuesView: View {
 
     /// ViewModel владеет загрузкой значений из provider и не знает о NavigationStack.
     @StateObject private var viewModel: LibraryCollectionValuesViewModel
-    /// ViewModel плеера нужен только album-строке для текущего трека и точечной загрузки обложки.
-    @ObservedObject var playerViewModel: PlayerViewModel
+    /// Контроллер runtime snapshot-ов сохраняет точечную загрузку обложки вне PlayerViewModel.
+    @StateObject private var runtimeController: LibraryTrackRuntimeController
+    /// Единый снимок сохраняет реактивность album-строк без наблюдения PlayerViewModel.
+    @State private var playbackState: PlaybackStateSnapshot
 
     // MARK: - Входные данные
 
     /// Передаёт выбранное значение наружу, чтобы навигацией управлял контейнер фонотеки.
     let onValueSelected: (LibraryCollectionValue) -> Void
+    /// Предоставляет playback-состояние только для подсветки album-строки.
+    let playbackStateProvider: any PlaybackStateProviding
 
     // MARK: - Init
 
     init(
         viewModel: LibraryCollectionValuesViewModel,
-        playerViewModel: PlayerViewModel,
+        playbackStateProvider: any PlaybackStateProviding,
         onValueSelected: @escaping (LibraryCollectionValue) -> Void
     ) {
         self._viewModel = StateObject(wrappedValue: viewModel)
-        self.playerViewModel = playerViewModel
+        self._runtimeController = StateObject(
+            wrappedValue: LibraryTrackRuntimeController()
+        )
+        self._playbackState = State(
+            initialValue: playbackStateProvider.playbackState
+        )
+        self.playbackStateProvider = playbackStateProvider
         self.onValueSelected = onValueSelected
     }
 
@@ -51,6 +61,9 @@ struct LibraryCollectionValuesView: View {
             }
             .task {
                 await viewModel.load()
+            }
+            .onReceive(playbackStateProvider.playbackStatePublisher) { playbackState in
+                self.playbackState = playbackState
             }
     }
 
@@ -193,7 +206,7 @@ struct LibraryCollectionValuesView: View {
                 value: value,
                 artworkRequest: albumArtworkRequest(for: value),
                 isCurrent: isCurrent,
-                isPlaying: isCurrent && playerViewModel.isPlaying
+                isPlaying: isCurrent && playbackState.isPlaying
             )
         }
         .buttonStyle(.plain)
@@ -206,7 +219,7 @@ struct LibraryCollectionValuesView: View {
     /// Собирает лёгкий запрос из runtime snapshot representative track, если он уже загружен.
     private func albumArtworkRequest(for value: LibraryCollectionValue) -> ArtworkRequest? {
         guard let representativeTrackId = value.representativeTrackId,
-              let snapshot = playerViewModel.snapshot(for: representativeTrackId),
+              let snapshot = runtimeController.snapshot(for: representativeTrackId),
               snapshot.artworkData != nil else {
             return nil
         }
@@ -220,10 +233,17 @@ struct LibraryCollectionValuesView: View {
 
     /// Проверяет, находится ли текущий трек плеера внутри выбранного альбома.
     private func isCurrentAlbum(_ value: LibraryCollectionValue) -> Bool {
-        guard let currentTrack = playerViewModel.currentTrackDisplayable else { return false }
+        if let currentDisplayableId = playbackState.currentDisplayableId,
+           value.trackIds.contains(currentDisplayableId) {
+            return true
+        }
 
-        return value.trackIds.contains(currentTrack.id)
-            || value.trackIds.contains(currentTrack.trackId)
+        if let currentTrackId = playbackState.currentTrackId,
+           value.trackIds.contains(currentTrackId) {
+            return true
+        }
+
+        return false
     }
 
     /// Точечно запрашивает runtime snapshot только для representative track видимой album-строки.
@@ -231,6 +251,6 @@ struct LibraryCollectionValuesView: View {
     private func requestAlbumArtworkIfNeeded(for value: LibraryCollectionValue) {
         guard let representativeTrackId = value.representativeTrackId else { return }
 
-        playerViewModel.requestSnapshotIfNeeded(for: representativeTrackId)
+        runtimeController.requestSnapshotIfNeeded(for: representativeTrackId)
     }
 }

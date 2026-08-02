@@ -13,5 +13,5 @@ protocol TrackListCommandExecuting {
     func removeTrackFromTrackList(
         listItemId: UUID,
         trackListId: UUID
-    ) async throws
+    ) async throws -> TrackRemovedFromTrackListSuccess
 }

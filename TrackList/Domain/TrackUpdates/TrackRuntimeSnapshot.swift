@@ -76,6 +76,60 @@ struct TrackRuntimeSnapshot: Equatable {
 }
 
 extension TrackRuntimeSnapshot {
+
+    /// Сохраняет последние валидные runtime-значения, если повторное чтение файла временно не вернуло их.
+    /// Явное изменение обложки или длительности всегда остаётся приоритетнее предыдущего snapshot.
+    func preservingUnavailableRuntimeValues(
+        from previousSnapshot: TrackRuntimeSnapshot?,
+        changedFields: Set<TrackChangedField>
+    ) -> TrackRuntimeSnapshot {
+        guard let previousSnapshot else { return self }
+
+        let duration = changedFields.contains(.duration)
+            ? duration
+            : duration ?? previousSnapshot.duration
+        let artworkData = changedFields.contains(.artworkData)
+            ? artworkData
+            : artworkData ?? previousSnapshot.artworkData
+        let artworkSourceIdentifier = changedFields.contains(.artworkData)
+            ? artworkSourceIdentifier
+            : artworkSourceIdentifier ?? previousSnapshot.artworkSourceIdentifier
+
+        return TrackRuntimeSnapshot(
+            trackId: trackId,
+            fileName: fileName,
+            isAvailable: isAvailable,
+            technicalMetadata: technicalMetadata,
+            title: title,
+            artist: artist,
+            album: album,
+            albumArtist: albumArtist,
+            genre: genre,
+            comment: comment,
+            composer: composer,
+            conductor: conductor,
+            lyricist: lyricist,
+            remixer: remixer,
+            grouping: grouping,
+            bpm: bpm,
+            musicalKey: musicalKey,
+            trackNumber: trackNumber,
+            totalTracks: totalTracks,
+            discNumber: discNumber,
+            totalDiscs: totalDiscs,
+            year: year,
+            date: date,
+            publisherOrLabel: publisherOrLabel,
+            copyright: copyright,
+            encodedBy: encodedBy,
+            isrc: isrc,
+            duration: duration,
+            artworkData: artworkData,
+            artworkSourceIdentifier: artworkSourceIdentifier,
+            updatedAt: updatedAt
+        )
+    }
+
     /// Собирает runtime snapshot для купленного iTunes-трека без BookmarkResolver и кэша метаданных.
     init(
         purchasedITunesTrack track: PurchasedITunesPlayableTrack,

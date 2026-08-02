@@ -29,9 +29,9 @@ struct MoveToFolderContainer: View {
     /// Данные sheet’а, переданные через SheetManager
     let data: MoveToFolderSheetData
 
-    /// PlayerManager временно пробрасывается для выполнения команды перемещения.
-    /// Копирование iTunes-трека через этот объект не проходит.
-    let playerManager: PlayerManager
+    /// Capability проверки занятости файла нужна только move-сценарию.
+    /// Копирование iTunes-трека через неё не проходит.
+    let fileBusyChecker: any TrackFileBusyChecking
 
     // MARK: - State
 
@@ -123,14 +123,19 @@ struct MoveToFolderContainer: View {
         to folderId: UUID
     ) async {
         do {
-            try await AppCommandExecutor.shared.moveTrack(
+            let result = try await AppCommandExecutor.shared.moveTrack(
                 trackId: data.track.trackId,
                 toFolder: folderId,
-                using: playerManager
+                using: fileBusyChecker
             )
+            AppCommandToastPresenter(
+                toastPresenter: ToastManager.shared
+            ).present(result)
             SheetManager.shared.closeActive()
         } catch let appError as AppError {
-            ToastManager.shared.handle(appError)
+            AppCommandToastPresenter(
+                toastPresenter: ToastManager.shared
+            ).present(appError)
         } catch {
             ToastManager.shared.handle(.fileMoveFailed)
         }
@@ -150,13 +155,18 @@ struct MoveToFolderContainer: View {
         }
 
         do {
-            try await AppCommandExecutor.shared.copyPurchasedITunesTrack(
+            let result = try await AppCommandExecutor.shared.copyPurchasedITunesTrack(
                 track,
                 toFolder: folderId
             )
+            AppCommandToastPresenter(
+                toastPresenter: ToastManager.shared
+            ).present(result, sourceTrack: track)
             SheetManager.shared.closeActive()
         } catch let appError as AppError {
-            ToastManager.shared.handle(appError)
+            AppCommandToastPresenter(
+                toastPresenter: ToastManager.shared
+            ).present(appError)
         } catch {
             ToastManager.shared.handle(
                 .operationFailed(

@@ -10,24 +10,36 @@
 import Foundation
 
 @MainActor
-enum LibraryScreenViewModelFactory {
-    // MARK: - Make
+struct LibraryScreenViewModelFactory {
 
-    static func make() -> LibraryScreenViewModel {
-        make(
-            navigationCoordinator: .shared,
-            musicLibraryManager: .shared,
-            trackRegistry: .shared,
-            toastPresenter: ToastManager.shared
-        )
-    }
+    /// Координатор маршрутов фонотеки, подготовленный Composition Root.
+    private let navigationCoordinator: NavigationCoordinator
+    /// Менеджер фонотеки, подготовленный Composition Root.
+    private let musicLibraryManager: MusicLibraryManager
+    /// Реестр треков, подготовленный Composition Root.
+    private let trackRegistry: TrackRegistry
+    /// Презентер ошибок фонотеки, подготовленный Composition Root.
+    private let toastPresenter: any ToastPresenting
+    /// Источник событий треков, подготовленный Composition Root.
+    private let trackEventProvider: any LibraryTrackEventProvider
 
-    static func make(
+    /// Получает готовые production-зависимости и не разрешает singleton самостоятельно.
+    init(
         navigationCoordinator: NavigationCoordinator,
         musicLibraryManager: MusicLibraryManager,
         trackRegistry: TrackRegistry,
-        toastPresenter: any ToastPresenting
-    ) -> LibraryScreenViewModel {
+        toastPresenter: any ToastPresenting,
+        trackEventProvider: any LibraryTrackEventProvider
+    ) {
+        self.navigationCoordinator = navigationCoordinator
+        self.musicLibraryManager = musicLibraryManager
+        self.trackRegistry = trackRegistry
+        self.toastPresenter = toastPresenter
+        self.trackEventProvider = trackEventProvider
+    }
+
+    /// Собирает ViewModel без доступа к глобальному графу зависимостей.
+    func make() -> LibraryScreenViewModel {
         let stateBuilder = LibraryScreenStateBuilder()
         let actionHandler = LibraryScreenActionHandler(
             navigationCoordinator: navigationCoordinator,
@@ -46,7 +58,7 @@ enum LibraryScreenViewModelFactory {
             stateBuilder: stateBuilder,
             actionHandler: actionHandler,
             collectionRootItemsProvider: collectionValuesProvider,
-            trackEventProvider: NotificationLibraryTrackEventProvider()
+            trackEventProvider: trackEventProvider
         )
     }
 }

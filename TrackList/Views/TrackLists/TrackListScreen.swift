@@ -12,23 +12,17 @@ import SwiftUI
 
 struct TrackListScreen: View {
     let trackList: TrackList
-    let playerViewModel: PlayerViewModel
     @ObservedObject var exportProgressViewModel: ExportProgressViewModel
     /// Единый обработчик «Избранного» передаётся в фабрику detail-flow.
     let favoriteTrackActionHandler: FavoriteTrackActionHandler
+    /// Готовые фабрики detail-flow, подготовленные Composition Root.
+    let dependencies: TrackListFeatureDependencies
     @StateObject private var viewModel: TrackListViewModel
-
-    /// Фабрика production ViewModel для detail-flow одного треклиста.
-    private static let viewModelFactory = TrackListViewModelFactory()
-
-    /// Фабрика production-обработчика действий detail-flow.
-    private let actionHandlerFactory = TrackListFlowActionHandlerFactory()
 
     /// Обработчик действий detail-flow одного треклиста.
     private var actionHandler: TrackListFlowActionHandler {
-        actionHandlerFactory.make(
+        dependencies.actionHandlerFactory.make(
             reader: viewModel,
-            playbackManager: playerViewModel,
             mutator: viewModel,
             renamer: viewModel,
             exportProgressViewModel: exportProgressViewModel,
@@ -38,20 +32,17 @@ struct TrackListScreen: View {
 
     init(
         trackList: TrackList,
-        playerViewModel: PlayerViewModel,
         exportProgressViewModel: ExportProgressViewModel,
-        favoriteTrackActionHandler: FavoriteTrackActionHandler
+        favoriteTrackActionHandler: FavoriteTrackActionHandler,
+        dependencies: TrackListFeatureDependencies
     ) {
         self.trackList = trackList
-        self.playerViewModel = playerViewModel
         self.exportProgressViewModel = exportProgressViewModel
         self.favoriteTrackActionHandler = favoriteTrackActionHandler
+        self.dependencies = dependencies
         _viewModel = StateObject(
-            wrappedValue: Self.viewModelFactory.make(
-                trackList: trackList,
-                playerManager: playerViewModel.fileOperationPlayerManager,
-                playbackStateProvider: playerViewModel,
-                favoriteTrackIdsProvider: playerViewModel
+            wrappedValue: dependencies.viewModelFactory.make(
+                trackList: trackList
             )
         )
     }

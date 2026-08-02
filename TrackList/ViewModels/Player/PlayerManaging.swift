@@ -37,6 +37,9 @@ protocol PlayerManaging: AnyObject {
     /// Освобождает security-scoped доступ к текущему треку.
     func stopAccessingCurrentTrack()
 
+    /// Полностью освобождает AVPlayerItem и доступ к файлу перед подтверждённой файловой операцией.
+    func releaseCurrentTrackForFileOperation()
+
     /// Возвращает уже подготовленный плеером локальный URL текущего трека без повторного открытия bookmark-доступа.
     func preparedLocalFileURL(for trackId: UUID) -> URL?
 
@@ -82,6 +85,12 @@ protocol PlayerManaging: AnyObject {
 }
 
 extension PlayerManaging {
+    /// Тестовые реализации могут ограничиться уже существующим освобождением security-scoped доступа.
+    func releaseCurrentTrackForFileOperation() {
+        pause()
+        stopAccessingCurrentTrack()
+    }
+
     /// Подмены PlayerManager в изолированных тестах не обязаны управлять системным Remote Command Center.
     func setTrackNavigationCommandsEnabled(
         isNextEnabled: Bool,

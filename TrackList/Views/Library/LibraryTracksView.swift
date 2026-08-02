@@ -24,7 +24,16 @@ struct LibraryTracksView: View {
     let onExportTracks: ([LibraryTrack]) -> Void
     let revealRequest: LibraryRevealRequest?
     let onRevealHandled: (UUID) -> Void
-    let playerViewModel: PlayerViewModel
+    /// Реактивное playback-состояние для строк и прокрутки к текущему треку.
+    let playbackStateProvider: any PlaybackStateProviding
+    /// Команды запуска и toggle для строк фонотеки.
+    let playbackController: any TrackPlaybackControlling
+    /// Published-состояние «Избранного» для presentation state строк.
+    let favoriteTrackIdsProvider: any FavoriteTrackIdsProviding
+    /// Проверка занятости файла для массового переименования.
+    let fileBusyChecker: any TrackFileBusyChecking
+    /// Общий обработчик одиночного переименования файла.
+    let renameActionHandler: TrackFileRenameActionHandler
     /// Единый обработчик «Избранного» передаётся в строки треков папки.
     let favoriteTrackActionHandler: FavoriteTrackActionHandler
     @Binding var selectionActionBarConfig: SelectionActionBarConfig?
@@ -34,6 +43,8 @@ struct LibraryTracksView: View {
     @State private var cloudAvailabilityController = LibraryCloudAvailabilityScreenController()
     @ObservedObject private var settingsManager = AppSettingsManager.shared
     @StateObject private var playbackStateController: LibraryTrackPlaybackStateController
+    /// Локальный снимок сохраняет реактивность строк без наблюдения PlayerViewModel.
+    @State private var favoriteTrackIds: Set<UUID>
     @StateObject private var revealCoordinator: LibraryTrackRevealCoordinator
     private let selectionActionBarCoordinator = LibrarySelectionActionBarCoordinator()
     private let sheetCoordinator = LibraryTracksSheetCoordinator()
@@ -77,7 +88,11 @@ struct LibraryTracksView: View {
         onExportTracks: @escaping ([LibraryTrack]) -> Void = { _ in },
         revealRequest: LibraryRevealRequest? = nil,
         onRevealHandled: @escaping (UUID) -> Void = { _ in },
-        playerViewModel: PlayerViewModel,
+        playbackStateProvider: any PlaybackStateProviding,
+        playbackController: any TrackPlaybackControlling,
+        favoriteTrackIdsProvider: any FavoriteTrackIdsProviding,
+        fileBusyChecker: any TrackFileBusyChecking,
+        renameActionHandler: TrackFileRenameActionHandler,
         favoriteTrackActionHandler: FavoriteTrackActionHandler,
         selectionActionBarConfig: Binding<SelectionActionBarConfig?> = .constant(nil)
     ) {
@@ -88,12 +103,19 @@ struct LibraryTracksView: View {
         self.onExportTracks = onExportTracks
         self.revealRequest = revealRequest
         self.onRevealHandled = onRevealHandled
-        self.playerViewModel = playerViewModel
+        self.playbackStateProvider = playbackStateProvider
+        self.playbackController = playbackController
+        self.favoriteTrackIdsProvider = favoriteTrackIdsProvider
+        self.fileBusyChecker = fileBusyChecker
+        self.renameActionHandler = renameActionHandler
         self.favoriteTrackActionHandler = favoriteTrackActionHandler
         self._selectionActionBarConfig = selectionActionBarConfig
+        self._favoriteTrackIds = State(
+            initialValue: favoriteTrackIdsProvider.favoriteTrackIds
+        )
         self._playbackStateController = StateObject(
             wrappedValue: LibraryTrackPlaybackStateController(
-                playerViewModel: playerViewModel
+                playbackStateProvider: playbackStateProvider
             )
         )
         self._revealCoordinator = StateObject(
@@ -104,13 +126,7 @@ struct LibraryTracksView: View {
         self._tracksViewModel = StateObject(
             wrappedValue: LibraryTracksViewModel(
                 folderURL: folder.url,
-                renameActionHandler: TrackFileRenameActionHandler(
-                    playerManager: playerViewModel.fileOperationPlayerManager,
-                    sheetManager: SheetManager.shared,
-                    commandExecutor: AppCommandExecutor.shared,
-                    toastManager: ToastManager.shared,
-                    proposalBuilder: FileRenameProposalBuilder()
-                )
+                renameActionHandler: renameActionHandler
             )
         )
     }
@@ -166,6 +182,9 @@ struct LibraryTracksView: View {
             }
             .onChange(of: tracksViewModel.batchFilenameRenameFlow.isActive) { _, isActive in
                 handleBatchFilenameRenameFlowActivityChange(isActive)
+            }
+            .onReceive(favoriteTrackIdsProvider.favoriteTrackIdsPublisher) { favoriteTrackIds in
+                self.favoriteTrackIds = favoriteTrackIds
             }
             .onDisappear {
                 cloudAvailabilityActionHandler.handle(.screenDidDisappear)
@@ -225,7 +244,9 @@ struct LibraryTracksView: View {
                     metadataProvider: tracksViewModel,
                     cloudAvailabilityStateStore: cloudAvailabilityController.stateStore(for:),
                     cloudAvailabilityActionHandler: cloudAvailabilityActionHandler,
-                    playerViewModel: playerViewModel,
+                    playbackStateProvider: playbackStateProvider,
+                    playbackController: playbackController,
+                    favoriteTrackIds: favoriteTrackIds,
                     favoriteTrackActionHandler: favoriteTrackActionHandler,
                     playbackStateController: playbackStateController,
                     sheetManager: sheetManager,
@@ -264,7 +285,7 @@ struct LibraryTracksView: View {
                     )
                 )
             }
-            .onChange(of: playbackStateController.currentTrackId) { _, _ in
+            .onChange(of: playbackStateController.currentDisplayableId) { _, _ in
                 requestActiveTrackScrollIfNeeded()
             }
             .onChange(of: playbackStateController.currentContext) { _, _ in
@@ -404,10 +425,9 @@ struct LibraryTracksView: View {
 
         sheetManager.presentBatchFilenameRename(
             flow: tracksViewModel.batchFilenameRenameFlow,
-            playerManager: playerViewModel.fileOperationPlayerManager,
             onApply: {
                 await tracksViewModel.applyBatchFilenameRename(
-                    using: playerViewModel.fileOperationPlayerManager
+                    using: fileBusyChecker
                 )
             }
         )
@@ -444,8 +464,8 @@ struct LibraryTracksView: View {
     /// Запрашивает прокрутку к активному треку, если она не конфликтует с reveal.
     private func requestActiveTrackScrollIfNeeded() {
         guard let request = revealCoordinator.activeTrackScrollRequestIfNeeded(
-            currentTrack: playerViewModel.currentTrackDisplayable,
-            currentContext: playerViewModel.currentContext,
+            currentDisplayableId: playbackStateController.currentDisplayableId,
+            currentContext: playbackStateController.currentContext,
             trackSections: tracksViewModel.trackSections,
             hasPendingScrollRequest: scrollRequest != nil
         ) else {

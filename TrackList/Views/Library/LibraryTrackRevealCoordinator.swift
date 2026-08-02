@@ -181,7 +181,7 @@ final class LibraryTrackRevealCoordinator: ObservableObject {
 
     /// Возвращает запрос прокрутки к текущему треку, если reveal не имеет приоритета.
     func activeTrackScrollRequestIfNeeded(
-        currentTrack: (any TrackDisplayable)?,
+        currentDisplayableId: UUID?,
         currentContext: PlaybackContext?,
         trackSections: [TrackSection],
         hasPendingScrollRequest: Bool
@@ -190,10 +190,10 @@ final class LibraryTrackRevealCoordinator: ObservableObject {
         guard !hasUnperformedRevealScroll else { return nil }
         guard !hasPendingScrollRequest else { return nil }
         guard currentContext == .library else { return nil }
-        guard let currentTrackId = currentTrack?.id else { return nil }
-        guard hasTrack(id: currentTrackId, in: trackSections) else { return nil }
+        guard let currentDisplayableId else { return nil }
+        guard hasTrack(id: currentDisplayableId, in: trackSections) else { return nil }
 
-        return .activeTrack(currentTrackId)
+        return .activeTrack(currentDisplayableId)
     }
 
     // MARK: - Track lookup

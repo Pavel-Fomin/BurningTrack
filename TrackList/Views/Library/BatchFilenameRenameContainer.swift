@@ -23,9 +23,6 @@ struct BatchFilenameRenameContainer: View {
     /// Flow массового переименования файлов.
     @ObservedObject var flow: BatchFilenameRenameFlow
 
-    /// Менеджер плеера нужен командному слою для проверки занятого файла.
-    let playerManager: PlayerManager
-
     /// Применение подготовленного плана переименования.
     let onApply: () async -> Void
 

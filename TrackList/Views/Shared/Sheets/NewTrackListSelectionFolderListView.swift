@@ -22,7 +22,7 @@ struct NewTrackListSelectionFolderListView: View {
 
     @ObservedObject var selectionViewModel: NewTrackListSelectionViewModel
     /// Передаёт единое published-состояние «Избранного» в дочерние экраны папок.
-    @ObservedObject var playerViewModel: PlayerViewModel
+    let favoriteTrackIdsProvider: any FavoriteTrackIdsProviding
 
     // MARK: - UI
 
@@ -35,7 +35,7 @@ struct NewTrackListSelectionFolderListView: View {
                             folder: folder,
                             selectionViewModel: selectionViewModel,
                             renameActionHandler: renameActionHandler,
-                            playerViewModel: playerViewModel
+                            favoriteTrackIdsProvider: favoriteTrackIdsProvider
                         )
                     } label: {
                         HStack(spacing: 12) {

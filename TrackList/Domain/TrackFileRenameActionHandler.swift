@@ -43,7 +43,8 @@ final class TrackFileRenameActionHandler {
 
     // MARK: - Dependencies
 
-    private let playerManager: PlayerManager
+    /// Capability проверки занятости файла не раскрывает handler-у PlayerManager.
+    private let fileBusyChecker: any TrackFileBusyChecking
     private let sheetManager: SheetManager
     private let commandExecutor: AppCommandExecutor
     private let toastManager: ToastManager
@@ -52,13 +53,13 @@ final class TrackFileRenameActionHandler {
     // MARK: - Инициализация
 
     init(
-        playerManager: PlayerManager,
+        fileBusyChecker: any TrackFileBusyChecking,
         sheetManager: SheetManager,
         commandExecutor: AppCommandExecutor,
         toastManager: ToastManager,
         proposalBuilder: FileRenameProposalBuilder
     ) {
-        self.playerManager = playerManager
+        self.fileBusyChecker = fileBusyChecker
         self.sheetManager = sheetManager
         self.commandExecutor = commandExecutor
         self.toastManager = toastManager
@@ -109,7 +110,7 @@ final class TrackFileRenameActionHandler {
 
         Task {
             do {
-                try await commandExecutor.saveTrackEdits(
+                let result = try await commandExecutor.saveTrackEdits(
                     trackId: request.trackId,
                     newFileName: proposal.newFileName,
                     fileChanged: true,
@@ -117,10 +118,15 @@ final class TrackFileRenameActionHandler {
                     tagsChanged: false,
                     artworkAction: .none,
                     artworkChanged: false,
-                    using: playerManager
+                    using: fileBusyChecker
                 )
+                AppCommandToastPresenter(
+                    toastPresenter: toastManager
+                ).present(result)
             } catch let appError as AppError {
-                toastManager.handle(appError)
+                AppCommandToastPresenter(
+                    toastPresenter: toastManager
+                ).present(appError)
             } catch {
                 toastManager.handle(
                     .operationFailed(

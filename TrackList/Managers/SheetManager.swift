@@ -164,9 +164,6 @@ struct BatchFilenameRenameSheetData: Identifiable, Equatable {
     /// Flow массового переименования файлов.
     let flow: BatchFilenameRenameFlow
 
-    /// Менеджер плеера для проверки занятых файлов при применении команды.
-    let playerManager: PlayerManager
-
     /// Применение подготовленного плана переименования.
     let onApply: () async -> Void
 
@@ -476,14 +473,12 @@ final class SheetManager: ObservableObject {
     /// Показывает sheet массового переименования файлов.
     func presentBatchFilenameRename(
         flow: BatchFilenameRenameFlow,
-        playerManager: PlayerManager,
         onApply: @escaping () async -> Void
     ) {
         guard !isBatchFilenameRenamePresentedOrPending else { return }
 
         let data = BatchFilenameRenameSheetData(
             flow: flow,
-            playerManager: playerManager,
             onApply: onApply
         )
 

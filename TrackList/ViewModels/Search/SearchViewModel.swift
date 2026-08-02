@@ -27,6 +27,8 @@ final class SearchViewModel: ObservableObject {
     private let settingsManager: any SettingsManaging
     /// Даёт единый published-снимок «Избранного» без подписки на доменные события во ViewModel поиска.
     private let favoriteTrackIdsProvider: any FavoriteTrackIdsProviding
+    /// Даёт единый playback-снимок для готового presentation state строк поиска.
+    private let playbackStateProvider: any PlaybackStateProviding
     /// Показывает ошибки чтения пользователю.
     private let toastPresenter: any ToastPresenting
     /// Собирает отображаемое состояние из результатов поиска.
@@ -51,6 +53,7 @@ final class SearchViewModel: ObservableObject {
         runtimeController: LibraryTrackRuntimeController,
         settingsManager: any SettingsManaging,
         favoriteTrackIdsProvider: any FavoriteTrackIdsProviding,
+        playbackStateProvider: any PlaybackStateProviding,
         toastPresenter: any ToastPresenting,
         presenter: SearchPresenter = SearchPresenter()
     ) {
@@ -58,11 +61,13 @@ final class SearchViewModel: ObservableObject {
         self.runtimeController = runtimeController
         self.settingsManager = settingsManager
         self.favoriteTrackIdsProvider = favoriteTrackIdsProvider
+        self.playbackStateProvider = playbackStateProvider
         self.toastPresenter = toastPresenter
         self.presenter = presenter
         self.state = presenter.empty()
         observeDisplaySettings()
         observeFavoriteTrackIds()
+        observePlaybackState()
     }
 
     deinit {
@@ -242,6 +247,15 @@ final class SearchViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 
+    /// Пересобирает только готовые строки поиска после изменения текущего playback-состояния.
+    private func observePlaybackState() {
+        playbackStateProvider.playbackStatePublisher
+            .sink { [weak self] _ in
+                self?.refreshDisplayedResults()
+            }
+            .store(in: &cancellables)
+    }
+
     /// Не запускает новый поиск, если настройка влияет только на отображение уже полученных строк.
     private func refreshDisplayedResults(using settings: AppSettings? = nil) {
         switch state.contentState {
@@ -333,6 +347,7 @@ final class SearchViewModel: ObservableObject {
             selectedSortMode: selectedSortMode,
             snapshotsByTrackId: runtimeController.snapshotsByTrackId,
             favoriteTrackIds: favoriteTrackIdsProvider.favoriteTrackIds,
+            playbackState: playbackStateProvider.playbackState,
             displaySettings: displaySettings
         )
     }

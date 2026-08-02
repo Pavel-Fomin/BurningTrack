@@ -16,8 +16,8 @@ final class LibraryTrackPlaybackStateController: ObservableObject {
 
     // MARK: - Состояние
 
-    /// Идентификатор текущего трека плеера.
-    @Published private(set) var currentTrackId: UUID?
+    /// Идентификатор текущего отображаемого элемента плеера.
+    @Published private(set) var currentDisplayableId: UUID?
     /// Контекст, в котором запущен текущий трек.
     @Published private(set) var currentContext: PlaybackContext?
     /// Воспроизводится ли текущий трек.
@@ -31,27 +31,13 @@ final class LibraryTrackPlaybackStateController: ObservableObject {
     // MARK: - Init
 
     init(
-        playerViewModel: PlayerViewModel
+        playbackStateProvider: any PlaybackStateProviding
     ) {
-        updateCurrentTrackId(playerViewModel.currentTrackDisplayable?.id)
-        updateCurrentContext(playerViewModel.currentContext)
-        updatePlaybackState(playerViewModel.isPlaying)
+        apply(playbackStateProvider.playbackState)
 
-        playerViewModel.$currentTrackDisplayable
-            .sink { [weak self] track in
-                self?.updateCurrentTrackId(track?.id)
-            }
-            .store(in: &cancellables)
-
-        playerViewModel.$currentContext
-            .sink { [weak self] context in
-                self?.updateCurrentContext(context)
-            }
-            .store(in: &cancellables)
-
-        playerViewModel.$isPlaying
-            .sink { [weak self] isPlaying in
-                self?.updatePlaybackState(isPlaying)
+        playbackStateProvider.playbackStatePublisher
+            .sink { [weak self] snapshot in
+                self?.apply(snapshot)
             }
             .store(in: &cancellables)
     }
@@ -62,7 +48,7 @@ final class LibraryTrackPlaybackStateController: ObservableObject {
     func isCurrent(
         _ track: LibraryTrack
     ) -> Bool {
-        currentTrackId == track.id && currentContext == .library
+        currentDisplayableId == track.id && currentContext == .library
     }
 
     /// Проверяет, воспроизводится ли текущий трек фонотеки.
@@ -74,15 +60,24 @@ final class LibraryTrackPlaybackStateController: ObservableObject {
 
     // MARK: - Обновление состояния
 
-    /// Не публикует одинаковый идентификатор текущего трека повторно.
-    private func updateCurrentTrackId(
-        _ trackId: UUID?
+    /// Применяет единый снимок и не создаёт независимых подписок на PlayerViewModel.
+    private func apply(
+        _ snapshot: PlaybackStateSnapshot
     ) {
-        guard currentTrackId != trackId else {
+        updateCurrentDisplayableId(snapshot.currentDisplayableId)
+        updateCurrentContext(snapshot.currentContext)
+        updatePlaybackState(snapshot.isPlaying)
+    }
+
+    /// Не публикует одинаковый идентификатор текущей строки повторно.
+    private func updateCurrentDisplayableId(
+        _ displayableId: UUID?
+    ) {
+        guard currentDisplayableId != displayableId else {
             return
         }
 
-        currentTrackId = trackId
+        currentDisplayableId = displayableId
     }
 
     /// Не публикует одинаковый playback-контекст повторно.

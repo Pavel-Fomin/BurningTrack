@@ -13,7 +13,8 @@ import SwiftUI
 
 struct ToastHostModifier: ViewModifier {
 
-    @ObservedObject private var toastManager = ToastManager.shared
+    /// Единый presentation-state Toast, переданный Composition Root.
+    @ObservedObject var toastManager: ToastManager
 
     func body(content: Content) -> some View {
         ZStack {
@@ -44,7 +45,9 @@ struct ToastHostModifier: ViewModifier {
 
 extension View {
     /// Подключает отображение тостов поверх текущего UI
-    func toastHost() -> some View {
-        modifier(ToastHostModifier())
+    func toastHost(
+        toastManager: ToastManager
+    ) -> some View {
+        modifier(ToastHostModifier(toastManager: toastManager))
     }
 }

@@ -18,10 +18,21 @@ struct LibraryFolderContainer: View {
     let folder: LibraryFolder
     let revealRequest: LibraryRevealRequest?
     let onRevealHandled: (UUID) -> Void
-    let playerViewModel: PlayerViewModel
+    /// Реактивное playback-состояние для строк папки.
+    let playbackStateProvider: any PlaybackStateProviding
+    /// Команды запуска строк папки.
+    let playbackController: any TrackPlaybackControlling
+    /// Published-состояние «Избранного» для строк папки.
+    let favoriteTrackIdsProvider: any FavoriteTrackIdsProviding
+    /// Проверка занятости файлов для массового переименования.
+    let fileBusyChecker: any TrackFileBusyChecking
+    /// Общий обработчик переименования файлов.
+    let renameActionHandler: TrackFileRenameActionHandler
     let exportProgressViewModel: ExportProgressViewModel
     /// Единый обработчик «Избранного» передаётся в содержимое папки.
     let favoriteTrackActionHandler: FavoriteTrackActionHandler
+    /// Готовая фабрика ViewModel папки с явными production-зависимостями.
+    let viewModelFactory: LibraryFolderViewModelFactory
     @Binding var selectionActionBarConfig: SelectionActionBarConfig?
 
     // MARK: - Init
@@ -30,17 +41,27 @@ struct LibraryFolderContainer: View {
         folder: LibraryFolder,
         revealRequest: LibraryRevealRequest? = nil,
         onRevealHandled: @escaping (UUID) -> Void = { _ in },
-        playerViewModel: PlayerViewModel,
+        playbackStateProvider: any PlaybackStateProviding,
+        playbackController: any TrackPlaybackControlling,
+        favoriteTrackIdsProvider: any FavoriteTrackIdsProviding,
+        fileBusyChecker: any TrackFileBusyChecking,
+        renameActionHandler: TrackFileRenameActionHandler,
         exportProgressViewModel: ExportProgressViewModel,
         favoriteTrackActionHandler: FavoriteTrackActionHandler,
+        viewModelFactory: LibraryFolderViewModelFactory,
         selectionActionBarConfig: Binding<SelectionActionBarConfig?>
     ) {
         self.folder = folder
         self.revealRequest = revealRequest
         self.onRevealHandled = onRevealHandled
-        self.playerViewModel = playerViewModel
+        self.playbackStateProvider = playbackStateProvider
+        self.playbackController = playbackController
+        self.favoriteTrackIdsProvider = favoriteTrackIdsProvider
+        self.fileBusyChecker = fileBusyChecker
+        self.renameActionHandler = renameActionHandler
         self.exportProgressViewModel = exportProgressViewModel
         self.favoriteTrackActionHandler = favoriteTrackActionHandler
+        self.viewModelFactory = viewModelFactory
         self._selectionActionBarConfig = selectionActionBarConfig
     }
 
@@ -51,9 +72,14 @@ struct LibraryFolderContainer: View {
             folder: folder,
             revealRequest: revealRequest,
             onRevealHandled: onRevealHandled,
-            playerViewModel: playerViewModel,
+            playbackStateProvider: playbackStateProvider,
+            playbackController: playbackController,
+            favoriteTrackIdsProvider: favoriteTrackIdsProvider,
+            fileBusyChecker: fileBusyChecker,
+            renameActionHandler: renameActionHandler,
             exportProgressViewModel: exportProgressViewModel,
             favoriteTrackActionHandler: favoriteTrackActionHandler,
+            viewModelFactory: viewModelFactory,
             selectionActionBarConfig: $selectionActionBarConfig
         )
         .id(folder.id)
@@ -67,10 +93,21 @@ private struct LibraryFolderContent: View {
     let folder: LibraryFolder
     let revealRequest: LibraryRevealRequest?
     let onRevealHandled: (UUID) -> Void
-    let playerViewModel: PlayerViewModel
+    /// Реактивное playback-состояние для строк папки.
+    let playbackStateProvider: any PlaybackStateProviding
+    /// Команды запуска строк папки.
+    let playbackController: any TrackPlaybackControlling
+    /// Published-состояние «Избранного» для строк папки.
+    let favoriteTrackIdsProvider: any FavoriteTrackIdsProviding
+    /// Проверка занятости файлов для массового переименования.
+    let fileBusyChecker: any TrackFileBusyChecking
+    /// Общий обработчик переименования файлов.
+    let renameActionHandler: TrackFileRenameActionHandler
     let exportProgressViewModel: ExportProgressViewModel
     /// Единый обработчик «Избранного» передаётся в экран папки.
     let favoriteTrackActionHandler: FavoriteTrackActionHandler
+    /// Готовая фабрика ViewModel папки с явными production-зависимостями.
+    let viewModelFactory: LibraryFolderViewModelFactory
     @Binding var selectionActionBarConfig: SelectionActionBarConfig?
 
     // MARK: - ViewModel
@@ -83,22 +120,32 @@ private struct LibraryFolderContent: View {
         folder: LibraryFolder,
         revealRequest: LibraryRevealRequest?,
         onRevealHandled: @escaping (UUID) -> Void,
-        playerViewModel: PlayerViewModel,
+        playbackStateProvider: any PlaybackStateProviding,
+        playbackController: any TrackPlaybackControlling,
+        favoriteTrackIdsProvider: any FavoriteTrackIdsProviding,
+        fileBusyChecker: any TrackFileBusyChecking,
+        renameActionHandler: TrackFileRenameActionHandler,
         exportProgressViewModel: ExportProgressViewModel,
         favoriteTrackActionHandler: FavoriteTrackActionHandler,
+        viewModelFactory: LibraryFolderViewModelFactory,
         selectionActionBarConfig: Binding<SelectionActionBarConfig?>
     ) {
         self.folder = folder
         self.revealRequest = revealRequest
         self.onRevealHandled = onRevealHandled
-        self.playerViewModel = playerViewModel
+        self.playbackStateProvider = playbackStateProvider
+        self.playbackController = playbackController
+        self.favoriteTrackIdsProvider = favoriteTrackIdsProvider
+        self.fileBusyChecker = fileBusyChecker
+        self.renameActionHandler = renameActionHandler
         self.exportProgressViewModel = exportProgressViewModel
         self.favoriteTrackActionHandler = favoriteTrackActionHandler
+        self.viewModelFactory = viewModelFactory
         self._selectionActionBarConfig = selectionActionBarConfig
         // Сохраняем Binding локально, чтобы action handler очищал текущую панель выбора.
         let selectionActionBarConfig = selectionActionBarConfig
         self._viewModel = StateObject(
-            wrappedValue: LibraryFolderViewModelFactory.make(
+            wrappedValue: viewModelFactory.make(
                 folder: folder,
                 exportProgressViewModel: exportProgressViewModel,
                 clearSelectionActionBar: {
@@ -115,7 +162,11 @@ private struct LibraryFolderContent: View {
             state: viewModel.screenState,
             revealRequest: revealRequest,
             onRevealHandled: onRevealHandled,
-            playerViewModel: playerViewModel,
+            playbackStateProvider: playbackStateProvider,
+            playbackController: playbackController,
+            favoriteTrackIdsProvider: favoriteTrackIdsProvider,
+            fileBusyChecker: fileBusyChecker,
+            renameActionHandler: renameActionHandler,
             favoriteTrackActionHandler: favoriteTrackActionHandler,
             selectionActionBarConfig: $selectionActionBarConfig,
             onAction: viewModel.handle

@@ -10,7 +10,7 @@
 //  - BookmarksRegistry (bookmark'и файлов и папок)
 //  - BookmarkResolver (URL из bookmark'ов)
 //  - TrackRegistry (метаданные треков)
-//  - PlayerManager (проверка, занят ли трек плеером)
+//  - TrackFileBusyChecking (проверка, занят ли файл трека плеером)
 //
 //  Created by Pavel Fomin on 07.12.2025.
 //
@@ -46,15 +46,15 @@ actor LibraryFileManager {
     /// - Parameters:
     ///   - trackId: ID трека (TrackRegistry / BookmarksRegistry).
     ///   - destinationFolderId: ID целевой папки (FolderEntry.id).
-    ///   - playerManager: актуальный экземпляр PlayerManager для проверки занятости трека.
+    ///   - fileBusyChecker: capability проверки занятости файла текущим плеером.
     func moveTrack(
         id trackId: UUID,
         toFolder destinationFolderId: UUID,
-        using playerManager: PlayerManager
+        using fileBusyChecker: any TrackFileBusyChecking
     ) async throws {
 
         // 1. Запрещаем перемещение файла, если он сейчас занят плеером.
-        guard !playerManager.isBusy(trackId) else {
+        guard await fileBusyChecker.isTrackFileBusy(trackId: trackId) == false else {
             throw LibraryFileError.trackIsPlaying
         }
 
@@ -189,15 +189,15 @@ actor LibraryFileManager {
     /// - Parameters:
     ///   - trackId: ID трека.
     ///   - newFileName: новое имя файла (желательно с расширением).
-    ///   - playerManager: актуальный экземпляр PlayerManager.
+    ///   - fileBusyChecker: capability проверки занятости файла текущим плеером.
     func renameTrack(
         id trackId: UUID,
         to newFileName: String,
-        using playerManager: PlayerManager
+        using fileBusyChecker: any TrackFileBusyChecking
     ) async throws {
         
         // 1. Запрещаем переименование файла, если он сейчас занят плеером.
-        guard !playerManager.isBusy(trackId) else {
+        guard await fileBusyChecker.isTrackFileBusy(trackId: trackId) == false else {
             throw LibraryFileError.trackIsPlaying
         }
 

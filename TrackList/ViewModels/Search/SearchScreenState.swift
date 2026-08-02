@@ -30,6 +30,10 @@ struct SearchTrackListRowState: Identifiable, Equatable {
 struct SearchTrackRowState: Identifiable {
     let result: SearchTrackResult
     let artworkRequest: ArtworkRequest?
+    /// Показывает, соответствует ли строка текущему физическому треку плеера.
+    let isCurrent: Bool
+    /// Показывает, активно ли воспроизведение текущей строки.
+    let isPlaying: Bool
     /// Текущее подтверждённое состояние «Избранного» для меню строки.
     let isFavorite: Bool
     /// Готовое presentation-состояние бейджа обложки.

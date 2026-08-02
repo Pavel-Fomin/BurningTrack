@@ -30,25 +30,32 @@ final class TrackListFlowActionHandler {
     /// Создаёт обработчик действий detail-flow одного треклиста.
     init(
         reader: any TrackListReading,
-        playbackManager: any TrackListPlaybackManaging,
+        playbackStateProvider: any PlaybackStateProviding,
+        playbackController: any TrackPlaybackControlling,
         mutator: any TrackListMutating,
         renamer: any TrackListRenaming,
         presenter: any TrackListPresenting,
         exportProgressViewModel: ExportProgressViewModel,
         viewControllerProvider: any ViewControllerProviding,
         toastPresenter: any ToastPresenting,
+        commandExecutor: AppCommandExecutor,
+        collectionNavigationHandler: TrackCollectionNavigationHandler,
+        trackShareActionHandler: TrackShareActionHandler,
         favoriteTrackActionHandler: FavoriteTrackActionHandler
     ) {
         self.presentationHandler = TrackListPresentationHandler(
             reader: reader,
             presenter: presenter,
             toastPresenter: toastPresenter,
-            collectionNavigationHandler: .shared,
+            commandExecutor: commandExecutor,
+            collectionNavigationHandler: collectionNavigationHandler,
+            trackShareActionHandler: trackShareActionHandler,
             favoriteActionHandler: favoriteTrackActionHandler
         )
         self.playbackHandler = TrackListPlaybackHandler(
             reader: reader,
-            playbackManager: playbackManager
+            playbackStateProvider: playbackStateProvider,
+            playbackController: playbackController
         )
         self.mutationHandler = TrackListMutationHandler(mutator: mutator)
         self.exportHandler = TrackListExportHandler(

@@ -25,6 +25,8 @@ final class TrackListPresentationHandler {
     private let commandExecutor: AppCommandExecutor
     /// Обработчик переходов к значениям музыкальной коллекции.
     private let collectionNavigationHandler: TrackCollectionNavigationHandler
+    /// Общий action flow отправки трека.
+    private let trackShareActionHandler: TrackShareActionHandler
     /// Общий обработчик «Избранного» выполняет сохранение вне UI и списка.
     private let favoriteActionHandler: FavoriteTrackActionHandler
 
@@ -33,8 +35,9 @@ final class TrackListPresentationHandler {
         reader: any TrackListReading,
         presenter: any TrackListPresenting,
         toastPresenter: any ToastPresenting,
-        commandExecutor: AppCommandExecutor = .shared,
+        commandExecutor: AppCommandExecutor,
         collectionNavigationHandler: TrackCollectionNavigationHandler,
+        trackShareActionHandler: TrackShareActionHandler,
         favoriteActionHandler: FavoriteTrackActionHandler
     ) {
         self.reader = reader
@@ -42,6 +45,7 @@ final class TrackListPresentationHandler {
         self.toastPresenter = toastPresenter
         self.commandExecutor = commandExecutor
         self.collectionNavigationHandler = collectionNavigationHandler
+        self.trackShareActionHandler = trackShareActionHandler
         self.favoriteActionHandler = favoriteActionHandler
     }
 
@@ -73,7 +77,7 @@ final class TrackListPresentationHandler {
     func shareTrack(rowId: UUID) {
         guard let track = reader.tracks.first(where: { $0.id == rowId }) else { return }
 
-        TrackShareActionHandler.shared.share(track)
+        trackShareActionHandler.share(track)
     }
 
     /// Открывает сценарий копирования iTunes-трека из строки треклиста.
@@ -91,11 +95,16 @@ final class TrackListPresentationHandler {
 
         Task {
             do {
-                try await commandExecutor.addPurchasedITunesTrackToPlayer(
+                let result = try await commandExecutor.addPurchasedITunesTrackToPlayer(
                     purchasedTrack
                 )
+                AppCommandToastPresenter(
+                    toastPresenter: toastPresenter
+                ).present(result)
             } catch let appError as AppError {
-                toastPresenter.handle(appError)
+                AppCommandToastPresenter(
+                    toastPresenter: toastPresenter
+                ).present(appError)
             } catch {
                 toastPresenter.handle(
                     .operationFailed(

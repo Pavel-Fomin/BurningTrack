@@ -13,14 +13,28 @@ import Foundation
 @MainActor
 struct PurchasedITunesMusicActionHandlerFactory {
 
+    /// Провайдер системного контроллера, подготовленный Composition Root.
+    private let viewControllerProvider: any ViewControllerProviding
+    /// Презентер пользовательских сообщений, подготовленный Composition Root.
+    private let toastPresenter: any ToastPresenting
+
+    /// Получает готовые production-зависимости и не разрешает singleton самостоятельно.
+    init(
+        viewControllerProvider: any ViewControllerProviding,
+        toastPresenter: any ToastPresenting
+    ) {
+        self.viewControllerProvider = viewControllerProvider
+        self.toastPresenter = toastPresenter
+    }
+
     /// Создаёт обработчик для существующего глобального состояния экспорта.
     func make(
         exportProgressViewModel: ExportProgressViewModel
     ) -> PurchasedITunesMusicActionHandler {
         PurchasedITunesMusicActionHandler(
             exportProgressViewModel: exportProgressViewModel,
-            viewControllerProvider: ApplicationViewControllerProvider(),
-            toastPresenter: ToastManager.shared
+            viewControllerProvider: viewControllerProvider,
+            toastPresenter: toastPresenter
         )
     }
 }

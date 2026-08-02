@@ -16,7 +16,10 @@ struct PurchasedITunesTrackRowContainer: View {
 
     let state: PurchasedITunesTrackRowState
     let context: [PurchasedITunesPlayableTrack]
-    @ObservedObject var playerViewModel: PlayerViewModel
+    /// Готовый snapshot делает строку реактивной без наблюдения PlayerViewModel.
+    let playbackState: PlaybackStateSnapshot
+    /// Команды запуска и toggle не раскрывают строке PlayerViewModel.
+    let playbackController: any TrackPlaybackControlling
     /// Единый обработчик «Избранного» передаётся в ActionHandler строки.
     let favoriteTrackActionHandler: FavoriteTrackActionHandler
 
@@ -25,7 +28,8 @@ struct PurchasedITunesTrackRowContainer: View {
     /// Обработчик пользовательских действий строки iTunes.
     private var actionHandler: PurchasedITunesTrackActionHandler {
         PurchasedITunesTrackActionHandler(
-            playerViewModel: playerViewModel,
+            playbackState: playbackState,
+            playbackController: playbackController,
             favoriteActionHandler: favoriteTrackActionHandler
         )
     }

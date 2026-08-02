@@ -24,7 +24,16 @@ struct LibraryFolderView: View {
 
     let revealRequest: LibraryRevealRequest?
     let onRevealHandled: (UUID) -> Void
-    let playerViewModel: PlayerViewModel
+    /// Реактивное playback-состояние для строк папки.
+    let playbackStateProvider: any PlaybackStateProviding
+    /// Команды запуска строк папки.
+    let playbackController: any TrackPlaybackControlling
+    /// Published-состояние «Избранного» для строк папки.
+    let favoriteTrackIdsProvider: any FavoriteTrackIdsProviding
+    /// Проверка занятости файлов для массового переименования.
+    let fileBusyChecker: any TrackFileBusyChecking
+    /// Общий обработчик переименования файлов.
+    let renameActionHandler: TrackFileRenameActionHandler
     /// Единый обработчик «Избранного» передаётся в список треков папки.
     let favoriteTrackActionHandler: FavoriteTrackActionHandler
     @Binding var selectionActionBarConfig: SelectionActionBarConfig?
@@ -52,7 +61,11 @@ struct LibraryFolderView: View {
                     },
                     revealRequest: revealRequest,
                     onRevealHandled: onRevealHandled,
-                    playerViewModel: playerViewModel,
+                    playbackStateProvider: playbackStateProvider,
+                    playbackController: playbackController,
+                    favoriteTrackIdsProvider: favoriteTrackIdsProvider,
+                    fileBusyChecker: fileBusyChecker,
+                    renameActionHandler: renameActionHandler,
                     favoriteTrackActionHandler: favoriteTrackActionHandler,
                     selectionActionBarConfig: $selectionActionBarConfig
                 )

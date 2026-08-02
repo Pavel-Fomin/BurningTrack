@@ -65,14 +65,19 @@ final class RenameTrackListActionHandler {
         guard !trimmedName.isEmpty else { return }
 
         do {
-            try await commandExecutor.renameTrackList(
+            let result = try await commandExecutor.renameTrackList(
                 trackListId: trackListId,
                 newName: trimmedName
             )
+            AppCommandToastPresenter(
+                toastPresenter: toastManager
+            ).present(result)
             sheetManager.closeActive()
         } catch let appError as AppError {
             print("❌ Ошибка переименования треклиста: \(appError)")
-            toastManager.handle(appError)
+            AppCommandToastPresenter(
+                toastPresenter: toastManager
+            ).present(appError)
         } catch {
             print("❌ Ошибка переименования треклиста: \(error)")
             toastManager.handle(AppError.trackListSaveFailed)

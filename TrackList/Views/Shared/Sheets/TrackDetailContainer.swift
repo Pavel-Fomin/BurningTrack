@@ -24,16 +24,21 @@ import SwiftUI
 struct TrackDetailContainer: View {
     
     let track: any TrackDisplayable
-    let playerManager: PlayerManager
+    /// Capability проверки занятости файла не раскрывает sheet-у PlayerManager.
+    let fileBusyChecker: any TrackFileBusyChecking
+    /// Освобождает текущий файл через согласованное состояние PlayerViewModel.
+    let playbackFileReleaser: any CurrentPlaybackFileReleasing
     
     /// Создаёт контейнер detail-sheet с нужным стартовым режимом.
     init(
         track: any TrackDisplayable,
-        playerManager: PlayerManager,
+        fileBusyChecker: any TrackFileBusyChecking,
+        playbackFileReleaser: any CurrentPlaybackFileReleasing,
         initialMode: TrackDetailSheet.Mode = .view
     ) {
         self.track = track
-        self.playerManager = playerManager
+        self.fileBusyChecker = fileBusyChecker
+        self.playbackFileReleaser = playbackFileReleaser
         self._mode = State(initialValue: initialMode)
     }
     
@@ -137,8 +142,7 @@ struct TrackDetailContainer: View {
             Button(TrackDetailPresentationText.cancelAccessibilityLabel, role: .cancel) {}
             
             Button(TrackDetailPresentationText.stopAndSaveTitle) {
-                playerManager.pause()
-                playerManager.stopAccessingCurrentTrack()
+                playbackFileReleaser.releaseCurrentPlaybackFile()
                 saveAndClose()
             }
         } message: {
@@ -199,7 +203,7 @@ struct TrackDetailContainer: View {
         Task {
             do {
                 let patch = buildTagWritePatch()
-                try await AppCommandExecutor.shared.saveTrackEdits(
+                let result = try await AppCommandExecutor.shared.saveTrackEdits(
                     trackId: track.trackId,
                     newFileName: newFullName,
                     fileChanged: fileChanged,
@@ -207,8 +211,14 @@ struct TrackDetailContainer: View {
                     tagsChanged: tagsChanged,
                     artworkAction: artworkAction,
                     artworkChanged: artworkChanged,
-                    using: playerManager
+                    using: fileBusyChecker
                 )
+
+                await MainActor.run {
+                    AppCommandToastPresenter(
+                        toastPresenter: ToastManager.shared
+                    ).present(result)
+                }
 
                 if let snapshot = await MainActor.run(
                     body: {
@@ -234,7 +244,9 @@ struct TrackDetailContainer: View {
                     }
                 default:
                     await MainActor.run {
-                        ToastManager.shared.handle(appError)
+                        AppCommandToastPresenter(
+                            toastPresenter: ToastManager.shared
+                        ).present(appError)
                     }
                 }
             } catch {

@@ -18,8 +18,10 @@ final class LibraryMasterActionHandler {
     private let navigationCoordinator: NavigationCoordinator
     /// Презентер пользовательских сообщений.
     private let toastPresenter: any ToastPresenting
-    /// ViewModel плеера для проверки и остановки воспроизведения.
-    private let playerViewModel: PlayerViewModel
+    /// Состояние плеера нужно только для проверки возможности открепления папки.
+    private let playbackState: any PlaybackStateProviding
+    /// Команда нужна только для остановки подтверждённого воспроизведения.
+    private let playbackController: any TrackPlaybackControlling
     /// Output корневого flow для изменения экранного состояния.
     private let output: any LibraryMasterActionOutput
     /// Запрашивает показ системного picker'а папки на уровне экрана.
@@ -29,14 +31,16 @@ final class LibraryMasterActionHandler {
         manager: MusicLibraryManager,
         navigationCoordinator: NavigationCoordinator,
         toastPresenter: any ToastPresenting,
-        playerViewModel: PlayerViewModel,
+        playbackState: any PlaybackStateProviding,
+        playbackController: any TrackPlaybackControlling,
         output: any LibraryMasterActionOutput,
         requestFolderPicker: @escaping @MainActor () -> Void
     ) {
         self.manager = manager
         self.navigationCoordinator = navigationCoordinator
         self.toastPresenter = toastPresenter
-        self.playerViewModel = playerViewModel
+        self.playbackState = playbackState
+        self.playbackController = playbackController
         self.output = output
         self.requestFolderPicker = requestFolderPicker
     }
@@ -143,8 +147,8 @@ final class LibraryMasterActionHandler {
         Task { @MainActor in
             let canDetach = await manager.canDetachFolder(
                 url: folder.url,
-                currentTrackId: playerViewModel.currentTrackDisplayable?.trackId,
-                isPlaying: playerViewModel.isPlaying
+                currentTrackId: playbackState.currentTrackId,
+                isPlaying: playbackState.isPlaying
             )
 
             if canDetach {
@@ -165,8 +169,8 @@ final class LibraryMasterActionHandler {
         }
 
         // Если трек сейчас играет — ставим его на паузу
-        if playerViewModel.isPlaying {
-            playerViewModel.togglePlayPause()
+        if playbackState.isPlaying {
+            playbackController.togglePlayPause()
         }
 
         Task { @MainActor in

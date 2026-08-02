@@ -79,7 +79,7 @@ final class LibraryBatchRenameHandler: ObservableObject {
     }
 
     /// Применяет массовое переименование файлов для готовых строк плана.
-    func applyRename(using playerManager: PlayerManager) async {
+    func applyRename(using fileBusyChecker: any TrackFileBusyChecking) async {
         guard !flow.isBusy else { return }
         // До выбора стратегии targetFileName равен текущему имени, поэтому применять такой план нельзя.
         guard flow.strategy != nil else { return }
@@ -103,7 +103,7 @@ final class LibraryBatchRenameHandler: ObservableObject {
 
         let result = await commandExecutor.renameTrackFilesBatch(
             commands,
-            using: playerManager,
+            using: fileBusyChecker,
             progress: { [weak self] processed, _ in
                 self?.flow.updateApplyingRenameProgress(
                     processedCount: processed

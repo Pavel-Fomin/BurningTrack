@@ -3,41 +3,51 @@ import Foundation
 /// Обрабатывает только воспроизведение строки фонотеки.
 @MainActor
 struct LibraryTrackPlaybackHandler {
-    let playerViewModel: PlayerViewModel
+    /// Состояние нужно только для проверки текущей строки фонотеки.
+    let playbackStateProvider: any PlaybackStateProviding
+    /// Команды запуска и toggle не раскрывают строке PlayerViewModel.
+    let playbackController: any TrackPlaybackControlling
     /// Источник передаётся экраном, который сформировал текущий список.
     let source: PlaybackContextSource?
 
     init(
-        playerViewModel: PlayerViewModel,
+        playbackStateProvider: any PlaybackStateProviding,
+        playbackController: any TrackPlaybackControlling,
         source: PlaybackContextSource? = nil
     ) {
-        self.playerViewModel = playerViewModel
+        self.playbackStateProvider = playbackStateProvider
+        self.playbackController = playbackController
         self.source = source
     }
 
     /// Проверяет, является ли трек текущим в контексте фонотеки.
     func isCurrent(_ track: LibraryTrack) -> Bool {
-        playerViewModel.isCurrent(track, in: .library)
+        playbackStateProvider.currentDisplayableId == track.id
+            && playbackStateProvider.currentContext == .library
     }
 
     /// Проверяет, играет ли текущий трек.
     func isPlaying(_ track: LibraryTrack) -> Bool {
-        isCurrent(track) && playerViewModel.isPlaying
+        isCurrent(track) && playbackStateProvider.isPlaying
     }
 
     /// Обрабатывает тап по строке.
     func handleTap(track: LibraryTrack, context: [LibraryTrack]) {
         if isCurrent(track) {
-            playerViewModel.togglePlayPause()
+            playbackController.togglePlayPause()
         } else if let source {
-            playerViewModel.play(
+            playbackController.play(
                 track: track,
-                context: context,
+                context: context.map { $0 as any TrackDisplayable },
                 source: source
             )
         } else {
             // Защищаем старый вызов для экранов, которые ещё не передали источник списка.
-            playerViewModel.play(track: track, context: context)
+            playbackController.play(
+                track: track,
+                context: context.map { $0 as any TrackDisplayable },
+                source: .playerQueue
+            )
         }
     }
 }

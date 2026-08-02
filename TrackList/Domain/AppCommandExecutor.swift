@@ -16,7 +16,6 @@
 //
 
 import Foundation
-import UIKit
 
 /// Единая точка исполнения команд пользовательских действий.
 ///
@@ -38,8 +37,8 @@ actor AppCommandExecutor {
     func moveTrack(
         trackId: UUID,
         toFolder folderId: UUID,
-        using playerManager: PlayerManager
-    ) async throws {
+        using fileBusyChecker: any TrackFileBusyChecking
+    ) async throws -> MoveTrackSuccess {
         
         // 1. Запоминаем старый URL до перемещения.
         let previousURL = await BookmarkResolver.url(forTrack: trackId)
@@ -49,7 +48,7 @@ actor AppCommandExecutor {
             try await LibraryFileManager.shared.moveTrack(
                 id: trackId,
                 toFolder: folderId,
-                using: playerManager
+                using: fileBusyChecker
             )
         } catch let libraryError as LibraryFileError {
             throw appError(from: libraryError, fallback: .fileMoveFailed)
@@ -69,25 +68,12 @@ actor AppCommandExecutor {
             .first(where: { $0.id == folderId })?
             .name
         
-        // 5. ToastEvent строится из snapshot
-        let snapshot = updateEvent?.snapshot
-        
-        let event = ToastEvent.trackMovedInLibrary(
-            title: snapshot?.title ?? snapshot?.fileName ?? "",
-            artist: snapshot?.artist ?? "",
-            artwork: snapshot.flatMap {
-                toastArtworkRequest(
-                    trackId: trackId,
-                    snapshot: $0
-                )
-            },
-            folderName: folderName
+        return MoveTrackSuccess(
+            trackId: trackId,
+            destinationFolderId: folderId,
+            destinationFolderName: folderName,
+            snapshot: updateEvent?.snapshot
         )
-        
-        // 6. Показ тоста
-        await MainActor.run {
-            ToastManager.shared.handle(event)
-        }
     }
 
     // MARK: - Копировать iTunes-трек
@@ -98,7 +84,7 @@ actor AppCommandExecutor {
     func copyPurchasedITunesTrack(
         _ track: PurchasedITunesPlayableTrack,
         toFolder folderId: UUID
-    ) async throws {
+    ) async throws -> CopyPurchasedITunesTrackSuccess {
         do {
             let result = try await PurchasedITunesTrackCopyManager.shared.copy(
                 track,
@@ -113,14 +99,12 @@ actor AppCommandExecutor {
                 mode: .safe
             )
 
-            let event = trackCopiedFromITunesEvent(
-                for: track,
-                folderName: result.folderName
+            return CopyPurchasedITunesTrackSuccess(
+                sourceTrackId: track.trackId,
+                copiedFileURL: result.fileURL,
+                destinationFolderId: result.folderId,
+                destinationFolderName: result.folderName
             )
-
-            await MainActor.run {
-                ToastManager.shared.handle(event)
-            }
         } catch {
             print("❌ copyPurchasedITunesTrack failed:", error)
             throw AppError.purchasedITunesCopyFailed
@@ -133,8 +117,8 @@ actor AppCommandExecutor {
     func renameTrack(
         trackId: UUID,
         to newFileName: String,
-        using playerManager: PlayerManager
-    ) async throws {
+        using fileBusyChecker: any TrackFileBusyChecking
+    ) async throws -> RenameTrackSuccess {
         
         // 1. Запоминаем старый URL до переименования.
         // Это нужно, чтобы после rename сбросить raw-cache и по старому пути.
@@ -145,7 +129,7 @@ actor AppCommandExecutor {
             try await LibraryFileManager.shared.renameTrack(
                 id: trackId,
                 to: newFileName,
-                using: playerManager
+                using: fileBusyChecker
             )
         } catch let libraryError as LibraryFileError {
             throw appError(from: libraryError, fallback: .fileRenameFailed)
@@ -159,24 +143,20 @@ actor AppCommandExecutor {
             previousURL: previousURL
         )
         
-        // 4. ToastEvent строится из готового snapshot единого контракта.
-        let event = ToastEvent.fileRenamed(
-            newName: updateEvent?.snapshot.fileName ?? newFileName
+        return RenameTrackSuccess(
+            trackId: trackId,
+            finalFileName: updateEvent?.snapshot.fileName ?? newFileName,
+            snapshot: updateEvent?.snapshot
         )
-        
-        // 5. Показ тоста.
-        await MainActor.run {
-            ToastManager.shared.handle(event)
-        }
     }
 
     /// Массово переименовывает файлы треков.
     ///
     /// Метод использует `LibraryFileManager.renameTrack` как атомарную операцию одного файла.
-    /// В отличие от одиночного rename-flow, здесь не показывается toast на каждый файл.
+    /// В отличие от одиночного rename-flow, здесь возвращается общий результат всей операции.
     func renameTrackFilesBatch(
         _ commands: [BatchFilenameRenameCommand],
-        using playerManager: PlayerManager,
+        using fileBusyChecker: any TrackFileBusyChecking,
         progress: (@MainActor (_ processed: Int, _ total: Int) -> Void)? = nil
     ) async -> BatchFilenameRenameResult {
         var succeeded: [BatchFilenameRenameSuccess] = []
@@ -193,7 +173,7 @@ actor AppCommandExecutor {
                 try await LibraryFileManager.shared.renameTrack(
                     id: command.trackId,
                     to: command.targetFileName,
-                    using: playerManager
+                    using: fileBusyChecker
                 )
 
                 succeeded.append(
@@ -284,7 +264,7 @@ actor AppCommandExecutor {
     func addTrackToTrackList(
         trackId: UUID,
         trackListId: UUID
-    ) async throws {
+    ) async throws -> TrackAddedToTrackListSuccess {
         
         /// 1. Резолвим URL трека через bookmark
         guard let url = await BookmarkResolver.url(forTrack: trackId) else {
@@ -312,26 +292,11 @@ actor AppCommandExecutor {
             throw TrackListStorageError.saveFailed(trackListId: list.id)
         }
         
-        /// 5. Получаем snapshot трека
-        let snapshot = await resolveSnapshot(for: trackId)
-        
-        /// 6. ToastEvent строится из snapshot
-        let event = ToastEvent.trackAddedToTrackList(
-            title: snapshot?.title ?? imported.fileName,
-            artist: snapshot?.artist ?? "",
-            artwork: snapshot.flatMap {
-                toastArtworkRequest(
-                    trackId: trackId,
-                    snapshot: $0
-                )
-            },
+        return TrackAddedToTrackListSuccess(
+            addedTrack: imported,
+            trackListId: list.id,
             trackListName: list.name
         )
-        
-        /// 7. Показ тоста — строго MainActor
-        await MainActor.run {
-            ToastManager.shared.handle(event)
-        }
     }
 
     /// Добавляет несколько треков в треклист одним сохранением.
@@ -339,8 +304,15 @@ actor AppCommandExecutor {
     func addTracksToTrackList(
         trackIds: [UUID],
         trackListId: UUID
-    ) async throws {
-        guard !trackIds.isEmpty else { return }
+    ) async throws -> TracksAddedToTrackListSuccess {
+        guard !trackIds.isEmpty else {
+            let list = try TrackListManager.shared.getTrackListById(trackListId)
+            return TracksAddedToTrackListSuccess(
+                addedTrackIds: [],
+                trackListId: list.id,
+                trackListName: list.name
+            )
+        }
 
         var importedTracks: [Track] = []
 
@@ -370,25 +342,26 @@ actor AppCommandExecutor {
             importedTracks,
             to: trackListId
         )
-        let addedCount = importedTracks.count
-
-        /// 4. Показываем один итоговый toast для batch-сценария.
-        await MainActor.run {
-            ToastManager.shared.handle(
-                .tracksAddedToTrackList(
-                    count: addedCount,
-                    name: list.name
-                )
-            )
-        }
+        return TracksAddedToTrackListSuccess(
+            addedTrackIds: importedTracks.map(\.trackId),
+            trackListId: list.id,
+            trackListName: list.name
+        )
     }
 
     /// Добавляет iTunes-треки в треклист без копирования и без BookmarkResolver.
     func addPurchasedITunesTracksToTrackList(
         _ tracks: [PurchasedITunesPlayableTrack],
         trackListId: UUID
-    ) async throws {
-        guard !tracks.isEmpty else { return }
+    ) async throws -> PurchasedITunesTracksAddedToTrackListSuccess {
+        guard !tracks.isEmpty else {
+            let list = try TrackListManager.shared.getTrackListById(trackListId)
+            return PurchasedITunesTracksAddedToTrackListSuccess(
+                addedTracks: [],
+                trackListId: list.id,
+                trackListName: list.name
+            )
+        }
 
         let importedTracks = tracks.map {
             Track(purchasedITunesTrack: $0)
@@ -399,29 +372,18 @@ actor AppCommandExecutor {
             to: trackListId
         )
 
-        let event: ToastEvent
-        if tracks.count == 1, let track = tracks.first {
-            event = trackAddedToTrackListEvent(
-                for: track,
-                trackListName: list.name
-            )
-        } else {
-            event = .tracksAddedToTrackList(
-                count: tracks.count,
-                name: list.name
-            )
-        }
-
-        await MainActor.run {
-            ToastManager.shared.handle(event)
-        }
+        return PurchasedITunesTracksAddedToTrackListSuccess(
+            addedTracks: importedTracks,
+            trackListId: list.id,
+            trackListName: list.name
+        )
     }
     
     // MARK: - Создать треклист
     
     func createTrackList(
         name: String
-    ) async throws {
+    ) async throws -> TrackListCreatedSuccess {
         
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard TrackListManager.shared.validateName(trimmed) else {
@@ -438,11 +400,10 @@ actor AppCommandExecutor {
             withName: trimmed
         )
         
-        let event = ToastEvent.trackListSaved(name: created.name)
-        
-        await MainActor.run {
-            ToastManager.shared.handle(event)
-        }
+        return TrackListCreatedSuccess(
+            trackListId: created.id,
+            trackListName: created.name
+        )
     }
     
     
@@ -451,7 +412,7 @@ actor AppCommandExecutor {
     func renameTrackList(
         trackListId: UUID,
         newName: String
-    ) async throws {
+    ) async throws -> TrackListRenamedSuccess {
         
         let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
         
@@ -461,13 +422,10 @@ actor AppCommandExecutor {
             to: trimmed
         )
         
-        // 2. ToastEvent
-        let event = ToastEvent.trackListRenamed(newName: trimmed)
-        
-        // 3. Показ тоста
-        await MainActor.run {
-            ToastManager.shared.handle(event)
-        }
+        return TrackListRenamedSuccess(
+            trackListId: trackListId,
+            trackListName: trimmed
+        )
     }
     
     // MARK: - Удалить трек из треклиста
@@ -475,7 +433,7 @@ actor AppCommandExecutor {
     func removeTrackFromTrackList(
         listItemId: UUID,
         trackListId: UUID
-    ) async throws {
+    ) async throws -> TrackRemovedFromTrackListSuccess {
         
         /// 1. Получаем треклист
         var list = try TrackListManager.shared.getTrackListById(trackListId)
@@ -495,35 +453,15 @@ actor AppCommandExecutor {
             throw TrackListStorageError.saveFailed(trackListId: list.id)
         }
         
-        /// 5. ToastEvent для iTunes строится из самой модели, без BookmarkResolver и snapshot-builder.
-        let event: ToastEvent
-        if removedTrack.isPurchasedITunesRuntimeTrack {
-            event = trackRemovedFromTrackListEvent(for: removedTrack)
-        } else {
-            let trackId = removedTrack.trackId
-            let snapshot = await resolveSnapshot(for: trackId)
-
-            event = ToastEvent.trackRemovedFromTrackList(
-                title: snapshot?.title ?? removedTrack.fileName,
-                artist: snapshot?.artist ?? "",
-                artwork: snapshot.flatMap {
-                    toastArtworkRequest(
-                        trackId: trackId,
-                        snapshot: $0
-                    )
-                }
-            )
-        }
-        
-        /// 6. Показ тоста
-        await MainActor.run {
-            ToastManager.shared.handle(event)
-        }
+        return TrackRemovedFromTrackListSuccess(
+            removedTrack: removedTrack,
+            trackListId: list.id
+        )
     }
     
     // MARK: - Добавить в плеер
     
-    func addTrackToPlayer(trackId: UUID) async throws {
+    func addTrackToPlayer(trackId: UUID) async throws -> TrackAddedToPlayerSuccess {
         /// 1. Формируем runtime-модель очереди из актуального snapshot.
         let importItem = try await makePlayerTrackImportItem(trackId: trackId)
 
@@ -535,18 +473,16 @@ actor AppCommandExecutor {
             throw AppError.playlistSaveFailed
         }
 
-        /// 3. ToastEvent.
-        let event = trackAddedToPlayerEvent(for: importItem)
-        
-        await MainActor.run {
-            ToastManager.shared.handle(event)
-        }
+        return TrackAddedToPlayerSuccess(
+            addedTrack: importItem.track,
+            snapshot: importItem.snapshot
+        )
     }
 
     /// Добавляет iTunes-трек в плеер через общий PlaylistManager без копирования файла.
     func addPurchasedITunesTrackToPlayer(
         _ track: PurchasedITunesPlayableTrack
-    ) async throws {
+    ) async throws -> PurchasedITunesTrackAddedToPlayerSuccess {
         let playerTrack = PlayerTrack.make(from: track)
 
         let didSave = await MainActor.run {
@@ -556,16 +492,14 @@ actor AppCommandExecutor {
             throw AppError.playlistSaveFailed
         }
 
-        let event = trackAddedToPlayerEvent(for: track)
-
-        await MainActor.run {
-            ToastManager.shared.handle(event)
-        }
+        return PurchasedITunesTrackAddedToPlayerSuccess(addedTrack: playerTrack)
     }
 
     /// Добавляет несколько треков в плеер одним сохранением очереди.
-    func addTracksToPlayer(trackIds: [UUID]) async throws {
-        guard !trackIds.isEmpty else { return }
+    func addTracksToPlayer(trackIds: [UUID]) async throws -> TracksAddedToPlayerSuccess {
+        guard !trackIds.isEmpty else {
+            return TracksAddedToPlayerSuccess(addedTracks: [])
+        }
 
         var importItems: [PlayerTrackImportItem] = []
 
@@ -586,22 +520,20 @@ actor AppCommandExecutor {
             throw AppError.playlistSaveFailed
         }
 
-        let event: ToastEvent
-        if importItems.count == 1, let item = importItems.first {
-            event = trackAddedToPlayerEvent(for: item)
-        } else {
-            event = .tracksAddedToPlayer(count: importItems.count)
-        }
-
-        await MainActor.run {
-            ToastManager.shared.handle(event)
-        }
+        return TracksAddedToPlayerSuccess(
+            addedTracks: importItems.map {
+                TrackAddedToPlayerSuccess(
+                    addedTrack: $0.track,
+                    snapshot: $0.snapshot
+                )
+            }
+        )
     }
     
     
     // MARK: - Удалить трек из плеера
     
-    func removeTrackFromPlayer(queueItemId: UUID) async throws {
+    func removeTrackFromPlayer(queueItemId: UUID) async throws -> TrackRemovedFromPlayerSuccess {
         
         // 1. Находим удаляемое вхождение и его trackId для тоста
         let removedTrack: PlayerTrack? = await MainActor.run {
@@ -639,36 +571,13 @@ actor AppCommandExecutor {
             throw AppError.playlistSaveFailed
         }
         
-        // 3. ToastEvent для iTunes строится из самой модели, без BookmarkResolver и snapshot-builder.
-        let event: ToastEvent
-        if removedTrack.isPurchasedITunesRuntimeTrack {
-            event = trackRemovedFromPlayerEvent(for: removedTrack)
-        } else {
-            let trackId = removedTrack.trackId
-            let snapshot = await resolveSnapshot(for: trackId)
-
-            event = ToastEvent.trackRemovedFromPlayer(
-                title: snapshot?.title ?? snapshot?.fileName ?? removedTrack.fileName,
-                artist: snapshot?.artist ?? "",
-                artwork: snapshot.flatMap {
-                    toastArtworkRequest(
-                        trackId: trackId,
-                        snapshot: $0
-                    )
-                }
-            )
-        }
-        
-        // 4. Показ тоста
-        await MainActor.run {
-            ToastManager.shared.handle(event)
-        }
+        return TrackRemovedFromPlayerSuccess(removedTrack: removedTrack)
     }
     
     
     // MARK: - Очистить плеер
     
-    func clearPlayer() async {
+    func clearPlayer() async throws -> PlayerClearedSuccess {
         
         // 1. Очистка — строго MainActor
         let didClear = await MainActor.run {
@@ -680,17 +589,9 @@ actor AppCommandExecutor {
             }
             return true
         }
-        guard didClear else {
-            await MainActor.run {
-                ToastManager.shared.handle(.playlistSaveFailed)
-            }
-            return
-        }
-        
-        // 2. ToastEvent
-        await MainActor.run {
-            ToastManager.shared.handle(.playerCleared)
-        }
+        guard didClear else { throw AppError.playlistSaveFailed }
+
+        return PlayerClearedSuccess()
     }
     
     
@@ -704,24 +605,24 @@ actor AppCommandExecutor {
         tagsChanged: Bool,
         artworkAction: ArtworkWriteAction,
         artworkChanged: Bool,
-        using playerManager: PlayerManager
-    ) async throws {
+        using fileBusyChecker: any TrackFileBusyChecking
+    ) async throws -> TrackEditsSavedSuccess {
         // 1. Запоминаем старый URL до возможного переименования.
         // Это нужно, чтобы post-update pipeline мог сбросить кэши по старому пути.
         let previousURL = await BookmarkResolver.url(forTrack: trackId)
-        // 2. Переименовываем файл без промежуточного success-toast.
+        // 2. Переименовываем файл как часть единой операции сохранения.
         if fileChanged {
             do {
                 try await LibraryFileManager.shared.renameTrack(
                     id: trackId,
                     to: newFileName,
-                    using: playerManager
+                    using: fileBusyChecker
                 )
             } catch let libraryError as LibraryFileError {
                 throw appError(from: libraryError, fallback: .fileRenameFailed)
             }
         }
-        // 3. Записываем теги и обложку без промежуточного success-toast.
+        // 3. Записываем теги и обложку в рамках той же операции.
         if tagsChanged || artworkChanged {
             guard let url = await BookmarkResolver.url(forTrack: trackId) else {
                 throw TagWriteError.fileNotFound
@@ -765,7 +666,7 @@ actor AppCommandExecutor {
             updateReason = .fileRenamed
         }
         // 6. Запускаем единый post-update pipeline после всех успешных операций.
-        // Ошибка сохранения metadata намеренно доходит до action handler, который показывает существующий error-toast.
+        // Ошибка сохранения metadata намеренно доходит до вызывающего сценария.
         let updateEvent = try await TrackUpdateCoordinator.shared.handleTrackUpdate(
             forTrackId: trackId,
             reason: updateReason,
@@ -773,27 +674,13 @@ actor AppCommandExecutor {
             previousURL: previousURL
         )
         let snapshot = updateEvent?.snapshot
-        // 7. Показываем только один итоговый success-toast.
-        let event: ToastEvent
-        if tagsChanged || artworkChanged {
-            event = ToastEvent.tagsUpdated(
-                title: snapshot?.title ?? snapshot?.fileName ?? newFileName,
-                artist: snapshot?.artist ?? "",
-                artwork: snapshot.flatMap {
-                    toastArtworkRequest(
-                        trackId: trackId,
-                        snapshot: $0
-                    )
-                }
-            )
-        } else {
-            event = ToastEvent.fileRenamed(
-                newName: snapshot?.fileName ?? newFileName
-            )
-        }
-        await MainActor.run {
-            ToastManager.shared.handle(event)
-        }
+
+        return TrackEditsSavedSuccess(
+            trackId: trackId,
+            finalFileName: snapshot?.fileName ?? newFileName,
+            snapshot: snapshot,
+            didUpdateTagsOrArtwork: tagsChanged || artworkChanged
+        )
     }
     
     
@@ -802,9 +689,8 @@ actor AppCommandExecutor {
     func updateTrackTags(
         trackId: UUID,
         patch: TagWritePatch,
-        artworkAction: ArtworkWriteAction,
-        showsSuccessToast: Bool = true
-    ) async throws {
+        artworkAction: ArtworkWriteAction
+    ) async throws -> TrackTagsUpdatedSuccess {
 
         // 1. Резолв URL трека через bookmark
         guard let url = await BookmarkResolver.url(forTrack: trackId) else {
@@ -846,33 +732,17 @@ actor AppCommandExecutor {
             ? .metadataUpdated
             : .artworkUpdated
 
-        // Ошибка сохранения metadata не превращается в success-toast и обрабатывается вызывающим action handler.
+        // Ошибка сохранения metadata доходит до вызывающего action handler.
         let updateEvent = try await TrackUpdateCoordinator.shared.handleTrackUpdate(
             forTrackId: trackId,
             reason: updateReason,
             changedFields: changedFields
         )
 
-        // 5. ToastEvent строится из готового snapshot единого контракта
-        let snapshot = updateEvent?.snapshot
-
-        let event = ToastEvent.tagsUpdated(
-            title: snapshot?.title ?? url.lastPathComponent,
-            artist: snapshot?.artist ?? "",
-            artwork: snapshot.flatMap {
-                toastArtworkRequest(
-                    trackId: trackId,
-                    snapshot: $0
-                )
-            }
+        return TrackTagsUpdatedSuccess(
+            trackId: trackId,
+            snapshot: updateEvent?.snapshot
         )
-
-        // 6. Показ тоста
-        if showsSuccessToast {
-            await MainActor.run {
-                ToastManager.shared.handle(event)
-            }
-        }
     }
 }
 
@@ -887,7 +757,7 @@ private enum PlayerTrackRemovalResult {
 }
 
 /// Подготовленный элемент импорта в очередь плеера.
-/// Хранит и runtime-модель очереди, и snapshot для итогового toast.
+/// Хранит runtime-модель очереди и snapshot, использованный при её формировании.
 private struct PlayerTrackImportItem {
     let track: PlayerTrack
     let snapshot: TrackRuntimeSnapshot?
@@ -917,125 +787,11 @@ private func makePlayerTrackImportItem(trackId: UUID) async throws -> PlayerTrac
     )
 }
 
-/// Строит одиночный toast добавления в плеер по подготовленному элементу.
-private func trackAddedToPlayerEvent(for item: PlayerTrackImportItem) -> ToastEvent {
-    let snapshot = item.snapshot
-
-    return ToastEvent.trackAddedToPlayer(
-        title: snapshot?.title ?? item.track.fileName,
-        artist: snapshot?.artist ?? "",
-        artwork: snapshot.flatMap {
-                toastArtworkRequest(
-                    trackId: item.track.trackId,
-                    snapshot: $0
-            )
-        }
-    )
-}
-
-/// Строит toast добавления iTunes-трека в плеер из runtime-данных MediaPlayer.
-private func trackAddedToPlayerEvent(
-    for track: PurchasedITunesPlayableTrack
-) -> ToastEvent {
-    ToastEvent.trackAddedToPlayer(
-        title: track.title ?? track.fileName,
-        artist: track.artist ?? "",
-        artwork: toastArtwork(for: track)
-    )
-}
-
-/// Строит toast добавления iTunes-трека в треклист из runtime-данных MediaPlayer.
-private func trackAddedToTrackListEvent(
-    for track: PurchasedITunesPlayableTrack,
-    trackListName: String
-) -> ToastEvent {
-    ToastEvent.trackAddedToTrackList(
-        title: track.title ?? track.fileName,
-        artist: track.artist ?? "",
-        artwork: toastArtwork(for: track),
-        trackListName: trackListName
-    )
-}
-
-/// Строит toast успешного копирования iTunes-трека из runtime-данных MediaPlayer.
-private func trackCopiedFromITunesEvent(
-    for track: PurchasedITunesPlayableTrack,
-    folderName: String?
-) -> ToastEvent {
-    ToastEvent.trackCopiedFromITunes(
-        title: track.title ?? track.fileName,
-        artist: track.artist ?? "",
-        artwork: toastArtwork(for: track),
-        folderName: folderName
-    )
-}
-
-/// Строит toast удаления iTunes-трека из плеера из сохранённых runtime-данных модели.
-private func trackRemovedFromPlayerEvent(
-    for track: PlayerTrack
-) -> ToastEvent {
-    ToastEvent.trackRemovedFromPlayer(
-        title: track.title ?? track.fileName,
-        artist: track.artist ?? "",
-        artwork: toastArtwork(for: track)
-    )
-}
-
-/// Строит toast удаления iTunes-трека из треклиста из сохранённых runtime-данных модели.
-private func trackRemovedFromTrackListEvent(
-    for track: Track
-) -> ToastEvent {
-    ToastEvent.trackRemovedFromTrackList(
-        title: track.title ?? track.fileName,
-        artist: track.artist ?? "",
-        artwork: toastArtwork(for: track)
-    )
-}
-
-/// Готовит обложку iTunes-трека для toast без файлового metadata cache.
-private func toastArtwork(
-    for track: any TrackDisplayable & PurchasedITunesTrackRepresentable
-) -> ArtworkRequest? {
-    toastArtworkRequest(
-        trackId: track.trackId,
-        artworkData: track.artworkData,
-        sourceIdentifier: .mediaLibrary(trackId: track.trackId)
-    )
-}
-
-/// Создаёт лёгкий запрос обложки для toast только при наличии исходных данных.
-private func toastArtworkRequest(
-    trackId: UUID,
-    artworkData: Data?,
-    sourceIdentifier: ArtworkSourceIdentifier
-) -> ArtworkRequest? {
-    guard let artworkData else { return nil }
-
-    return ArtworkRequest(
-        trackId: trackId,
-        artworkData: artworkData,
-        purpose: .toast,
-        sourceIdentifier: sourceIdentifier
-    )
-}
-
-/// Создаёт запрос toast из каноничного snapshot с идентичностью исходных байтов.
-private func toastArtworkRequest(
-    trackId: UUID,
-    snapshot: TrackRuntimeSnapshot
-) -> ArtworkRequest? {
-    ArtworkRequest(
-        trackId: trackId,
-        snapshot: snapshot,
-        purpose: .toast
-    )
-}
-
 /// Преобразует файловую ошибку фонотеки в ошибку пользовательского уровня.
 ///
 /// LibraryFileManager остаётся низкоуровневым файловым слоем.
 /// AppCommandExecutor переводит техническую причину в AppError,
-/// который дальше маппится в ToastEvent.
+/// который обрабатывается presentation-слоем.
 private func appError(from error: LibraryFileError, fallback: AppError) -> AppError {
     switch error {
     case .trackIsPlaying:

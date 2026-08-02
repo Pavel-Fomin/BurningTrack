@@ -15,22 +15,23 @@ struct PlayerScreen: View {
     @ObservedObject var exportProgressViewModel: ExportProgressViewModel
     /// Единый обработчик «Избранного» передаётся в фабрику Player-flow.
     let favoriteTrackActionHandler: FavoriteTrackActionHandler
+    /// Готовая factory экранного flow с явными production-зависимостями.
+    let viewModelFactory: PlayerScreenViewModelFactory
 
     @StateObject private var screenViewModel: PlayerScreenViewModel
-
-    /// Фабрика production ViewModel для Player-flow.
-    private static let viewModelFactory = PlayerScreenViewModelFactory()
 
     init(
         playerViewModel: PlayerViewModel,
         exportProgressViewModel: ExportProgressViewModel,
-        favoriteTrackActionHandler: FavoriteTrackActionHandler
+        favoriteTrackActionHandler: FavoriteTrackActionHandler,
+        viewModelFactory: PlayerScreenViewModelFactory
     ) {
         self.playerViewModel = playerViewModel
         self.exportProgressViewModel = exportProgressViewModel
         self.favoriteTrackActionHandler = favoriteTrackActionHandler
+        self.viewModelFactory = viewModelFactory
         _screenViewModel = StateObject(
-            wrappedValue: Self.viewModelFactory.make(
+            wrappedValue: viewModelFactory.make(
                 playerViewModel: playerViewModel,
                 exportProgressViewModel: exportProgressViewModel,
                 favoriteTrackActionHandler: favoriteTrackActionHandler

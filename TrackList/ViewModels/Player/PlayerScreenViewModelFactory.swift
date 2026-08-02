@@ -11,8 +11,18 @@ import Foundation
 @MainActor
 struct PlayerScreenViewModelFactory {
 
-    /// Factory production-обработчика действий Player-flow.
-    private let actionHandlerFactory = PlayerFlowActionHandlerFactory()
+    /// Готовые production-зависимости Player feature.
+    private let dependencies: PlayerFeatureDependencies
+    /// Фабрика production-обработчика действий Player-flow с теми же зависимостями.
+    private let actionHandlerFactory: PlayerFlowActionHandlerFactory
+
+    /// Получает подготовленные Composition Root зависимости и не разрешает singleton самостоятельно.
+    init(dependencies: PlayerFeatureDependencies) {
+        self.dependencies = dependencies
+        self.actionHandlerFactory = PlayerFlowActionHandlerFactory(
+            dependencies: dependencies
+        )
+    }
 
     /// Создаёт production ViewModel для Player-flow.
     func make(
@@ -29,9 +39,10 @@ struct PlayerScreenViewModelFactory {
                 exportProgressViewModel: exportProgressViewModel,
                 favoriteTrackActionHandler: favoriteTrackActionHandler
             ),
-            sheetManager: SheetManager.shared,
-            playlistManager: PlaylistManager.shared,
-            appSettingsManager: AppSettingsManager.shared,
+            sheetManager: dependencies.sheetManager,
+            playlistManager: dependencies.playlistManager,
+            appSettingsManager: dependencies.appSettingsManager,
+            trackRegistry: dependencies.trackRegistry,
             rowStateBuilder: rowStateBuilder
         )
     }

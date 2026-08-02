@@ -75,11 +75,16 @@ struct SaveTrackListContainer: View {
     /// Асинхронное создание треклиста
     private func create() async {
         do {
-            try await AppCommandExecutor.shared.createTrackList(name: name)
+            let result = try await AppCommandExecutor.shared.createTrackList(name: name)
+            AppCommandToastPresenter(
+                toastPresenter: ToastManager.shared
+            ).present(result)
             closeSheet()
         } catch let appError as AppError {
             print("❌ Ошибка сохранения треклиста: \(appError)")
-            ToastManager.shared.handle(appError)
+            AppCommandToastPresenter(
+                toastPresenter: ToastManager.shared
+            ).present(appError)
         } catch {
             print("❌ Ошибка сохранения треклиста: \(error)")
             ToastManager.shared.handle(AppError.trackListSaveFailed)

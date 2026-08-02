@@ -111,25 +111,36 @@ struct AddToTrackListContainer: View {
                     to: trackListId
                 )
             } else if let purchasedITunesTracks = purchasedITunesTracks() {
-                try await AppCommandExecutor.shared.addPurchasedITunesTracksToTrackList(
+                let result = try await AppCommandExecutor.shared.addPurchasedITunesTracksToTrackList(
                     purchasedITunesTracks,
                     trackListId: trackListId
                 )
+                AppCommandToastPresenter(
+                    toastPresenter: ToastManager.shared
+                ).present(result)
             } else if data.trackIds.count == 1, let trackId = data.trackIds.first {
-                try await AppCommandExecutor.shared.addTrackToTrackList(
+                let result = try await AppCommandExecutor.shared.addTrackToTrackList(
                     trackId: trackId,
                     trackListId: trackListId
                 )
+                await AppCommandToastPresenter(
+                    toastPresenter: ToastManager.shared
+                ).present(result)
             } else {
-                try await AppCommandExecutor.shared.addTracksToTrackList(
+                let result = try await AppCommandExecutor.shared.addTracksToTrackList(
                     trackIds: data.trackIds,
                     trackListId: trackListId
                 )
+                AppCommandToastPresenter(
+                    toastPresenter: ToastManager.shared
+                ).present(result)
             }
             SheetManager.shared.closeActive()
         } catch let appError as AppError {
             print("❌ Ошибка добавления трека в треклист: \(appError)")
-            ToastManager.shared.handle(appError)
+            AppCommandToastPresenter(
+                toastPresenter: ToastManager.shared
+            ).present(appError)
         } catch {
             print("❌ Ошибка добавления трека в треклист: \(error)")
             ToastManager.shared.handle(AppError.trackListSaveFailed)

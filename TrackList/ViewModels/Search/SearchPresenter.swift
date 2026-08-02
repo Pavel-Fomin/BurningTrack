@@ -80,6 +80,7 @@ struct SearchPresenter {
         selectedSortMode: SearchSortMode,
         snapshotsByTrackId: [UUID: TrackRuntimeSnapshot],
         favoriteTrackIds: Set<UUID>,
+        playbackState: PlaybackStateSnapshot,
         displaySettings: SearchTrackDisplaySettings
     ) -> SearchScreenState {
         let trackListRows = makeTrackListRows(from: results.trackLists)
@@ -96,6 +97,7 @@ struct SearchPresenter {
             from: sortedTrackResults,
             snapshotsByTrackId: snapshotsByTrackId,
             favoriteTrackIds: favoriteTrackIds,
+            playbackState: playbackState,
             displaySettings: displaySettings
         )
         let visibleFolders = selectedTrackFilterField == nil ? results.folders : []
@@ -140,12 +142,14 @@ struct SearchPresenter {
         from results: [SearchTrackResult],
         snapshotsByTrackId: [UUID: TrackRuntimeSnapshot],
         favoriteTrackIds: Set<UUID>,
+        playbackState: PlaybackStateSnapshot,
         displaySettings: SearchTrackDisplaySettings
     ) -> [SearchTrackRowState] {
         results.map { result in
             let snapshot = snapshotsByTrackId[result.trackId]
             let displayFileName = nonEmpty(snapshot?.fileName) ?? result.fileName
             let isFavorite = favoriteTrackIds.contains(result.trackId)
+            let isCurrent = playbackState.currentTrackId == result.trackId
 
             return SearchTrackRowState(
                 result: result,
@@ -154,6 +158,8 @@ struct SearchPresenter {
                     snapshot: snapshot,
                     shouldShowTags: displaySettings.shouldShowTags
                 ),
+                isCurrent: isCurrent,
+                isPlaying: isCurrent && playbackState.isPlaying,
                 isFavorite: isFavorite,
                 // Поиск читает SQLite-фонотеку, поэтому его результаты имеют локальный источник.
                 artworkBadgeState: artworkBadgeStateFactory.makeState(

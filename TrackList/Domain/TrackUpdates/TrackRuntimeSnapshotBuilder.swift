@@ -143,8 +143,15 @@ final class TrackRuntimeSnapshotBuilder {
             var model = TrackMetadataDatabaseMapper.databaseModel(from: snapshot)
 
             // Runtime reader пока не умеет читать исполнителя альбома, поэтому nil не должен затирать сохранённое SQLite-значение.
+            let previousModel = try store.fetchTrackMetadata(trackId: snapshot.trackId)
             if model.albumArtist == nil {
-                model.albumArtist = try store.fetchTrackMetadata(trackId: snapshot.trackId)?.albumArtist
+                model.albumArtist = previousModel?.albumArtist
+            }
+
+            // Повторный технический разбор может кратковременно не вернуть длительность.
+            // Такое отсутствие не является изменением аудиофайла и не должно затирать валидное SQLite-значение.
+            if model.duration == nil {
+                model.duration = previousModel?.duration
             }
 
             try store.upsertTrackMetadata(model)

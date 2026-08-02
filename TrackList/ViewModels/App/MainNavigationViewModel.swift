@@ -38,12 +38,7 @@ final class MainNavigationViewModel: ObservableObject {
 
     // MARK: - Инициализация
 
-    /// Создаёт ViewModel с глобальным владельцем активной вкладки внутри MainActor-контекста.
-    convenience init() {
-        self.init(scenePhaseHandler: ScenePhaseHandler.shared)
-    }
-
-    /// Позволяет явно передать владельца вкладки при изолированной сборке ViewModel.
+    /// Получает владельца вкладки из Composition Root или изолированной тестовой сборки.
     init(scenePhaseHandler: ScenePhaseHandler) {
         self.scenePhaseHandler = scenePhaseHandler
         self.sidebarSelection = Self.sidebarSelection(for: scenePhaseHandler.activeTab)

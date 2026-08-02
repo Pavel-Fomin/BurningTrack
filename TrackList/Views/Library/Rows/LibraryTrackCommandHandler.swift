@@ -86,11 +86,16 @@ struct LibraryTrackCommandHandler {
     private func addToPlayer(trackId: UUID) {
         Task {
             do {
-                try await AppCommandExecutor.shared.addTrackToPlayer(
+                let result = try await AppCommandExecutor.shared.addTrackToPlayer(
                     trackId: trackId
                 )
+                AppCommandToastPresenter(
+                    toastPresenter: ToastManager.shared
+                ).present(result)
             } catch let appError as AppError {
-                ToastManager.shared.handle(appError)
+                AppCommandToastPresenter(
+                    toastPresenter: ToastManager.shared
+                ).present(appError)
             } catch {
                 ToastManager.shared.handle(
                     .operationFailed(

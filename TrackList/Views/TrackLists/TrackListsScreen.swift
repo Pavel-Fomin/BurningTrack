@@ -15,21 +15,15 @@ import UIKit
 struct TrackListsScreen: View {
 
     @ObservedObject var trackListsViewModel: TrackListsViewModel
-    @ObservedObject var playerViewModel: PlayerViewModel
     @ObservedObject var exportProgressViewModel: ExportProgressViewModel
     /// Единый обработчик «Избранного» передаётся в detail-flow треклистов.
     let favoriteTrackActionHandler: FavoriteTrackActionHandler
-    @ObservedObject private var navigationCoordinator = NavigationCoordinator.shared
-
-    /// Фабрика production action handler для master-flow списка треклистов.
-    private let actionHandlerFactory = TrackListsActionHandlerFactory()
-
-    /// Обрабатывает действия экрана списка треклистов.
-    private var actionHandler: TrackListsActionHandler {
-        actionHandlerFactory.make(
-            viewModel: trackListsViewModel
-        )
-    }
+    /// Единый ActionHandler master-flow, подготовленный Composition Root.
+    let actionHandler: TrackListsActionHandler
+    /// Единый координатор навигации, подготовленный Composition Root.
+    @ObservedObject var navigationCoordinator: NavigationCoordinator
+    /// Готовые фабрики detail-flow одного треклиста.
+    let trackListFeatureDependencies: TrackListFeatureDependencies
 
     var body: some View {
         NavigationStack(path: $trackListsViewModel.navigationPath) {
@@ -46,9 +40,9 @@ struct TrackListsScreen: View {
                 if let trackList = trackListsViewModel.trackList(for: id) {
                     TrackListScreen(
                         trackList: trackList,
-                        playerViewModel: playerViewModel,
                         exportProgressViewModel: exportProgressViewModel,
-                        favoriteTrackActionHandler: favoriteTrackActionHandler
+                        favoriteTrackActionHandler: favoriteTrackActionHandler,
+                        dependencies: trackListFeatureDependencies
                     )
                 }
             }

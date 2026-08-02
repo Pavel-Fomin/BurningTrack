@@ -14,8 +14,10 @@ import Foundation
 struct PurchasedITunesTrackActionHandler {
     // MARK: - Зависимости
 
-    /// ViewModel воспроизведения для play/pause сценария.
-    let playerViewModel: PlayerViewModel
+    /// Готовый snapshot строки не раскрывает ActionHandler-у PlayerViewModel.
+    let playbackState: PlaybackStateSnapshot
+    /// Команды запуска и toggle не раскрывают handler-у PlayerViewModel.
+    let playbackController: any TrackPlaybackControlling
     /// Менеджер sheet-состояния для выбора треклиста и папки назначения.
     private let sheetManager: SheetManager
     /// Исполнитель бизнес-команд приложения.
@@ -29,13 +31,15 @@ struct PurchasedITunesTrackActionHandler {
 
     /// Создаёт обработчик строки iTunes с явным маршрутом «Избранного».
     init(
-        playerViewModel: PlayerViewModel,
+        playbackState: PlaybackStateSnapshot,
+        playbackController: any TrackPlaybackControlling,
         sheetManager: SheetManager? = nil,
         commandExecutor: AppCommandExecutor = .shared,
         toastPresenter: (any ToastPresenting)? = nil,
         favoriteActionHandler: FavoriteTrackActionHandler
     ) {
-        self.playerViewModel = playerViewModel
+        self.playbackState = playbackState
+        self.playbackController = playbackController
         self.sheetManager = sheetManager ?? SheetManager.shared
         self.commandExecutor = commandExecutor
         self.toastPresenter = toastPresenter ?? ToastManager.shared
@@ -46,12 +50,13 @@ struct PurchasedITunesTrackActionHandler {
 
     /// Проверяет, является ли трек текущим в контексте купленных iTunes-треков.
     func isCurrent(_ track: PurchasedITunesPlayableTrack) -> Bool {
-        playerViewModel.isCurrent(track, in: .purchasedITunes)
+        playbackState.currentDisplayableId == track.id
+            && playbackState.currentContext == .purchasedITunes
     }
 
     /// Проверяет, играет ли текущий iTunes-трек.
     func isPlaying(_ track: PurchasedITunesPlayableTrack) -> Bool {
-        isCurrent(track) && playerViewModel.isPlaying
+        isCurrent(track) && playbackState.isPlaying
     }
 
     // MARK: - Действия
@@ -97,9 +102,13 @@ struct PurchasedITunesTrackActionHandler {
         context: [PurchasedITunesPlayableTrack]
     ) {
         if isCurrent(track) {
-            playerViewModel.togglePlayPause()
+            playbackController.togglePlayPause()
         } else {
-            playerViewModel.play(track: track, context: context)
+            playbackController.play(
+                track: track,
+                context: context.map { $0 as any TrackDisplayable },
+                source: .purchasedITunes
+            )
         }
     }
 
@@ -109,11 +118,16 @@ struct PurchasedITunesTrackActionHandler {
     ) {
         Task {
             do {
-                try await commandExecutor.addPurchasedITunesTrackToPlayer(
+                let result = try await commandExecutor.addPurchasedITunesTrackToPlayer(
                     track
                 )
+                AppCommandToastPresenter(
+                    toastPresenter: toastPresenter
+                ).present(result)
             } catch let appError as AppError {
-                toastPresenter.handle(appError)
+                AppCommandToastPresenter(
+                    toastPresenter: toastPresenter
+                ).present(appError)
             } catch {
                 toastPresenter.handle(
                     .operationFailed(

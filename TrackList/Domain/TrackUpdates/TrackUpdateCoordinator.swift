@@ -112,6 +112,12 @@ final class TrackUpdateCoordinator {
         previousURL: URL? = nil
     ) async throws -> TrackUpdateEvent? {
 
+        // Последний валидный snapshot остаётся доступен потребителям до готовности его замены.
+        // Это не даёт параллельным feature увидеть промежуточное пустое runtime-состояние.
+        let previousSnapshot = await TrackRuntimeStore.shared.snapshot(
+            forTrackId: trackId
+        )
+
         // Получаем актуальный URL трека через существующий bookmark pipeline.
         guard let url = await BookmarkResolver.url(forTrack: trackId) else { return nil }
 
@@ -124,9 +130,17 @@ final class TrackUpdateCoordinator {
         )
 
         // Пересобираем каноничный snapshot трека.
-        guard let snapshot = try await TrackRuntimeSnapshotBuilder.shared.buildSnapshot(forTrackId: trackId) else {
+        guard let builtSnapshot = try await TrackRuntimeSnapshotBuilder.shared.buildSnapshot(forTrackId: trackId) else {
             return nil
         }
+
+        // Технический reader может быть кратковременно недоступен сразу после записи тегов.
+        // Для не менявшихся runtime-полей сохраняем последний подтверждённый результат,
+        // а не публикуем строкам ложную пустоту.
+        let snapshot = builtSnapshot.preservingUnavailableRuntimeValues(
+            from: previousSnapshot,
+            changedFields: changedFields
+        )
 
         // Сохраняем новый snapshot в централизованное runtime-хранилище.
         await TrackRuntimeStore.shared.storeSnapshot(snapshot)
@@ -169,8 +183,7 @@ final class TrackUpdateCoordinator {
             await ArtworkProvider.shared.invalidate(trackId: trackId)
         }
 
-        // Удаляем старый snapshot из централизованного runtime store.
-        await TrackRuntimeStore.shared.removeSnapshot(forTrackId: trackId)
+        // Старый snapshot намеренно не удаляем: готовый новый snapshot заменит его атомарно.
     }
 
     // MARK: - Publish

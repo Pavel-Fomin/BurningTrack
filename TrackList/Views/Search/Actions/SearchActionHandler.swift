@@ -11,7 +11,10 @@ import Foundation
 @MainActor
 final class SearchActionHandler {
     private let viewModel: SearchViewModel
-    private let playerViewModel: PlayerViewModel
+    /// Состояние playback нужно только для проверки текущего результата поиска.
+    private let playbackStateProvider: any PlaybackStateProviding
+    /// Команды запуска и toggle не раскрывают ActionHandler-у PlayerViewModel.
+    private let playbackController: any TrackPlaybackControlling
     private let navigationCoordinator: NavigationCoordinator
     private let sheetManager: SheetManager
     private let sheetActionCoordinator: SheetActionCoordinator
@@ -21,7 +24,8 @@ final class SearchActionHandler {
 
     init(
         viewModel: SearchViewModel,
-        playerViewModel: PlayerViewModel,
+        playbackStateProvider: any PlaybackStateProviding,
+        playbackController: any TrackPlaybackControlling,
         navigationCoordinator: NavigationCoordinator,
         sheetManager: SheetManager,
         sheetActionCoordinator: SheetActionCoordinator,
@@ -29,7 +33,8 @@ final class SearchActionHandler {
         favoriteActionHandler: FavoriteTrackActionHandler
     ) {
         self.viewModel = viewModel
-        self.playerViewModel = playerViewModel
+        self.playbackStateProvider = playbackStateProvider
+        self.playbackController = playbackController
         self.navigationCoordinator = navigationCoordinator
         self.sheetManager = sheetManager
         self.sheetActionCoordinator = sheetActionCoordinator
@@ -103,14 +108,15 @@ final class SearchActionHandler {
 
     /// Запускает найденный трек без перехода в раздел фонотеки.
     private func playTrack(_ result: SearchTrackResult) {
-        if playerViewModel.isCurrent(result, in: .unknown) {
-            playerViewModel.togglePlayPause()
+        if playbackStateProvider.currentTrackId == result.trackId {
+            playbackController.togglePlayPause()
             return
         }
 
-        playerViewModel.play(
+        playbackController.play(
             track: result,
-            context: [result]
+            context: [result],
+            source: .playerQueue
         )
     }
 
@@ -118,11 +124,16 @@ final class SearchActionHandler {
     private func addToPlayer(trackId: UUID) {
         Task {
             do {
-                try await AppCommandExecutor.shared.addTrackToPlayer(
+                let result = try await AppCommandExecutor.shared.addTrackToPlayer(
                     trackId: trackId
                 )
+                AppCommandToastPresenter(
+                    toastPresenter: ToastManager.shared
+                ).present(result)
             } catch let appError as AppError {
-                ToastManager.shared.handle(appError)
+                AppCommandToastPresenter(
+                    toastPresenter: ToastManager.shared
+                ).present(appError)
             } catch {
                 ToastManager.shared.handle(
                     .operationFailed(

@@ -11,6 +11,8 @@ import Combine
 import Foundation
 
 /// Предоставляет единый снимок «Избранного» и поток его точечных изменений для presentation-слоя.
+/// Контракт намеренно не содержит playback-команды, очередь, файловые операции и доменные мутации «Избранного».
+/// Production-provider — PlayerViewModel; feature получают только готовое состояние, а не concrete player type.
 @MainActor
 protocol FavoriteTrackIdsProviding: AnyObject {
     /// Текущий подтверждённый набор идентификаторов треков в «Избранном».

@@ -20,10 +20,19 @@ struct MainSidebarView: View {
     let favoriteTrackActionHandler: FavoriteTrackActionHandler
     @ObservedObject var trackListsViewModel: TrackListsViewModel
     @ObservedObject var navigationViewModel: MainNavigationViewModel
+    /// Готовая фабрика экранного flow плеера.
+    let playerScreenViewModelFactory: PlayerScreenViewModelFactory
+    /// Готовые фабрики feature фонотеки.
+    let libraryFeatureDependencies: LibraryFeatureDependencies
+    /// Готовая фабрика ViewModel поиска.
+    let searchViewModelFactory: SearchViewModelFactory
+    /// Готовые фабрики detail-flow одного треклиста.
+    let trackListFeatureDependencies: TrackListFeatureDependencies
+    /// Единый ActionHandler master-flow треклистов.
+    let trackListsActionHandler: TrackListsActionHandler
+    /// Единый координатор межэкранной навигации.
+    let navigationCoordinator: NavigationCoordinator
     @Binding var isSearchActive: Bool
-
-    /// Фабрика направляет lifecycle master-flow треклистов через существующий action layer.
-    private let trackListsActionHandlerFactory = TrackListsActionHandlerFactory()
 
     // MARK: - Представление
 
@@ -35,13 +44,6 @@ struct MainSidebarView: View {
     /// Detail-экраны получают тот же резерв нижней области, что и в compact-компоновке.
     private var globalBottomScrollReserve: CGFloat {
         showsMiniPlayer ? GlobalBottomGeometry.miniPlayerScrollReserve : 0
-    }
-
-    /// Обработчик сохраняет View свободным от доступа к данным треклистов.
-    private var trackListsActionHandler: TrackListsActionHandler {
-        trackListsActionHandlerFactory.make(
-            viewModel: trackListsViewModel
-        )
     }
 
     // MARK: - Интерфейс
@@ -119,38 +121,39 @@ struct MainSidebarView: View {
             PlayerScreen(
                 playerViewModel: playerViewModel,
                 exportProgressViewModel: exportProgressViewModel,
-                favoriteTrackActionHandler: favoriteTrackActionHandler
+                favoriteTrackActionHandler: favoriteTrackActionHandler,
+                viewModelFactory: playerScreenViewModelFactory
             )
         case .library:
             LibraryScreen(
-                playerViewModel: playerViewModel,
                 exportProgressViewModel: exportProgressViewModel,
-                favoriteTrackActionHandler: favoriteTrackActionHandler
+                favoriteTrackActionHandler: favoriteTrackActionHandler,
+                dependencies: libraryFeatureDependencies
             )
         case .search:
             SearchScreen(
-                playerViewModel: playerViewModel,
                 favoriteTrackActionHandler: favoriteTrackActionHandler,
+                viewModelFactory: searchViewModelFactory,
                 isSearchActive: $isSearchActive
             )
         case .settings:
-            SettingsScreen(
-                playerViewModel: playerViewModel
-            )
+            SettingsScreen()
         case .allTrackLists:
             TrackListsScreen(
                 trackListsViewModel: trackListsViewModel,
-                playerViewModel: playerViewModel,
                 exportProgressViewModel: exportProgressViewModel,
-                favoriteTrackActionHandler: favoriteTrackActionHandler
+                favoriteTrackActionHandler: favoriteTrackActionHandler,
+                actionHandler: trackListsActionHandler,
+                navigationCoordinator: navigationCoordinator,
+                trackListFeatureDependencies: trackListFeatureDependencies
             )
         case .trackList(let id):
             if let trackList = trackListsViewModel.trackList(for: id) {
                 TrackListScreen(
                     trackList: trackList,
-                    playerViewModel: playerViewModel,
                     exportProgressViewModel: exportProgressViewModel,
-                    favoriteTrackActionHandler: favoriteTrackActionHandler
+                    favoriteTrackActionHandler: favoriteTrackActionHandler,
+                    dependencies: trackListFeatureDependencies
                 )
             } else {
                 ContentUnavailableView(

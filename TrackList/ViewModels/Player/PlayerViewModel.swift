@@ -115,7 +115,8 @@ final class PlayerViewModel: ObservableObject {
     /// Не допускает параллельную подготовку одного ранне восстановленного трека по быстрым повторным нажатиям Play.
     private var isPreparingCurrentTrackForPlayback = false
     /// Источник текущего playback-контекста нужен для сохранения его при переходе Next/Previous.
-    private var currentPlaybackContextSource: PlaybackContextSource = .playerQueue
+    /// Источник контекста публикуется вместе с остальным playback-состоянием без отдельного хранилища.
+    @Published private(set) var currentPlaybackContextSource: PlaybackContextSource = .playerQueue
     /// Наблюдатель нужен для повторной попытки восстановления локального трека после открытия bookmark-доступа.
     private var libraryAccessRestoredObserver: NSObjectProtocol?
     /// Наблюдатель повторяет только отложенное восстановление iTunes после ответа на системный запрос MediaPlayer.
@@ -158,19 +159,6 @@ final class PlayerViewModel: ObservableObject {
 
     /// Ненулевое значение означает, что отображение, предварительный или окончательный контекст стартового трека ещё восстанавливаются.
     private var pendingLastTrackRestoration: PendingLastTrackRestoration?
-
-    /// Конкретный PlayerManager нужен сценариям файловых операций,
-    /// где используется проверка занятости трека.
-    private let concretePlayerManager: PlayerManager?
-
-    /// Отдаёт тот же PlayerManager для файловых операций вне playback-слоя.
-    var fileOperationPlayerManager: PlayerManager {
-        guard let concretePlayerManager else {
-            preconditionFailure("Для файловых операций требуется PlayerManager")
-        }
-
-        return concretePlayerManager
-    }
 
     // MARK: - Now Playing Snapshot
     
@@ -270,8 +258,6 @@ final class PlayerViewModel: ObservableObject {
             generator: WaveformGenerator(),
             cache: WaveformFileCache()
         )
-        self.concretePlayerManager = playerManager as? PlayerManager
-
         if self.statePersistence == nil {
             PersistentLogger.log("PlayerViewModel: не удалось создать хранилище состояния плеера")
         }
@@ -2059,6 +2045,16 @@ final class PlayerViewModel: ObservableObject {
         }
 
         prepareAndPlayRestoredTrack(currentTrack)
+    }
+
+    /// Останавливает playback и освобождает файл, сохраняя published-состояние плеера согласованным.
+    /// Используется только перед подтверждёнными файловыми операциями внешних feature.
+    func releaseCurrentPlaybackFile() {
+        playerManager.releaseCurrentTrackForFileOperation()
+        isPlaying = false
+        isCurrentTrackPreparedForPlayback = false
+        isPreparingCurrentTrackForPlayback = false
+        applyCurrentPlaybackState()
     }
 
     /// Обрабатывает завершение текущего трека с учётом режима повтора.

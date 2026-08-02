@@ -15,16 +15,20 @@ final class TrackListPlaybackHandler {
     /// Источник read-only данных одного треклиста.
     private let reader: any TrackListReading
 
-    /// Управляет playback-командами треклиста.
-    private let playbackManager: any TrackListPlaybackManaging
+    /// Предоставляет только состояние, нужное для различения текущей строки треклиста.
+    private let playbackStateProvider: any PlaybackStateProviding
+    /// Выполняет только команды запуска и toggle без раскрытия PlayerViewModel.
+    private let playbackController: any TrackPlaybackControlling
 
     /// Создаёт обработчик playback-действий одного треклиста.
     init(
         reader: any TrackListReading,
-        playbackManager: any TrackListPlaybackManaging
+        playbackStateProvider: any PlaybackStateProviding,
+        playbackController: any TrackPlaybackControlling
     ) {
         self.reader = reader
-        self.playbackManager = playbackManager
+        self.playbackStateProvider = playbackStateProvider
+        self.playbackController = playbackController
     }
 
     /// Обрабатывает нажатие на строку трека.
@@ -32,12 +36,13 @@ final class TrackListPlaybackHandler {
         guard let track = reader.tracks.first(where: { $0.id == rowId }) else { return }
 
         if track.isAvailable {
-            if (playbackManager.currentTrackDisplayable as? Track)?.id == track.id {
-                playbackManager.togglePlayPause()
+            if playbackStateProvider.currentDisplayableId == track.id,
+               playbackStateProvider.currentContext == .trackList {
+                playbackController.togglePlayPause()
             } else if let trackListId = reader.currentListId {
-                playbackManager.play(
+                playbackController.play(
                     track: track,
-                    context: reader.tracks,
+                    context: reader.tracks.map { $0 as any TrackDisplayable },
                     source: .trackList(id: trackListId)
                 )
             }

@@ -15,7 +15,10 @@ struct RenameTrackFileContainer: View {
     // MARK: - Input
 
     let data: RenameTrackFileSheetData
-    let playerManager: PlayerManager
+    /// Capability проверки занятости файла не раскрывает sheet-у PlayerManager.
+    let fileBusyChecker: any TrackFileBusyChecking
+    /// Освобождает текущий файл через согласованное состояние PlayerViewModel.
+    let playbackFileReleaser: any CurrentPlaybackFileReleasing
 
     // MARK: - State
 
@@ -31,10 +34,12 @@ struct RenameTrackFileContainer: View {
 
     init(
         data: RenameTrackFileSheetData,
-        playerManager: PlayerManager
+        fileBusyChecker: any TrackFileBusyChecking,
+        playbackFileReleaser: any CurrentPlaybackFileReleasing
     ) {
         self.data = data
-        self.playerManager = playerManager
+        self.fileBusyChecker = fileBusyChecker
+        self.playbackFileReleaser = playbackFileReleaser
         self._fileName = State(
             initialValue: (data.currentFileName as NSString).deletingPathExtension
         )
@@ -68,8 +73,7 @@ struct RenameTrackFileContainer: View {
             Button(String(localized: "Cancel"), role: .cancel) {}
 
             Button(FileRenamePresentationText.stopAndRenameTitle) {
-                playerManager.pause()
-                playerManager.stopAccessingCurrentTrack()
+                playbackFileReleaser.releaseCurrentPlaybackFile()
                 Task { await rename() }
             }
         } message: {
@@ -118,7 +122,7 @@ struct RenameTrackFileContainer: View {
         }
 
         do {
-            try await AppCommandExecutor.shared.saveTrackEdits(
+            let result = try await AppCommandExecutor.shared.saveTrackEdits(
                 trackId: data.trackId,
                 newFileName: proposal.newFileName,
                 fileChanged: true,
@@ -126,8 +130,14 @@ struct RenameTrackFileContainer: View {
                 tagsChanged: false,
                 artworkAction: .none,
                 artworkChanged: false,
-                using: playerManager
+                using: fileBusyChecker
             )
+
+            await MainActor.run {
+                AppCommandToastPresenter(
+                    toastPresenter: ToastManager.shared
+                ).present(result)
+            }
 
             await MainActor.run {
                 closeSheet()
@@ -140,7 +150,9 @@ struct RenameTrackFileContainer: View {
                 case .fileAlreadyExists:
                     showFileNameConflictAlert = true
                 default:
-                    ToastManager.shared.handle(appError)
+                    AppCommandToastPresenter(
+                        toastPresenter: ToastManager.shared
+                    ).present(appError)
                 }
             }
         } catch {

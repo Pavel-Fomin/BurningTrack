@@ -37,9 +37,18 @@ final class LibraryBatchPlayerHandler {
 
         Task { [commandExecutor, toastManager, trackIds = pendingAction.trackIDs] in
             do {
-                try await commandExecutor.addTracksToPlayer(trackIds: trackIds)
+                let result = try await commandExecutor.addTracksToPlayer(trackIds: trackIds)
+                await MainActor.run {
+                    AppCommandToastPresenter(
+                        toastPresenter: toastManager
+                    ).present(result)
+                }
             } catch let appError as AppError {
-                toastManager.handle(appError)
+                await MainActor.run {
+                    AppCommandToastPresenter(
+                        toastPresenter: toastManager
+                    ).present(appError)
+                }
             } catch {
                 toastManager.handle(
                     .operationFailed(

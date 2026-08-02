@@ -14,7 +14,6 @@ import Foundation
 /// Роль:
 /// - последовательно выполняет команды записи;
 /// - использует AppCommandExecutor как единый write-layer;
-/// - отключает per-track success toast;
 /// - возвращает общий результат batch-операции;
 /// - не знает про UI и SheetManager.
 struct BatchTagEditSaveExecutor {
@@ -36,11 +35,10 @@ struct BatchTagEditSaveExecutor {
 
         for command in plan.commands {
             do {
-                try await appCommandExecutor.updateTrackTags(
+                _ = try await appCommandExecutor.updateTrackTags(
                     trackId: command.trackId,
                     patch: command.patch,
-                    artworkAction: command.artworkAction,
-                    showsSuccessToast: false
+                    artworkAction: command.artworkAction
                 )
                 succeededTrackIDs.append(command.trackId)
             } catch {

@@ -11,27 +11,19 @@ import Foundation
 import SwiftUI
 
 struct SettingsScreen: View {
-    let playerViewModel: PlayerViewModel
-
     @StateObject private var viewModel: SettingsScreenViewModel
 
-    init(
-        playerViewModel: PlayerViewModel
-    ) {
+    init() {
         let settingsManager = AppSettingsManager.shared
 
         self.init(
-            playerViewModel: playerViewModel,
             settingsManager: settingsManager
         )
     }
 
     init(
-        playerViewModel: PlayerViewModel,
         settingsManager: any SettingsManaging
     ) {
-        self.playerViewModel = playerViewModel
-
         // Собираем зависимости экрана настроек в composition root.
         let actionHandler = SettingsActionHandler(settingsManager: settingsManager)
         _viewModel = StateObject(

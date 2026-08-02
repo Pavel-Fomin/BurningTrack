@@ -65,11 +65,16 @@ final class PlayerQueueActionHandler {
     func deleteTrack(queueItemId: UUID) {
         Task {
             do {
-                try await commandExecutor.removeTrackFromPlayer(
+                let result = try await commandExecutor.removeTrackFromPlayer(
                     queueItemId: queueItemId
                 )
+                await AppCommandToastPresenter(
+                    toastPresenter: toastManager
+                ).present(result)
             } catch let appError as AppError {
-                toastManager.handle(appError)
+                AppCommandToastPresenter(
+                    toastPresenter: toastManager
+                ).present(appError)
             } catch {
                 toastManager.handle(
                     .operationFailed(
@@ -83,7 +88,18 @@ final class PlayerQueueActionHandler {
     /// Очищает текущую очередь плеера.
     func clearTrackList() {
         Task {
-            await commandExecutor.clearPlayer()
+            do {
+                let result = try await commandExecutor.clearPlayer()
+                AppCommandToastPresenter(
+                    toastPresenter: toastManager
+                ).present(result)
+            } catch let appError as AppError {
+                AppCommandToastPresenter(
+                    toastPresenter: toastManager
+                ).present(appError)
+            } catch {
+                toastManager.handle(.playlistSaveFailed)
+            }
         }
     }
 }

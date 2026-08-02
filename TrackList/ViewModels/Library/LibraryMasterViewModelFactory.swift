@@ -10,33 +10,36 @@
 import Foundation
 
 @MainActor
-enum LibraryMasterViewModelFactory {
-    // MARK: - Make
+struct LibraryMasterViewModelFactory {
 
-    static func make() -> LibraryMasterViewModel {
-        make(
-            manager: .shared,
-            settingsManager: AppSettingsManager.shared,
-            toastPresenter: ToastManager.shared,
-            stateBuilder: LibraryMasterScreenStateBuilder()
-        )
+    /// Менеджер фонотеки, подготовленный Composition Root.
+    private let manager: MusicLibraryManager
+    /// Настройки фонотеки, подготовленные Composition Root.
+    private let settingsManager: any SettingsManaging
+    /// Презентер ошибок фонотеки, подготовленный Composition Root.
+    private let toastPresenter: any ToastPresenting
+    /// Builder presentation-состояния, подготовленный Composition Root.
+    private let stateBuilder: LibraryMasterScreenStateBuilder
+
+    /// Получает готовые production-зависимости и не разрешает singleton самостоятельно.
+    init(
+        manager: MusicLibraryManager,
+        settingsManager: any SettingsManaging,
+        toastPresenter: any ToastPresenting,
+        stateBuilder: LibraryMasterScreenStateBuilder
+    ) {
+        self.manager = manager
+        self.settingsManager = settingsManager
+        self.toastPresenter = toastPresenter
+        self.stateBuilder = stateBuilder
     }
 
-    static func make(
-        manager: MusicLibraryManager,
-        settingsManager: (any SettingsManaging)? = nil,
-        toastPresenter: (any ToastPresenting)? = nil,
-        stateBuilder: LibraryMasterScreenStateBuilder = LibraryMasterScreenStateBuilder()
-    ) -> LibraryMasterViewModel {
-        // Singleton берём внутри MainActor-функции, чтобы не использовать actor-isolated значение в default argument.
-        let resolvedSettingsManager = settingsManager ?? AppSettingsManager.shared
-        // Toast-презентер нужен ViewModel только для ошибок сохранения порядка папок.
-        let resolvedToastPresenter = toastPresenter ?? ToastManager.shared
-
+    /// Собирает ViewModel без доступа к глобальному графу зависимостей.
+    func make() -> LibraryMasterViewModel {
         return LibraryMasterViewModel(
             manager: manager,
-            settingsManager: resolvedSettingsManager,
-            toastPresenter: resolvedToastPresenter,
+            settingsManager: settingsManager,
+            toastPresenter: toastPresenter,
             stateBuilder: stateBuilder
         )
     }

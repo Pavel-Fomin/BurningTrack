@@ -184,6 +184,17 @@ final class PlayerManager {
         currentPreparedURL = nil
     }
 
+    /// Отсоединяет текущий AVPlayerItem до записи в файл и освобождает связанный security-scoped доступ.
+    /// ViewModel сохраняет display-состояние трека и при следующем запуске создаст новый item по актуальному файлу.
+    func releaseCurrentTrackForFileOperation() {
+        player.pause()
+        player.replaceCurrentItem(with: nil)
+        removeTimeObserver()
+        stopAccessingCurrentTrack()
+        currentTrackId = nil
+        isPlaying = false
+    }
+
     /// Возвращает только уже подготовленный локальный файл текущего AVPlayerItem.
     /// Новый bookmark и security scope здесь не создаются, чтобы waveform использовал тот же доступ, что и playback.
     func preparedLocalFileURL(for trackId: UUID) -> URL? {

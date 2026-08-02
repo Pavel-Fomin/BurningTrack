@@ -25,7 +25,12 @@ struct LibraryTrackSectionsListView: View {
     let cloudAvailabilityStateStore: (UUID) -> CloudTrackAvailabilityRowStateStore
     let cloudAvailabilityActionHandler: LibraryCloudAvailabilityActionHandler
     
-    let playerViewModel: PlayerViewModel
+    /// Проверяет текущее playback-состояние при обработке тапа строки.
+    let playbackStateProvider: any PlaybackStateProviding
+    /// Выполняет команды запуска строки фонотеки.
+    let playbackController: any TrackPlaybackControlling
+    /// Готовый снимок «Избранного» для presentation state строк.
+    let favoriteTrackIds: Set<UUID>
     /// Единый обработчик «Избранного» передаётся в обработчик команды строки.
     let favoriteTrackActionHandler: FavoriteTrackActionHandler
     let playbackStateController: LibraryTrackPlaybackStateController
@@ -53,7 +58,9 @@ struct LibraryTrackSectionsListView: View {
                 playbackSource: playbackSource,
                 currentCollectionCategory: currentCollectionCategory,
                 trackListMembershipsById: trackListMembershipsById,
-                playerViewModel: playerViewModel,
+                playbackStateProvider: playbackStateProvider,
+                playbackController: playbackController,
+                favoriteTrackIds: favoriteTrackIds,
                 metadataProvider: metadataProvider,
                 cloudAvailabilityStateStore: cloudAvailabilityStateStore,
                 cloudAvailabilityActionHandler: cloudAvailabilityActionHandler,

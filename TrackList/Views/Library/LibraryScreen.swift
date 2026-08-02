@@ -40,19 +40,11 @@ struct LibraryScreen: View {
 
     // MARK: - Зависимости
 
-    /// Фабрика production action handler для корневого flow фонотеки.
-    private let actionHandlerFactory = LibraryMasterActionHandlerFactory()
-    /// Фабрика обработчика экспорта общего списка треков.
-    private let allTracksActionHandlerFactory = LibraryAllTracksActionHandlerFactory()
-    /// Фабрика обработчика экспорта выбранного значения коллекции.
-    private let collectionTracksActionHandlerFactory = LibraryCollectionTracksActionHandlerFactory()
-    /// Фабрика обработчика обычного экспорта раздела «Куплено в iTunes».
-    private let purchasedITunesActionHandlerFactory = PurchasedITunesMusicActionHandlerFactory()
-
-    let playerViewModel: PlayerViewModel
     @ObservedObject var exportProgressViewModel: ExportProgressViewModel
     /// Единый обработчик «Избранного» передаётся в строки всех источников фонотеки.
     let favoriteTrackActionHandler: FavoriteTrackActionHandler
+    /// Готовые фабрики feature фонотеки, подготовленные Composition Root.
+    let dependencies: LibraryFeatureDependencies
 
     // MARK: - ViewModels
 
@@ -70,25 +62,24 @@ struct LibraryScreen: View {
     // MARK: - Init
 
     init(
-        playerViewModel: PlayerViewModel,
         exportProgressViewModel: ExportProgressViewModel,
-        favoriteTrackActionHandler: FavoriteTrackActionHandler
+        favoriteTrackActionHandler: FavoriteTrackActionHandler,
+        dependencies: LibraryFeatureDependencies
     ) {
-        self.playerViewModel = playerViewModel
         self.exportProgressViewModel = exportProgressViewModel
         self.favoriteTrackActionHandler = favoriteTrackActionHandler
+        self.dependencies = dependencies
         self._viewModel = StateObject(
-            wrappedValue: LibraryScreenViewModelFactory.make()
+            wrappedValue: dependencies.screenViewModelFactory.make()
         )
         self._masterViewModel = StateObject(
-            wrappedValue: LibraryMasterViewModelFactory.make()
+            wrappedValue: dependencies.masterViewModelFactory.make()
         )
     }
 
     /// Обработчик действий корневого flow фонотеки.
     private var actionHandler: LibraryMasterActionHandler {
-        actionHandlerFactory.make(
-            playerViewModel: playerViewModel,
+        dependencies.masterActionHandlerFactory.make(
             output: masterViewModel,
             requestFolderPicker: {
                 isShowingFolderPicker = true
@@ -98,7 +89,7 @@ struct LibraryScreen: View {
 
     /// Обработчик действий экрана всех треков фонотеки.
     private var allTracksActionHandler: LibraryAllTracksActionHandler {
-        allTracksActionHandlerFactory.make(
+        dependencies.allTracksActionHandlerFactory.make(
             exportProgressViewModel: exportProgressViewModel
         )
     }
@@ -107,7 +98,7 @@ struct LibraryScreen: View {
     private func collectionTracksActionHandler(
         for source: LibraryTrackListSource
     ) -> LibraryCollectionTracksActionHandler {
-        collectionTracksActionHandlerFactory.make(
+        dependencies.collectionTracksActionHandlerFactory.make(
             source: source,
             exportProgressViewModel: exportProgressViewModel
         )
@@ -115,7 +106,7 @@ struct LibraryScreen: View {
 
     /// Собирает обработчик действий iTunes с существующим глобальным экспортом.
     private var purchasedITunesActionHandler: PurchasedITunesMusicActionHandler {
-        purchasedITunesActionHandlerFactory.make(
+        dependencies.purchasedITunesActionHandlerFactory.make(
             exportProgressViewModel: exportProgressViewModel
         )
     }
@@ -226,7 +217,9 @@ struct LibraryScreen: View {
 
         case .purchasedITunes(let revealRequest):
             PurchasedITunesMusicView(
-                playerViewModel: playerViewModel,
+                playbackStateProvider: dependencies.playbackStateProvider,
+                playbackController: dependencies.playbackController,
+                favoriteTrackIdsProvider: dependencies.favoriteTrackIdsProvider,
                 favoriteTrackActionHandler: favoriteTrackActionHandler,
                 revealRequest: revealRequest,
                 onRevealHandled: { requestId in
@@ -243,7 +236,11 @@ struct LibraryScreen: View {
         case .allLibraryTracks:
             LibraryCollectionTracksView(
                 source: .allLibraryTracks,
-                playerViewModel: playerViewModel,
+                playbackStateProvider: dependencies.playbackStateProvider,
+                playbackController: dependencies.playbackController,
+                favoriteTrackIdsProvider: dependencies.favoriteTrackIdsProvider,
+                fileBusyChecker: dependencies.fileBusyChecker,
+                renameActionHandler: dependencies.trackFileRenameActionHandler,
                 favoriteTrackActionHandler: favoriteTrackActionHandler,
                 selectionActionBarConfig: $selectionActionBarConfig,
                 onAllTracksAction: { action in
@@ -257,7 +254,7 @@ struct LibraryScreen: View {
         case .collectionCategory(let category):
             LibraryCollectionValuesView(
                 viewModel: LibraryCollectionValuesViewModel(category: category),
-                playerViewModel: playerViewModel,
+                playbackStateProvider: dependencies.playbackStateProvider,
                 onValueSelected: { value in
                     viewModel.handle(.collectionValueSelected(value))
                 }
@@ -273,7 +270,11 @@ struct LibraryScreen: View {
                     rawValue: value,
                     artistKey: artistKey
                 ),
-                playerViewModel: playerViewModel,
+                playbackStateProvider: dependencies.playbackStateProvider,
+                playbackController: dependencies.playbackController,
+                favoriteTrackIdsProvider: dependencies.favoriteTrackIdsProvider,
+                fileBusyChecker: dependencies.fileBusyChecker,
+                renameActionHandler: dependencies.trackFileRenameActionHandler,
                 favoriteTrackActionHandler: favoriteTrackActionHandler,
                 selectionActionBarConfig: $selectionActionBarConfig,
                 onCollectionTracksAction: { action in
@@ -298,9 +299,14 @@ struct LibraryScreen: View {
                 onRevealHandled: { requestId in
                     viewModel.handle(.revealHandled(requestId))
                 },
-                playerViewModel: playerViewModel,
+                playbackStateProvider: dependencies.playbackStateProvider,
+                playbackController: dependencies.playbackController,
+                favoriteTrackIdsProvider: dependencies.favoriteTrackIdsProvider,
+                fileBusyChecker: dependencies.fileBusyChecker,
+                renameActionHandler: dependencies.trackFileRenameActionHandler,
                 exportProgressViewModel: exportProgressViewModel,
                 favoriteTrackActionHandler: favoriteTrackActionHandler,
+                viewModelFactory: dependencies.folderViewModelFactory,
                 selectionActionBarConfig: $selectionActionBarConfig
             )
 

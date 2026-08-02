@@ -14,7 +14,12 @@ struct PurchasedITunesMusicView: View {
 
     // MARK: - Входные данные
 
-    @ObservedObject var playerViewModel: PlayerViewModel
+    /// Реактивное playback-состояние для подсветки и прокрутки текущего iTunes-трека.
+    let playbackStateProvider: any PlaybackStateProviding
+    /// Команды запуска и toggle строки iTunes.
+    let playbackController: any TrackPlaybackControlling
+    /// Подтверждённое состояние «Избранного» для готовых строк iTunes.
+    let favoriteTrackIdsProvider: any FavoriteTrackIdsProviding
     /// Единый обработчик «Избранного» передаётся в контейнеры строк iTunes.
     let favoriteTrackActionHandler: FavoriteTrackActionHandler
     /// Одноразовый intent прокрутки к треку, полученный из общего сценария фонотеки.
@@ -31,6 +36,16 @@ struct PurchasedITunesMusicView: View {
     @StateObject private var viewModel = PurchasedITunesMusicViewModel()
     /// Собирает готовое состояние строки iTunes до передачи в её контейнер.
     private let rowStateBuilder = PurchasedITunesTrackRowStateBuilder()
+    /// Локальный snapshot сохраняет реактивность без наблюдения PlayerViewModel.
+    @State private var playbackState = PlaybackStateSnapshot(
+        currentDisplayableId: nil,
+        currentTrackId: nil,
+        currentContext: nil,
+        currentContextSource: nil,
+        isPlaying: false
+    )
+    /// Локальный snapshot сохраняет реактивность состояния «Избранного» без PlayerViewModel.
+    @State private var favoriteTrackIds = Set<UUID>()
 
     // MARK: - Интерфейс
 
@@ -52,6 +67,12 @@ struct PurchasedITunesMusicView: View {
         }
         .task {
             await viewModel.load()
+        }
+        .onReceive(playbackStateProvider.playbackStatePublisher) { playbackState in
+            self.playbackState = playbackState
+        }
+        .onReceive(favoriteTrackIdsProvider.favoriteTrackIdsPublisher) { favoriteTrackIds in
+            self.favoriteTrackIds = favoriteTrackIds
         }
     }
 
@@ -125,16 +146,17 @@ struct PurchasedITunesMusicView: View {
                     ForEach(tracks) { track in
                         let rowState = rowStateBuilder.build(
                             track: track,
-                            favoriteTrackIds: playerViewModel.favoriteTrackIds
+                            favoriteTrackIds: favoriteTrackIds
                         )
 
                         PurchasedITunesTrackRowContainer(
                             state: rowState,
                             context: tracks,
-                            playerViewModel: playerViewModel,
+                            playbackState: playbackState,
+                            playbackController: playbackController,
                             favoriteTrackActionHandler: favoriteTrackActionHandler
                         )
-                        .id(track.trackId)
+                        .id(track.id)
                     }
                 }
             }
@@ -158,14 +180,14 @@ struct PurchasedITunesMusicView: View {
                     tracks: tracks
                 )
             }
-            .onChange(of: playerViewModel.currentTrackDisplayable?.trackId) { _, _ in
+            .onChange(of: playbackState.currentDisplayableId) { _, _ in
                 scrollToCurrentTrackIfNeeded(
                     using: proxy,
                     tracks: tracks,
                     animated: true
                 )
             }
-            .onChange(of: playerViewModel.currentContext) { _, _ in
+            .onChange(of: playbackState.currentContext) { _, _ in
                 scrollToCurrentTrackIfNeeded(
                     using: proxy,
                     tracks: tracks,
@@ -195,13 +217,13 @@ struct PurchasedITunesMusicView: View {
     private func currentPurchasedITunesTrackId(
         in tracks: [PurchasedITunesPlayableTrack]
     ) -> UUID? {
-        guard playerViewModel.currentContext == .purchasedITunes,
-              let currentTrackId = playerViewModel.currentTrackDisplayable?.trackId,
-              tracks.contains(where: { $0.trackId == currentTrackId }) else {
+        guard playbackState.currentContext == .purchasedITunes,
+              let currentDisplayableId = playbackState.currentDisplayableId,
+              tracks.contains(where: { $0.id == currentDisplayableId }) else {
             return nil
         }
 
-        return currentTrackId
+        return currentDisplayableId
     }
 
     /// Прокручивает список к текущему iTunes-треку, если он есть на экране.

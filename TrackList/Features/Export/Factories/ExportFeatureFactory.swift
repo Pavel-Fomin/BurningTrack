@@ -33,15 +33,6 @@ struct ExportFeatureFactory {
         self.detailsRouter = detailsRouter
     }
 
-    /// Создаёт фабрику с общими production-зависимостями приложения.
-    init() {
-        self.init(
-            exporter: ExportManager.shared,
-            toastPresenter: ToastManager.shared,
-            detailsRouter: SheetManager.shared
-        )
-    }
-
     /// Собирает глобальную ViewModel и все зависимости жизненного цикла экспорта.
     func makeExportProgressViewModel() -> ExportProgressViewModel {
         let actionHandler = ExportActionHandler(

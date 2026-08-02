@@ -23,25 +23,81 @@ enum TrackToastEventBuilder {
         track: LibraryTrack,
         trackListName: String
     ) async -> ToastEvent {
-        let snapshot: TrackRuntimeSnapshot?
-
-        if let storedSnapshot = await TrackRuntimeStore.shared.snapshot(forTrackId: track.trackId) {
-            snapshot = storedSnapshot
-        } else {
-            snapshot = try? await TrackRuntimeSnapshotBuilder.shared.buildSnapshot(forTrackId: track.trackId)
-        }
-
-        let artwork = ArtworkRequest(
+        await trackAddedToTrackList(
             trackId: track.trackId,
-            snapshot: snapshot,
-            purpose: .toast
+            fallbackFileName: track.fileName,
+            fallbackTitle: track.title,
+            fallbackArtist: track.artist,
+            trackListName: trackListName
         )
+    }
+
+    /// Создаёт track-style Toast для добавления трека по предметному результату команды.
+    static func trackAddedToTrackList(
+        trackId: UUID,
+        fallbackFileName: String,
+        fallbackTitle: String? = nil,
+        fallbackArtist: String? = nil,
+        trackListName: String
+    ) async -> ToastEvent {
+        let snapshot = await snapshot(for: trackId)
 
         return .trackAddedToTrackList(
-            title: snapshot?.title ?? track.title ?? track.fileName,
-            artist: snapshot?.artist ?? track.artist ?? "",
-            artwork: artwork,
+            title: snapshot?.title ?? fallbackTitle ?? fallbackFileName,
+            artist: snapshot?.artist ?? fallbackArtist ?? "",
+            artwork: artwork(for: trackId, snapshot: snapshot),
             trackListName: trackListName
+        )
+    }
+
+    /// Создаёт track-style Toast для удаления трека из треклиста.
+    static func trackRemovedFromTrackList(
+        trackId: UUID,
+        fallbackFileName: String
+    ) async -> ToastEvent {
+        let snapshot = await snapshot(for: trackId)
+
+        return .trackRemovedFromTrackList(
+            title: snapshot?.title ?? fallbackFileName,
+            artist: snapshot?.artist ?? "",
+            artwork: artwork(for: trackId, snapshot: snapshot)
+        )
+    }
+
+    /// Создаёт track-style Toast для удаления трека из очереди плеера.
+    static func trackRemovedFromPlayer(
+        trackId: UUID,
+        fallbackFileName: String
+    ) async -> ToastEvent {
+        let snapshot = await snapshot(for: trackId)
+
+        return .trackRemovedFromPlayer(
+            title: snapshot?.title ?? snapshot?.fileName ?? fallbackFileName,
+            artist: snapshot?.artist ?? "",
+            artwork: artwork(for: trackId, snapshot: snapshot)
+        )
+    }
+
+    /// Возвращает актуальный snapshot для presentation-данных Toast.
+    private static func snapshot(
+        for trackId: UUID
+    ) async -> TrackRuntimeSnapshot? {
+        if let storedSnapshot = await TrackRuntimeStore.shared.snapshot(forTrackId: trackId) {
+            return storedSnapshot
+        }
+
+        return try? await TrackRuntimeSnapshotBuilder.shared.buildSnapshot(forTrackId: trackId)
+    }
+
+    /// Создаёт запрос обложки только при наличии актуального snapshot.
+    private static func artwork(
+        for trackId: UUID,
+        snapshot: TrackRuntimeSnapshot?
+    ) -> ArtworkRequest? {
+        ArtworkRequest(
+            trackId: trackId,
+            snapshot: snapshot,
+            purpose: .toast
         )
     }
 }

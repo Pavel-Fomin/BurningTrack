@@ -10,35 +10,38 @@
 import Foundation
 
 @MainActor
-enum LibraryFolderViewModelFactory {
-    // MARK: - Make
+struct LibraryFolderViewModelFactory {
 
-    static func make(
-        folder: LibraryFolder,
-        exportProgressViewModel: ExportProgressViewModel,
-        clearSelectionActionBar: @escaping @MainActor () -> Void
-    ) -> LibraryFolderViewModel {
-        // Используем overload вместо default-значения, чтобы обращаться к shared внутри MainActor.
-        make(
-            folder: folder,
-            navigationCoordinator: .shared,
-            exportProgressViewModel: exportProgressViewModel,
-            viewControllerProvider: ApplicationViewControllerProvider(),
-            toastPresenter: ToastManager.shared,
-            summaryProvider: makeSummaryProvider(),
-            eventProvider: NotificationLibraryTrackEventProvider(),
-            clearSelectionActionBar: clearSelectionActionBar
-        )
-    }
+    /// Координатор маршрутов фонотеки, подготовленный Composition Root.
+    private let navigationCoordinator: NavigationCoordinator
+    /// Провайдер системного контроллера, подготовленный Composition Root.
+    private let viewControllerProvider: any ViewControllerProviding
+    /// Презентер ошибок фонотеки, подготовленный Composition Root.
+    private let toastPresenter: any ToastPresenting
+    /// SQLite-провайдер статистики, подготовленный Composition Root.
+    private let summaryProvider: any TrackCollectionSummaryProviding
+    /// Источник событий треков, подготовленный Composition Root.
+    private let eventProvider: any LibraryTrackEventProvider
 
-    static func make(
-        folder: LibraryFolder,
+    /// Получает готовые production-зависимости и не разрешает singleton самостоятельно.
+    init(
         navigationCoordinator: NavigationCoordinator,
-        exportProgressViewModel: ExportProgressViewModel,
         viewControllerProvider: any ViewControllerProviding,
         toastPresenter: any ToastPresenting,
         summaryProvider: any TrackCollectionSummaryProviding,
-        eventProvider: any LibraryTrackEventProvider,
+        eventProvider: any LibraryTrackEventProvider
+    ) {
+        self.navigationCoordinator = navigationCoordinator
+        self.viewControllerProvider = viewControllerProvider
+        self.toastPresenter = toastPresenter
+        self.summaryProvider = summaryProvider
+        self.eventProvider = eventProvider
+    }
+
+    /// Собирает ViewModel без доступа к глобальному графу зависимостей.
+    func make(
+        folder: LibraryFolder,
+        exportProgressViewModel: ExportProgressViewModel,
         clearSelectionActionBar: @escaping @MainActor () -> Void
     ) -> LibraryFolderViewModel {
         let stateBuilder = LibraryFolderStateBuilder()
@@ -57,14 +60,5 @@ enum LibraryFolderViewModelFactory {
             summaryProvider: summaryProvider,
             eventProvider: eventProvider
         )
-    }
-
-    /// Собирает единственный SQLite-компонент статистики для production-папки.
-    private static func makeSummaryProvider() -> any TrackCollectionSummaryProviding {
-        do {
-            return try SQLiteTrackCollectionSummaryProvider()
-        } catch {
-            preconditionFailure("Не удалось создать SQLite-провайдер статистики: \(error)")
-        }
     }
 }
