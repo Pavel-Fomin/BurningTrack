@@ -21,31 +21,25 @@ struct LibraryTrackSectionsListView: View {
 
     let trackListMembershipsById: [UUID: [TrackListMembership]]
     
-    let metadataProvider: TrackMetadataProviding
+    let presentationHandler: LibraryTrackPresentationHandler
     let cloudAvailabilityStateStore: (UUID) -> CloudTrackAvailabilityRowStateStore
     let cloudAvailabilityActionHandler: LibraryCloudAvailabilityActionHandler
     
-    /// Проверяет текущее playback-состояние при обработке тапа строки.
-    let playbackStateProvider: any PlaybackStateProviding
-    /// Выполняет команды запуска строки фонотеки.
-    let playbackController: any TrackPlaybackControlling
     /// Готовый снимок «Избранного» для presentation state строк.
     let favoriteTrackIds: Set<UUID>
-    /// Единый обработчик «Избранного» передаётся в обработчик команды строки.
-    let favoriteTrackActionHandler: FavoriteTrackActionHandler
+    /// Один screen-local handler принимает все действия строк без создания объектов в body секции.
+    let commandHandler: LibraryTrackCommandHandler
     let playbackStateController: LibraryTrackPlaybackStateController
-    let sheetManager: SheetManager
     
     let revealedTrackID: UUID?
     let highlightedTrackID: UUID?
-    let onRenameTrack: (UUID, FileRenameStrategy) -> Void
     let shouldShowTags: Bool
     let shouldShowTrackListMembership: Bool
     let shouldShowFileFormat: Bool
     
     let isSelecting: Bool
     
-    @Binding var selection: OrderedSelection<UUID>
+    let selectedTrackIDs: OrderedSelection<UUID>
 
     var body: some View {
         ForEach(sections, id: \.id) { section in
@@ -58,23 +52,19 @@ struct LibraryTrackSectionsListView: View {
                 playbackSource: playbackSource,
                 currentCollectionCategory: currentCollectionCategory,
                 trackListMembershipsById: trackListMembershipsById,
-                playbackStateProvider: playbackStateProvider,
-                playbackController: playbackController,
                 favoriteTrackIds: favoriteTrackIds,
-                metadataProvider: metadataProvider,
+                presentationHandler: presentationHandler,
                 cloudAvailabilityStateStore: cloudAvailabilityStateStore,
                 cloudAvailabilityActionHandler: cloudAvailabilityActionHandler,
-                sheetManager: sheetManager,
-                favoriteTrackActionHandler: favoriteTrackActionHandler,
+                commandHandler: commandHandler,
                 playbackStateController: playbackStateController,
                 revealedTrackID: revealedTrackID,
                 highlightedTrackID: highlightedTrackID,
-                onRenameTrack: onRenameTrack,
                 shouldShowTags: shouldShowTags,
                 shouldShowTrackListMembership: shouldShowTrackListMembership,
                 shouldShowFileFormat: shouldShowFileFormat,
                 isSelecting: isSelecting,
-                selection: $selection
+                selectedTrackIDs: selectedTrackIDs
                
             )
         }

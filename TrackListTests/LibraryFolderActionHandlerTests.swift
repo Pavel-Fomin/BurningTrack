@@ -7,6 +7,7 @@
 //  Created by Pavel Fomin on 20.07.2026.
 //
 
+import Combine
 import Foundation
 import UIKit
 import XCTest
@@ -135,16 +136,20 @@ final class LibraryFolderActionHandlerTests: XCTestCase {
         toastPresenter: FolderToastPresenterSpy,
         clearSelectionActionBar: @escaping @MainActor () -> Void = {}
     ) -> LibraryFolderViewModel {
-        LibraryFolderViewModelFactory.make(
-            folder: folder,
+        let factory = LibraryFolderViewModelFactory(
+            // Фабрика принимает concrete coordinator с private initializer, поэтому без изменения production-контракта
+            // тест сохраняет существующий изолированный сбросом singleton только для проверки folder route.
             navigationCoordinator: .shared,
-            exportProgressViewModel: exportProgressViewModel,
             viewControllerProvider: FolderViewControllerProviderSpy(
                 presenter: UIViewController()
             ),
             toastPresenter: toastPresenter,
             summaryProvider: EmptyTrackCollectionSummaryProvider(),
-            eventProvider: NotificationLibraryTrackEventProvider(),
+            eventProvider: LibraryFolderEventProviderStub()
+        )
+        return factory.make(
+            folder: folder,
+            exportProgressViewModel: exportProgressViewModel,
             clearSelectionActionBar: clearSelectionActionBar
         )
     }
@@ -216,6 +221,30 @@ private final class EmptyTrackCollectionSummaryProvider: TrackCollectionSummaryP
             unknownDurationCount: 0,
             unknownFileSizeCount: 0
         )
+    }
+}
+
+/// Заменяет production NotificationCenter, чтобы тесты действий папки не получали внешние события приложения.
+@MainActor
+private final class LibraryFolderEventProviderStub: LibraryTrackEventProvider {
+    var trackDidUpdate: AnyPublisher<TrackUpdateEvent, Never> {
+        Empty().eraseToAnyPublisher()
+    }
+
+    var trackBatchDidUpdate: AnyPublisher<[TrackUpdateEvent], Never> {
+        Empty().eraseToAnyPublisher()
+    }
+
+    var libraryDataDidChange: AnyPublisher<Void, Never> {
+        Empty().eraseToAnyPublisher()
+    }
+
+    var appSettingsDidChange: AnyPublisher<Void, Never> {
+        Empty().eraseToAnyPublisher()
+    }
+
+    var trackListBadgesDidChange: AnyPublisher<Void, Never> {
+        Empty().eraseToAnyPublisher()
     }
 }
 

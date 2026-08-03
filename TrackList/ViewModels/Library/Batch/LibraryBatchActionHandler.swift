@@ -18,9 +18,10 @@ struct LibraryBatchActionHandler {
     let onRenameFiles: @MainActor (PendingBulkTrackAction) -> Void
     let onEditTags: @MainActor (PendingBulkTrackAction) -> Void
 
-    /// Передаёт массовое действие в соответствующий сценарий.
-    func handle(_ pendingAction: PendingBulkTrackAction) {
-        guard !pendingAction.isEmpty else { return }
+    /// Передаёт массовое действие в соответствующий сценарий и подтверждает его принятие.
+    @discardableResult
+    func handle(_ pendingAction: PendingBulkTrackAction) -> Bool {
+        guard !pendingAction.isEmpty else { return false }
 
         switch pendingAction.action {
         case .addToPlayer:
@@ -32,5 +33,7 @@ struct LibraryBatchActionHandler {
         case .editTags:
             onEditTags(pendingAction)
         }
+
+        return true
     }
 }

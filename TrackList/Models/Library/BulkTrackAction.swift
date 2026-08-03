@@ -14,7 +14,7 @@
 
 import Foundation
 
-enum BulkTrackAction {
+enum BulkTrackAction: Equatable {
     case addToPlayer
     case addToTrackList
     case renameFiles

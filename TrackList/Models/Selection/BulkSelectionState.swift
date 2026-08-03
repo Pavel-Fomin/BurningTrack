@@ -15,7 +15,7 @@
 
 import Foundation
 
-struct BulkSelectionState<ID: Hashable, Action> {
+struct BulkSelectionState<ID: Hashable & Equatable, Action: Equatable>: Equatable {
     /// Показывает, активен ли режим массового выбора.
     private(set) var isActive = false
 
@@ -38,12 +38,14 @@ struct BulkSelectionState<ID: Hashable, Action> {
     /// Включает выбор без заранее выбранного действия.
     mutating func activate() {
         isActive = true
+        selection.clear()
         pendingAction = nil
     }
 
     /// Включает выбор и запоминает действие, которое будет подтверждено позже.
     mutating func activate(action: Action) {
         isActive = true
+        selection.clear()
         pendingAction = action
     }
 

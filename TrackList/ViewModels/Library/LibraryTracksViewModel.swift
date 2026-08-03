@@ -13,7 +13,7 @@ import Combine
 import UIKit
 
 @MainActor
-final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
+final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding, LibraryTracksActionSending, LibraryTracksActionHandlingOutput, LibraryTracksStateReceiving {
 
     // MARK: - Входные данные
 
@@ -23,15 +23,29 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
 
     // MARK: - Состояние списка
 
-    @Published private(set) var trackSections: [TrackSection] = []
-    @Published private(set) var trackListMembershipsById: [UUID: [TrackListMembership]] = [:]
-    @Published private(set) var isLoading = false
-    @Published private(set) var didLoad = false
-    @Published private(set) var sortMode: LibraryTrackSortMode
+    @Published private(set) var trackSections: [TrackSection] = [] {
+        didSet { updateScreenState() }
+    }
+    @Published private(set) var trackListMembershipsById: [UUID: [TrackListMembership]] = [:] {
+        didSet { updateScreenState() }
+    }
+    @Published private(set) var isLoading = false {
+        didSet { updateScreenState() }
+    }
+    @Published private(set) var didLoad = false {
+        didSet { updateScreenState() }
+    }
+    @Published private(set) var sortMode: LibraryTrackSortMode {
+        didSet { updateScreenState() }
+    }
+    /// Основное состояние экрана публикуется отдельно от частых playback и iCloud обновлений строк.
+    @Published private(set) var state: LibraryTracksScreenState
 
     // MARK: - Состояние выбора
 
-    @Published var bulkSelection = BulkSelectionState<UUID, BulkTrackAction>()
+    @Published var bulkSelection = BulkSelectionState<UUID, BulkTrackAction>() {
+        didSet { updateScreenState() }
+    }
 
     // MARK: - Зависимости
 
@@ -43,6 +57,12 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
     private let runtimeController: LibraryTrackRuntimeController
     /// Даёт текущие настройки отображения, которые влияют на runtime metadata строк.
     private let settingsManager: any SettingsManaging
+    /// SQLite-реестр передаётся composition root, чтобы ViewModel не разрешала singleton самостоятельно.
+    private let trackRegistry: TrackRegistry
+    /// Синхронизация папки остаётся существующей manager-операцией, но её зависимость явна.
+    private let musicLibraryManager: MusicLibraryManager
+    /// Восстановление URL вынесено из ViewModel в injected capability.
+    private let trackURLProvider: @MainActor (UUID) async -> URL?
     /// Разрешает читать и сохранять сортировку в настройках папки.
     private let usesLibrarySortSettings: Bool
     /// SQLite metadata, используемые как сохранённые ключи сортировки и целей перехода коллекции.
@@ -108,6 +128,11 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
     /// Общий обработчик переименования файлов треков.
     private let renameActionHandler: TrackFileRenameActionHandler
 
+    /// Маршрутизатор typed-actions подключается только factory после создания weak output.
+    private var actionHandler: LibraryTracksActionHandler?
+    /// Presenter формирует единый снимок, а ViewModel остаётся владельцем публикации состояния.
+    private var presenter: LibraryTracksPresenter?
+
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Производное состояние
@@ -154,11 +179,14 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
     convenience init(
         folderURL: URL,
         renameActionHandler: TrackFileRenameActionHandler,
-        tracksProvider: LibraryTracksProvider = FastLibraryTracksProvider(),
-        badgeProvider: TrackListBadgeProvider = DefaultTrackListBadgeProvider(),
-        eventProvider: LibraryTrackEventProvider = NotificationLibraryTrackEventProvider(),
-        runtimeController: LibraryTrackRuntimeController = LibraryTrackRuntimeController(),
-        settingsManager: (any SettingsManaging)? = nil,
+        tracksProvider: LibraryTracksProvider,
+        badgeProvider: TrackListBadgeProvider,
+        eventProvider: LibraryTrackEventProvider,
+        runtimeController: LibraryTrackRuntimeController,
+        settingsManager: any SettingsManaging,
+        trackRegistry: TrackRegistry,
+        musicLibraryManager: MusicLibraryManager,
+        trackURLProvider: @escaping @MainActor (UUID) async -> URL?,
         usesLibrarySortSettings: Bool = true
     ) {
         self.init(
@@ -169,6 +197,9 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
             eventProvider: eventProvider,
             runtimeController: runtimeController,
             settingsManager: settingsManager,
+            trackRegistry: trackRegistry,
+            musicLibraryManager: musicLibraryManager,
+            trackURLProvider: trackURLProvider,
             usesLibrarySortSettings: usesLibrarySortSettings
         )
     }
@@ -176,15 +207,16 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
     init(
         source: LibraryTrackListSource,
         renameActionHandler: TrackFileRenameActionHandler,
-        tracksProvider: LibraryTracksProvider = FastLibraryTracksProvider(),
-        badgeProvider: TrackListBadgeProvider = DefaultTrackListBadgeProvider(),
-        eventProvider: LibraryTrackEventProvider = NotificationLibraryTrackEventProvider(),
-        runtimeController: LibraryTrackRuntimeController = LibraryTrackRuntimeController(),
-        settingsManager: (any SettingsManaging)? = nil,
+        tracksProvider: LibraryTracksProvider,
+        badgeProvider: TrackListBadgeProvider,
+        eventProvider: LibraryTrackEventProvider,
+        runtimeController: LibraryTrackRuntimeController,
+        settingsManager: any SettingsManaging,
+        trackRegistry: TrackRegistry,
+        musicLibraryManager: MusicLibraryManager,
+        trackURLProvider: @escaping @MainActor (UUID) async -> URL?,
         usesLibrarySortSettings: Bool = true
     ) {
-        let resolvedSettingsManager = settingsManager ?? AppSettingsManager.shared
-
         let availableSortModes = source.availableTrackSortModes
 
         self.source = source
@@ -194,19 +226,66 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         self.badgeProvider = badgeProvider
         self.eventProvider = eventProvider
         self.runtimeController = runtimeController
-        self.settingsManager = resolvedSettingsManager
+        self.settingsManager = settingsManager
+        self.trackRegistry = trackRegistry
+        self.musicLibraryManager = musicLibraryManager
+        self.trackURLProvider = trackURLProvider
         self.usesLibrarySortSettings = usesLibrarySortSettings && source.canPersistFolderSortMode
-        self.sortMode = Self.resolvedSortMode(
+        let initialSortMode = Self.resolvedSortMode(
             .fileDateDesc,
             availableSortModes: availableSortModes
         )
-        self.lastTagReadingEnabled = resolvedSettingsManager.settings.visible.metadata.isTagReadingEnabled
+        self.sortMode = initialSortMode
+        self.state = LibraryTracksScreenState(sortMode: initialSortMode)
+        self.lastTagReadingEnabled = settingsManager.settings.visible.metadata.isTagReadingEnabled
 
         bindRuntimeController()
         bindBatchRenameHandler()
         bindTrackUpdateEvents()
         bindSettingsEvents()
         bindBadgeEvents()
+    }
+
+    /// Подключает objects screen-flow после инициализации и исключает сильный цикл ViewModel → Handler → ViewModel.
+    func configure(
+        actionHandler: LibraryTracksActionHandler,
+        presenter: LibraryTracksPresenter
+    ) {
+        self.actionHandler = actionHandler
+        self.presenter = presenter
+        updateScreenState()
+    }
+
+    /// Единственная typed-точка входа для View и host нижней панели.
+    func send(_ action: LibraryTracksAction) {
+        guard let actionHandler else {
+            assertionFailure("LibraryTracksActionHandler must be configured before sending actions")
+            return
+        }
+
+        actionHandler.handle(action)
+    }
+
+    /// Принимает presentation-снимок через weak output Presenter-а.
+    func receive(_ state: LibraryTracksScreenState) {
+        guard self.state != state else { return }
+        self.state = state
+    }
+
+    /// Синхронизирует новый screen state с существующими данными списка и selection-flow.
+    private func updateScreenState() {
+        guard let presenter else { return }
+        presenter.present(
+            presenter.makeState(
+                sections: trackSections,
+                isLoading: isLoading,
+                didLoad: didLoad,
+                sortMode: sortMode,
+                selection: bulkSelection,
+                membershipsById: trackListMembershipsById,
+                isBatchFilenameRenameFlowActive: batchRenameHandler.flow.isActive
+            )
+        )
     }
 
     // MARK: - Переименование
@@ -283,7 +362,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         sortMode = mode
         if usesLibrarySortSettings,
            let folderId = source.folderId {
-            await TrackRegistry.shared.setLibraryTrackSortMode(mode, forFolderId: folderId)
+            await trackRegistry.setLibraryTrackSortMode(mode, forFolderId: folderId)
         }
 
         await reloadCachedMetadata(for: visibleTracks())
@@ -316,7 +395,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
 
     /// Догружает SQLite metadata для сортировки и доступности переходов к коллекции.
     private func reloadCachedMetadata(for tracks: [LibraryTrack]) async {
-        cachedMetadataByTrackId = await TrackRegistry.shared.cachedMetadata(
+        cachedMetadataByTrackId = await trackRegistry.cachedMetadata(
             forTrackIds: tracks.map(\.trackId)
         )
     }
@@ -324,7 +403,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
     /// Обновляет SQLite metadata конкретных треков после tag-событий.
     private func reloadCachedMetadata(for trackIds: [UUID]) async {
 
-        let metadataByTrackId = await TrackRegistry.shared.cachedMetadata(
+        let metadataByTrackId = await trackRegistry.cachedMetadata(
             forTrackIds: trackIds
         )
 
@@ -344,7 +423,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
 
         guard let folderId = source.folderId else { return }
 
-        await MusicLibraryManager.shared.syncFolderIfNeeded(folderId: folderId)
+        await musicLibraryManager.syncFolderIfNeeded(folderId: folderId)
         await updateAvailabilityInBackground()
     }
 
@@ -354,7 +433,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         var availabilityByRowId: [UUID: Bool] = [:]
 
         for track in tracks {
-            availabilityByRowId[track.id] = await BookmarkResolver.url(forTrack: track.trackId) != nil
+            availabilityByRowId[track.id] = await trackURLProvider(track.trackId) != nil
         }
 
         trackSections = trackSections.map { section in
@@ -395,6 +474,12 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         bulkSelection.activate()
     }
 
+    /// Переключает строку через action route, не выдавая View Binding на bulk state.
+    func toggleSelection(for trackId: UUID) {
+        guard bulkSelection.isActive else { return }
+        bulkSelection.selection.toggle(trackId)
+    }
+
     /// Сбрасывает режим массового выбора и текущий selection.
     func resetBulkSelection() {
         bulkSelection.reset()
@@ -417,12 +502,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
     /// Обрабатывает выбор массового действия из toolbar.
     func selectBulkAction(_ action: BulkTrackAction) {
         if bulkSelection.isActive {
-            guard bulkSelection.hasSelection else {
-                bulkSelection.setPendingAction(action)
-                return
-            }
-
-            applyBulkAction(action)
+            bulkSelection.setPendingAction(action)
             return
         }
 
@@ -433,6 +513,43 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
     func applyPendingBulkAction() {
         guard let action = bulkSelection.pendingAction else { return }
         applyBulkAction(action)
+    }
+
+    // MARK: - Typed action output
+
+    /// Адаптирует существующие screen-flow методы к узкому output ActionHandler-а.
+    func refreshTracks() async {
+        await refresh()
+    }
+
+    /// Адаптирует выбор сортировки к typed action без доступа View к domain-методу.
+    func selectSortMode(_ mode: LibraryTrackSortMode) async {
+        await setSortMode(mode)
+    }
+
+    /// Адаптирует вход в selection к экранному действию.
+    func startSelection() {
+        activateBulkSelection()
+    }
+
+    /// Адаптирует отмену selection к экранному действию.
+    func cancelSelection() {
+        resetBulkSelection()
+    }
+
+    /// Адаптирует массовое переключение selection к экранному действию.
+    func toggleSelectAll() {
+        toggleSelectAllVisibleTracks()
+    }
+
+    /// Адаптирует выбор batch-сценария к экранному действию.
+    func selectBatchAction(_ action: BulkTrackAction) {
+        selectBulkAction(action)
+    }
+
+    /// Адаптирует подтверждение нижней панели к экранному действию.
+    func confirmBatchAction() {
+        applyPendingBulkAction()
     }
 
     // MARK: - Массовые действия
@@ -451,7 +568,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
             trackIDs: selectedTrackIds
         )
 
-        batchActionHandler.handle(pendingAction)
+        guard batchActionHandler.handle(pendingAction) else { return }
         bulkSelection.reset()
     }
 
@@ -460,6 +577,11 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         batchRenameHandler.objectWillChange
             .sink { [weak self] _ in
                 self?.objectWillChange.send()
+                // BatchFilenameRenameFlow публикует objectWillChange до изменения своего свойства.
+                // Откладываем снимок, чтобы state получил уже новое значение isActive.
+                Task { @MainActor [weak self] in
+                    self?.updateScreenState()
+                }
             }
             .store(in: &cancellables)
     }
@@ -530,7 +652,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding {
         guard didLoadFolderSortMode == false else { return }
 
         didLoadFolderSortMode = true
-        let requestedMode = await TrackRegistry.shared.libraryTrackSortMode(forFolderId: folderId)
+        let requestedMode = await trackRegistry.libraryTrackSortMode(forFolderId: folderId)
         sortMode = Self.resolvedSortMode(
             requestedMode,
             availableSortModes: availableSortModes

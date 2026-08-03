@@ -8,9 +8,18 @@ struct LibraryTrackCommandHandler {
     let presentationHandler: LibraryTrackPresentationHandler
     let cloudAvailabilityActionHandler: LibraryCloudAvailabilityActionHandler
     let collectionNavigationHandler: TrackCollectionNavigationHandler
+    /// Share flow передаётся Composition Root, поэтому строка не обращается к singleton.
+    let trackShareActionHandler: TrackShareActionHandler
+    /// Выполняет команду добавления в плеер без обращения строки к application singleton.
+    let commandExecutor: AppCommandExecutor
+    let toastManager: ToastManager
+    let sheetActionCoordinator: SheetActionCoordinator
     /// Общий обработчик «Избранного» сохраняет состояние и публикует подтверждённое событие.
     private let favoriteActionHandler: FavoriteTrackActionHandler
-    let onToggleSelection: () -> Void
+    /// Экранный маршрут нужен только для selection, которое относится к LibraryTracks, а не к строке.
+    private let screenActionHandler: LibraryTracksActionHandler?
+    /// Legacy collection flow передаёт замыкание до его отдельного этапа экранной архитектуры.
+    private let onToggleSelection: ((UUID) -> Void)?
     let onRenameTrack: (UUID, FileRenameStrategy) -> Void
 
     /// Выполняет действие строки.
@@ -21,7 +30,7 @@ struct LibraryTrackCommandHandler {
         case .tapArtwork(let track):
             sheetManager.present(.trackDetail(track))
         case .share(let track):
-            TrackShareActionHandler.shared.share(track)
+            trackShareActionHandler.share(track)
         case .addToPlayer(let trackId):
             addToPlayer(trackId: trackId)
         case .addToTrackList(let track):
@@ -33,7 +42,7 @@ struct LibraryTrackCommandHandler {
         case .goToAlbum(let trackId):
             collectionNavigationHandler.openAlbum(trackId: trackId)
         case .moveToFolder(let track):
-            SheetActionCoordinator.shared.handle(
+            sheetActionCoordinator.handle(
                 action: .moveToFolder,
                 track: track,
                 context: .library
@@ -42,8 +51,13 @@ struct LibraryTrackCommandHandler {
             sheetManager.presentTrackDetailForEditing(track)
         case .rename(let trackId, let strategy):
             onRenameTrack(trackId, strategy)
-        case .toggleSelection:
-            onToggleSelection()
+        case .toggleSelection(let trackId):
+            // Selection возвращается в typed screen action, а не меняется Binding-ом строки.
+            if let screenActionHandler {
+                screenActionHandler.handle(.trackSelectionToggled(trackId))
+            } else {
+                onToggleSelection?(trackId)
+            }
         case .requestSnapshot(let trackId):
             presentationHandler.requestSnapshotIfNeeded(for: trackId)
         case .trackDidAppear(let trackId):
@@ -68,8 +82,13 @@ struct LibraryTrackCommandHandler {
         presentationHandler: LibraryTrackPresentationHandler,
         cloudAvailabilityActionHandler: LibraryCloudAvailabilityActionHandler,
         collectionNavigationHandler: TrackCollectionNavigationHandler,
+        trackShareActionHandler: TrackShareActionHandler,
+        commandExecutor: AppCommandExecutor,
+        toastManager: ToastManager,
+        sheetActionCoordinator: SheetActionCoordinator,
         favoriteActionHandler: FavoriteTrackActionHandler,
-        onToggleSelection: @escaping () -> Void,
+        screenActionHandler: LibraryTracksActionHandler? = nil,
+        onToggleSelection: ((UUID) -> Void)? = nil,
         onRenameTrack: @escaping (UUID, FileRenameStrategy) -> Void
     ) {
         self.sheetManager = sheetManager
@@ -77,7 +96,12 @@ struct LibraryTrackCommandHandler {
         self.presentationHandler = presentationHandler
         self.cloudAvailabilityActionHandler = cloudAvailabilityActionHandler
         self.collectionNavigationHandler = collectionNavigationHandler
+        self.trackShareActionHandler = trackShareActionHandler
+        self.commandExecutor = commandExecutor
+        self.toastManager = toastManager
+        self.sheetActionCoordinator = sheetActionCoordinator
         self.favoriteActionHandler = favoriteActionHandler
+        self.screenActionHandler = screenActionHandler
         self.onToggleSelection = onToggleSelection
         self.onRenameTrack = onRenameTrack
     }
@@ -86,18 +110,18 @@ struct LibraryTrackCommandHandler {
     private func addToPlayer(trackId: UUID) {
         Task {
             do {
-                let result = try await AppCommandExecutor.shared.addTrackToPlayer(
+                let result = try await commandExecutor.addTrackToPlayer(
                     trackId: trackId
                 )
                 AppCommandToastPresenter(
-                    toastPresenter: ToastManager.shared
+                    toastPresenter: toastManager
                 ).present(result)
             } catch let appError as AppError {
                 AppCommandToastPresenter(
-                    toastPresenter: ToastManager.shared
+                    toastPresenter: toastManager
                 ).present(appError)
             } catch {
-                ToastManager.shared.handle(
+                toastManager.handle(
                     .operationFailed(
                         message: PlayerPresentationText.addTrackToPlayerFailedMessage
                     )

@@ -23,8 +23,8 @@ struct SelectionActionBarConfig {
     /// Подзаголовок нижней панели, например количество выбранных элементов.
     let subtitle: String?
 
-    /// Текст основной кнопки подтверждения.
-    let primaryTitle: String
+    /// Текст основной кнопки подтверждения; отсутствует в обычном режиме выбора.
+    let primaryTitle: String?
 
     /// Опциональная системная иконка.
     let iconName: String?
@@ -32,8 +32,6 @@ struct SelectionActionBarConfig {
     /// Доступность основной кнопки.
     let isPrimaryEnabled: Bool
 
-    /// Callback подтверждения, переданный владельцем состояния выбора.
-    let onPrimaryTap: () -> Void
 }
 
 struct LibraryScreen: View {
@@ -58,6 +56,8 @@ struct LibraryScreen: View {
     @State private var isShowingFolderPicker = false
     /// Конфигурация верхней нижней панели для текущего экрана фонотеки.
     @State private var selectionActionBarConfig: SelectionActionBarConfig?
+    /// Маршрут подтверждения принадлежит дочернему экрану, а host хранит только ссылку для возврата действия.
+    @State private var selectionActionSender: (any LibraryTracksActionSending)?
 
     // MARK: - Init
 
@@ -144,6 +144,9 @@ struct LibraryScreen: View {
                     }
                 }
         }
+        .onChange(of: viewModel.screenState.libraryPath) { oldPath, newPath in
+            handleLibraryPathChange(from: oldPath, to: newPath)
+        }
         .bottomPanelsHost(
             showsTopPanel: selectionActionBarConfig != nil
         ) {
@@ -154,7 +157,9 @@ struct LibraryScreen: View {
                     primaryTitle: config.primaryTitle,
                     iconName: config.iconName,
                     isPrimaryEnabled: config.isPrimaryEnabled,
-                    onPrimaryTap: config.onPrimaryTap
+                    onPrimaryTap: {
+                        selectionActionSender?.send(.batchActionConfirmed)
+                    }
                 )
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
@@ -196,7 +201,6 @@ struct LibraryScreen: View {
             }
         )
         .onAppear {
-            selectionActionBarConfig = nil
             // Коллекция всегда видна в едином корне, поэтому её счётчики загружаются при появлении.
             viewModel.setCollectionRootVisibility(true)
         }
@@ -229,9 +233,6 @@ struct LibraryScreen: View {
                     purchasedITunesActionHandler.handle(action)
                 }
             )
-                .onAppear {
-                    selectionActionBarConfig = nil
-                }
 
         case .allLibraryTracks:
             LibraryCollectionTracksView(
@@ -243,13 +244,11 @@ struct LibraryScreen: View {
                 renameActionHandler: dependencies.trackFileRenameActionHandler,
                 favoriteTrackActionHandler: favoriteTrackActionHandler,
                 selectionActionBarConfig: $selectionActionBarConfig,
+                selectionActionSender: $selectionActionSender,
                 onAllTracksAction: { action in
                     allTracksActionHandler.handle(action)
                 }
             )
-                .onAppear {
-                    selectionActionBarConfig = nil
-                }
 
         case .collectionCategory(let category):
             LibraryCollectionValuesView(
@@ -259,9 +258,6 @@ struct LibraryScreen: View {
                     viewModel.handle(.collectionValueSelected(value))
                 }
             )
-                .onAppear {
-                    selectionActionBarConfig = nil
-                }
 
         case .collectionValue(let category, let value, let artistKey):
             LibraryCollectionTracksView(
@@ -277,6 +273,7 @@ struct LibraryScreen: View {
                 renameActionHandler: dependencies.trackFileRenameActionHandler,
                 favoriteTrackActionHandler: favoriteTrackActionHandler,
                 selectionActionBarConfig: $selectionActionBarConfig,
+                selectionActionSender: $selectionActionSender,
                 onCollectionTracksAction: { action in
                     collectionTracksActionHandler(
                         for: .collectionValue(
@@ -288,9 +285,6 @@ struct LibraryScreen: View {
                     .handle(action)
                 }
             )
-                .onAppear {
-                    selectionActionBarConfig = nil
-                }
 
         case .folder(let destination):
             LibraryFolderContainer(
@@ -299,15 +293,11 @@ struct LibraryScreen: View {
                 onRevealHandled: { requestId in
                     viewModel.handle(.revealHandled(requestId))
                 },
-                playbackStateProvider: dependencies.playbackStateProvider,
-                playbackController: dependencies.playbackController,
-                favoriteTrackIdsProvider: dependencies.favoriteTrackIdsProvider,
-                fileBusyChecker: dependencies.fileBusyChecker,
-                renameActionHandler: dependencies.trackFileRenameActionHandler,
                 exportProgressViewModel: exportProgressViewModel,
-                favoriteTrackActionHandler: favoriteTrackActionHandler,
                 viewModelFactory: dependencies.folderViewModelFactory,
-                selectionActionBarConfig: $selectionActionBarConfig
+                tracksScreenFactory: dependencies.tracksScreenFactory,
+                selectionActionBarConfig: $selectionActionBarConfig,
+                selectionActionSender: $selectionActionSender
             )
 
         case .missingFolder:
@@ -318,6 +308,23 @@ struct LibraryScreen: View {
                     viewModel.handle(.folderMissingAppeared)
                 }
         }
+    }
+
+    /// Завершает selection только когда активная папка перестала быть текущим destination.
+    private func handleLibraryPathChange(
+        from oldPath: [NavigationCoordinator.LibraryRoute],
+        to newPath: [NavigationCoordinator.LibraryRoute]
+    ) {
+        guard LibraryFolderRouteClosureEvaluator.didCloseActiveFolder(
+            from: oldPath,
+            to: newPath
+        ) else {
+            return
+        }
+
+        selectionActionSender?.send(.screenClosed)
+        selectionActionSender = nil
+        selectionActionBarConfig = nil
     }
 }
 

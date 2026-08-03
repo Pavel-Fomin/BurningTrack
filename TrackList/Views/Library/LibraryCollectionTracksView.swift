@@ -29,6 +29,7 @@ struct LibraryCollectionTracksView: View {
     let favoriteTrackActionHandler: FavoriteTrackActionHandler
     /// Конфигурация нижней панели массового выбора в общем host фонотеки.
     @Binding var selectionActionBarConfig: SelectionActionBarConfig?
+    @Binding var selectionActionSender: (any LibraryTracksActionSending)?
     /// Передаёт действия общего списка в отдельный обработчик экспорта.
     let onAllTracksAction: ((LibraryAllTracksAction) -> Void)?
     /// Передаёт действия выбранного значения коллекции отдельному обработчику экспорта.
@@ -69,6 +70,7 @@ struct LibraryCollectionTracksView: View {
         renameActionHandler: TrackFileRenameActionHandler,
         favoriteTrackActionHandler: FavoriteTrackActionHandler,
         selectionActionBarConfig: Binding<SelectionActionBarConfig?> = .constant(nil),
+        selectionActionSender: Binding<(any LibraryTracksActionSending)?> = .constant(nil),
         onAllTracksAction: ((LibraryAllTracksAction) -> Void)? = nil,
         onCollectionTracksAction: ((LibraryCollectionTracksAction) -> Void)? = nil
     ) {
@@ -80,6 +82,7 @@ struct LibraryCollectionTracksView: View {
         self.renameActionHandler = renameActionHandler
         self.favoriteTrackActionHandler = favoriteTrackActionHandler
         self._selectionActionBarConfig = selectionActionBarConfig
+        self._selectionActionSender = selectionActionSender
         self.onAllTracksAction = onAllTracksAction
         self.onCollectionTracksAction = onCollectionTracksAction
         self._favoriteTrackIds = State(
@@ -90,12 +93,35 @@ struct LibraryCollectionTracksView: View {
                 playbackStateProvider: playbackStateProvider
             )
         )
-        self._tracksViewModel = StateObject(
-            wrappedValue: LibraryTracksViewModel(
-                source: source,
-                renameActionHandler: renameActionHandler
-            )
+        let tracksViewModel = LibraryTracksViewModel(
+            source: source,
+            renameActionHandler: renameActionHandler,
+            tracksProvider: FastLibraryTracksProvider(),
+            badgeProvider: DefaultTrackListBadgeProvider(),
+            eventProvider: NotificationLibraryTrackEventProvider(),
+            runtimeController: LibraryTrackRuntimeController(),
+            settingsManager: AppSettingsManager.shared,
+            trackRegistry: TrackRegistry.shared,
+            musicLibraryManager: MusicLibraryManager.shared,
+            trackURLProvider: { trackId in
+                await BookmarkResolver.url(forTrack: trackId)
+            }
         )
+        let presenter = LibraryTracksPresenter(
+            output: tracksViewModel,
+            selectionActionBarCoordinator: LibrarySelectionActionBarCoordinator()
+        )
+        let actionHandler = LibraryTracksActionHandler(
+            output: tracksViewModel,
+            applyBatchFilenameRename: { [weak tracksViewModel, fileBusyChecker] in
+                await tracksViewModel?.applyBatchFilenameRename(using: fileBusyChecker)
+            }
+        )
+        tracksViewModel.configure(
+            actionHandler: actionHandler,
+            presenter: presenter
+        )
+        self._tracksViewModel = StateObject(wrappedValue: tracksViewModel)
     }
 
     // MARK: - Производное состояние
@@ -177,6 +203,7 @@ struct LibraryCollectionTracksView: View {
                 await tracksViewModel.refresh()
             }
             .task {
+                selectionActionSender = tracksViewModel
                 await tracksViewModel.loadTracksIfNeeded()
             }
             .onChange(of: sheetManager.dismissCounter) { _, _ in
@@ -194,6 +221,7 @@ struct LibraryCollectionTracksView: View {
             .onDisappear {
                 cloudAvailabilityActionHandler.handle(.screenDidDisappear)
                 selectionActionBarConfig = nil
+                selectionActionSender = nil
             }
     }
 
@@ -250,7 +278,33 @@ struct LibraryCollectionTracksView: View {
 
     /// Список треков с обработчиками прокрутки и lifecycle списка.
     private var tracksListView: some View {
-        ScrollViewReader { proxy in
+        let presentationHandler = LibraryTrackPresentationHandler(
+            metadataProvider: tracksViewModel
+        )
+        let commandHandler = LibraryTrackCommandHandler(
+            sheetManager: sheetManager,
+            playbackHandler: LibraryTrackPlaybackHandler(
+                playbackStateProvider: playbackStateProvider,
+                playbackController: playbackController,
+                source: playbackSource
+            ),
+            presentationHandler: presentationHandler,
+            cloudAvailabilityActionHandler: cloudAvailabilityActionHandler,
+            collectionNavigationHandler: .shared,
+            trackShareActionHandler: .shared,
+            commandExecutor: .shared,
+            toastManager: .shared,
+            sheetActionCoordinator: .shared,
+            favoriteActionHandler: favoriteTrackActionHandler,
+            onToggleSelection: { trackId in
+                tracksViewModel.toggleSelection(for: trackId)
+            },
+            onRenameTrack: { trackId, strategy in
+                tracksViewModel.renameTrack(trackId: trackId, strategy: strategy)
+            }
+        )
+
+        return ScrollViewReader { proxy in
             List {
                 LibraryTrackSectionsListView(
                     sections: tracksViewModel.trackSections,
@@ -258,28 +312,19 @@ struct LibraryCollectionTracksView: View {
                     playbackSource: playbackSource,
                     currentCollectionCategory: source.collectionCategory,
                     trackListMembershipsById: tracksViewModel.trackListMembershipsById,
-                    metadataProvider: tracksViewModel,
+                    presentationHandler: presentationHandler,
                     cloudAvailabilityStateStore: cloudAvailabilityController.stateStore(for:),
                     cloudAvailabilityActionHandler: cloudAvailabilityActionHandler,
-                    playbackStateProvider: playbackStateProvider,
-                    playbackController: playbackController,
                     favoriteTrackIds: favoriteTrackIds,
-                    favoriteTrackActionHandler: favoriteTrackActionHandler,
+                    commandHandler: commandHandler,
                     playbackStateController: playbackStateController,
-                    sheetManager: sheetManager,
                     revealedTrackID: nil,
                     highlightedTrackID: sheetManager.highlightedRowID,
-                    onRenameTrack: { trackId, strategy in
-                        tracksViewModel.renameTrack(
-                            trackId: trackId,
-                            strategy: strategy
-                        )
-                    },
                     shouldShowTags: settingsManager.settings.visible.metadata.isTagReadingEnabled,
                     shouldShowTrackListMembership: settingsManager.settings.visible.library.isTrackListMembershipVisible,
                     shouldShowFileFormat: settingsManager.settings.visible.library.isFileFormatVisible,
                     isSelecting: isSelecting,
-                    selection: selectionBinding
+                    selectedTrackIDs: tracksViewModel.bulkSelection.selection
                 )
 
                 if tracksViewModel.isLoading == false && tracksViewModel.trackSections.isEmpty {
@@ -429,12 +474,17 @@ struct LibraryCollectionTracksView: View {
 
     /// Синхронизирует конфигурацию нижней панели подтверждения для родительского host.
     private func updateSelectionActionBarConfig() {
-        selectionActionBarConfig = selectionActionBarCoordinator.makeConfig(
+        guard let state = selectionActionBarCoordinator.makeState(
+            isSelecting: tracksViewModel.bulkSelection.isActive,
             pendingAction: tracksViewModel.bulkSelection.pendingAction,
             selectedCount: tracksViewModel.bulkSelection.selectedCount,
-            hasSelection: tracksViewModel.bulkSelection.hasSelection,
-            onPrimaryTap: applySelectedBatchAction
-        )
+            hasSelection: tracksViewModel.bulkSelection.hasSelection
+        ) else {
+            selectionActionBarConfig = nil
+            return
+        }
+
+        selectionActionBarConfig = selectionActionBarCoordinator.makeConfig(from: state)
     }
 
     /// Сбрасывает режим мультиселекта и очищает нижнюю панель.

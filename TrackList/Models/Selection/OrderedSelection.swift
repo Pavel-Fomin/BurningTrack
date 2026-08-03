@@ -15,7 +15,7 @@
 
 import Foundation
 
-struct OrderedSelection<ID: Hashable> {
+struct OrderedSelection<ID: Hashable & Equatable>: Equatable {
     /// ID выбранных элементов в порядке выбора.
     private(set) var ids: [ID] = []
 

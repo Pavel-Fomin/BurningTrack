@@ -49,6 +49,16 @@ struct NewTrackListSelectionFolderView: View {
             wrappedValue: LibraryTracksViewModel(
                 folderURL: folder.url,
                 renameActionHandler: renameActionHandler,
+                tracksProvider: FastLibraryTracksProvider(),
+                badgeProvider: DefaultTrackListBadgeProvider(),
+                eventProvider: NotificationLibraryTrackEventProvider(),
+                runtimeController: LibraryTrackRuntimeController(),
+                settingsManager: AppSettingsManager.shared,
+                trackRegistry: TrackRegistry.shared,
+                musicLibraryManager: MusicLibraryManager.shared,
+                trackURLProvider: { trackId in
+                    await BookmarkResolver.url(forTrack: trackId)
+                },
                 usesLibrarySortSettings: false
             )
         )

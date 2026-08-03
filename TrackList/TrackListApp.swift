@@ -87,6 +87,7 @@ struct TrackListApp: App {
             toastPresenter: toastManager
         )
         let favoritesEventCenter = FavoritesEventCenter.shared
+        let cloudTrackAvailabilityManager = CloudTrackAvailabilityManager.shared
         let favoritesService = FavoritesService(
             trackListsManager: trackListsManager,
             trackListManager: trackListManager,
@@ -220,6 +221,27 @@ struct TrackListApp: App {
                 toastPresenter: toastManager,
                 summaryProvider: summaryProvider,
                 eventProvider: NotificationLibraryTrackEventProvider()
+            ),
+            tracksScreenFactory: LibraryTracksScreenFactory(
+                tracksProvider: FastLibraryTracksProvider(),
+                badgeProvider: DefaultTrackListBadgeProvider(),
+                makeEventProvider: { NotificationLibraryTrackEventProvider() },
+                settingsManager: appSettingsManager,
+                trackRegistry: trackRegistry,
+                musicLibraryManager: musicLibraryManager,
+                playbackStateProvider: playbackStateProvider,
+                playbackController: playbackController,
+                favoriteTrackIdsProvider: favoriteTrackIdsProvider,
+                fileBusyChecker: fileBusyChecker,
+                renameActionHandler: renameActionHandler,
+                favoriteTrackActionHandler: favoriteTrackActionHandler,
+                sheetManager: sheetManager,
+                cloudAvailabilityManager: cloudTrackAvailabilityManager,
+                collectionNavigationHandler: trackCollectionNavigationHandler,
+                trackShareActionHandler: trackShareActionHandler,
+                commandExecutor: commandExecutor,
+                toastManager: toastManager,
+                sheetActionCoordinator: sheetActionCoordinator
             ),
             playbackStateProvider: playbackStateProvider,
             playbackController: playbackController,

@@ -18,7 +18,8 @@ struct SelectionActionBar: View {
 
     let title: String
     let subtitle: String?
-    let primaryTitle: String
+    /// Кнопка подтверждения нужна только после выбора конкретного массового действия.
+    let primaryTitle: String?
     let iconName: String?
     let isPrimaryEnabled: Bool
     let onPrimaryTap: () -> Void
@@ -54,12 +55,14 @@ struct SelectionActionBar: View {
 
             Spacer()
 
-            Button(primaryTitle) {
-                onPrimaryTap()
+            if let primaryTitle {
+                Button(primaryTitle) {
+                    onPrimaryTap()
+                }
+                .font(.headline)
+                .foregroundColor(isPrimaryEnabled ? .white : .white.opacity(0.38))
+                .disabled(!isPrimaryEnabled)
             }
-            .font(.headline)
-            .foregroundColor(isPrimaryEnabled ? .white : .white.opacity(0.38))
-            .disabled(!isPrimaryEnabled)
         }
         .padding(.leading, 10)
         .padding(.trailing, 16)

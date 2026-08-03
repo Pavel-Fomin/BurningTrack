@@ -14,7 +14,7 @@ enum LibraryTrackAction {
     case moveToFolder(track: LibraryTrack)
     case editTags(track: LibraryTrack)
     case rename(trackId: UUID, strategy: FileRenameStrategy)
-    case toggleSelection
+    case toggleSelection(trackId: UUID)
     case requestSnapshot(trackId: UUID)
     case trackDidAppear(trackId: UUID)
     case trackDidDisappear(trackId: UUID)

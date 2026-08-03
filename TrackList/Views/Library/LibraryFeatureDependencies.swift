@@ -28,6 +28,8 @@ struct LibraryFeatureDependencies {
     let purchasedITunesActionHandlerFactory: PurchasedITunesMusicActionHandlerFactory
     /// Собирает ViewModel экрана папки фонотеки.
     let folderViewModelFactory: LibraryFolderViewModelFactory
+    /// Собирает screen-local объекты и View экрана треков папки.
+    let tracksScreenFactory: LibraryTracksScreenFactory
     /// Предоставляет реактивное playback-состояние экранам фонотеки.
     let playbackStateProvider: any PlaybackStateProviding
     /// Выполняет playback-команды строк и подтверждённого открепления папки.

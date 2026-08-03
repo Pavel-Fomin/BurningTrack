@@ -24,19 +24,10 @@ struct LibraryFolderView: View {
 
     let revealRequest: LibraryRevealRequest?
     let onRevealHandled: (UUID) -> Void
-    /// Реактивное playback-состояние для строк папки.
-    let playbackStateProvider: any PlaybackStateProviding
-    /// Команды запуска строк папки.
-    let playbackController: any TrackPlaybackControlling
-    /// Published-состояние «Избранного» для строк папки.
-    let favoriteTrackIdsProvider: any FavoriteTrackIdsProviding
-    /// Проверка занятости файлов для массового переименования.
-    let fileBusyChecker: any TrackFileBusyChecking
-    /// Общий обработчик переименования файлов.
-    let renameActionHandler: TrackFileRenameActionHandler
-    /// Единый обработчик «Избранного» передаётся в список треков папки.
-    let favoriteTrackActionHandler: FavoriteTrackActionHandler
+    /// Собирает экран треков с ready-made screen-local dependencies.
+    let tracksScreenFactory: LibraryTracksScreenFactory
     @Binding var selectionActionBarConfig: SelectionActionBarConfig?
+    @Binding var selectionActionSender: (any LibraryTracksActionSending)?
 
     // MARK: - Actions
 
@@ -49,25 +40,20 @@ struct LibraryFolderView: View {
             switch state.displayMode {
 
             case .content:
-                LibraryTracksView(
+                tracksScreenFactory.makeLibraryTracksContainer(
                     folder: state.folder,
                     summary: state.summary,
                     subfolders: state.subfolders,
+                    revealRequest: revealRequest,
                     onSubfolderTap: { subfolder in
                         onAction(.subfolderTapped(subfolder))
                     },
                     onExportTracks: { libraryTracks in
                         onAction(.exportTracks(libraryTracks))
                     },
-                    revealRequest: revealRequest,
                     onRevealHandled: onRevealHandled,
-                    playbackStateProvider: playbackStateProvider,
-                    playbackController: playbackController,
-                    favoriteTrackIdsProvider: favoriteTrackIdsProvider,
-                    fileBusyChecker: fileBusyChecker,
-                    renameActionHandler: renameActionHandler,
-                    favoriteTrackActionHandler: favoriteTrackActionHandler,
-                    selectionActionBarConfig: $selectionActionBarConfig
+                    selectionActionBarConfig: $selectionActionBarConfig,
+                    selectionActionSender: $selectionActionSender
                 )
 
             case .empty:

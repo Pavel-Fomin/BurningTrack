@@ -67,7 +67,9 @@ struct LibraryTrackRowContainer: View {
             showsSelection: rowState.showsSelection,
             isSelected: rowState.isSelected,
             onToggleSelection: {
-                commandHandler.handle(.toggleSelection)
+                commandHandler.handle(
+                    .toggleSelection(trackId: rowState.track.trackId)
+                )
             },
             selectionPlacement: .trailing,
             showsFileFormat: rowState.showsFileFormat,

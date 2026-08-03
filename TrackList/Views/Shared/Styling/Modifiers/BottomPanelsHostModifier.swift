@@ -92,16 +92,16 @@ struct BottomPanelsHostModifier<TopPanel: View>: ViewModifier {
 
     @ViewBuilder
     func body(content: Content) -> some View {
-        if showsTopPanel {
-            content
-                .safeAreaInset(edge: .bottom, spacing: 0) {
+        // Safe area inset остаётся частью одного дерева независимо от видимости панели.
+        // Иначе смена верхней панели меняет structural identity content, включая NavigationStack.
+        content
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if showsTopPanel {
                     topPanel()
                         .padding(.horizontal, 8)
                         .animation(.easeOut(duration: 0.25), value: showsTopPanel)
                 }
-        } else {
-            content
-        }
+            }
     }
 }
 

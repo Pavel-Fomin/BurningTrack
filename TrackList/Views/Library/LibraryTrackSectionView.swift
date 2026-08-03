@@ -25,30 +25,24 @@ struct LibraryTrackSectionView: View {
 
     let trackListMembershipsById: [UUID: [TrackListMembership]]
 
-    /// Проверяет текущее playback-состояние при обработке тапа строки.
-    let playbackStateProvider: any PlaybackStateProviding
-    /// Выполняет команды запуска строки фонотеки.
-    let playbackController: any TrackPlaybackControlling
     /// Готовый снимок «Избранного» для presentation state строк.
     let favoriteTrackIds: Set<UUID>
     
-    let metadataProvider: TrackMetadataProviding
+    let presentationHandler: LibraryTrackPresentationHandler
     let cloudAvailabilityStateStore: (UUID) -> CloudTrackAvailabilityRowStateStore
     let cloudAvailabilityActionHandler: LibraryCloudAvailabilityActionHandler
-    let sheetManager: SheetManager
-    /// Единый обработчик «Избранного» передаётся в командный слой строки.
-    let favoriteTrackActionHandler: FavoriteTrackActionHandler
+    /// Стабильный handler создан screen factory и не зависит от конкретной строки.
+    let commandHandler: LibraryTrackCommandHandler
     let playbackStateController: LibraryTrackPlaybackStateController
 
     let revealedTrackID: UUID?
     let highlightedTrackID: UUID?
-    let onRenameTrack: (UUID, FileRenameStrategy) -> Void
     let shouldShowTags: Bool
     let shouldShowTrackListMembership: Bool
     let shouldShowFileFormat: Bool
     
     let isSelecting: Bool
-    @Binding var selection: OrderedSelection<UUID>
+    let selectedTrackIDs: OrderedSelection<UUID>
 
     var body: some View {
         if showsHeader {
@@ -83,18 +77,7 @@ struct LibraryTrackSectionView: View {
     private func row(for track: LibraryTrack) -> some View {
         let rowId: UUID = track.id
         let isRevealed: Bool = rowId == revealedTrackID
-        let isSelected: Bool = selection.contains(rowId)
-        let onToggleSelection: () -> Void = {
-            selection.toggle(rowId)
-        }
-        let playbackHandler = LibraryTrackPlaybackHandler(
-            playbackStateProvider: playbackStateProvider,
-            playbackController: playbackController,
-            source: playbackSource
-        )
-        let presentationHandler = LibraryTrackPresentationHandler(
-            metadataProvider: metadataProvider
-        )
+        let isSelected: Bool = selectedTrackIDs.contains(rowId)
         let rowState = presentationHandler.makeState(
             track: track,
             snapshot: presentationHandler.snapshot(for: track.trackId),
@@ -112,17 +95,6 @@ struct LibraryTrackSectionView: View {
             // iCloud-состояние приходит точечно в контейнер строки.
             cloudAvailabilityState: nil
         )
-        let commandHandler = LibraryTrackCommandHandler(
-            sheetManager: sheetManager,
-            playbackHandler: playbackHandler,
-            presentationHandler: presentationHandler,
-            cloudAvailabilityActionHandler: cloudAvailabilityActionHandler,
-            collectionNavigationHandler: .shared,
-            favoriteActionHandler: favoriteTrackActionHandler,
-            onToggleSelection: onToggleSelection,
-            onRenameTrack: onRenameTrack
-        )
-
         return LibraryTrackRowContainer(
             state: rowState,
             allTracks: allTracks,
