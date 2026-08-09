@@ -33,21 +33,40 @@ struct ExportFeatureFactory {
         self.detailsRouter = detailsRouter
     }
 
-    /// Собирает глобальную ViewModel и все зависимости жизненного цикла экспорта.
-    func makeExportProgressViewModel() -> ExportProgressViewModel {
-        let actionHandler = ExportActionHandler(
+    /// Собирает долгоживущее состояние и единственный обработчик typed-действий Export-feature.
+    func makeFeature() -> ExportFeature {
+        let operationActionHandler = ExportActionHandler(
             exporter: exporter,
             toastPresenter: toastPresenter
         )
         let coordinator = ExportOperationCoordinator(
-            actionHandler: actionHandler,
+            actionHandler: operationActionHandler,
             liveActivityManager: ProgressLiveActivityManager()
         )
 
-        return ExportProgressViewModel(
+        let progressViewModel = ExportProgressViewModel(
             coordinator: coordinator,
-            toastPresenter: toastPresenter,
+            toastPresenter: toastPresenter
+        )
+        let actionHandler = ExportFeatureActionHandler(
+            progressViewModel: progressViewModel,
             detailsRouter: detailsRouter
         )
+
+        return ExportFeature(
+            progressViewModel: progressViewModel,
+            actionHandler: actionHandler
+        )
     }
+}
+
+/// Сохраняет связанные объекты Export-feature вместе в Composition Root.
+@MainActor
+struct ExportFeature {
+
+    /// Долгоживущее состояние операции, независимое от presentation sheet.
+    let progressViewModel: ExportProgressViewModel
+
+    /// Единственная точка входа UI-действий и lifecycle-событий Export-feature.
+    let actionHandler: ExportFeatureActionHandler
 }

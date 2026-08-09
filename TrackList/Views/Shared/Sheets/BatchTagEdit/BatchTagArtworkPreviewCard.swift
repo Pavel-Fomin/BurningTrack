@@ -2,141 +2,66 @@
 //  BatchTagArtworkPreviewCard.swift
 //  TrackList
 //
-//  Карточка preview одной обложки в форме массового редактирования тегов.
+//  Показывает карточку artwork из готового presentation state.
 //
-//  Created by Pavel Fomin on 25.05.2026.
+//  Created by Pavel Fomin on 09.08.2026.
 //
 
 import SwiftUI
 import UIKit
 
-/// Карточка preview одной обложки в форме массового редактирования тегов.
+/// Карточка одной artwork без обращения к ArtworkProvider или runtime store.
 struct BatchTagArtworkPreviewCard: View {
-    /// Загруженное preview-изображение обложки.
-    @State private var image: UIImage?
-    /// Preview-элемент обложки.
-    let item: BatchTagArtworkPreviewItem
-    /// Несохранённое действие с обложкой для этой карточки.
-    let artworkAction: BatchTagArtworkEditAction
-    /// Идентификатор несохранённой замены исключает сравнение Data и объединяет preview-запросы.
-    let replacementPreviewIdentifier: UUID?
-    /// Должна ли карточка показывать обложку с учётом несохранённых изменений.
-    let hasArtworkForPreview: Bool
-    /// Размер preview-обложки в байтах с учётом несохранённых изменений.
-    let artworkSizeBytesForPreview: Int
-    /// Выбрана ли карточка.
-    let isSelected: Bool
-    /// Обработчик выбора карточки.
+    /// Полностью подготовленные Presenter-ом данные карточки.
+    let state: BatchTagEditArtworkCardScreenState
+    /// Передаёт выбор конкретного трека наружу.
     let onSelect: () -> Void
-    /// Обработчик действия из меню.
-    let onMenuAction: (BatchTagArtworkMenuAction, BatchTagArtworkActionTarget) -> Void
+    /// Передаёт выбранное действие меню наружу.
+    let onMenuAction: (BatchTagArtworkMenuAction) -> Void
+
     var body: some View {
-        artworkView
-            .onTapGesture {
-                onSelect()
-            }
-            .batchTagArtworkSelection(isSelected)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(
-                BatchTagEditPresentationText.artworkPreviewAccessibilityLabel(
-                    title: item.title,
-                    hasArtwork: hasArtworkForAccessibility
-                )
-            )
-            .accessibilityValue(
-                isSelected ? String(localized: "Selected") : ""
-            )
-            .accessibilityAddTraits(.isButton)
-            .accessibilityAction {
-                onSelect()
-            }
-            .task(id: previewTaskId) {
-                await loadArtworkIfNeeded()
-            }
-            .onDisappear {
-                image = nil
-            }
-    }
-    /// Обложка или placeholder.
-    @ViewBuilder
-    private var artworkView: some View {
         ZStack(alignment: .topTrailing) {
             artworkContent
             VStack {
                 Spacer()
-                sizeBadge
-                    .padding(.bottom, 8)
+                sizeBadge.padding(.bottom, 8)
             }
             .frame(width: 150, height: 150)
-            menuButton
+            BatchTagArtworkCardMenu(onAction: onMenuAction)
                 .padding(8)
         }
+        .onTapGesture(perform: onSelect)
+        .batchTagArtworkSelection(state.isSelected)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            BatchTagEditPresentationText.artworkPreviewAccessibilityLabel(
+                title: state.title,
+                hasArtwork: state.hasArtwork
+            )
+        )
+        .accessibilityValue(state.isSelected ? String(localized: "Selected") : "")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction {
+            onSelect()
+        }
     }
-    /// Основное содержимое обложки.
-    @ViewBuilder
+
+    /// Использует общий presentation-компонент только с готовым ArtworkRequest.
     private var artworkContent: some View {
-        switch artworkAction {
-        case .replace:
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 150, height: 150)
-                    .clipShape(previewShape)
-            } else {
-                placeholder
-            }
-        case .keep, .remove:
-            if hasArtworkForPreview, let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 150, height: 150)
-                    .clipShape(previewShape)
-            } else {
-                placeholder
-            }
+        ArtworkPreparationView(request: state.artworkRequest) { image in
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 150, height: 150)
+                .clipShape(previewShape)
+        } placeholder: {
+            placeholder
         }
     }
 
-    /// Идентификатор перезагрузки preview при изменении локального состояния обложки.
-    private var previewTaskId: PreviewTaskIdentifier {
-        switch artworkAction {
-        case .keep:
-            return .original(
-                trackId: item.trackId,
-                hasArtwork: hasArtworkForPreview,
-                revision: item.artworkRevision
-            )
-        case .remove:
-            return .removed(trackId: item.trackId)
-        case .replace:
-            return .replacement(
-                replacementPreviewIdentifier ?? item.trackId
-            )
-        }
-    }
-
-    /// Форматированный размер preview-обложки.
-    private var formattedArtworkSize: String {
-        BatchTagArtworkSizeFormatter.string(from: artworkSizeBytesForPreview)
-    }
-
-    /// Учитывает несохранённую замену или удаление при формировании VoiceOver-подписи.
-    private var hasArtworkForAccessibility: Bool {
-        switch artworkAction {
-        case .keep:
-            return hasArtworkForPreview
-        case .remove:
-            return false
-        case .replace:
-            return true
-        }
-    }
-
-    /// Подпись с размером обложки внутри карточки.
+    /// Badge не форматирует domain-данные и отображает готовый текст.
     private var sizeBadge: some View {
-        Text(formattedArtworkSize)
+        Text(state.formattedArtworkSize)
             .font(.caption2)
             .foregroundStyle(.white)
             .lineLimit(1)
@@ -146,7 +71,7 @@ struct BatchTagArtworkPreviewCard: View {
             .clipShape(Capsule())
     }
 
-    /// Placeholder при отсутствии обложки.
+    /// Показывает сохранённый placeholder, если artwork отсутствует или не декодирована.
     private var placeholder: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 24, style: .continuous)
@@ -158,51 +83,9 @@ struct BatchTagArtworkPreviewCard: View {
         .frame(width: 150, height: 150)
         .clipShape(previewShape)
     }
-    /// Кнопка меню действий.
-    private var menuButton: some View {
-        BatchTagArtworkCardMenu {
-            onMenuAction($0, .track(item.trackId))
-        }
-    }
 
-    /// Фиксированный размер preview обложки.
+    /// Геометрия artwork остаётся идентичной прежней карточке.
     private var previewShape: some Shape {
         RoundedRectangle(cornerRadius: 24, style: .continuous)
     }
-
-    /// Лениво загружает preview-изображение обложки.
-    private func loadArtworkIfNeeded() async {
-        image = nil
-
-        if case .replace(let data) = artworkAction {
-            guard let replacementPreviewIdentifier else { return }
-            let loadedImage = await ArtworkProvider.shared.image(
-                for: ArtworkRequest(
-                    trackId: item.trackId,
-                    artworkData: data,
-                    purpose: .batchTagPreview,
-                    sourceIdentifier: .transient(
-                        revision: replacementPreviewIdentifier
-                    )
-                )
-            )
-            guard !Task.isCancelled else { return }
-            image = loadedImage
-            return
-        }
-        guard hasArtworkForPreview else { return }
-        let loadedImage = await BatchTagArtworkPreviewLoader.shared.image(
-            forTrackId: item.trackId,
-            hasArtwork: hasArtworkForPreview
-        )
-        guard !Task.isCancelled else { return }
-        image = loadedImage
-    }
-}
-
-/// Лёгкая идентичность preview-задачи без сравнения бинарных данных в SwiftUI body.
-private enum PreviewTaskIdentifier: Equatable {
-    case original(trackId: UUID, hasArtwork: Bool, revision: Date?)
-    case removed(trackId: UUID)
-    case replacement(UUID)
 }

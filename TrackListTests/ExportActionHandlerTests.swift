@@ -86,8 +86,8 @@ final class ExportActionHandlerTests: XCTestCase {
         XCTAssertTrue(toastPresenter.errors.isEmpty)
     }
 
-    /// Проверяет пользовательское сообщение при активном экспорте сервиса.
-    func testStartExportWithAlreadyRunningServiceShowsOperationMessage() async throws {
+    /// Проверяет локализованное presentation-сообщение при активном экспорте сервиса.
+    func testStartExportWithAlreadyRunningServiceUsesPresentationMessage() async throws {
         let exporter = ExportingSpy()
         exporter.errorToThrow = TrackExportServiceError.exportAlreadyRunning
         let toastPresenter = ToastPresenterSpy()
@@ -101,7 +101,7 @@ final class ExportActionHandlerTests: XCTestCase {
         XCTAssertNil(result)
         XCTAssertEqual(
             toastPresenter.events,
-            [.operationFailed(message: "Экспорт уже выполняется")]
+            [.operationFailed(message: ExportPresentationText.alreadyRunningMessage)]
         )
         XCTAssertTrue(toastPresenter.errors.isEmpty)
     }
@@ -146,8 +146,8 @@ final class ExportActionHandlerTests: XCTestCase {
         XCTAssertTrue(toastPresenter.events.isEmpty)
     }
 
-    /// Проверяет текст ошибки выбора папки из ExportDestinationResolver.
-    func testStartExportWithResolverErrorShowsLocalizedMessage() async throws {
+    /// Проверяет presentation-сообщение вместо технического localizedDescription resolver-а.
+    func testStartExportWithResolverErrorUsesPresentationMessage() async throws {
         let exporter = ExportingSpy()
         exporter.errorToThrow = ExportDestinationResolverError.pickerAlreadyPresented
         let toastPresenter = ToastPresenterSpy()
@@ -163,8 +163,7 @@ final class ExportActionHandlerTests: XCTestCase {
             toastPresenter.events,
             [
                 .operationFailed(
-                    message: ExportDestinationResolverError.pickerAlreadyPresented
-                        .localizedDescription
+                    message: ExportPresentationText.destinationSelectionFailedMessage
                 )
             ]
         )

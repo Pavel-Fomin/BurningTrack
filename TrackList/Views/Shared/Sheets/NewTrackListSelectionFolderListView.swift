@@ -14,15 +14,12 @@ struct NewTrackListSelectionFolderListView: View {
     // MARK: - Input
 
     let folders: [LibraryFolder]
-
-    /// Общий обработчик переименования файлов треков.
-    let renameActionHandler: TrackFileRenameActionHandler
+    /// Собирает дочерний экран папки через feature-factory.
+    let folderViewFactory: NewTrackListSelectionFolderViewFactory
 
     // MARK: - State
 
     @ObservedObject var selectionViewModel: NewTrackListSelectionViewModel
-    /// Передаёт единое published-состояние «Избранного» в дочерние экраны папок.
-    let favoriteTrackIdsProvider: any FavoriteTrackIdsProviding
 
     // MARK: - UI
 
@@ -31,11 +28,9 @@ struct NewTrackListSelectionFolderListView: View {
             Section {
                 ForEach(folders) { folder in
                     NavigationLink {
-                        NewTrackListSelectionFolderView(
+                        folderViewFactory.makeFolderContainer(
                             folder: folder,
-                            selectionViewModel: selectionViewModel,
-                            renameActionHandler: renameActionHandler,
-                            favoriteTrackIdsProvider: favoriteTrackIdsProvider
+                            selectionViewModel: selectionViewModel
                         )
                     } label: {
                         HStack(spacing: 12) {

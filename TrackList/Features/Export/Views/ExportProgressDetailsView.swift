@@ -14,8 +14,13 @@ struct ExportProgressDetailsView: View {
 
     // MARK: - Dependencies
 
+    /// Неизменяемый route конкретного показа подробностей.
+    let route: ExportDetailsSheetRoute
+
     /// Глобальная ViewModel передаётся через существующий environment приложения.
     @EnvironmentObject private var exportProgressViewModel: ExportProgressViewModel
+    /// Все пользовательские и lifecycle-события направляются в feature ActionHandler.
+    @EnvironmentObject private var exportActionHandler: ExportFeatureActionHandler
 
     // MARK: - Presentation
 
@@ -51,15 +56,15 @@ struct ExportProgressDetailsView: View {
             ToolbarItem(placement: .confirmationAction) {
                 Button(String(localized: "Close")) {
                     if exportProgressViewModel.isExportActive {
-                        exportProgressViewModel.dismissDetails()
+                        exportActionHandler.handle(.dismissDetails)
                     } else {
-                        exportProgressViewModel.dismissCompletedExport()
+                        exportActionHandler.handle(.dismissCompleted)
                     }
                 }
             }
         }
         .onDisappear {
-            exportProgressViewModel.detailsDidDisappear()
+            exportActionHandler.handle(.detailsDidDisappear(route))
         }
     }
 
@@ -128,10 +133,9 @@ struct ExportProgressDetailsView: View {
                 }
 
                 if exportProgressViewModel.canCancel {
-                    // Делегируем отмену глобальной ViewModel, чтобы сервис
-                    // остановил FileHandle и удалил частичный файл.
+                    // Typed ActionHandler передаёт отмену в существующий lifecycle операции.
                     Button(role: .destructive) {
-                        _ = exportProgressViewModel.cancelExport()
+                        exportActionHandler.handle(.cancel)
                     } label: {
                         Text(ExportPresentationText.cancelExportTitle)
                             .frame(maxWidth: .infinity)

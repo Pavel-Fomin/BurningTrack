@@ -22,6 +22,8 @@ struct PurchasedITunesMusicView: View {
     let favoriteTrackIdsProvider: any FavoriteTrackIdsProviding
     /// Единый обработчик «Избранного» передаётся в контейнеры строк iTunes.
     let favoriteTrackActionHandler: FavoriteTrackActionHandler
+    /// Sheet- и command-зависимости строки подготовлены Composition Root.
+    let trackActionDependencies: PurchasedITunesTrackActionDependencies
     /// Одноразовый intent прокрутки к треку, полученный из общего сценария фонотеки.
     let revealRequest: LibraryRevealRequest?
     /// Подтверждает владельцу общего reveal-intent завершение обработки прокрутки.
@@ -154,7 +156,8 @@ struct PurchasedITunesMusicView: View {
                             context: tracks,
                             playbackState: playbackState,
                             playbackController: playbackController,
-                            favoriteTrackActionHandler: favoriteTrackActionHandler
+                            favoriteTrackActionHandler: favoriteTrackActionHandler,
+                            actionDependencies: trackActionDependencies
                         )
                         .id(track.id)
                     }

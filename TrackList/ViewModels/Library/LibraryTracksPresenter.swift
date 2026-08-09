@@ -37,8 +37,7 @@ final class LibraryTracksPresenter {
         didLoad: Bool,
         sortMode: LibraryTrackSortMode,
         selection: BulkSelectionState<UUID, BulkTrackAction>,
-        membershipsById: [UUID: [TrackListMembership]],
-        isBatchFilenameRenameFlowActive: Bool
+        membershipsById: [UUID: [TrackListMembership]]
     ) -> LibraryTracksScreenState {
         var state = LibraryTracksScreenState(sortMode: sortMode)
         state.sections = sections
@@ -47,7 +46,6 @@ final class LibraryTracksPresenter {
         state.isSelecting = selection.isActive
         state.selectedTrackIDs = selection.selection
         state.trackListMembershipsById = membershipsById
-        state.isBatchFilenameRenameFlowActive = isBatchFilenameRenameFlowActive
         state.selectionActionBarState = selectionActionBarCoordinator.makeState(
             isSelecting: selection.isActive,
             pendingAction: selection.pendingAction,

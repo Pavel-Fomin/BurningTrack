@@ -10,6 +10,12 @@
 import Foundation
 
 struct NewTrackListSelectionState {
+    /// Готовый снимок прикреплённых папок для корневого списка выбора.
+    let folders: [LibraryFolder]
+    /// Количество выбранных треков для presentation-элементов экрана.
+    let selectedCount: Int
     /// Можно ли применить текущий выбор треков.
-    var canSubmit: Bool
+    let canSubmit: Bool
+    /// Выполняется ли создание или добавление выбранных треков.
+    let isSubmitting: Bool
 }

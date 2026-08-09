@@ -12,9 +12,16 @@ import Foundation
 @MainActor
 struct NewTrackListSelectionStateBuilder {
     /// Собирает состояние выбора треков.
-    func build(selectedCount: Int) -> NewTrackListSelectionState {
+    func build(
+        folders: [LibraryFolder],
+        selectedCount: Int,
+        isSubmitting: Bool
+    ) -> NewTrackListSelectionState {
         return NewTrackListSelectionState(
-            canSubmit: selectedCount > 0
+            folders: folders,
+            selectedCount: selectedCount,
+            canSubmit: selectedCount > 0 && !isSubmitting,
+            isSubmitting: isSubmitting
         )
     }
 }

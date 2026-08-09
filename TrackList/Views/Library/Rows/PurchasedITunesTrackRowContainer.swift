@@ -22,6 +22,8 @@ struct PurchasedITunesTrackRowContainer: View {
     let playbackController: any TrackPlaybackControlling
     /// Единый обработчик «Избранного» передаётся в ActionHandler строки.
     let favoriteTrackActionHandler: FavoriteTrackActionHandler
+    /// Явные зависимости sheet- и command-действий переданы корневой factory.
+    let actionDependencies: PurchasedITunesTrackActionDependencies
 
     // MARK: - Обработчик действий
 
@@ -30,6 +32,7 @@ struct PurchasedITunesTrackRowContainer: View {
         PurchasedITunesTrackActionHandler(
             playbackState: playbackState,
             playbackController: playbackController,
+            actionDependencies: actionDependencies,
             favoriteActionHandler: favoriteTrackActionHandler
         )
     }

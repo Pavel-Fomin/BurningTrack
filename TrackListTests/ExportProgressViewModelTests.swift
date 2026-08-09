@@ -31,6 +31,7 @@ final class ExportProgressViewModelTests: XCTestCase {
     /// Проверяет доставку промежуточного снимка прогресса.
     func testIntermediateProgressIsPublished() async {
         let exporter = ExportingSpy()
+        exporter.holdsOperation = true
         exporter.snapshots = [
             makeProgress(state: .preparing),
             makeProgress(
@@ -58,6 +59,9 @@ final class ExportProgressViewModelTests: XCTestCase {
         XCTAssertTrue(viewModel.screenState.isVisible)
         XCTAssertTrue(viewModel.screenState.isExportActive)
         XCTAssertTrue(viewModel.screenState.canCancel)
+
+        viewModel.cancelExport()
+        await yieldToExportTask()
     }
 
     /// Проверяет сохранение успешного результата после завершения операции.
@@ -179,8 +183,9 @@ final class ExportProgressViewModelTests: XCTestCase {
         exporter.holdsOperation = true
         exporter.snapshots = [makeProgress(state: .copying)]
         let detailsRouter = ExportDetailsRouterSpy()
-        let viewModel = makeViewModel(
-            exporter: exporter,
+        let viewModel = makeViewModel(exporter: exporter)
+        let actionHandler = makeFeatureActionHandler(
+            viewModel: viewModel,
             detailsRouter: detailsRouter
         )
 
@@ -192,7 +197,7 @@ final class ExportProgressViewModelTests: XCTestCase {
         )
         await yieldToExportTask()
 
-        viewModel.handle(.cancel)
+        actionHandler.handle(.cancel)
         await yieldToExportTask()
 
         XCTAssertEqual(exporter.cancelCallCount, 1)
@@ -206,8 +211,9 @@ final class ExportProgressViewModelTests: XCTestCase {
         exporter.holdsOperation = true
         exporter.snapshots = [makeProgress(state: .copying)]
         let detailsRouter = ExportDetailsRouterSpy()
-        let viewModel = makeViewModel(
-            exporter: exporter,
+        let viewModel = makeViewModel(exporter: exporter)
+        let actionHandler = makeFeatureActionHandler(
+            viewModel: viewModel,
             detailsRouter: detailsRouter
         )
 
@@ -219,17 +225,23 @@ final class ExportProgressViewModelTests: XCTestCase {
         )
         await yieldToExportTask()
 
-        viewModel.presentDetails()
+        actionHandler.handle(.presentDetails)
         XCTAssertEqual(detailsRouter.presentDetailsCallCount, 1)
+        guard let route = detailsRouter.presentedRoutes.last else {
+            return XCTFail("Должен быть создан route подробностей")
+        }
 
-        XCTAssertTrue(viewModel.cancelExport())
-        XCTAssertEqual(detailsRouter.closeDetailsCallCount, 1)
+        actionHandler.handle(.cancel)
+        XCTAssertEqual(detailsRouter.dismissedRoutes, [route])
+
+        actionHandler.handle(.detailsDidDisappear(route))
 
         await yieldToExportTask()
 
         XCTAssertEqual(viewModel.progress?.state, .cancelled)
         XCTAssertFalse(viewModel.canCancel)
         XCTAssertFalse(viewModel.isShowingDetails)
+        XCTAssertTrue(viewModel.isVisible)
     }
 
     /// Проверяет, что action очистки не скрывает активную операцию.
@@ -247,7 +259,7 @@ final class ExportProgressViewModelTests: XCTestCase {
         )
         await yieldToExportTask()
 
-        viewModel.handle(.dismissCompleted)
+        XCTAssertFalse(viewModel.dismissCompletedExport())
 
         XCTAssertNotNil(viewModel.progress)
         XCTAssertTrue(viewModel.isExportActive)
@@ -271,7 +283,7 @@ final class ExportProgressViewModelTests: XCTestCase {
         )
         await yieldToExportTask()
 
-        viewModel.dismissCompletedExport()
+        XCTAssertTrue(viewModel.dismissCompletedExport())
 
         XCTAssertNil(viewModel.progress)
         XCTAssertFalse(viewModel.isVisible)
@@ -301,7 +313,7 @@ final class ExportProgressViewModelTests: XCTestCase {
             )
             await yieldToExportTask()
 
-            viewModel.dismissCompletedExport()
+            XCTAssertTrue(viewModel.dismissCompletedExport())
 
             XCTAssertNil(viewModel.progress)
             XCTAssertFalse(viewModel.isVisible)
@@ -322,7 +334,7 @@ final class ExportProgressViewModelTests: XCTestCase {
         )
         await yieldToExportTask()
 
-        viewModel.handle(.dismissCompleted)
+        XCTAssertTrue(viewModel.dismissCompletedExport())
 
         XCTAssertNil(viewModel.progress)
         XCTAssertEqual(viewModel.screenState.phase, .hidden)
@@ -371,9 +383,13 @@ final class ExportProgressViewModelTests: XCTestCase {
         exporter.holdsOperation = true
         exporter.snapshots = [makeProgress(state: .copying)]
         let viewModel = makeViewModel(exporter: exporter)
+        let actionHandler = makeFeatureActionHandler(
+            viewModel: viewModel,
+            detailsRouter: ExportDetailsRouterSpy()
+        )
         let track = makeTrack()
 
-        viewModel.handle(
+        actionHandler.handle(
             .start(
                 tracks: [track],
                 exportFolder: .named("Экспорт через action"),
@@ -389,8 +405,174 @@ final class ExportProgressViewModelTests: XCTestCase {
         XCTAssertTrue(viewModel.isExportActive)
         XCTAssertEqual(viewModel.progress?.state, .copying)
 
-        viewModel.handle(.cancel)
+        actionHandler.handle(.cancel)
         await yieldToExportTask()
+    }
+
+    /// Проверяет цепочку открытия подробностей через typed ActionHandler и route с идентичностью.
+    func testPresentDetailsCreatesRouteAndMarksMatchingScreenState() async {
+        let exporter = ExportingSpy()
+        exporter.snapshots = [makeProgress(state: .completed)]
+        let viewModel = makeViewModel(exporter: exporter)
+        let detailsRouter = ExportDetailsRouterSpy()
+        let actionHandler = makeFeatureActionHandler(
+            viewModel: viewModel,
+            detailsRouter: detailsRouter
+        )
+
+        viewModel.startExport(
+            tracks: [makeTrack()],
+            exportFolder: .playerQueue,
+            fileNamingMode: .numbered,
+            presenter: UIViewController()
+        )
+        await yieldToExportTask()
+
+        actionHandler.handle(.presentDetails)
+
+        XCTAssertEqual(detailsRouter.presentDetailsCallCount, 1)
+        XCTAssertTrue(viewModel.screenState.isShowingDetails)
+        XCTAssertEqual(viewModel.detailsRoute, detailsRouter.presentedRoutes.last)
+    }
+
+    /// Проверяет, что lifecycle системного dismiss только синхронизирует state и не отправляет второй close.
+    func testDetailsDidDisappearDoesNotSendRepeatedDismiss() async {
+        let exporter = ExportingSpy()
+        exporter.snapshots = [makeProgress(state: .completed)]
+        let viewModel = makeViewModel(exporter: exporter)
+        let detailsRouter = ExportDetailsRouterSpy()
+        let actionHandler = makeFeatureActionHandler(
+            viewModel: viewModel,
+            detailsRouter: detailsRouter
+        )
+
+        viewModel.startExport(
+            tracks: [makeTrack()],
+            exportFolder: .playerQueue,
+            fileNamingMode: .numbered,
+            presenter: UIViewController()
+        )
+        await yieldToExportTask()
+        actionHandler.handle(.presentDetails)
+        guard let route = detailsRouter.presentedRoutes.last else {
+            return XCTFail("Должен быть создан route подробностей")
+        }
+
+        actionHandler.handle(.detailsDidDisappear(route))
+
+        XCTAssertFalse(viewModel.screenState.isShowingDetails)
+        XCTAssertNil(viewModel.detailsRoute)
+        XCTAssertTrue(detailsRouter.dismissedRoutes.isEmpty)
+    }
+
+    /// Проверяет, что повторное открытие получает новый route без stale lifecycle-состояния.
+    func testDetailsCanReopenAfterDismissWithNewRoute() async {
+        let exporter = ExportingSpy()
+        exporter.snapshots = [makeProgress(state: .completed)]
+        let viewModel = makeViewModel(exporter: exporter)
+        let detailsRouter = ExportDetailsRouterSpy()
+        let actionHandler = makeFeatureActionHandler(
+            viewModel: viewModel,
+            detailsRouter: detailsRouter
+        )
+
+        viewModel.startExport(
+            tracks: [makeTrack()],
+            exportFolder: .playerQueue,
+            fileNamingMode: .numbered,
+            presenter: UIViewController()
+        )
+        await yieldToExportTask()
+        actionHandler.handle(.presentDetails)
+        guard let firstRoute = detailsRouter.presentedRoutes.last else {
+            return XCTFail("Должен быть создан первый route подробностей")
+        }
+
+        actionHandler.handle(.dismissDetails)
+        actionHandler.handle(.detailsDidDisappear(firstRoute))
+        actionHandler.handle(.presentDetails)
+        guard let secondRoute = detailsRouter.presentedRoutes.last else {
+            return XCTFail("Должен быть создан второй route подробностей")
+        }
+
+        XCTAssertNotEqual(firstRoute, secondRoute)
+        XCTAssertEqual(detailsRouter.dismissedRoutes, [firstRoute])
+        XCTAssertEqual(viewModel.detailsRoute, secondRoute)
+        XCTAssertTrue(viewModel.screenState.isShowingDetails)
+    }
+
+    /// Проверяет, что очистка terminal-результата закрывает только ранее созданный Export route.
+    func testDismissCompletedClearsTerminalResultAndDismissesDetailsRoute() async {
+        let exporter = ExportingSpy()
+        exporter.snapshots = [makeProgress(state: .completed)]
+        let viewModel = makeViewModel(exporter: exporter)
+        let detailsRouter = ExportDetailsRouterSpy()
+        let actionHandler = makeFeatureActionHandler(
+            viewModel: viewModel,
+            detailsRouter: detailsRouter
+        )
+
+        viewModel.startExport(
+            tracks: [makeTrack()],
+            exportFolder: .playerQueue,
+            fileNamingMode: .numbered,
+            presenter: UIViewController()
+        )
+        await yieldToExportTask()
+        actionHandler.handle(.presentDetails)
+        guard let route = detailsRouter.presentedRoutes.last else {
+            return XCTFail("Должен быть создан route подробностей")
+        }
+
+        actionHandler.handle(.dismissCompleted)
+
+        XCTAssertNil(viewModel.progress)
+        XCTAssertEqual(detailsRouter.dismissedRoutes, [route])
+    }
+
+    /// Проверяет, что поздний lifecycle старого Export route не закрывает replacement AppSheet.
+    func testLateDetailsLifecycleDoesNotCloseReplacementSheet() async {
+        let exporter = ExportingSpy()
+        exporter.snapshots = [makeProgress(state: .completed)]
+        let viewModel = makeViewModel(exporter: exporter)
+        let sheetManager = SheetManager()
+        let actionHandler = ExportFeatureActionHandler(
+            progressViewModel: viewModel,
+            detailsRouter: sheetManager
+        )
+
+        viewModel.startExport(
+            tracks: [makeTrack()],
+            exportFolder: .playerQueue,
+            fileNamingMode: .numbered,
+            presenter: UIViewController()
+        )
+        await yieldToExportTask()
+        actionHandler.handle(.presentDetails)
+        guard case let .exportProgress(route)? = sheetManager.activeSheet else {
+            return XCTFail("Должен быть открыт Export route")
+        }
+
+        sheetManager.replaceActive(with: .createTrackList(CreateTrackListSheetData()))
+        sheetManager.handleDismiss()
+        actionHandler.handle(.detailsDidDisappear(route))
+
+        guard case .createTrackList? = sheetManager.activeSheet else {
+            return XCTFail("Late Export lifecycle не должен закрыть replacement route")
+        }
+        XCTAssertFalse(viewModel.screenState.isShowingDetails)
+    }
+
+    /// Проверяет, что explicit Export dismiss не может закрыть другой активный AppSheet.
+    func testExportDetailsDismissDoesNotCloseAnotherActiveSheet() {
+        let sheetManager = SheetManager()
+        sheetManager.present(.createTrackList(CreateTrackListSheetData()))
+
+        sheetManager.dismissExportDetails(ExportDetailsSheetRoute())
+
+        guard case .createTrackList? = sheetManager.activeSheet else {
+            return XCTFail("Несовпадающий Export route не должен закрыть Create TrackList")
+        }
     }
 
     /// Проверяет возможность нового запуска после полного успешного завершения.
@@ -433,8 +615,6 @@ final class ExportProgressViewModelTests: XCTestCase {
             fileNamingMode: .numbered,
             presenter: UIViewController()
         )
-
-        XCTAssertNil(viewModel.progress)
 
         await yieldToExportTask()
 
@@ -737,11 +917,9 @@ final class ExportProgressViewModelTests: XCTestCase {
     /// Создаёт ViewModel с тестовыми зависимостями.
     private func makeViewModel(
         exporter: ExportingSpy,
-        toastPresenter: ToastPresenterSpy? = nil,
-        detailsRouter: ExportDetailsRouterSpy? = nil
+        toastPresenter: ToastPresenterSpy? = nil
     ) -> ExportProgressViewModel {
         let toastPresenter = toastPresenter ?? ToastPresenterSpy()
-        let detailsRouter = detailsRouter ?? ExportDetailsRouterSpy()
         return ExportProgressViewModel(
             coordinator: ExportOperationCoordinator(
                 actionHandler: ExportActionHandler(
@@ -749,7 +927,17 @@ final class ExportProgressViewModelTests: XCTestCase {
                     toastPresenter: toastPresenter
                 )
             ),
-            toastPresenter: toastPresenter,
+            toastPresenter: toastPresenter
+        )
+    }
+
+    /// Собирает typed ActionHandler Export-feature с контролируемым router-ом.
+    private func makeFeatureActionHandler(
+        viewModel: ExportProgressViewModel,
+        detailsRouter: ExportDetailsRouterSpy
+    ) -> ExportFeatureActionHandler {
+        ExportFeatureActionHandler(
+            progressViewModel: viewModel,
             detailsRouter: detailsRouter
         )
     }

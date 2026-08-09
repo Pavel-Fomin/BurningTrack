@@ -69,11 +69,7 @@ final class MiniPlayerActionHandler {
             return
         }
 
-        sheetActionCoordinator.handle(
-            action: .showInLibrary,
-            track: track,
-            context: .player
-        )
+        sheetActionCoordinator.showInLibrary(track)
     }
 
     /// Принимает типизированные модели очереди и повторно использует правила меню плеера.

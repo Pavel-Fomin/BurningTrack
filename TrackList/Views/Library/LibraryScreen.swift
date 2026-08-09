@@ -225,6 +225,7 @@ struct LibraryScreen: View {
                 playbackController: dependencies.playbackController,
                 favoriteTrackIdsProvider: dependencies.favoriteTrackIdsProvider,
                 favoriteTrackActionHandler: favoriteTrackActionHandler,
+                trackActionDependencies: dependencies.purchasedITunesTrackActionDependencies,
                 revealRequest: revealRequest,
                 onRevealHandled: { requestId in
                     viewModel.handle(.revealHandled(requestId))
@@ -240,9 +241,10 @@ struct LibraryScreen: View {
                 playbackStateProvider: dependencies.playbackStateProvider,
                 playbackController: dependencies.playbackController,
                 favoriteTrackIdsProvider: dependencies.favoriteTrackIdsProvider,
-                fileBusyChecker: dependencies.fileBusyChecker,
                 renameActionHandler: dependencies.trackFileRenameActionHandler,
                 favoriteTrackActionHandler: favoriteTrackActionHandler,
+                batchTagEditHandler: dependencies.tracksScreenFactory.makeBatchTagEditHandler(),
+                batchRenameHandler: dependencies.tracksScreenFactory.makeBatchRenameHandler(),
                 selectionActionBarConfig: $selectionActionBarConfig,
                 selectionActionSender: $selectionActionSender,
                 onAllTracksAction: { action in
@@ -269,9 +271,10 @@ struct LibraryScreen: View {
                 playbackStateProvider: dependencies.playbackStateProvider,
                 playbackController: dependencies.playbackController,
                 favoriteTrackIdsProvider: dependencies.favoriteTrackIdsProvider,
-                fileBusyChecker: dependencies.fileBusyChecker,
                 renameActionHandler: dependencies.trackFileRenameActionHandler,
                 favoriteTrackActionHandler: favoriteTrackActionHandler,
+                batchTagEditHandler: dependencies.tracksScreenFactory.makeBatchTagEditHandler(),
+                batchRenameHandler: dependencies.tracksScreenFactory.makeBatchRenameHandler(),
                 selectionActionBarConfig: $selectionActionBarConfig,
                 selectionActionSender: $selectionActionSender,
                 onCollectionTracksAction: { action in

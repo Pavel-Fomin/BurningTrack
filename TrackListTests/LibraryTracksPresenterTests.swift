@@ -31,8 +31,7 @@ final class LibraryTracksPresenterTests: XCTestCase {
             didLoad: true,
             sortMode: .titleAsc,
             selection: selection,
-            membershipsById: [:],
-            isBatchFilenameRenameFlowActive: false
+            membershipsById: [:]
         )
 
         XCTAssertTrue(state.isLoading)
@@ -133,8 +132,7 @@ final class LibraryTracksPresenterTests: XCTestCase {
             didLoad: true,
             sortMode: .fileDateDesc,
             selection: selection,
-            membershipsById: [:],
-            isBatchFilenameRenameFlowActive: false
+            membershipsById: [:]
         )
 
         XCTAssertEqual(state.selectionActionBarState?.selectedCount, 3)
@@ -157,8 +155,7 @@ final class LibraryTracksPresenterTests: XCTestCase {
             didLoad: true,
             sortMode: .fileDateDesc,
             selection: selection,
-            membershipsById: [:],
-            isBatchFilenameRenameFlowActive: false
+            membershipsById: [:]
         )
 
         XCTAssertNil(state.selectionActionBarState)
@@ -250,8 +247,7 @@ final class LibraryTracksPresenterTests: XCTestCase {
             didLoad: true,
             sortMode: .artistDesc,
             selection: BulkSelectionState(),
-            membershipsById: [:],
-            isBatchFilenameRenameFlowActive: false
+            membershipsById: [:]
         )
 
         XCTAssertEqual(state.sections, sections)
@@ -262,13 +258,7 @@ final class LibraryTracksPresenterTests: XCTestCase {
     /// Проверяет typed-маршрут базовых действий без View, SheetManager и файловых операций.
     func testActionHandlerRoutesSelectionAndRefreshActions() async {
         let output = LibraryTracksActionOutputSpy()
-        var batchRenameApplyCallCount = 0
-        let handler = LibraryTracksActionHandler(
-            output: output,
-            applyBatchFilenameRename: {
-                batchRenameApplyCallCount += 1
-            }
-        )
+        let handler = LibraryTracksActionHandler(output: output)
 
         handler.handle(.screenAppeared)
         handler.handle(.sortModeSelected(.artistAsc))
@@ -277,7 +267,6 @@ final class LibraryTracksPresenterTests: XCTestCase {
         handler.handle(.selectAllToggled)
         handler.handle(.batchActionSelected(.editTags))
         handler.handle(.batchActionConfirmed)
-        handler.handle(.batchFilenameRenameApplyRequested)
         handler.handle(.selectionCancelled)
         handler.handle(.screenClosed)
         handler.handle(.refreshRequested)
@@ -292,7 +281,6 @@ final class LibraryTracksPresenterTests: XCTestCase {
         XCTAssertEqual(output.toggleSelectAllCallCount, 1)
         XCTAssertEqual(output.selectedBatchActions, [.editTags])
         XCTAssertEqual(output.confirmBatchActionCallCount, 1)
-        XCTAssertEqual(batchRenameApplyCallCount, 1)
         XCTAssertEqual(output.cancelSelectionCallCount, 2)
         XCTAssertEqual(output.refreshCallCount, 1)
     }
@@ -306,10 +294,7 @@ final class LibraryTracksPresenterTests: XCTestCase {
             selectionActionBarCoordinator: LibrarySelectionActionBarCoordinator()
         )
         screenFlow.configure(presenter: presenter)
-        let handler = LibraryTracksActionHandler(
-            output: screenFlow,
-            applyBatchFilenameRename: {}
-        )
+        let handler = LibraryTracksActionHandler(output: screenFlow)
 
         handler.handle(.batchActionSelected(.addToPlayer))
         handler.handle(.trackSelectionToggled(screenFlow.selectedTrackID))
@@ -421,13 +406,7 @@ final class LibraryTracksPresenterTests: XCTestCase {
         )
         screenFlow.configure(presenter: presenter)
 
-        var batchRenameApplyCallCount = 0
-        let handler = LibraryTracksActionHandler(
-            output: screenFlow,
-            applyBatchFilenameRename: {
-                batchRenameApplyCallCount += 1
-            }
-        )
+        let handler = LibraryTracksActionHandler(output: screenFlow)
 
         handler.handle(.screenAppeared)
         for _ in 0..<3 {
@@ -466,13 +445,11 @@ final class LibraryTracksPresenterTests: XCTestCase {
         )
         XCTAssertFalse(receiver.receivedState?.isSelecting == true)
 
-        handler.handle(.batchFilenameRenameApplyRequested)
         handler.handle(.selectionCancelled)
         for _ in 0..<3 {
             await Task.yield()
         }
 
-        XCTAssertEqual(batchRenameApplyCallCount, 1)
         XCTAssertFalse(receiver.receivedState?.isSelecting == true)
         XCTAssertNil(receiver.receivedState?.selectionActionBarState)
     }
@@ -487,10 +464,7 @@ final class LibraryTracksPresenterTests: XCTestCase {
             selectionActionBarCoordinator: LibrarySelectionActionBarCoordinator()
         )
         output.configure(presenter: presenter)
-        return LibraryTracksActionHandler(
-            output: output,
-            applyBatchFilenameRename: {}
-        )
+        return LibraryTracksActionHandler(output: output)
     }
 }
 
@@ -624,8 +598,7 @@ private final class LibraryTracksActionStateFlowSpy: LibraryTracksActionHandling
                 didLoad: didLoad,
                 sortMode: sortMode,
                 selection: selection,
-                membershipsById: [:],
-                isBatchFilenameRenameFlowActive: false
+                membershipsById: [:]
             )
         )
     }

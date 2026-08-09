@@ -39,7 +39,7 @@ final class SheetTrackListPresenter: TrackListPresenting {
     }
 
     func presentTrackDetail(_ track: Track) {
-        sheetManager.present(.trackDetail(track))
+        sheetManager.presentTrackDetail(track)
     }
 
     func presentCopyPurchasedITunesTrack(_ track: PurchasedITunesPlayableTrack) {
@@ -51,18 +51,10 @@ final class SheetTrackListPresenter: TrackListPresenting {
     }
 
     func showInLibrary(_ track: Track) {
-        sheetActionCoordinator.handle(
-            action: .showInLibrary,
-            track: track,
-            context: .tracklist
-        )
+        sheetActionCoordinator.showInLibrary(track)
     }
 
     func moveToFolder(_ track: Track) {
-        sheetActionCoordinator.handle(
-            action: .moveToFolder,
-            track: track,
-            context: .tracklist
-        )
+        sheetManager.presentMoveToFolder(for: track)
     }
 }

@@ -19,17 +19,26 @@ struct SheetHostModifier: ViewModifier {
 
     /// Единое presentation-state Sheet, переданное Composition Root.
     @ObservedObject var sheetManager: SheetManager
-    /// Единый presentation-state Toast, переданный Composition Root.
-    let toastManager: ToastManager
-
-    /// Published-снимок «Избранного» нужен только sheet выбора треков.
-    let favoriteTrackIdsProvider: any FavoriteTrackIdsProviding
     /// Проверяет занятость файла без передачи Sheet-сценариям PlayerManager.
     let fileBusyChecker: any TrackFileBusyChecking
-    /// Освобождает текущий файл через согласованное playback-состояние.
-    let playbackFileReleaser: any CurrentPlaybackFileReleasing
-    /// Готовый обработчик переименования файла для sheet выбора треков.
-    let renameActionHandler: TrackFileRenameActionHandler
+    /// Готовая factory feature-flow выбора папки и файловой операции.
+    let moveToFolderFeatureFactory: MoveToFolderFeatureFactory
+    /// Готовая factory связанного flow создания и выбора треклиста.
+    let createTrackListFlowFactory: CreateTrackListFlowFactory
+    /// Готовая factory feature-flow переименования треклиста.
+    let renameTrackListFeatureFactory: RenameTrackListFeatureFactory
+    /// Готовая factory feature-flow добавления треков в треклист.
+    let addToTrackListFeatureFactory: AddToTrackListFeatureFactory
+    /// Готовая factory feature-flow сохранения очереди плеера в треклист.
+    let saveTrackListFeatureFactory: SaveTrackListFeatureFactory
+    /// Готовая factory feature-flow ручного переименования файла трека.
+    let renameTrackFileFeatureFactory: RenameTrackFileFeatureFactory
+    /// Готовая factory feature-flow просмотра и редактирования одного трека.
+    let trackDetailFeatureFactory: TrackDetailFeatureFactory
+    /// Готовая factory feature-local массового редактирования тегов.
+    let batchTagEditFeatureFactory: BatchTagEditFeatureFactory
+    /// Готовая factory feature-local массового переименования файлов.
+    let batchFilenameRenameFeatureFactory: BatchFilenameRenameFeatureFactory
 
     func body(content: Content) -> some View {
         content
@@ -43,104 +52,66 @@ struct SheetHostModifier: ViewModifier {
                 // MARK: - Действия над треком
                 
                 /// Сохранение треклиста
-            case .saveTrackList:
-                SaveTrackListContainer()
+            case .saveTrackList(let data):
+                saveTrackListFeatureFactory.makeView(data: data)
                     .appSheet(detents: [.fraction(0.45), .medium])
                 
                 /// Переименование треклиста
             case .renameTrackList(let data):
-                RenameTrackListContainer(data: data)
+                renameTrackListFeatureFactory.makeView(data: data)
                     .appSheet(detents: [.fraction(0.45), .medium])
 
                 /// Ручное переименование файла трека
             case .renameTrackFile(let data):
-                RenameTrackFileContainer(
-                    data: data,
-                    fileBusyChecker: fileBusyChecker,
-                    playbackFileReleaser: playbackFileReleaser
-                )
+                renameTrackFileFeatureFactory.makeView(data: data)
                 .appSheet(detents: [.fraction(0.45), .medium])
-                .toastHost(toastManager: toastManager)
                 
                 /// Перемещение трека
             case .moveToFolder(let data):
-                MoveToFolderContainer(
-                    data: data,
-                    fileBusyChecker: fileBusyChecker
-                )
+                moveToFolderFeatureFactory.makeView(data: data)
                 .appSheet(detents: [.fraction(0.6), .medium])
                 
                 /// О треке
-            case .trackDetail(let track):
-                    TrackDetailContainer(
-                        track: track,
-                        fileBusyChecker: fileBusyChecker,
-                        playbackFileReleaser: playbackFileReleaser
+            case .trackDetail(let data):
+                    trackDetailFeatureFactory.makeView(
+                        data: data
                     )
                     .appSheet(detents: [.large])
-                    .toastHost(toastManager: toastManager)
-
-                /// Редактирование тегов трека
-            case .trackDetailEdit(let track):
-                    TrackDetailContainer(
-                        track: track,
-                        fileBusyChecker: fileBusyChecker,
-                        playbackFileReleaser: playbackFileReleaser,
-                        initialMode: .edit
-                    )
-                    .appSheet(detents: [.large])
-                    .toastHost(toastManager: toastManager)
 
                 
                 /// Добавить в треклист
             case .addToTrackList(let data):
-                AddToTrackListContainer(data: data)
+                addToTrackListFeatureFactory.makeView(data: data)
                     .appSheet(detents: [.fraction(0.6), .medium])
 
                 /// Массовое добавление в треклист через тот же UI выбора треклиста.
             case .batchAddToTrackList(let data):
-                AddToTrackListContainer(data: data)
+                addToTrackListFeatureFactory.makeView(data: data)
                     .appSheet(detents: [.fraction(0.6), .medium])
 
                 /// Выбор треков для нового треклиста
             case .newTrackListSelection(let data):
-                NewTrackListSelectionContainer(
-                    data: data,
-                    renameActionHandler: renameActionHandler,
-                    favoriteTrackIdsProvider: favoriteTrackIdsProvider
-                )
+                createTrackListFlowFactory.makeSelectionView(data: data)
                     .appSheet(detents: [.large])
 
                 /// Массовое редактирование тегов
             case .batchTagEdit(let data):
-                BatchTagEditContainer(
-                    flow: $sheetManager.batchTagEditFlow,
-                    onClose: {
-                        sheetManager.closeActive()
-                    },
-                    onSave: data.onSave
-                )
-                .appSheet(detents: [.large])
+                batchTagEditFeatureFactory.makeView(data: data)
+                    .appSheet(detents: [.large])
 
                 /// Массовое переименование файлов
             case .batchFilenameRename(let data):
-                BatchFilenameRenameContainer(
-                    flow: data.flow,
-                    onApply: data.onApply,
-                    onClose: {
-                        sheetManager.closeActive()
-                    }
-                )
-                .appSheet(detents: [.large])
+                batchFilenameRenameFeatureFactory.makeView(data: data)
+                    .appSheet(detents: [.large])
 
                 /// Создание нового треклиста
-            case .createTrackList:
-                CreateTrackListContainer()
+            case .createTrackList(let data):
+                createTrackListFlowFactory.makeCreateTrackListView(data: data)
                     .appSheet(detents: [.fraction(0.55), .medium])
 
                 /// Подробности глобального экспорта.
-            case .exportProgress:
-                ExportProgressDetailsView()
+            case .exportProgress(let route):
+                ExportProgressDetailsView(route: route)
                     .appSheet(detents: [.medium, .large])
             }
         }
@@ -155,20 +126,30 @@ extension View {
     /// Используется один раз в корне приложения.
     func sheetHost(
         sheetManager: SheetManager,
-        toastManager: ToastManager,
-        favoriteTrackIdsProvider: any FavoriteTrackIdsProviding,
         fileBusyChecker: any TrackFileBusyChecking,
-        playbackFileReleaser: any CurrentPlaybackFileReleasing,
-        renameActionHandler: TrackFileRenameActionHandler
+        moveToFolderFeatureFactory: MoveToFolderFeatureFactory,
+        createTrackListFlowFactory: CreateTrackListFlowFactory,
+        renameTrackListFeatureFactory: RenameTrackListFeatureFactory,
+        addToTrackListFeatureFactory: AddToTrackListFeatureFactory,
+        saveTrackListFeatureFactory: SaveTrackListFeatureFactory,
+        renameTrackFileFeatureFactory: RenameTrackFileFeatureFactory,
+        trackDetailFeatureFactory: TrackDetailFeatureFactory,
+        batchTagEditFeatureFactory: BatchTagEditFeatureFactory,
+        batchFilenameRenameFeatureFactory: BatchFilenameRenameFeatureFactory
     ) -> some View {
         modifier(
             SheetHostModifier(
                 sheetManager: sheetManager,
-                toastManager: toastManager,
-                favoriteTrackIdsProvider: favoriteTrackIdsProvider,
                 fileBusyChecker: fileBusyChecker,
-                playbackFileReleaser: playbackFileReleaser,
-                renameActionHandler: renameActionHandler
+                moveToFolderFeatureFactory: moveToFolderFeatureFactory,
+                createTrackListFlowFactory: createTrackListFlowFactory,
+                renameTrackListFeatureFactory: renameTrackListFeatureFactory,
+                addToTrackListFeatureFactory: addToTrackListFeatureFactory,
+                saveTrackListFeatureFactory: saveTrackListFeatureFactory,
+                renameTrackFileFeatureFactory: renameTrackFileFeatureFactory,
+                trackDetailFeatureFactory: trackDetailFeatureFactory,
+                batchTagEditFeatureFactory: batchTagEditFeatureFactory,
+                batchFilenameRenameFeatureFactory: batchFilenameRenameFeatureFactory
             )
         )
     }

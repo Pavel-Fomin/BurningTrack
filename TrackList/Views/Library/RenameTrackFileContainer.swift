@@ -2,47 +2,23 @@
 //  RenameTrackFileContainer.swift
 //  TrackList
 //
-//  Контейнер ручного переименования файла трека.
-//  Готовит предложение переименования и отправляет команду сохранения без прямой работы с файловой системой.
+//  UI-контейнер ручного переименования файла трека.
+//  Передаёт готовое presentation-state и typed-действия между ViewModel и SwiftUI-формой.
 //
-//  Created by Pavel Fomin on 17.05.2026.
+//  Created by Pavel Fomin on 08.08.2026.
 //
 
 import SwiftUI
 
 struct RenameTrackFileContainer: View {
 
-    // MARK: - Input
-
-    let data: RenameTrackFileSheetData
-    /// Capability проверки занятости файла не раскрывает sheet-у PlayerManager.
-    let fileBusyChecker: any TrackFileBusyChecking
-    /// Освобождает текущий файл через согласованное состояние PlayerViewModel.
-    let playbackFileReleaser: any CurrentPlaybackFileReleasing
-
-    // MARK: - State
-
-    @State private var fileName: String
-    @State private var showStopPlayerAlert = false
-    @State private var showFileNameConflictAlert = false
+    /// Готовая ViewModel формы, собранная feature factory.
+    @StateObject private var viewModel: RenameTrackFileViewModel
+    /// Фокус остаётся UI-специфичным состоянием контейнера.
     @FocusState private var isFileNameFocused: Bool
 
-    /// Проверяет, заполнено ли имя файла после удаления пробелов по краям.
-    private var isFileNameValid: Bool {
-        !fileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    init(
-        data: RenameTrackFileSheetData,
-        fileBusyChecker: any TrackFileBusyChecking,
-        playbackFileReleaser: any CurrentPlaybackFileReleasing
-    ) {
-        self.data = data
-        self.fileBusyChecker = fileBusyChecker
-        self.playbackFileReleaser = playbackFileReleaser
-        self._fileName = State(
-            initialValue: (data.currentFileName as NSString).deletingPathExtension
-        )
+    init(viewModel: RenameTrackFileViewModel) {
+        self._viewModel = StateObject(wrappedValue: viewModel)
     }
 
     // MARK: - UI
@@ -51,118 +27,98 @@ struct RenameTrackFileContainer: View {
         NavigationBarHost(
             title: FileRenamePresentationText.renameFileTitle,
             rightButtonImage: "checkmark",
-            isRightEnabled: .constant(isFileNameValid),
+            isRightEnabled: .constant(viewModel.state.isRenameEnabled),
             onClose: {
-                closeSheet()
+                isFileNameFocused = false
+                viewModel.send(.close)
             },
             closeAccessibilityLabel: String(localized: "Cancel"),
             onRightTap: {
-                Task { await rename() }
+                viewModel.send(.rename)
             },
             rightButtonAccessibilityLabel: String(localized: "Rename")
         ) {
             RenameTrackFileSheet(
-                fileName: $fileName,
+                fileName: fileName,
                 isFileNameFocused: $isFileNameFocused
             )
         }
         .alert(
-            FileRenamePresentationText.stopPlaybackTitle,
-            isPresented: $showStopPlayerAlert
-        ) {
-            Button(String(localized: "Cancel"), role: .cancel) {}
-
-            Button(FileRenamePresentationText.stopAndRenameTitle) {
-                playbackFileReleaser.releaseCurrentPlaybackFile()
-                Task { await rename() }
-            }
-        } message: {
-            Text(FileRenamePresentationText.stopPlaybackDescription)
-        }
-        .alert(
-            FileRenamePresentationText.nameConflictTitle,
-            isPresented: $showFileNameConflictAlert
-        ) {
-            Button(String(localized: "Close"), role: .cancel) {}
-        } message: {
-            Text(FileRenamePresentationText.nameConflictDescription)
+            alertTitle,
+            isPresented: isAlertPresented,
+            actions: alertActions,
+            message: alertMessage
+        )
+        .onDisappear {
+            viewModel.send(.sheetDisappeared)
         }
     }
 
-    // MARK: - Actions
-
-    /// Закрывает sheet после предварительного снятия фокуса с поля ввода.
-    private func closeSheet() {
-        isFileNameFocused = false
-        SheetManager.shared.closeActive()
+    /// Связывает TextField с presentation-state через typed action.
+    private var fileName: Binding<String> {
+        Binding(
+            get: { viewModel.state.fileName },
+            set: { viewModel.send(.fileNameChanged($0)) }
+        )
     }
 
-    /// Выполняет ручное переименование через общий генератор предложения и командный слой.
-    private func rename() async {
-        let input = FileRenameInput(
-            trackId: data.trackId,
-            currentFileName: data.currentFileName,
-            artist: nil,
-            title: nil
-        )
-
-        let proposal = FileRenameProposalBuilder().makeProposal(
-            from: input,
-            strategy: .manual,
-            manualName: fileName
-        )
-
-        guard case .ready = proposal.status else {
-            ToastManager.shared.handle(
-                .operationFailed(
-                    message: FileRenamePresentationText.preparationFailedMessage
-                )
-            )
-            return
-        }
-
-        do {
-            let result = try await AppCommandExecutor.shared.saveTrackEdits(
-                trackId: data.trackId,
-                newFileName: proposal.newFileName,
-                fileChanged: true,
-                patch: TagWritePatch(),
-                tagsChanged: false,
-                artworkAction: .none,
-                artworkChanged: false,
-                using: fileBusyChecker
-            )
-
-            await MainActor.run {
-                AppCommandToastPresenter(
-                    toastPresenter: ToastManager.shared
-                ).present(result)
-            }
-
-            await MainActor.run {
-                closeSheet()
-            }
-        } catch let appError as AppError {
-            await MainActor.run {
-                switch appError {
-                case .fileAccessDenied:
-                    showStopPlayerAlert = true
-                case .fileAlreadyExists:
-                    showFileNameConflictAlert = true
-                default:
-                    AppCommandToastPresenter(
-                        toastPresenter: ToastManager.shared
-                    ).present(appError)
+    /// Связывает показ системного alert с единым типизированным состоянием.
+    private var isAlertPresented: Binding<Bool> {
+        Binding(
+            get: { viewModel.state.alert != nil },
+            set: { isPresented in
+                if !isPresented {
+                    viewModel.send(.dismissAlert)
                 }
             }
-        } catch {
-            await MainActor.run {
-                ToastManager.shared.handle(
-                    .operationFailed(
-                        message: FileRenamePresentationText.fileRenameFailedMessage
-                    )
-                )
+        )
+    }
+
+    /// Возвращает локализованный заголовок для активного состояния alert.
+    private var alertTitle: String {
+        switch viewModel.state.alert {
+        case .stopPlayback:
+            FileRenamePresentationText.stopPlaybackTitle
+        case .fileNameConflict:
+            FileRenamePresentationText.nameConflictTitle
+        case nil:
+            ""
+        }
+    }
+
+    /// Строит кнопки системного alert только из presentation-state.
+    @ViewBuilder
+    private func alertActions() -> some View {
+        switch viewModel.state.alert {
+        case .stopPlayback:
+            Button(String(localized: "Cancel"), role: .cancel) {
+                viewModel.send(.dismissAlert)
             }
+
+            Button(FileRenamePresentationText.stopAndRenameTitle) {
+                viewModel.send(.confirmStopPlayback)
+            }
+
+        case .fileNameConflict:
+            Button(String(localized: "Close"), role: .cancel) {
+                viewModel.send(.dismissAlert)
+            }
+
+        case nil:
+            EmptyView()
+        }
+    }
+
+    /// Возвращает локализованное описание для активного состояния alert.
+    @ViewBuilder
+    private func alertMessage() -> some View {
+        switch viewModel.state.alert {
+        case .stopPlayback:
+            Text(FileRenamePresentationText.stopPlaybackDescription)
+        case .fileNameConflict:
+            Text(FileRenamePresentationText.nameConflictDescription)
+        case nil:
+            EmptyView()
         }
     }
 }

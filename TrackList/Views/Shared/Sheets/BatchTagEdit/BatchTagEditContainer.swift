@@ -2,57 +2,46 @@
 //  BatchTagEditContainer.swift
 //  TrackList
 //
-//  Контейнер sheet массового редактирования тегов.
+//  SwiftUI-контейнер сценария массового редактирования тегов.
 //
-//  Created by PavelFomin on 25.05.2026.
+//  Created by Pavel Fomin on 09.08.2026.
 //
 
 import SwiftUI
 
-/// Контейнер sheet массового редактирования тегов.
-///
-/// Роль:
-/// - владеет navigation/header через NavigationBarHost;
-/// - закрывает sheet через onClose;
-/// - не содержит логики сохранения тегов.
+/// Связывает navigation UI со state-based Batch Tag Edit ViewModel.
 struct BatchTagEditContainer: View {
-    /// Состояние flow массового редактирования тегов.
-    @Binding var flow: BatchTagEditFlow
+    /// Единственный владелец draft и асинхронного lifecycle feature.
+    @StateObject private var viewModel: BatchTagEditViewModel
 
-    /// Закрытие sheet.
-    let onClose: () -> Void
-
-    /// Сохранение изменений.
-    let onSave: () async -> Void
-
-    /// Выполняется ли сохранение изменений.
-    @State private var isSaving = false
+    init(viewModel: BatchTagEditViewModel) {
+        _viewModel = StateObject(wrappedValue: viewModel)
+    }
 
     var body: some View {
         NavigationBarHost(
             title: BatchTagEditPresentationText.navigationTitle,
             rightButtonImage: "checkmark",
-            isRightEnabled: .constant(flow.canSave && !isSaving),
-            onClose: onClose,
+            isRightEnabled: .constant(viewModel.state.canSave),
+            onClose: {
+                viewModel.send(.closeTapped)
+            },
             closeAccessibilityLabel: String(localized: "Cancel"),
             onRightTap: {
-                Task {
-                    await save()
-                }
+                viewModel.send(.saveTapped)
             },
             rightButtonAccessibilityLabel: String(localized: "Save")
         ) {
-            BatchTagEditSheet(flow: $flow)
+            BatchTagEditSheet(
+                state: viewModel.state,
+                send: viewModel.send
+            )
         }
-    }
-
-    /// Запускает сохранение изменений.
-    private func save() async {
-        guard flow.canSave else { return }
-        isSaving = true
-        flow.phase = .saving
-        await onSave()
-        flow.phase = .editing
-        isSaving = false
+        .task {
+            viewModel.send(.appeared)
+        }
+        .onDisappear {
+            viewModel.send(.sheetDisappeared)
+        }
     }
 }

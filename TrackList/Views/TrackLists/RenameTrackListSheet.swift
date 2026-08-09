@@ -14,7 +14,7 @@
 //  - не знает о SheetManager
 //  - не знает о командах сохранения
 //  - не управляет закрытием sheet’а
-//  - используется только внутри RenameTrackListContainer
+//  - получает готовый state и отправляет typed actions
 //
 //  Created by Pavel Fomin on 09.11.2025.
 //
@@ -25,16 +25,10 @@ struct RenameTrackListSheet: View {
 
     // MARK: - Input
 
-    /// Связанное состояние имени треклиста.
-    /// Источник истины находится в контейнере.
-    @Binding var name: String
-
-    /// Можно ли подтвердить переименование с текущим названием.
-    let canSubmit: Bool
-    /// Действие подтверждения переименования.
-    let onSubmit: () -> Void
-    /// Действие закрытия sheet без переименования.
-    let onCancel: () -> Void
+    /// Готовое presentation-состояние формы.
+    let state: RenameTrackListState
+    /// Typed-действия, передаваемые во ViewModel.
+    let onAction: (RenameTrackListAction) -> Void
 
     /// Состояние фокуса поля ввода.
     /// Управляется sheet-компонентом, чтобы снимать focus до закрытия sheet.
@@ -51,18 +45,18 @@ struct RenameTrackListSheet: View {
             rightButtonImage: "checkmark",
 
             /// Активна только при валидном имени
-            isRightEnabled: .constant(canSubmit),
+            isRightEnabled: .constant(state.canSubmit),
 
             /// Закрытие sheet’а без действий
             onClose: {
                 finishEditing()
-                onCancel()
+                onAction(.cancel)
             },
 
             /// Подтверждение переименования
             onRightTap: {
                 finishEditing()
-                onSubmit()
+                onAction(.submit)
             }
         ) {
             form
@@ -73,8 +67,8 @@ struct RenameTrackListSheet: View {
     private var form: some View {
         Form {
             Section {
-                TextField("Tracklist Name", text: $name)
-                    .clearable($name)
+                TextField("Tracklist Name", text: nameBinding)
+                    .clearable(nameBinding)
                     .focused($isNameFocused)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled(true)
@@ -98,5 +92,13 @@ struct RenameTrackListSheet: View {
     /// Снимает фокус с поля ввода перед закрытием или подтверждением.
     private func finishEditing() {
         isNameFocused = false
+    }
+
+    /// Связывает TextField с presentation-state через typed action ViewModel.
+    private var nameBinding: Binding<String> {
+        Binding(
+            get: { state.name },
+            set: { onAction(.nameChanged($0)) }
+        )
     }
 }

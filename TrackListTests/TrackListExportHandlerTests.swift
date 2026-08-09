@@ -53,7 +53,7 @@ final class TrackListExportHandlerTests: XCTestCase {
         XCTAssertTrue(toastPresenter.errors.isEmpty)
     }
 
-    /// Проверяет сохранение существующей обработки пустого треклиста.
+    /// Проверяет передачу semantic AppError, который ToastManager преобразует в warning-событие.
     func testEmptyTrackListDoesNotStartExport() async {
         let reader = TrackListReaderSpy(name: "Пустой", tracks: [])
         let exporter = ExportRequestSpy()
@@ -71,8 +71,9 @@ final class TrackListExportHandlerTests: XCTestCase {
         await yieldToExportTask()
 
         XCTAssertEqual(exporter.exportCallCount, 0)
-        XCTAssertEqual(toastPresenter.events, [.noTracksToExport])
-        XCTAssertTrue(toastPresenter.errors.isEmpty)
+        XCTAssertTrue(toastPresenter.events.isEmpty)
+        XCTAssertEqual(toastPresenter.errors, [.exportNoTracks])
+        XCTAssertEqual(toastPresenter.errors.first?.toastEvent, .noTracksToExport)
     }
 
     /// Собирает обработчик экспорта сохранённого треклиста с тестовыми зависимостями.

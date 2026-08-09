@@ -14,9 +14,8 @@ struct NewTrackListSelectionFolderView: View {
     // MARK: - Input
 
     let folder: LibraryFolder
-
-    /// Общий обработчик переименования файлов треков.
-    let renameActionHandler: TrackFileRenameActionHandler
+    /// Собирает дочерние папки через feature-factory.
+    let folderViewFactory: NewTrackListSelectionFolderViewFactory
 
     // MARK: - State
 
@@ -26,41 +25,25 @@ struct NewTrackListSelectionFolderView: View {
     /// Локально опубликованный снимок сохраняет реактивное обновление готовых строк без PlayerViewModel.
     @State private var favoriteTrackIds: Set<UUID>
 
-    /// ViewModel для загрузки треков папки
-    @StateObject private var tracksViewModel: LibraryTracksViewModel
+    /// Готовая ViewModel Library Tracks, собранная отдельным container через factory.
+    @ObservedObject var tracksViewModel: LibraryTracksViewModel
 
     // MARK: - Init
 
     init(
         folder: LibraryFolder,
+        folderViewFactory: NewTrackListSelectionFolderViewFactory,
         selectionViewModel: NewTrackListSelectionViewModel,
-        renameActionHandler: TrackFileRenameActionHandler,
-        favoriteTrackIdsProvider: any FavoriteTrackIdsProviding
+        favoriteTrackIdsProvider: any FavoriteTrackIdsProviding,
+        tracksViewModel: LibraryTracksViewModel
     ) {
         self.folder = folder
+        self.folderViewFactory = folderViewFactory
         self.selectionViewModel = selectionViewModel
-        self.renameActionHandler = renameActionHandler
         self.favoriteTrackIdsProvider = favoriteTrackIdsProvider
-        self._favoriteTrackIds = State(
+        self.tracksViewModel = tracksViewModel
+        _favoriteTrackIds = State(
             initialValue: favoriteTrackIdsProvider.favoriteTrackIds
-        )
-
-        _tracksViewModel = StateObject(
-            wrappedValue: LibraryTracksViewModel(
-                folderURL: folder.url,
-                renameActionHandler: renameActionHandler,
-                tracksProvider: FastLibraryTracksProvider(),
-                badgeProvider: DefaultTrackListBadgeProvider(),
-                eventProvider: NotificationLibraryTrackEventProvider(),
-                runtimeController: LibraryTrackRuntimeController(),
-                settingsManager: AppSettingsManager.shared,
-                trackRegistry: TrackRegistry.shared,
-                musicLibraryManager: MusicLibraryManager.shared,
-                trackURLProvider: { trackId in
-                    await BookmarkResolver.url(forTrack: trackId)
-                },
-                usesLibrarySortSettings: false
-            )
         )
     }
 
@@ -73,7 +56,7 @@ struct NewTrackListSelectionFolderView: View {
     private var selectableTrackSections: [TrackSelectableSectionState] {
         tracksViewModel.makeSelectableTrackSections(
             favoriteTrackIds: favoriteTrackIds,
-            selectedTrackIds: Set(selectionViewModel.selectedTracksById.keys)
+            selectedTrackIds: selectionViewModel.selectedTrackIds
         )
     }
 
@@ -86,11 +69,9 @@ struct NewTrackListSelectionFolderView: View {
                     Section {
                         ForEach(folder.subfolders) { subfolder in
                             NavigationLink {
-                                NewTrackListSelectionFolderView(
+                                folderViewFactory.makeFolderContainer(
                                     folder: subfolder,
-                                    selectionViewModel: selectionViewModel,
-                                    renameActionHandler: renameActionHandler,
-                                    favoriteTrackIdsProvider: favoriteTrackIdsProvider
+                                    selectionViewModel: selectionViewModel
                                 )
                             } label: {
                                 HStack(spacing: 12) {
@@ -111,7 +92,7 @@ struct NewTrackListSelectionFolderView: View {
                     TrackSelectableSectionsView(
                         sections: selectableTrackSections,
                         onToggleSelection: { track in
-                            selectionViewModel.toggle(track)
+                            selectionViewModel.handle(.toggleTrack(track))
                         },
                         onRequestSnapshot: { trackId in
                             tracksViewModel.requestSnapshotIfNeeded(for: trackId)
@@ -154,9 +135,9 @@ struct NewTrackListSelectionFolderView: View {
                             : String(localized: "Select All")
                     ) {
                         if selectionViewModel.areAllSelected(currentTracks) {
-                            selectionViewModel.deselectAll(currentTracks)
+                            selectionViewModel.handle(.deselectAll(currentTracks))
                         } else {
-                            selectionViewModel.selectAll(currentTracks)
+                            selectionViewModel.handle(.selectAll(currentTracks))
                         }
                     }
                 }

@@ -24,8 +24,6 @@ enum LibraryTracksAction {
     case batchActionConfirmed
     case revealRequestReceived(LibraryRevealRequest?)
     case scenePhaseChanged(ScenePhase)
-    case batchFilenameRenameFlowChanged(isActive: Bool)
-    case batchFilenameRenameApplyRequested
 }
 
 /// Позволяет host нижней панели вернуть подтверждение в экранный action-маршрут.

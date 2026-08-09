@@ -13,7 +13,7 @@
 //  - не содержит бизнес-логики
 //  - не выполняет команд добавления
 //  - не управляет закрытием sheet’а
-//  - подтверждение и отмена обрабатываются контейнером
+//  - отправляет typed actions во ViewModel
 //
 //  Created by Pavel Fomin on 29.07.2025.
 //
@@ -25,17 +25,36 @@ struct AddToTrackListSheet: View {
     
     // MARK: - Input
     
-    let trackLists: [TrackListMeta]                    /// Список доступных треклистов (read-only).
-    let currentTrackListId: UUID?                      /// Текущий  треклист. Используется для бейджа «Текущий»
-    
-    @Binding var selectedTrackListId: UUID?            /// Выбранный треклист назначения.Источник истины находится в контейнере
+    /// Готовое presentation-состояние экрана.
+    let state: AddToTrackListState
+    /// Typed-действия, передаваемые во ViewModel.
+    let onAction: (AddToTrackListAction) -> Void
     
     
     // MARK: - UI
     
     var body: some View {
+        NavigationBarHost(
+            title: "Add to Tracklist",
+            rightButtonImage: "checkmark",
+            isRightEnabled: .constant(state.canSubmit),
+            onClose: {
+                onAction(.cancel)
+            },
+            onRightTap: {
+                onAction(.submit)
+            }
+        ) {
+            trackListContent
+        }
+    }
+
+    /// Сохраняет визуальное отображение списка и состояния отсутствия треклистов.
+    private var trackListContent: some View {
         List {
-            if trackLists.isEmpty {
+            if state.isLoading {
+                ProgressView()
+            } else if state.items.isEmpty {
                 ContentUnavailableView(
                     "No Tracklists",
                     systemImage: "music.note.list"
@@ -48,26 +67,19 @@ struct AddToTrackListSheet: View {
 
     @ViewBuilder
     private var trackListRows: some View {
-        ForEach(trackLists) { meta in
+        ForEach(state.items) { item in
             Button {
-                guard meta.id != currentTrackListId else { return }
-                
-                selectedTrackListId =
-                (selectedTrackListId == meta.id) ? nil : meta.id
+                guard item.isAvailable else { return }
+
+                onAction(.trackListSelected(item.id))
             } label: {
                 HStack(spacing: 12) {
-                    
-                    Text(
-                        TrackListPresentationText.title(
-                            for: meta.kind,
-                            storedName: meta.name
-                        )
-                    )
+                    Text(item.title)
                         .lineLimit(1)
-                    
+
                     Spacer()
-                    
-                    if meta.id == currentTrackListId {
+
+                    if !item.isAvailable {
                         // Бейдж "Текущий"
                         Image(systemName: "checkmark.circle.fill")
                             .font(.title3)
@@ -77,7 +89,7 @@ struct AddToTrackListSheet: View {
                     } else {
                         Image(
                             systemName:
-                                selectedTrackListId == meta.id
+                                item.isSelected
                             ? "largecircle.fill.circle"
                             : "circle"
                         )
@@ -91,17 +103,17 @@ struct AddToTrackListSheet: View {
             }
             .buttonStyle(.plain)
             .listRowBackground(Color(.tertiarySystemBackground))
-            .accessibilityValue(accessibilityValue(for: meta))
+            .accessibilityValue(accessibilityValue(for: item))
         }
     }
 
     /// Возвращает VoiceOver-статус строки без изменения данных выбора.
-    private func accessibilityValue(for trackList: TrackListMeta) -> String {
-        if trackList.id == currentTrackListId {
+    private func accessibilityValue(for item: AddToTrackListItemState) -> String {
+        if !item.isAvailable {
             return String(localized: "Current Tracklist")
         }
 
-        if trackList.id == selectedTrackListId {
+        if item.isSelected {
             return String(localized: "Selected")
         }
 

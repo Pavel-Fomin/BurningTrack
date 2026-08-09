@@ -14,79 +14,84 @@ final class NewTrackListSelectionActionHandler {
 
     /// Режим применения выбранных треков.
     private let mode: NewTrackListSelectionMode
-    /// Возвращает актуальный выбор треков на момент подтверждения.
-    private let selectedTracksProvider: () -> [LibraryTrack]
     /// Управляет созданием и пополнением треклистов.
-    private let trackListsManager: TrackListsManager
+    private let trackListsManager: any TrackListFlowManaging
     /// Показывает пользовательские сообщения.
-    private let toastManager: ToastManager
-    /// Управляет закрытием sheet.
-    private let sheetManager: SheetManager
+    private let toastPresenter: any ToastPresenting
+    /// Маршрутизирует завершение sheet-flow.
+    private let router: any NewTrackListSelectionRouting
+    /// Неизменяемая идентичность конкретного route выбора треков.
+    private let routeID: UUID
 
     init(
         mode: NewTrackListSelectionMode,
-        selectedTracksProvider: @escaping () -> [LibraryTrack],
-        trackListsManager: TrackListsManager? = nil,
-        toastManager: ToastManager? = nil,
-        sheetManager: SheetManager? = nil
+        trackListsManager: any TrackListFlowManaging,
+        toastPresenter: any ToastPresenting,
+        router: any NewTrackListSelectionRouting,
+        routeID: UUID = UUID()
     ) {
         self.mode = mode
-        self.selectedTracksProvider = selectedTracksProvider
-        self.trackListsManager = trackListsManager ?? .shared
-        self.toastManager = toastManager ?? .shared
-        self.sheetManager = sheetManager ?? .shared
+        self.trackListsManager = trackListsManager
+        self.toastPresenter = toastPresenter
+        self.router = router
+        self.routeID = routeID
     }
 
-    /// Выполняет действие sheet-flow выбора треков.
-    func handle(_ action: NewTrackListSelectionAction) {
-        switch action {
-        case .submit:
-            Task {
-                await submitSelectedTracks()
-            }
-
-        case .cancel:
-            sheetManager.closeActive()
-        }
+    /// Закрывает только текущий route выбора без выполнения доменной операции.
+    func cancel() {
+        router.dismissNewTrackListSelection(routeID)
     }
 
     /// Создаёт треклист с выбранными треками или добавляет их в существующий.
-    private func submitSelectedTracks() async {
-        let selectedTracks = selectedTracksProvider()
-
-        guard !selectedTracks.isEmpty else { return }
+    func submit(
+        selectedTracks: [LibraryTrack]
+    ) async -> NewTrackListSelectionSubmissionResult {
+        guard !selectedTracks.isEmpty else { return .failure(.trackListSaveFailed) }
 
         switch mode {
         case .create(let name):
-            guard createTrackList(from: selectedTracks, withName: name) else { return }
+            return createTrackList(from: selectedTracks, withName: name)
 
         case .append(let trackListId):
-            guard await appendTracks(selectedTracks, to: trackListId) else { return }
+            return await appendTracks(selectedTracks, to: trackListId)
         }
+    }
 
-        sheetManager.closeActive()
+    /// Показывает feedback и закрывает route только пока его completion ещё актуален.
+    func present(
+        _ result: NewTrackListSelectionSubmissionResult
+    ) async {
+        switch result {
+        case .created(let name):
+            toastPresenter.handle(.trackListCreated(name: name))
+            router.dismissNewTrackListSelection(routeID)
+
+        case let .appended(tracks, trackListName):
+            await showAddedTracksToast(tracks, trackListName: trackListName)
+            router.dismissNewTrackListSelection(routeID)
+
+        case .failure(let error):
+            toastPresenter.handle(error)
+        }
     }
 
     /// Создаёт новый треклист из выбранных треков.
     private func createTrackList(
         from selectedTracks: [LibraryTrack],
         withName name: String
-    ) -> Bool {
+    ) -> NewTrackListSelectionSubmissionResult {
         do {
             let created = try trackListsManager.createTrackList(
                 from: selectedTracks,
                 withName: name
             )
-            toastManager.handle(.trackListCreated(name: created.name))
-            return true
+            return .created(created.name)
         } catch let appError as AppError {
-            PersistentLogger.log("NewTrackListSelectionContainer: create tracklist failed error=\(appError)")
-            toastManager.handle(appError)
-            return false
+            PersistentLogger.log("NewTrackListSelectionActionHandler: create tracklist failed error=\(appError)")
+            return .failure(appError)
         } catch {
-            PersistentLogger.log("NewTrackListSelectionContainer: create tracklist failed error=\(error)")
-            toastManager.handle(AppError.trackListSaveFailed)
-            return false
+            PersistentLogger.log("NewTrackListSelectionActionHandler: create tracklist failed error=\(error)")
+            return .failure(.trackListSaveFailed)
         }
     }
 
@@ -94,7 +99,7 @@ final class NewTrackListSelectionActionHandler {
     private func appendTracks(
         _ selectedTracks: [LibraryTrack],
         to trackListId: UUID
-    ) async -> Bool {
+    ) async -> NewTrackListSelectionSubmissionResult {
         let trackListName: String
 
         do {
@@ -103,32 +108,23 @@ final class NewTrackListSelectionActionHandler {
                 .first { $0.id == trackListId }?
                 .name ?? TrackListPresentationText.defaultTrackListName
         } catch let appError as AppError {
-            toastManager.handle(appError)
-            return false
+            return .failure(appError)
         } catch {
-            toastManager.handle(AppError.trackListLoadFailed)
-            return false
+            return .failure(.trackListLoadFailed)
         }
 
         do {
-            let addedTracks = selectedTracks
-            try trackListsManager.addTracks(
+            _ = try trackListsManager.addTracks(
                 selectedTracks,
                 to: trackListId
             )
-            await showAddedTracksToast(
-                addedTracks,
-                trackListName: trackListName
-            )
-            return true
+            return .appended(selectedTracks, trackListName: trackListName)
         } catch let appError as AppError {
-            PersistentLogger.log("NewTrackListSelectionContainer: add tracks failed error=\(appError)")
-            toastManager.handle(appError)
-            return false
+            PersistentLogger.log("NewTrackListSelectionActionHandler: add tracks failed error=\(appError)")
+            return .failure(appError)
         } catch {
-            PersistentLogger.log("NewTrackListSelectionContainer: add tracks failed error=\(error)")
-            toastManager.handle(AppError.trackListSaveFailed)
-            return false
+            PersistentLogger.log("NewTrackListSelectionActionHandler: add tracks failed error=\(error)")
+            return .failure(.trackListSaveFailed)
         }
     }
 
@@ -142,15 +138,25 @@ final class NewTrackListSelectionActionHandler {
                 track: track,
                 trackListName: trackListName
             )
-            toastManager.handle(event)
+            toastPresenter.handle(event)
             return
         }
 
-        toastManager.handle(
+        toastPresenter.handle(
             .tracksAddedToTrackList(
                 count: addedTracks.count,
                 name: trackListName
             )
         )
     }
+}
+
+/// Результат доменной операции до presentation feedback конкретного UI-сеанса.
+enum NewTrackListSelectionSubmissionResult {
+    /// Создан новый треклист с нормализованным именем.
+    case created(String)
+    /// Выбранные треки добавлены в существующий треклист.
+    case appended([LibraryTrack], trackListName: String)
+    /// Операция не выполнена и должна показать существующее сообщение AppError.
+    case failure(AppError)
 }

@@ -17,7 +17,6 @@ final class SearchActionHandler {
     private let playbackController: any TrackPlaybackControlling
     private let navigationCoordinator: NavigationCoordinator
     private let sheetManager: SheetManager
-    private let sheetActionCoordinator: SheetActionCoordinator
     private let fileRenamer: TrackFileRenameActionHandler
     /// Общий обработчик «Избранного» не зависит от состояния конкретного экрана поиска.
     private let favoriteActionHandler: FavoriteTrackActionHandler
@@ -28,7 +27,6 @@ final class SearchActionHandler {
         playbackController: any TrackPlaybackControlling,
         navigationCoordinator: NavigationCoordinator,
         sheetManager: SheetManager,
-        sheetActionCoordinator: SheetActionCoordinator,
         fileRenamer: TrackFileRenameActionHandler,
         favoriteActionHandler: FavoriteTrackActionHandler
     ) {
@@ -37,7 +35,6 @@ final class SearchActionHandler {
         self.playbackController = playbackController
         self.navigationCoordinator = navigationCoordinator
         self.sheetManager = sheetManager
-        self.sheetActionCoordinator = sheetActionCoordinator
         self.fileRenamer = fileRenamer
         self.favoriteActionHandler = favoriteActionHandler
     }
@@ -81,11 +78,7 @@ final class SearchActionHandler {
             )
 
         case .moveToFolder(let result):
-            sheetActionCoordinator.handle(
-                action: .moveToFolder,
-                track: result,
-                context: .library
-            )
+            sheetManager.presentMoveToFolder(for: result)
 
         case .addToPlayer(let trackId):
             addToPlayer(trackId: trackId)

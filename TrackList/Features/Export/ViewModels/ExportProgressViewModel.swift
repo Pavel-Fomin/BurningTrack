@@ -23,7 +23,7 @@ final class ExportProgressViewModel: ObservableObject {
     /// Последний полученный снимок состояния экспорта.
     @Published private(set) var progress: ExportProgress?
 
-    /// Показывает, что подробный экран экспорта уже запрошен.
+    /// Показывает, что текущий route подробностей ещё не сообщил о своём исчезновении.
     @Published private(set) var isShowingDetails = false
 
     /// Показывает, что Coordinator ещё не завершил текущую экспортную операцию.
@@ -37,8 +37,8 @@ final class ExportProgressViewModel: ObservableObject {
     /// Сообщает о повторном запуске, который отклоняется жизненным циклом ViewModel.
     private let toastPresenter: any ToastPresenting
 
-    /// Маршрутизирует подробности экспорта без знания глобального менеджера sheet.
-    private let detailsRouter: any ExportDetailsRouting
+    /// Идентичность route подробностей, ожидающего lifecycle-событие SwiftUI.
+    private(set) var detailsRoute: ExportDetailsSheetRoute?
 
     /// Преобразует внутренние данные операции в единый снимок интерфейса.
     private let exportPresenter = ExportPresenter()
@@ -48,12 +48,10 @@ final class ExportProgressViewModel: ObservableObject {
     /// Создаёт ViewModel с координатором операции и сообщением повторного запуска.
     init(
         coordinator: ExportOperationCoordinator,
-        toastPresenter: any ToastPresenting,
-        detailsRouter: any ExportDetailsRouting
+        toastPresenter: any ToastPresenting
     ) {
         self.coordinator = coordinator
         self.toastPresenter = toastPresenter
-        self.detailsRouter = detailsRouter
 
         coordinator.onExportAccepted = { [weak self] in
             self?.exportWasAccepted()
@@ -90,29 +88,6 @@ final class ExportProgressViewModel: ObservableObject {
 
     // MARK: - Export actions
 
-    /// Направляет действие интерфейса в существующий маршрут экспорта.
-    func handle(_ action: ExportAction) {
-        switch action {
-        case let .start(tracks, exportFolder, fileNamingMode, presenter):
-            startExport(
-                tracks: tracks,
-                exportFolder: exportFolder,
-                fileNamingMode: fileNamingMode,
-                presenter: presenter
-            )
-        case .cancel:
-            cancelExport()
-        case .presentDetails:
-            presentDetails()
-        case .dismissDetails:
-            dismissDetails()
-        case .detailsDidDisappear:
-            detailsDidDisappear()
-        case .dismissCompleted:
-            dismissCompletedExport()
-        }
-    }
-
     /// Запускает экспорт и оставляет его независимым от жизненного цикла экрана.
     func startExport(
         tracks: [Track],
@@ -142,43 +117,35 @@ final class ExportProgressViewModel: ObservableObject {
     func cancelExport() -> Bool {
         guard coordinator.cancelExport() else { return false }
 
-        // После принятия запроса отмены подробный экран больше не нужен:
-        // итоговое состояние останется доступным в компактной панели.
-        dismissDetails()
         return true
     }
 
-    /// Открывает подробный результат через явный маршрут Export-feature.
-    func presentDetails() {
-        guard progress != nil else { return }
-
+    /// Фиксирует route подробностей, для которого ActionHandler уже отправил typed-команду.
+    func detailsPresentationWasRequested(for route: ExportDetailsSheetRoute) {
         isShowingDetails = true
-        detailsRouter.presentExportDetails()
+        detailsRoute = route
     }
 
-    /// Закрывает подробный экран, не меняя результат операции.
-    func dismissDetails() {
-        isShowingDetails = false
-        closeDetailsSheetIfNeeded()
-    }
+    /// Синхронизирует feature-state только с исчезновением того же route.
+    func detailsDidDisappear(for route: ExportDetailsSheetRoute) {
+        guard detailsRoute == route else { return }
 
-    /// Запоминает закрытие подробного экрана системным жестом.
-    func detailsDidDisappear() {
         isShowingDetails = false
+        detailsRoute = nil
     }
 
     /// Удаляет завершённый результат после явного действия пользователя.
-    func dismissCompletedExport() {
-        guard isExportActive == false else { return }
+    @discardableResult
+    func dismissCompletedExport() -> Bool {
+        guard isExportActive == false else { return false }
         guard let state = progress?.state,
               state != .preparing,
               state != .copying else {
-            return
+            return false
         }
 
         progress = nil
-        isShowingDetails = false
-        closeDetailsSheetIfNeeded()
+        return true
     }
 
     // MARK: - Coordinator events
@@ -187,6 +154,7 @@ final class ExportProgressViewModel: ObservableObject {
     private func exportWasAccepted() {
         progress = nil
         isShowingDetails = false
+        detailsRoute = nil
     }
 
     /// Сохраняет снимок, который Coordinator признал частью текущей операции.
@@ -199,8 +167,4 @@ final class ExportProgressViewModel: ObservableObject {
         isExportActive = false
     }
 
-    /// Закрывает только открытый экран деталей экспорта.
-    private func closeDetailsSheetIfNeeded() {
-        detailsRouter.closeExportDetailsIfNeeded()
-    }
 }

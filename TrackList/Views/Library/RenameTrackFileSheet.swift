@@ -15,7 +15,7 @@ struct RenameTrackFileSheet: View {
     // MARK: - Input
 
     /// Связанное состояние имени файла.
-    /// Источник истины находится в контейнере.
+    /// Источник истины находится в ViewModel feature-flow.
     @Binding var fileName: String
 
     /// Состояние фокуса поля ввода.

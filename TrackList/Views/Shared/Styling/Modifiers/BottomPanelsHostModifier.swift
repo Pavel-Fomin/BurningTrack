@@ -23,6 +23,8 @@ struct GlobalBottomPanelsHostModifier: ViewModifier {
     @ObservedObject var playerViewModel: PlayerViewModel
     /// Использует общее состояние экспорта без создания локальной операции.
     @ObservedObject var exportProgressViewModel: ExportProgressViewModel
+    /// Передаёт UI-намерения в typed Export-feature ActionHandler.
+    @EnvironmentObject private var exportActionHandler: ExportFeatureActionHandler
     /// Управляет только присутствием высокого MiniPlayer в общем контейнере.
     let showsMiniPlayer: Bool
 
@@ -44,12 +46,7 @@ struct GlobalBottomPanelsHostModifier: ViewModifier {
                         if let exportProgress {
                             ExportProgressCompactView(
                                 progress: exportProgress,
-                                onTap: {
-                                    exportProgressViewModel.presentDetails()
-                                },
-                                onDismiss: {
-                                    exportProgressViewModel.dismissCompletedExport()
-                                }
+                                actionHandler: exportActionHandler
                             )
                             .padding(.horizontal, 8)
                             .transition(

@@ -20,9 +20,7 @@ struct BatchTagEditSaveExecutor {
     /// Исполнитель команд приложения.
     private let appCommandExecutor: AppCommandExecutor
 
-    init(
-        appCommandExecutor: AppCommandExecutor = .shared
-    ) {
+    init(appCommandExecutor: AppCommandExecutor) {
         self.appCommandExecutor = appCommandExecutor
     }
 

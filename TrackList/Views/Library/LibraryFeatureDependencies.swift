@@ -36,8 +36,8 @@ struct LibraryFeatureDependencies {
     let playbackController: any TrackPlaybackControlling
     /// Предоставляет подтверждённое состояние «Избранного» строкам фонотеки.
     let favoriteTrackIdsProvider: any FavoriteTrackIdsProviding
-    /// Проверяет занятость файлов в одиночных и массовых операциях фонотеки.
-    let fileBusyChecker: any TrackFileBusyChecking
     /// Выполняет общий flow переименования файлов без создания handler-а во View.
     let trackFileRenameActionHandler: TrackFileRenameActionHandler
+    /// Передаёт строкам iTunes явные sheet- и command-зависимости.
+    let purchasedITunesTrackActionDependencies: PurchasedITunesTrackActionDependencies
 }

@@ -75,20 +75,10 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding, Li
     private let selectionStateBuilder = LibrarySelectionStateBuilder()
     /// Собирает готовые строки режима выбора без вычислений во View.
     private let selectableRowStateBuilder = TrackSelectableRowStateBuilder()
-    /// Обрабатывает подготовку и применение массового переименования файлов.
-    private lazy var batchRenameHandler = LibraryBatchRenameHandler(
-        snapshotProvider: { [weak self] trackId in
-            self?.runtimeController.snapshot(for: trackId)
-        },
-        snapshotLoader: { [weak self] trackId in
-            await self?.runtimeController.loadSnapshotIfNeeded(for: trackId)
-        },
-        tracksProvider: { [weak self] in
-            self?.trackSections.flatMap(\.tracks) ?? []
-        }
-    )
+    /// Открывает feature-local сценарий массового переименования без mutable состояния в Library.
+    private let batchRenameHandler: LibraryBatchRenameHandler
     /// Обрабатывает массовое редактирование тегов.
-    private let batchTagEditHandler = LibraryBatchTagEditHandler()
+    private let batchTagEditHandler: LibraryBatchTagEditHandler
     /// Обрабатывает массовое добавление выбранных треков в плеер.
     private let batchPlayerHandler = LibraryBatchPlayerHandler()
     /// Обрабатывает открытие sheet массового добавления в треклист.
@@ -106,7 +96,10 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding, Li
             self?.batchTrackListHandler.startAddToTrackList(with: pendingAction)
         },
         onRenameFiles: { [weak self] pendingAction in
-            self?.batchRenameHandler.startRename(with: pendingAction)
+            self?.batchRenameHandler.startRename(
+                with: pendingAction,
+                tracks: self?.trackSections.flatMap(\.tracks) ?? []
+            )
         },
         onEditTags: { [weak self] pendingAction in
             self?.batchTagEditHandler.startEdit(with: pendingAction)
@@ -136,11 +129,6 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding, Li
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Производное состояние
-
-    /// Состояние массового переименования файлов для существующего модального окна.
-    var batchFilenameRenameFlow: BatchFilenameRenameFlow {
-        batchRenameHandler.flow
-    }
 
     /// Показывает, выбраны ли все видимые строки.
     var areAllVisibleTracksSelected: Bool {
@@ -187,6 +175,8 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding, Li
         trackRegistry: TrackRegistry,
         musicLibraryManager: MusicLibraryManager,
         trackURLProvider: @escaping @MainActor (UUID) async -> URL?,
+        batchRenameHandler: LibraryBatchRenameHandler,
+        batchTagEditHandler: LibraryBatchTagEditHandler,
         usesLibrarySortSettings: Bool = true
     ) {
         self.init(
@@ -200,6 +190,8 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding, Li
             trackRegistry: trackRegistry,
             musicLibraryManager: musicLibraryManager,
             trackURLProvider: trackURLProvider,
+            batchRenameHandler: batchRenameHandler,
+            batchTagEditHandler: batchTagEditHandler,
             usesLibrarySortSettings: usesLibrarySortSettings
         )
     }
@@ -215,6 +207,8 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding, Li
         trackRegistry: TrackRegistry,
         musicLibraryManager: MusicLibraryManager,
         trackURLProvider: @escaping @MainActor (UUID) async -> URL?,
+        batchRenameHandler: LibraryBatchRenameHandler,
+        batchTagEditHandler: LibraryBatchTagEditHandler,
         usesLibrarySortSettings: Bool = true
     ) {
         let availableSortModes = source.availableTrackSortModes
@@ -230,6 +224,8 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding, Li
         self.trackRegistry = trackRegistry
         self.musicLibraryManager = musicLibraryManager
         self.trackURLProvider = trackURLProvider
+        self.batchRenameHandler = batchRenameHandler
+        self.batchTagEditHandler = batchTagEditHandler
         self.usesLibrarySortSettings = usesLibrarySortSettings && source.canPersistFolderSortMode
         let initialSortMode = Self.resolvedSortMode(
             .fileDateDesc,
@@ -240,7 +236,6 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding, Li
         self.lastTagReadingEnabled = settingsManager.settings.visible.metadata.isTagReadingEnabled
 
         bindRuntimeController()
-        bindBatchRenameHandler()
         bindTrackUpdateEvents()
         bindSettingsEvents()
         bindBadgeEvents()
@@ -282,8 +277,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding, Li
                 didLoad: didLoad,
                 sortMode: sortMode,
                 selection: bulkSelection,
-                membershipsById: trackListMembershipsById,
-                isBatchFilenameRenameFlowActive: batchRenameHandler.flow.isActive
+                membershipsById: trackListMembershipsById
             )
         )
     }
@@ -572,20 +566,6 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding, Li
         bulkSelection.reset()
     }
 
-    /// Пробрасывает изменения handler массового переименования наружу для подписчиков ViewModel.
-    private func bindBatchRenameHandler() {
-        batchRenameHandler.objectWillChange
-            .sink { [weak self] _ in
-                self?.objectWillChange.send()
-                // BatchFilenameRenameFlow публикует objectWillChange до изменения своего свойства.
-                // Откладываем снимок, чтобы state получил уже новое значение isActive.
-                Task { @MainActor [weak self] in
-                    self?.updateScreenState()
-                }
-            }
-            .store(in: &cancellables)
-    }
-
     /// Пробрасывает изменения runtime controller наружу для подписчиков ViewModel.
     private func bindRuntimeController() {
         runtimeController.objectWillChange
@@ -670,11 +650,6 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding, Li
 
         // Недоступный режим не должен оставаться активным и скрытым от пользователя.
         return .titleAsc
-    }
-
-    /// Применяет массовое переименование файлов через capability проверки занятости.
-    func applyBatchFilenameRename(using fileBusyChecker: any TrackFileBusyChecking) async {
-        await batchRenameHandler.applyRename(using: fileBusyChecker)
     }
 
     // MARK: - Runtime-снимки

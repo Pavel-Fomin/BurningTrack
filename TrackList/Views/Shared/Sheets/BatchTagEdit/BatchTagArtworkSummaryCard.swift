@@ -2,25 +2,22 @@
 //  BatchTagArtworkSummaryCard.swift
 //  TrackList
 //
-//  Карточка со сводной информацией по обложкам выбранных треков.
+//  Показывает сводную карточку artwork из presentation state.
 //
-//  Created by Pavel Fomin on 25.05.2026.
+//  Created by Pavel Fomin on 09.08.2026.
 //
 
 import SwiftUI
 
-/// Карточка со сводной информацией по обложкам выбранных треков.
+/// Карточка всех выбранных треков без знаний о mutable artwork state.
 struct BatchTagArtworkSummaryCard: View {
-    /// Сводная информация по обложкам.
-    let summary: BatchTagArtworkPreviewSummary
-    /// Общий размер preview-обложек в байтах с учётом несохранённых изменений.
-    let totalArtworkSizeBytesForPreview: Int
-    /// Выбрана ли карточка.
-    let isSelected: Bool
-    /// Обработчик выбора карточки.
+    /// Готовые отображаемые данные summary-карточки.
+    let state: BatchTagEditArtworkSummaryScreenState
+    /// Передаёт выбор цели наружу.
     let onSelect: () -> Void
-    /// Обработчик действия из меню.
+    /// Передаёт выбранное действие меню наружу.
     let onMenuAction: (BatchTagArtworkMenuAction, BatchTagArtworkActionTarget) -> Void
+
     var body: some View {
         ZStack(alignment: .topTrailing) {
             background
@@ -30,25 +27,22 @@ struct BatchTagArtworkSummaryCard: View {
                 .frame(width: 150, height: 150)
             VStack {
                 Spacer()
-                sizeBadge
-                    .padding(.bottom, 8)
+                sizeBadge.padding(.bottom, 8)
             }
             .frame(width: 150, height: 150)
-            menuButton
-                .padding(8)
+            BatchTagArtworkCardMenu {
+                onMenuAction($0, .summary)
+            }
+            .padding(8)
         }
         .frame(width: 150, height: 150)
-        .onTapGesture {
-            onSelect()
-        }
-        .batchTagArtworkSelection(isSelected)
+        .onTapGesture(perform: onSelect)
+        .batchTagArtworkSelection(state.isSelected)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(
-            BatchTagEditPresentationText.allSelectedTracksAccessibilityLabel
-        )
+        .accessibilityLabel(BatchTagEditPresentationText.allSelectedTracksAccessibilityLabel)
         .accessibilityValue(
             BatchTagEditPresentationText.selectedTracksAccessibilityValue(
-                for: summary.selectedCount
+                for: state.selectedCount
             )
         )
         .accessibilityAddTraits(.isButton)
@@ -57,14 +51,9 @@ struct BatchTagArtworkSummaryCard: View {
         }
     }
 
-    /// Форматированный общий размер preview-обложек.
-    private var formattedTotalArtworkSize: String {
-        BatchTagArtworkSizeFormatter.string(from: totalArtworkSizeBytesForPreview)
-    }
-
-    /// Badge с общим размером обложек.
+    /// Badge получает уже отформатированное Presenter-ом значение.
     private var sizeBadge: some View {
-        Text(formattedTotalArtworkSize)
+        Text(state.formattedArtworkSize)
             .font(.caption2)
             .foregroundStyle(.white)
             .lineLimit(1)
@@ -74,13 +63,7 @@ struct BatchTagArtworkSummaryCard: View {
             .clipShape(Capsule())
     }
 
-    /// Кнопка меню действий.
-    private var menuButton: some View {
-        BatchTagArtworkCardMenu {
-            onMenuAction($0, .summary)
-        }
-    }
-    /// Фон карточки.
+    /// Сохраняет существующую геометрию summary-карточки.
     private var background: some View {
         RoundedRectangle(cornerRadius: 24, style: .continuous)
             .fill(Color(.secondarySystemGroupedBackground))

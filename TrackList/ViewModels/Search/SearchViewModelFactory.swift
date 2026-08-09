@@ -27,8 +27,6 @@ struct SearchViewModelFactory {
     private let navigationCoordinator: NavigationCoordinator
     /// Менеджер sheet-состояния, подготовленный Composition Root.
     private let sheetManager: SheetManager
-    /// Координатор sheet-действий, подготовленный Composition Root.
-    private let sheetActionCoordinator: SheetActionCoordinator
     /// Общий обработчик переименования файла, подготовленный Composition Root.
     private let fileRenamer: TrackFileRenameActionHandler
 
@@ -42,7 +40,6 @@ struct SearchViewModelFactory {
         playbackController: any TrackPlaybackControlling,
         navigationCoordinator: NavigationCoordinator,
         sheetManager: SheetManager,
-        sheetActionCoordinator: SheetActionCoordinator,
         fileRenamer: TrackFileRenameActionHandler
     ) {
         self.searchService = searchService
@@ -53,7 +50,6 @@ struct SearchViewModelFactory {
         self.playbackController = playbackController
         self.navigationCoordinator = navigationCoordinator
         self.sheetManager = sheetManager
-        self.sheetActionCoordinator = sheetActionCoordinator
         self.fileRenamer = fileRenamer
     }
 
@@ -81,7 +77,6 @@ struct SearchViewModelFactory {
             playbackController: playbackController,
             navigationCoordinator: navigationCoordinator,
             sheetManager: sheetManager,
-            sheetActionCoordinator: sheetActionCoordinator,
             fileRenamer: fileRenamer,
             favoriteActionHandler: favoriteActionHandler
         )

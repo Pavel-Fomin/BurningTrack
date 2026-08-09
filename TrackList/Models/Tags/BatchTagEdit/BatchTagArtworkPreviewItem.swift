@@ -23,4 +23,6 @@ struct BatchTagArtworkPreviewItem: Identifiable, Equatable {
     let artworkRevision: Date?
     /// Размер исходной обложки в байтах.
     let artworkSizeBytes: Int?
+    /// Готовый запрос исходной artwork для presentation-компонента без доступа View к runtime store.
+    let originalArtworkRequest: ArtworkRequest?
 }

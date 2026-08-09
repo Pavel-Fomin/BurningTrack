@@ -21,12 +21,14 @@ struct LibraryCollectionTracksView: View {
     let playbackController: any TrackPlaybackControlling
     /// Published-состояние «Избранного» для presentation state строк.
     let favoriteTrackIdsProvider: any FavoriteTrackIdsProviding
-    /// Проверка занятости файла для массового переименования.
-    let fileBusyChecker: any TrackFileBusyChecking
     /// Общий обработчик одиночного переименования файла.
     let renameActionHandler: TrackFileRenameActionHandler
     /// Единый обработчик «Избранного» передаётся в строки выбранной коллекции.
     let favoriteTrackActionHandler: FavoriteTrackActionHandler
+    /// Тонкий маршрутизатор Batch Tag Edit передаётся из composition root.
+    let batchTagEditHandler: LibraryBatchTagEditHandler
+    /// Тонкий маршрутизатор Batch Filename Rename передаётся из composition root.
+    let batchRenameHandler: LibraryBatchRenameHandler
     /// Конфигурация нижней панели массового выбора в общем host фонотеки.
     @Binding var selectionActionBarConfig: SelectionActionBarConfig?
     @Binding var selectionActionSender: (any LibraryTracksActionSending)?
@@ -38,6 +40,7 @@ struct LibraryCollectionTracksView: View {
     // MARK: - Environment
 
     @Environment(\.scenePhase) private var scenePhase
+    /// Передаётся существующим row ActionHandler-ам, но не используется экраном для Sheet lifecycle.
     @EnvironmentObject var sheetManager: SheetManager
 
     // MARK: - ViewModel
@@ -52,7 +55,6 @@ struct LibraryCollectionTracksView: View {
     // MARK: - Coordinators
 
     private let selectionActionBarCoordinator = LibrarySelectionActionBarCoordinator()
-    private let sheetCoordinator = LibraryTracksSheetCoordinator()
 
     // MARK: - State
 
@@ -66,9 +68,10 @@ struct LibraryCollectionTracksView: View {
         playbackStateProvider: any PlaybackStateProviding,
         playbackController: any TrackPlaybackControlling,
         favoriteTrackIdsProvider: any FavoriteTrackIdsProviding,
-        fileBusyChecker: any TrackFileBusyChecking,
         renameActionHandler: TrackFileRenameActionHandler,
         favoriteTrackActionHandler: FavoriteTrackActionHandler,
+        batchTagEditHandler: LibraryBatchTagEditHandler,
+        batchRenameHandler: LibraryBatchRenameHandler,
         selectionActionBarConfig: Binding<SelectionActionBarConfig?> = .constant(nil),
         selectionActionSender: Binding<(any LibraryTracksActionSending)?> = .constant(nil),
         onAllTracksAction: ((LibraryAllTracksAction) -> Void)? = nil,
@@ -78,9 +81,10 @@ struct LibraryCollectionTracksView: View {
         self.playbackStateProvider = playbackStateProvider
         self.playbackController = playbackController
         self.favoriteTrackIdsProvider = favoriteTrackIdsProvider
-        self.fileBusyChecker = fileBusyChecker
         self.renameActionHandler = renameActionHandler
         self.favoriteTrackActionHandler = favoriteTrackActionHandler
+        self.batchTagEditHandler = batchTagEditHandler
+        self.batchRenameHandler = batchRenameHandler
         self._selectionActionBarConfig = selectionActionBarConfig
         self._selectionActionSender = selectionActionSender
         self.onAllTracksAction = onAllTracksAction
@@ -105,18 +109,15 @@ struct LibraryCollectionTracksView: View {
             musicLibraryManager: MusicLibraryManager.shared,
             trackURLProvider: { trackId in
                 await BookmarkResolver.url(forTrack: trackId)
-            }
+            },
+            batchRenameHandler: batchRenameHandler,
+            batchTagEditHandler: batchTagEditHandler
         )
         let presenter = LibraryTracksPresenter(
             output: tracksViewModel,
             selectionActionBarCoordinator: LibrarySelectionActionBarCoordinator()
         )
-        let actionHandler = LibraryTracksActionHandler(
-            output: tracksViewModel,
-            applyBatchFilenameRename: { [weak tracksViewModel, fileBusyChecker] in
-                await tracksViewModel?.applyBatchFilenameRename(using: fileBusyChecker)
-            }
-        )
+        let actionHandler = LibraryTracksActionHandler(output: tracksViewModel)
         tracksViewModel.configure(
             actionHandler: actionHandler,
             presenter: presenter
@@ -206,14 +207,8 @@ struct LibraryCollectionTracksView: View {
                 selectionActionSender = tracksViewModel
                 await tracksViewModel.loadTracksIfNeeded()
             }
-            .onChange(of: sheetManager.dismissCounter) { _, _ in
-                handleSheetDismissCounterChange()
-            }
             .onChange(of: tracksViewModel.bulkSelection.selectedCount) { _, _ in
                 updateSelectionActionBarConfig()
-            }
-            .onChange(of: tracksViewModel.batchFilenameRenameFlow.isActive) { _, isActive in
-                handleBatchFilenameRenameFlowActivityChange(isActive)
             }
             .onReceive(favoriteTrackIdsProvider.favoriteTrackIdsPublisher) { favoriteTrackIds in
                 self.favoriteTrackIds = favoriteTrackIds
@@ -294,7 +289,6 @@ struct LibraryCollectionTracksView: View {
             trackShareActionHandler: .shared,
             commandExecutor: .shared,
             toastManager: .shared,
-            sheetActionCoordinator: .shared,
             favoriteActionHandler: favoriteTrackActionHandler,
             onToggleSelection: { trackId in
                 tracksViewModel.toggleSelection(for: trackId)
@@ -440,38 +434,6 @@ struct LibraryCollectionTracksView: View {
         requestActiveTrackScrollIfNeeded()
     }
 
-    /// Обновляет список после закрытия глобального sheet.
-    private func handleSheetDismissCounterChange() {
-        guard sheetCoordinator.shouldRefreshAfterDismiss(
-            lastDismissedSheetKind: sheetManager.lastDismissedSheetKind,
-            isLoading: tracksViewModel.isLoading
-        ) else {
-            return
-        }
-
-        Task {
-            await tracksViewModel.refresh()
-        }
-    }
-
-    /// Открывает глобальный sheet при запуске flow массового переименования.
-    private func handleBatchFilenameRenameFlowActivityChange(_ isActive: Bool) {
-        guard sheetCoordinator.shouldPresentBatchFilenameRename(
-            isActive: isActive
-        ) else {
-            return
-        }
-
-        sheetManager.presentBatchFilenameRename(
-            flow: tracksViewModel.batchFilenameRenameFlow,
-            onApply: {
-                await tracksViewModel.applyBatchFilenameRename(
-                    using: fileBusyChecker
-                )
-            }
-        )
-    }
-
     /// Синхронизирует конфигурацию нижней панели подтверждения для родительского host.
     private func updateSelectionActionBarConfig() {
         guard let state = selectionActionBarCoordinator.makeState(
@@ -495,7 +457,7 @@ struct LibraryCollectionTracksView: View {
 
     /// Обрабатывает выбор batch-действия с учётом текущего режима и выбора.
     private func handleBatchActionSelection(_ action: BulkTrackAction) {
-        tracksViewModel.selectBulkAction(action)
+        tracksViewModel.send(.batchActionSelected(action))
         updateSelectionActionBarConfig()
     }
 

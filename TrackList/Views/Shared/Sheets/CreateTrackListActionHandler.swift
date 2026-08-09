@@ -12,84 +12,81 @@ import Foundation
 @MainActor
 final class CreateTrackListActionHandler {
 
-    /// Текущее название треклиста в форме.
-    private var name: String
-    /// Передаёт обновлённое название владельцу состояния.
-    private let onNameChanged: (String) -> Void
     /// Управляет созданием треклистов.
-    private let trackListsManager: TrackListsManager
+    private let trackListsManager: any TrackListFlowManaging
     /// Показывает пользовательские сообщения.
-    private let toastManager: ToastManager
-    /// Управляет открытием и закрытием sheet.
-    private let sheetManager: SheetManager
+    private let toastPresenter: any ToastPresenting
+    /// Маршрутизирует завершение формы и переход к выбору треков.
+    private let router: any CreateTrackListRouting
+    /// Неизменяемая идентичность конкретной формы создания.
+    private let routeID: UUID
 
     init(
-        name: String,
-        onNameChanged: @escaping (String) -> Void,
-        trackListsManager: TrackListsManager = .shared,
-        toastManager: ToastManager? = nil,
-        sheetManager: SheetManager? = nil
+        trackListsManager: any TrackListFlowManaging,
+        toastPresenter: any ToastPresenting,
+        router: any CreateTrackListRouting,
+        routeID: UUID = UUID()
     ) {
-        self.name = name
-        self.onNameChanged = onNameChanged
         self.trackListsManager = trackListsManager
-        self.toastManager = toastManager ?? .shared
-        self.sheetManager = sheetManager ?? .shared
+        self.toastPresenter = toastPresenter
+        self.router = router
+        self.routeID = routeID
     }
 
     /// Выполняет действие sheet-flow создания треклиста.
-    func handle(_ action: CreateTrackListAction) {
+    func handle(
+        _ action: CreateTrackListAction,
+        name: String
+    ) {
         switch action {
-        case .nameChanged(let newName):
-            name = newName
-            onNameChanged(newName)
+        case .nameChanged:
+            // Изменение поля — presentation-состояние CreateTrackListViewModel.
+            return
 
         case .createEmpty:
-            createEmptyTrackList()
+            createEmptyTrackList(name: name)
 
         case .addTracks:
-            openSelectionForCreate()
+            openSelectionForCreate(name: name)
 
         case .cancel:
-            sheetManager.closeActive()
+            router.dismissCreateTrackList(routeID)
         }
     }
 
     /// Создаёт пустой треклист и закрывает sheet.
-    private func createEmptyTrackList() {
-        let trimmedName = trimmedName()
+    private func createEmptyTrackList(name: String) {
+        let trimmedName = trimmedName(name)
 
         guard !trimmedName.isEmpty else { return }
 
         do {
             let created = try trackListsManager.createEmptyTrackList(withName: trimmedName)
-            toastManager.handle(.trackListCreated(name: created.name))
+            toastPresenter.handle(.trackListCreated(name: created.name))
         } catch let appError as AppError {
-            PersistentLogger.log("CreateTrackListContainer: create empty tracklist failed error=\(appError)")
-            toastManager.handle(appError)
+            PersistentLogger.log("CreateTrackListActionHandler: create empty tracklist failed error=\(appError)")
+            toastPresenter.handle(appError)
             return
         } catch {
-            PersistentLogger.log("CreateTrackListContainer: create empty tracklist failed error=\(error)")
-            toastManager.handle(AppError.trackListSaveFailed)
+            PersistentLogger.log("CreateTrackListActionHandler: create empty tracklist failed error=\(error)")
+            toastPresenter.handle(AppError.trackListSaveFailed)
             return
         }
 
-        sheetManager.closeActive()
+        router.dismissCreateTrackList(routeID)
     }
 
     /// Открывает выбор треков для создания треклиста после подтверждения.
-    private func openSelectionForCreate() {
-        let trimmedName = trimmedName()
+    private func openSelectionForCreate(name: String) {
+        let trimmedName = trimmedName(name)
 
         guard !trimmedName.isEmpty else { return }
 
-        sheetManager.presentNewTrackListSelectionForCreate(
-            name: trimmedName
-        )
+        router.presentTrackSelectionForCreate(name: trimmedName, from: routeID)
     }
 
     /// Возвращает название без внешних пробелов и переводов строк.
-    private func trimmedName() -> String {
+    private func trimmedName(_ name: String) -> String {
         name.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

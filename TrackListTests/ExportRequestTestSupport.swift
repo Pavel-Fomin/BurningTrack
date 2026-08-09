@@ -97,17 +97,23 @@ final class ExportDetailsRouterSpy: ExportDetailsRouting {
     /// Количество запросов открытия подробностей экспорта.
     private(set) var presentDetailsCallCount = 0
 
-    /// Количество запросов точечного закрытия подробностей экспорта.
-    private(set) var closeDetailsCallCount = 0
+    /// Route каждого запроса открытия подробностей экспорта.
+    private(set) var presentedRoutes: [ExportDetailsSheetRoute] = []
+
+    /// Route каждого точечного explicit dismiss подробностей экспорта.
+    private(set) var dismissedRoutes: [ExportDetailsSheetRoute] = []
 
     /// Сохраняет запрос открытия подробностей.
-    func presentExportDetails() {
+    func presentExportDetails() -> ExportDetailsSheetRoute {
         presentDetailsCallCount += 1
+        let route = ExportDetailsSheetRoute()
+        presentedRoutes.append(route)
+        return route
     }
 
     /// Сохраняет запрос закрытия подробностей.
-    func closeExportDetailsIfNeeded() {
-        closeDetailsCallCount += 1
+    func dismissExportDetails(_ route: ExportDetailsSheetRoute) {
+        dismissedRoutes.append(route)
     }
 }
 
@@ -141,7 +147,6 @@ func makeExportProgressViewModelForRequestTests(
                 toastPresenter: toastPresenter
             )
         ),
-        toastPresenter: toastPresenter,
-        detailsRouter: ExportDetailsRouterSpy()
+        toastPresenter: toastPresenter
     )
 }

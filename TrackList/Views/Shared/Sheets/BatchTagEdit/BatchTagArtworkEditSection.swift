@@ -2,68 +2,58 @@
 //  BatchTagArtworkEditSection.swift
 //  TrackList
 //
-//  UI-секция редактирования обложек при массовом редактировании тегов.
+//  Отображает готовые карточки artwork для массового редактирования тегов.
 //
-//  Created by PavelFomin on 25.05.2026.
+//  Created by Pavel Fomin on 09.08.2026.
 //
 
 import SwiftUI
 
-/// UI-секция редактирования обложек при массовом редактировании тегов.
+/// Leaf-секция artwork без binding к draft и без runtime-зависимостей.
 struct BatchTagArtworkEditSection: View {
-    /// Состояние редактирования обложек.
-    @Binding var artwork: BatchTagArtworkEditState
-    /// Обработчик действия из меню карточки.
-    let onMenuAction: (BatchTagArtworkMenuAction, BatchTagArtworkActionTarget) -> Void
+    /// Готовые данные карточек и прогресса artwork.
+    let state: BatchTagEditArtworkScreenState
+    /// Typed-канал всех изменений feature.
+    let send: (BatchTagEditAction) -> Void
+    /// Открывает системный picker после передачи action во ViewModel.
+    let onReplaceRequested: (BatchTagArtworkActionTarget) -> Void
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             previewScroll
-            if artwork.compressionFailureCount > 0 {
+            if let compressionFailureText = state.compressionFailureText {
                 Text(compressionFailureText)
                     .font(.footnote)
                     .foregroundStyle(.red)
                     .padding(.horizontal, 16)
             }
+            if let progress = state.preparationProgress {
+                ProgressView(value: Double(progress.current), total: Double(progress.total))
+                    .padding(.horizontal, 16)
+            }
         }
     }
 
-    /// Текст ошибки сжатия обложек.
-    private var compressionFailureText: String {
-        BatchTagEditPresentationText.compressionFailureText(
-            for: artwork.compressionFailureCount
-        )
-    }
-
-    /// Горизонтальный список preview-карточек.
+    /// Горизонтальный список карточек, полностью собранных Presenter-ом.
     private var previewScroll: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             LazyHStack(alignment: .top, spacing: 12) {
                 BatchTagArtworkSummaryCard(
-                    summary: artwork.previewSummary,
-                    totalArtworkSizeBytesForPreview: totalArtworkSizeBytesForPreview,
-                    isSelected: artwork.selectedTarget == .summary,
+                    state: state.summary,
                     onSelect: {
-                        artwork.selectedTarget = .summary
+                        send(.artworkTargetSelected(.summary))
                     },
-                    onMenuAction: onMenuAction
+                    onMenuAction: handleMenuAction
                 )
-                ForEach(artwork.previewItems) { item in
-                    let hasArtworkForPreview = hasArtworkForPreview(for: item)
-                    let artworkAction = artwork.action(for: item.trackId)
-                    let artworkSizeBytesForPreview = artworkSizeBytesForPreview(for: item)
+                ForEach(state.cards) { card in
                     BatchTagArtworkPreviewCard(
-                        item: item,
-                        artworkAction: artworkAction,
-                        replacementPreviewIdentifier: artwork.replacementPreviewIdentifier(
-                            for: item.trackId
-                        ),
-                        hasArtworkForPreview: hasArtworkForPreview,
-                        artworkSizeBytesForPreview: artworkSizeBytesForPreview,
-                        isSelected: artwork.selectedTarget == .track(item.trackId),
+                        state: card,
                         onSelect: {
-                            artwork.selectedTarget = .track(item.trackId)
+                            send(.artworkTargetSelected(.track(card.trackId)))
                         },
-                        onMenuAction: onMenuAction
+                        onMenuAction: { action in
+                            handleMenuAction(action, target: .track(card.trackId))
+                        }
                     )
                 }
             }
@@ -71,34 +61,18 @@ struct BatchTagArtworkEditSection: View {
         }
     }
 
-    /// Определяет, должна ли карточка визуально показывать обложку с учётом несохранённых изменений.
-    private func hasArtworkForPreview(for item: BatchTagArtworkPreviewItem) -> Bool {
-        switch artwork.action(for: item.trackId) {
-        case .keep:
-            return item.hasArtwork
+    /// Переводит UI-меню в feature actions, не позволяя карточкам менять draft напрямую.
+    private func handleMenuAction(
+        _ action: BatchTagArtworkMenuAction,
+        target: BatchTagArtworkActionTarget
+    ) {
+        switch action {
         case .remove:
-            return false
+            send(.artworkRemoveTapped(target: target))
         case .replace:
-            return item.hasArtwork
-        }
-    }
-
-    /// Возвращает размер обложки с учётом несохранённых изменений.
-    private func artworkSizeBytesForPreview(for item: BatchTagArtworkPreviewItem) -> Int {
-        switch artwork.action(for: item.trackId) {
-        case .keep:
-            return item.artworkSizeBytes ?? 0
-        case .remove:
-            return 0
-        case .replace(let data):
-            return data.count
-        }
-    }
-
-    /// Возвращает общий размер обложек с учётом несохранённых изменений.
-    private var totalArtworkSizeBytesForPreview: Int {
-        artwork.previewItems.reduce(0) { result, item in
-            result + artworkSizeBytesForPreview(for: item)
+            onReplaceRequested(target)
+        case .compress(let option):
+            send(.artworkCompressTapped(target: target, option: option))
         }
     }
 }

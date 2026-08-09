@@ -40,13 +40,31 @@ struct MoveToFolderSheet: View {
     /// Используется для бейджа "Текущая" и валидации.
     @Binding var trackCurrentFolderId: UUID?
 
+    /// Явно переданное read-only дерево папок для navigation context и virtual current row.
+    let library: MusicLibraryManager
+
     // MARK: - State
 
     /// Контекст навигации по дереву папок.
     /// Управляет переходами внутрь подпапок и возвратами назад.
-    @StateObject private var nav = MoveToFolderNavigationContext(
-        library: MusicLibraryManager.shared
-    )
+    @StateObject private var nav: MoveToFolderNavigationContext
+
+    init(
+        trackId: UUID,
+        rootNavigationTitle: String,
+        selectedFolderId: Binding<UUID?>,
+        trackCurrentFolderId: Binding<UUID?>,
+        library: MusicLibraryManager
+    ) {
+        self.trackId = trackId
+        self.rootNavigationTitle = rootNavigationTitle
+        _selectedFolderId = selectedFolderId
+        _trackCurrentFolderId = trackCurrentFolderId
+        self.library = library
+        _nav = StateObject(
+            wrappedValue: MoveToFolderNavigationContext(library: library)
+        )
+    }
 
     // MARK: - Rows
 
@@ -78,7 +96,7 @@ struct MoveToFolderSheet: View {
             return rows
         }
 
-        guard let currentFolder = MusicLibraryManager.shared.folder(for: currentId) else {
+        guard let currentFolder = library.folder(for: currentId) else {
             return rows
         }
 

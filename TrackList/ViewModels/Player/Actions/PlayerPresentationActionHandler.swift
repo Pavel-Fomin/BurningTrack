@@ -71,11 +71,7 @@ final class PlayerPresentationActionHandler {
         guard let track = track(queueItemId: queueItemId) else { return }
         guard canShowInLibrary(track) else { return }
 
-        sheetActionCoordinator.handle(
-            action: .showInLibrary,
-            track: track,
-            context: .player
-        )
+        sheetActionCoordinator.showInLibrary(track)
     }
 
     /// Открывает сценарий перемещения элемента очереди плеера в другую папку.
@@ -83,11 +79,7 @@ final class PlayerPresentationActionHandler {
         guard let track = track(queueItemId: queueItemId) else { return }
         guard canUseFileActions(track) else { return }
 
-        sheetActionCoordinator.handle(
-            action: .moveToFolder,
-            track: track,
-            context: .player
-        )
+        sheetManager.presentMoveToFolder(for: track)
     }
 
     /// Открывает выбор треклиста для элемента очереди плеера.
@@ -136,7 +128,7 @@ final class PlayerPresentationActionHandler {
     func artworkTap(queueItemId: UUID) {
         guard let track = track(queueItemId: queueItemId) else { return }
 
-        sheetManager.present(.trackDetail(track))
+        sheetManager.presentTrackDetail(track)
     }
 
     /// Подготавливает файл элемента очереди через общий flow без работы с URL во View.

@@ -21,7 +21,6 @@ struct LibraryTracksScreenFactory {
     private let playbackStateProvider: any PlaybackStateProviding
     private let playbackController: any TrackPlaybackControlling
     private let favoriteTrackIdsProvider: any FavoriteTrackIdsProviding
-    private let fileBusyChecker: any TrackFileBusyChecking
     private let renameActionHandler: TrackFileRenameActionHandler
     private let favoriteTrackActionHandler: FavoriteTrackActionHandler
     private let sheetManager: SheetManager
@@ -30,7 +29,6 @@ struct LibraryTracksScreenFactory {
     private let trackShareActionHandler: TrackShareActionHandler
     private let commandExecutor: AppCommandExecutor
     private let toastManager: ToastManager
-    private let sheetActionCoordinator: SheetActionCoordinator
 
     init(
         tracksProvider: LibraryTracksProvider,
@@ -42,7 +40,6 @@ struct LibraryTracksScreenFactory {
         playbackStateProvider: any PlaybackStateProviding,
         playbackController: any TrackPlaybackControlling,
         favoriteTrackIdsProvider: any FavoriteTrackIdsProviding,
-        fileBusyChecker: any TrackFileBusyChecking,
         renameActionHandler: TrackFileRenameActionHandler,
         favoriteTrackActionHandler: FavoriteTrackActionHandler,
         sheetManager: SheetManager,
@@ -50,8 +47,7 @@ struct LibraryTracksScreenFactory {
         collectionNavigationHandler: TrackCollectionNavigationHandler,
         trackShareActionHandler: TrackShareActionHandler,
         commandExecutor: AppCommandExecutor,
-        toastManager: ToastManager,
-        sheetActionCoordinator: SheetActionCoordinator
+        toastManager: ToastManager
     ) {
         self.tracksProvider = tracksProvider
         self.badgeProvider = badgeProvider
@@ -62,7 +58,6 @@ struct LibraryTracksScreenFactory {
         self.playbackStateProvider = playbackStateProvider
         self.playbackController = playbackController
         self.favoriteTrackIdsProvider = favoriteTrackIdsProvider
-        self.fileBusyChecker = fileBusyChecker
         self.renameActionHandler = renameActionHandler
         self.favoriteTrackActionHandler = favoriteTrackActionHandler
         self.sheetManager = sheetManager
@@ -71,7 +66,6 @@ struct LibraryTracksScreenFactory {
         self.trackShareActionHandler = trackShareActionHandler
         self.commandExecutor = commandExecutor
         self.toastManager = toastManager
-        self.sheetActionCoordinator = sheetActionCoordinator
     }
 
     /// Возвращает контейнер, который откладывает production composition до инициализации StateObject.
@@ -100,35 +94,40 @@ struct LibraryTracksScreenFactory {
         )
     }
 
+    /// Собирает ViewModel папки для selection-flow без создания production-зависимостей во View.
+    func makeSelectionTracksViewModel(
+        folder: LibraryFolder
+    ) -> LibraryTracksViewModel {
+        makeTracksViewModel(
+            folder: folder,
+            usesLibrarySortSettings: false
+        )
+    }
+
+    /// Собирает тонкий маршрутизатор Batch Tag Edit без глобальных singleton в Library ViewModel.
+    func makeBatchTagEditHandler() -> LibraryBatchTagEditHandler {
+        LibraryBatchTagEditHandler(router: sheetManager)
+    }
+
+    /// Собирает тонкий маршрутизатор Batch Filename Rename без singleton в Library ViewModel.
+    func makeBatchRenameHandler() -> LibraryBatchRenameHandler {
+        LibraryBatchRenameHandler(router: sheetManager)
+    }
+
     /// Собирает graph один раз по запросу StateObject-контейнера, не из body родительского View.
     func makeScreenStore(
         folder: LibraryFolder,
         revealRequest: LibraryRevealRequest?
     ) -> LibraryTracksScreenStore {
-        let viewModel = LibraryTracksViewModel(
-            folderURL: folder.url,
-            renameActionHandler: renameActionHandler,
-            tracksProvider: tracksProvider,
-            badgeProvider: badgeProvider,
-            eventProvider: makeEventProvider(),
-            runtimeController: LibraryTrackRuntimeController(),
-            settingsManager: settingsManager,
-            trackRegistry: trackRegistry,
-            musicLibraryManager: musicLibraryManager,
-            trackURLProvider: { [trackRegistry] trackId in
-                await BookmarkResolver.url(forTrack: trackId, trackRegistry: trackRegistry)
-            }
+        let viewModel = makeTracksViewModel(
+            folder: folder,
+            usesLibrarySortSettings: true
         )
         let presenter = LibraryTracksPresenter(
             output: viewModel,
             selectionActionBarCoordinator: LibrarySelectionActionBarCoordinator()
         )
-        let actionHandler = LibraryTracksActionHandler(
-            output: viewModel,
-            applyBatchFilenameRename: { [weak viewModel, fileBusyChecker] in
-                await viewModel?.applyBatchFilenameRename(using: fileBusyChecker)
-            }
-        )
+        let actionHandler = LibraryTracksActionHandler(output: viewModel)
         viewModel.configure(actionHandler: actionHandler, presenter: presenter)
 
         let cloudController = LibraryCloudAvailabilityScreenController(
@@ -152,7 +151,6 @@ struct LibraryTracksScreenFactory {
             trackShareActionHandler: trackShareActionHandler,
             commandExecutor: commandExecutor,
             toastManager: toastManager,
-            sheetActionCoordinator: sheetActionCoordinator,
             favoriteActionHandler: favoriteTrackActionHandler,
             screenActionHandler: actionHandler,
             onRenameTrack: { [weak viewModel] trackId, strategy in
@@ -171,6 +169,30 @@ struct LibraryTracksScreenFactory {
             presentationHandler: presentationHandler,
             commandHandler: commandHandler,
             favoriteTrackIdsProvider: favoriteTrackIdsProvider
+        )
+    }
+
+    /// Создаёт общую ViewModel папки, изолируя её production-зависимости внутри Library Tracks factory.
+    private func makeTracksViewModel(
+        folder: LibraryFolder,
+        usesLibrarySortSettings: Bool
+    ) -> LibraryTracksViewModel {
+        LibraryTracksViewModel(
+            folderURL: folder.url,
+            renameActionHandler: renameActionHandler,
+            tracksProvider: tracksProvider,
+            badgeProvider: badgeProvider,
+            eventProvider: makeEventProvider(),
+            runtimeController: LibraryTrackRuntimeController(),
+            settingsManager: settingsManager,
+            trackRegistry: trackRegistry,
+            musicLibraryManager: musicLibraryManager,
+            trackURLProvider: { [trackRegistry] trackId in
+                await BookmarkResolver.url(forTrack: trackId, trackRegistry: trackRegistry)
+            },
+            batchRenameHandler: makeBatchRenameHandler(),
+            batchTagEditHandler: makeBatchTagEditHandler(),
+            usesLibrarySortSettings: usesLibrarySortSettings
         )
     }
 }

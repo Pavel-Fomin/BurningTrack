@@ -13,7 +13,6 @@ struct LibraryTrackCommandHandler {
     /// Выполняет команду добавления в плеер без обращения строки к application singleton.
     let commandExecutor: AppCommandExecutor
     let toastManager: ToastManager
-    let sheetActionCoordinator: SheetActionCoordinator
     /// Общий обработчик «Избранного» сохраняет состояние и публикует подтверждённое событие.
     private let favoriteActionHandler: FavoriteTrackActionHandler
     /// Экранный маршрут нужен только для selection, которое относится к LibraryTracks, а не к строке.
@@ -28,7 +27,7 @@ struct LibraryTrackCommandHandler {
         case .tapRow(let track, let context):
             playbackHandler.handleTap(track: track, context: context)
         case .tapArtwork(let track):
-            sheetManager.present(.trackDetail(track))
+            sheetManager.presentTrackDetail(track)
         case .share(let track):
             trackShareActionHandler.share(track)
         case .addToPlayer(let trackId):
@@ -42,11 +41,7 @@ struct LibraryTrackCommandHandler {
         case .goToAlbum(let trackId):
             collectionNavigationHandler.openAlbum(trackId: trackId)
         case .moveToFolder(let track):
-            sheetActionCoordinator.handle(
-                action: .moveToFolder,
-                track: track,
-                context: .library
-            )
+            sheetManager.presentMoveToFolder(for: track)
         case .editTags(let track):
             sheetManager.presentTrackDetailForEditing(track)
         case .rename(let trackId, let strategy):
@@ -85,7 +80,6 @@ struct LibraryTrackCommandHandler {
         trackShareActionHandler: TrackShareActionHandler,
         commandExecutor: AppCommandExecutor,
         toastManager: ToastManager,
-        sheetActionCoordinator: SheetActionCoordinator,
         favoriteActionHandler: FavoriteTrackActionHandler,
         screenActionHandler: LibraryTracksActionHandler? = nil,
         onToggleSelection: ((UUID) -> Void)? = nil,
@@ -99,7 +93,6 @@ struct LibraryTrackCommandHandler {
         self.trackShareActionHandler = trackShareActionHandler
         self.commandExecutor = commandExecutor
         self.toastManager = toastManager
-        self.sheetActionCoordinator = sheetActionCoordinator
         self.favoriteActionHandler = favoriteActionHandler
         self.screenActionHandler = screenActionHandler
         self.onToggleSelection = onToggleSelection

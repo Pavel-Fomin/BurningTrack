@@ -12,80 +12,63 @@ import Foundation
 @MainActor
 final class RenameTrackListActionHandler {
 
-    /// ID треклиста, который нужно переименовать.
-    private let trackListId: UUID
-    /// Текущее название треклиста в форме.
-    private var name: String
-    /// Передаёт обновлённое название владельцу состояния.
-    private let onNameChanged: (String) -> Void
-    /// Выполняет команду переименования треклиста.
-    private let commandExecutor: AppCommandExecutor
+    /// Управляет метаданными треклистов.
+    private let trackListsService: any TrackListsManaging
     /// Показывает пользовательские сообщения.
-    private let toastManager: ToastManager
-    /// Управляет закрытием sheet.
-    private let sheetManager: SheetManager
+    private let toastPresenter: any ToastPresenting
+    /// Маршрутизирует завершение rename-sheet.
+    private let router: any RenameTrackListRouting
+    /// Неизменяемая идентичность конкретного rename route.
+    private let routeID: UUID
 
     init(
-        trackListId: UUID,
-        name: String,
-        onNameChanged: @escaping (String) -> Void,
-        commandExecutor: AppCommandExecutor? = nil,
-        toastManager: ToastManager? = nil,
-        sheetManager: SheetManager? = nil
+        trackListsService: any TrackListsManaging,
+        toastPresenter: any ToastPresenting,
+        router: any RenameTrackListRouting,
+        routeID: UUID = UUID()
     ) {
-        self.trackListId = trackListId
-        self.name = name
-        self.onNameChanged = onNameChanged
-        self.commandExecutor = commandExecutor ?? .shared
-        self.toastManager = toastManager ?? .shared
-        self.sheetManager = sheetManager ?? .shared
+        self.trackListsService = trackListsService
+        self.toastPresenter = toastPresenter
+        self.router = router
+        self.routeID = routeID
     }
 
-    /// Выполняет действие sheet-flow переименования треклиста.
-    func handle(_ action: RenameTrackListAction) {
-        switch action {
-        case .nameChanged(let newName):
-            name = newName
-            onNameChanged(newName)
-
-        case .submit:
-            Task {
-                await renameTrackList()
-            }
-
-        case .cancel:
-            sheetManager.closeActive()
-        }
+    /// Закрывает rename-sheet без выполнения доменной команды.
+    func cancel() {
+        router.dismissRenameTrackList(routeID)
     }
 
-    /// Переименовывает треклист через текущий command-flow и закрывает sheet при успехе.
-    private func renameTrackList() async {
-        let trimmedName = trimmedName()
+    /// Переименовывает треклист и закрывает sheet только после успешной команды.
+    func rename(
+        trackListId: UUID,
+        newName: String
+    ) -> RenameTrackListResult {
+        let trimmedName = newName.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        guard !trimmedName.isEmpty else { return }
+        guard !trimmedName.isEmpty else { return .failure }
 
         do {
-            let result = try await commandExecutor.renameTrackList(
-                trackListId: trackListId,
-                newName: trimmedName
+            try trackListsService.renameTrackList(
+                id: trackListId,
+                to: trimmedName
             )
-            AppCommandToastPresenter(
-                toastPresenter: toastManager
-            ).present(result)
-            sheetManager.closeActive()
+            toastPresenter.handle(.trackListRenamed(newName: trimmedName))
+            router.dismissRenameTrackList(routeID)
+            return .success
         } catch let appError as AppError {
-            print("❌ Ошибка переименования треклиста: \(appError)")
-            AppCommandToastPresenter(
-                toastPresenter: toastManager
-            ).present(appError)
+            PersistentLogger.log("RenameTrackListActionHandler: rename tracklist failed error=\(appError)")
+            toastPresenter.handle(appError)
+            return .failure
         } catch {
-            print("❌ Ошибка переименования треклиста: \(error)")
-            toastManager.handle(AppError.trackListSaveFailed)
+            PersistentLogger.log("RenameTrackListActionHandler: rename tracklist failed error=\(error)")
+            toastPresenter.handle(AppError.trackListSaveFailed)
+            return .failure
         }
     }
+}
 
-    /// Возвращает название без внешних пробелов и переводов строк.
-    private func trimmedName() -> String {
-        name.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
+/// Результат доменной операции переименования для координации flow.
+enum RenameTrackListResult: Equatable {
+    case success
+    case failure
 }

@@ -25,16 +25,9 @@ struct BatchTagMetadataLoader {
     /// Ограничение параллельной загрузки snapshot.
     private let limiter: BatchTagMetadataAsyncLimiter
 
-    @MainActor
-    init(concurrentLimit: Int = 6) {
-        self.runtimeStore = .shared
-        self.snapshotBuilder = .shared
-        self.limiter = BatchTagMetadataAsyncLimiter(limit: concurrentLimit)
-    }
-
     init(
         runtimeStore: TrackRuntimeStore,
-        snapshotBuilder: TrackRuntimeSnapshotBuilder = .shared,
+        snapshotBuilder: TrackRuntimeSnapshotBuilder,
         concurrentLimit: Int = 6
     ) {
         self.runtimeStore = runtimeStore

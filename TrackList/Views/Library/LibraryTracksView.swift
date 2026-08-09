@@ -45,7 +45,6 @@ struct LibraryTracksView: View {
     @State private var presentationHandler: LibraryTrackPresentationHandler
     @State private var commandHandler: LibraryTrackCommandHandler
     private let selectionActionBarCoordinator = LibrarySelectionActionBarCoordinator()
-    private let sheetCoordinator = LibraryTracksSheetCoordinator()
 
     // MARK: -  Локальное состояние для скролла
     
@@ -165,12 +164,6 @@ struct LibraryTracksView: View {
             }
             .onChange(of: tracksViewModel.state.selectionActionBarState) { _, newValue in
                 updateSelectionActionBarConfig(from: newValue)
-            }
-            .onChange(of: tracksViewModel.state.isBatchFilenameRenameFlowActive) { _, isActive in
-                tracksViewModel.send(
-                    .batchFilenameRenameFlowChanged(isActive: isActive)
-                )
-                handleBatchFilenameRenameFlowActivityChange(isActive)
             }
             .onReceive(favoriteTrackIdsProvider.favoriteTrackIdsPublisher) { favoriteTrackIds in
                 self.favoriteTrackIds = favoriteTrackIds
@@ -375,22 +368,6 @@ struct LibraryTracksView: View {
     private func handleScenePhaseChange(_ newPhase: ScenePhase) {
         guard newPhase == .active else { return }
         requestActiveTrackScrollIfNeeded()
-    }
-
-    /// Открывает глобальный sheet при запуске flow массового переименования.
-    private func handleBatchFilenameRenameFlowActivityChange(_ isActive: Bool) {
-        guard sheetCoordinator.shouldPresentBatchFilenameRename(
-            isActive: isActive
-        ) else {
-            return
-        }
-
-        sheetManager.presentBatchFilenameRename(
-            flow: tracksViewModel.batchFilenameRenameFlow,
-            onApply: {
-                tracksViewModel.send(.batchFilenameRenameApplyRequested)
-            }
-        )
     }
 
     /// Синхронизирует конфигурацию нижней панели подтверждения для родительского host.

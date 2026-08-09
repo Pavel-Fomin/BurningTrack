@@ -174,8 +174,7 @@ final class LibraryFolderActionHandlerTests: XCTestCase {
                     toastPresenter: toastPresenter
                 )
             ),
-            toastPresenter: toastPresenter,
-            detailsRouter: ExportDetailsRouterSpy()
+            toastPresenter: toastPresenter
         )
     }
 

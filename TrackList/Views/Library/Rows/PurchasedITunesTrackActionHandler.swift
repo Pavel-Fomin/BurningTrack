@@ -9,6 +9,17 @@
 
 import Foundation
 
+/// Явные production-зависимости sheet- и command-действий строки iTunes.
+@MainActor
+struct PurchasedITunesTrackActionDependencies {
+    /// Открывает единый lifecycle-managed Sheet Flow.
+    let sheetManager: SheetManager
+    /// Выполняет добавление iTunes-трека в очередь плеера.
+    let commandExecutor: AppCommandExecutor
+    /// Показывает feedback команды добавления в плеер.
+    let toastPresenter: any ToastPresenting
+}
+
 /// Выполняет действия строки iTunes без смешивания с LibraryTrack и без логики во View.
 @MainActor
 struct PurchasedITunesTrackActionHandler {
@@ -33,16 +44,14 @@ struct PurchasedITunesTrackActionHandler {
     init(
         playbackState: PlaybackStateSnapshot,
         playbackController: any TrackPlaybackControlling,
-        sheetManager: SheetManager? = nil,
-        commandExecutor: AppCommandExecutor = .shared,
-        toastPresenter: (any ToastPresenting)? = nil,
+        actionDependencies: PurchasedITunesTrackActionDependencies,
         favoriteActionHandler: FavoriteTrackActionHandler
     ) {
         self.playbackState = playbackState
         self.playbackController = playbackController
-        self.sheetManager = sheetManager ?? SheetManager.shared
-        self.commandExecutor = commandExecutor
-        self.toastPresenter = toastPresenter ?? ToastManager.shared
+        self.sheetManager = actionDependencies.sheetManager
+        self.commandExecutor = actionDependencies.commandExecutor
+        self.toastPresenter = actionDependencies.toastPresenter
         self.favoriteActionHandler = favoriteActionHandler
     }
 

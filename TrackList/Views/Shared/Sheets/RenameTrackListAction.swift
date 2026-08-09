@@ -16,4 +16,6 @@ enum RenameTrackListAction {
     case submit
     /// Пользователь закрыл sheet без переименования.
     case cancel
+    /// SwiftUI подтвердил исчезновение конкретного sheet route.
+    case sheetDisappeared
 }

@@ -13,15 +13,9 @@ import SwiftUI
 @MainActor
 final class LibraryTracksActionHandler {
     private weak var output: (any LibraryTracksActionHandlingOutput)?
-    /// Замыкание связывает действие с существующим batch handler-ом, не раскрывая ViewModel во View.
-    private let applyBatchFilenameRename: @MainActor () async -> Void
 
-    init(
-        output: any LibraryTracksActionHandlingOutput,
-        applyBatchFilenameRename: @escaping @MainActor () async -> Void
-    ) {
+    init(output: any LibraryTracksActionHandlingOutput) {
         self.output = output
-        self.applyBatchFilenameRename = applyBatchFilenameRename
     }
 
     /// Сохраняет единственную точку входа действий, а асинхронные сценарии оставляет у screen-flow.
@@ -53,15 +47,9 @@ final class LibraryTracksActionHandler {
             output?.selectBatchAction(action)
         case .batchActionConfirmed:
             output?.confirmBatchAction()
-        case .batchFilenameRenameApplyRequested:
-            Task { [applyBatchFilenameRename] in
-                await applyBatchFilenameRename()
-            }
         case .revealRequestReceived,
-             .scenePhaseChanged,
-             .batchFilenameRenameFlowChanged:
-            // Reveal и scene phase дают View только решение для SwiftUI-эффекта, а flow переименования
-            // по-прежнему использует существующий SheetManager в рамках этапа 2.1.
+             .scenePhaseChanged:
+            // Reveal и scene phase дают View только решение для SwiftUI-эффекта.
             break
         }
     }

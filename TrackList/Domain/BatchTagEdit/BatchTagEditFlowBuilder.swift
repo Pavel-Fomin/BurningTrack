@@ -154,7 +154,12 @@ enum BatchTagEditFlowBuilder {
                 title: snapshot.fileName,
                 hasArtwork: snapshot.artworkData != nil,
                 artworkRevision: snapshot.updatedAt,
-                artworkSizeBytes: snapshot.artworkData?.count
+                artworkSizeBytes: snapshot.artworkData?.count,
+                originalArtworkRequest: ArtworkRequest(
+                    trackId: snapshot.trackId,
+                    snapshot: snapshot,
+                    purpose: .batchTagPreview
+                )
             )
         }
     }

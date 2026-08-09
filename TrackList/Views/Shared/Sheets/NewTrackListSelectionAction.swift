@@ -10,8 +10,16 @@
 import Foundation
 
 enum NewTrackListSelectionAction {
+    /// Пользователь изменил выбор одного трека.
+    case toggleTrack(LibraryTrack)
+    /// Пользователь выбрал все треки открытой папки.
+    case selectAll([LibraryTrack])
+    /// Пользователь снял выбор со всех треков открытой папки.
+    case deselectAll([LibraryTrack])
     /// Пользователь подтвердил выбранные треки.
     case submit
     /// Пользователь закрыл sheet без применения выбора.
     case cancel
+    /// SwiftUI подтвердил исчезновение конкретного sheet route.
+    case sheetDisappeared
 }

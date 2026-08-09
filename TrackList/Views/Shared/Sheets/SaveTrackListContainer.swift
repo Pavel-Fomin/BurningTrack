@@ -2,13 +2,11 @@
 //  SaveTrackListContainer.swift
 //  TrackList
 //
-//  UI-контейнер экрана создания треклиста.
+//  UI-контейнер экрана сохранения очереди плеера в треклист.
 //
 //  Роль контейнера:
-//  - владеет состоянием формы (name)
-//  - управляет бизнес-действием сохранения
-//  - управляет закрытием sheet’а
-//  - конфигурирует NavigationBarHost
+//  - удерживает готовую ViewModel Save TrackList flow
+//  - передаёт presentation-state и typed actions в UI
 //
 //  ВАЖНО:
 //  - НЕ содержит визуальной разметки формы
@@ -24,70 +22,22 @@ import Foundation
 
 struct SaveTrackListContainer: View {
 
-    // MARK: - State
+    /// Готовая ViewModel формы, созданная feature factory.
+    @StateObject private var viewModel: SaveTrackListViewModel
 
-    /// Название нового треклиста. Источник истины для формы.
-    @State private var name = generateDefaultTrackListName()
-
-    /// Фокус поля имени для управления клавиатурой из контейнера.
-    @FocusState private var isNameFocused: Bool
+    init(viewModel: SaveTrackListViewModel) {
+        self._viewModel = StateObject(wrappedValue: viewModel)
+    }
 
     // MARK: - UI
 
     var body: some View {
-        NavigationBarHost(
-            title: "Tracklist Name",
-
-            /// Кнопка подтверждения (✓)
-            rightButtonImage: "checkmark",
-
-            /// Активна только при валидном имени
-            isRightEnabled: .constant(
-                TrackListManager.shared.validateName(name)
-            ),
-
-            /// Закрытие sheet’а без действий
-            onClose: {
-                closeSheet()
-            },
-
-            /// Подтверждение создания треклиста
-            onRightTap: {
-                Task { await create() }
-            }
-        ) {
-            /// Чистый UI-слой формы
-            SaveTrackListSheet(
-                name: $name,
-                isNameFocused: $isNameFocused
-            )
-        }
-    }
-
-    // MARK: - Actions
-
-    /// Закрывает sheet после предварительного снятия фокуса с поля ввода.
-    private func closeSheet() {
-        isNameFocused = false
-        SheetManager.shared.closeActive()
-    }
-
-    /// Асинхронное создание треклиста
-    private func create() async {
-        do {
-            let result = try await AppCommandExecutor.shared.createTrackList(name: name)
-            AppCommandToastPresenter(
-                toastPresenter: ToastManager.shared
-            ).present(result)
-            closeSheet()
-        } catch let appError as AppError {
-            print("❌ Ошибка сохранения треклиста: \(appError)")
-            AppCommandToastPresenter(
-                toastPresenter: ToastManager.shared
-            ).present(appError)
-        } catch {
-            print("❌ Ошибка сохранения треклиста: \(error)")
-            ToastManager.shared.handle(AppError.trackListSaveFailed)
+        SaveTrackListSheet(
+            state: viewModel.state,
+            onAction: viewModel.handle
+        )
+        .onDisappear {
+            viewModel.handle(.sheetDisappeared)
         }
     }
 }

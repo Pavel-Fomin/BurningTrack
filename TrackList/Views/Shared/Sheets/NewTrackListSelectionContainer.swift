@@ -11,32 +11,27 @@ import SwiftUI
 
 struct NewTrackListSelectionContainer: View {
 
-    let data: NewTrackListSelectionSheetData
-
-    /// Общий обработчик переименования файлов треков.
-    let renameActionHandler: TrackFileRenameActionHandler
-
-    /// Передаёт published-снимок «Избранного» в готовое состояние строк выбора.
-    let favoriteTrackIdsProvider: any FavoriteTrackIdsProviding
-
     // MARK: - State
 
-    /// Количество выбранных треков.
-    /// Состояние выбора треков внутри sheet.
-    @StateObject private var viewModel = NewTrackListSelectionViewModel()
+    /// ViewModel выбора уже собрана feature-factory и сохраняет выбор на время sheet-flow.
+    @StateObject private var viewModel: NewTrackListSelectionViewModel
+    /// Создаёт дочерние folder-экраны через существующую factory Library Tracks.
+    let folderViewFactory: NewTrackListSelectionFolderViewFactory
+
+    // MARK: - Init
+
+    init(
+        viewModel: NewTrackListSelectionViewModel,
+        folderViewFactory: NewTrackListSelectionFolderViewFactory
+    ) {
+        _viewModel = StateObject(wrappedValue: viewModel)
+        self.folderViewFactory = folderViewFactory
+    }
 
     // MARK: - UI
 
     var body: some View {
-        let state = NewTrackListSelectionStateBuilder().build(
-            selectedCount: viewModel.selectedCount
-        )
-        let actionHandler = NewTrackListSelectionActionHandler(
-            mode: data.mode,
-            selectedTracksProvider: {
-                viewModel.selectedTracks
-            }
-        )
+        let state = viewModel.state
 
         ZStack(alignment: .bottom) {
             NavigationBarHost(
@@ -53,20 +48,19 @@ struct NewTrackListSelectionContainer: View {
 
                 /// Закрытие sheet’а без применения выбора.
                 onClose: {
-                    actionHandler.handle(.cancel)
+                    viewModel.handle(.cancel)
                 },
 
                 /// Применение выбранных треков после подтверждения.
                 onRightTap: {
-                    actionHandler.handle(.submit)
+                    viewModel.handle(.submit)
                 },
                 showsRightButtonOnlyOnRoot: true
             ) {
                 NewTrackListSelectionFolderListView(
-                    folders: MusicLibraryManager.shared.attachedFolders,
-                    renameActionHandler: renameActionHandler,
-                    selectionViewModel: viewModel,
-                    favoriteTrackIdsProvider: favoriteTrackIdsProvider
+                    folders: state.folders,
+                    folderViewFactory: folderViewFactory,
+                    selectionViewModel: viewModel
                 )
             }
             
@@ -81,10 +75,16 @@ struct NewTrackListSelectionContainer: View {
                     iconName: "music.note",
                     isPrimaryEnabled: state.canSubmit,
                     onPrimaryTap: {
-                        actionHandler.handle(.submit)
+                        viewModel.handle(.submit)
                     }
                 )
             }
+        }
+        .task {
+            viewModel.reloadFolders()
+        }
+        .onDisappear {
+            viewModel.handle(.sheetDisappeared)
         }
     }
 }

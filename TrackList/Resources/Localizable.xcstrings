@@ -3044,6 +3044,17 @@
         }
       }
     },
+    "trackDetail.yearInvalid" : {
+      "comment" : "Пояснение невалидного значения года в форме Track Detail.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter a valid year."
+          }
+        }
+      }
+    },
     "toast.tracklist.cleared" : {
       "localizations" : {
         "en" : {

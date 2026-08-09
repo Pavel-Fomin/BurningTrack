@@ -29,11 +29,8 @@ struct ExportProgressCompactView: View {
     /// Снимок состояния, полученный напрямую от ExportProgressViewModel.
     let progress: ExportProgress
 
-    /// Открывает подробный результат операции.
-    let onTap: () -> Void
-
-    /// Удаляет терминальный результат из глобального состояния.
-    let onDismiss: () -> Void
+    /// Направляет все намерения компактной панели в Export-feature.
+    let actionHandler: any ExportActionHandling
 
     // MARK: - Presentation
 
@@ -118,7 +115,9 @@ struct ExportProgressCompactView: View {
         ZStack(alignment: .topTrailing) {
             // Основное содержимое остаётся отдельной кнопкой и открывает детали.
             // Кнопка закрытия размещается рядом, поэтому вложенных Button нет.
-            Button(action: onTap) {
+            Button {
+                actionHandler.handle(.presentDetails)
+            } label: {
                 HStack(spacing: 8) {
                     if isDismissibleResult {
                         Text(resultTitle)
@@ -161,7 +160,9 @@ struct ExportProgressCompactView: View {
             if isDismissibleResult {
                 // В активной операции кнопка отсутствует: экспорт нельзя скрыть
                 // до его завершения и случайно прервать отображение прогресса.
-                Button(action: onDismiss) {
+                Button {
+                    actionHandler.handle(.dismissCompleted)
+                } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.secondary)
                         .frame(width: dismissIconSize, height: dismissIconSize)
@@ -187,7 +188,7 @@ struct ExportProgressCompactView: View {
         .modifier(
             ExportCompletionSwipeDismissModifier(
                 isEnabled: isCompleted,
-                onDismiss: onDismiss
+                actionHandler: actionHandler
             )
         )
         // Повторяем горизонтальные отступы мини-плеера: 16 у стекла и 8 у общего хоста.
@@ -262,8 +263,8 @@ private struct ExportCompletionSwipeDismissModifier: ViewModifier {
     /// Разрешает жест только после успешного завершения копирования.
     let isEnabled: Bool
 
-    /// Удаляет завершённый результат из глобального состояния.
-    let onDismiss: () -> Void
+    /// Направляет результат жеста в typed Export-feature ActionHandler.
+    let actionHandler: any ExportActionHandling
 
     /// Добавляет жест горизонтального смахивания с безопасным порогом.
     func body(content: Content) -> some View {
@@ -279,7 +280,7 @@ private struct ExportCompletionSwipeDismissModifier: ViewModifier {
                             return
                         }
 
-                        onDismiss()
+                        actionHandler.handle(.dismissCompleted)
                     }
             )
         } else {

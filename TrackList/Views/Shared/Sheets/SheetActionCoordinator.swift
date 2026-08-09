@@ -2,13 +2,10 @@
 //  SheetActionCoordinator.swift
 //  TrackList
 //
-//  Координатор UI-действий, инициируемых из sheet’ов.
+//  Координатор межэкранной навигации из действий над треком.
 //
 //  Отвечает за:
-//  - интерпретацию TrackAction
-//  - открытие следующих sheet’ов
-//  - навигацию между экранами
-//  - закрытие текущего sheet
+//  - переход к треку в фонотеке
 //
 //  НЕ содержит бизнес-логики.
 //  НЕ выполняет команды.
@@ -31,38 +28,12 @@ final class SheetActionCoordinator {
 
     // MARK: - Зависимости
 
-    private let sheetManager = SheetManager.shared
     private let navigationCoordinator = NavigationCoordinator.shared
 
     // MARK: - Обработка действий над треком
 
-    /// Обрабатывает действие над треком, инициированное из sheet.
-    ///
-    /// - Parameters:
-    ///   - action: Действие, выбранное пользователем.
-    ///   - track: Трек, к которому применяется действие.
-    ///   - context: Контекст, из которого вызвано действие.
-    ///
-    func handle(
-        action: TrackAction,
-        track: any TrackDisplayable,
-        context: TrackContext
-    ) {
-        switch action {
-
-        case .moveToFolder:
-            // 1. Закрываем текущий sheet
-            sheetManager.closeActive()
-
-            // 2. Открываем sheet перемещения
-            sheetManager.presentMoveToFolder(for: track)
-
-        case .showInLibrary:
-            // Переходим к треку в фонотеке
-            navigationCoordinator.showInLibrary(track)
-
-            // Закрываем текущий sheet
-            sheetManager.closeActive()
-        }
+    /// Переходит к треку в фонотеке, не меняя состояние активного sheet.
+    func showInLibrary(_ track: any TrackDisplayable) {
+        navigationCoordinator.showInLibrary(track)
     }
 }

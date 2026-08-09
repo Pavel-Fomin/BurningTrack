@@ -7,6 +7,7 @@
 //  Created by Pavel Fomin on 18.07.2026.
 //
 
+import Foundation
 import UIKit
 
 /// Описывает действия пользователя и экранов, относящиеся к глобальному экспорту.
@@ -29,9 +30,17 @@ enum ExportAction {
     /// Закрывает подробный экран, сохраняя результат операции.
     case dismissDetails
 
-    /// Сообщает о системном закрытии подробного экрана.
-    case detailsDidDisappear
+    /// Сообщает об исчезновении конкретного route подробностей после системного dismiss.
+    case detailsDidDisappear(ExportDetailsSheetRoute)
 
     /// Удаляет завершённый результат из глобального состояния.
     case dismissCompleted
+}
+
+/// Принимает типизированные действия Export-feature из SwiftUI-представлений.
+@MainActor
+protocol ExportActionHandling: AnyObject {
+
+    /// Выполняет пользовательское намерение или lifecycle-событие экспорта.
+    func handle(_ action: ExportAction)
 }

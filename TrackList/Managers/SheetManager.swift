@@ -37,6 +37,25 @@ struct MoveToFolderSheetData: Identifiable, Equatable {
     }
 }
 
+// MARK: - Данные для TrackDetailSheet
+
+/// Неизменяемый route карточки трека.
+///
+/// `id` описывает конкретное открытие sheet, а не доменную идентичность трека:
+/// один и тот же трек может быть открыт повторно после закрытия предыдущего route.
+struct TrackDetailSheetData: Identifiable, Equatable {
+    let id = UUID()
+    let track: any TrackDisplayable
+    let initialMode: TrackDetailMode
+
+    static func == (
+        lhs: TrackDetailSheetData,
+        rhs: TrackDetailSheetData
+    ) -> Bool {
+        lhs.id == rhs.id
+    }
+}
+
 // MARK: - Данные для RenameTrackListSheet
 
 struct RenameTrackListSheetData: Identifiable, Equatable {
@@ -88,6 +107,20 @@ enum NewTrackListSelectionMode: Equatable {
 struct NewTrackListSelectionSheetData: Identifiable, Equatable {
     let id = UUID()
     let mode: NewTrackListSelectionMode
+}
+
+// MARK: - Данные для CreateTrackListSheet
+
+/// Идентичность одного открытия формы создания треклиста.
+struct CreateTrackListSheetData: Identifiable, Equatable {
+    let id = UUID()
+
+    static func == (
+        lhs: CreateTrackListSheetData,
+        rhs: CreateTrackListSheetData
+    ) -> Bool {
+        lhs.id == rhs.id
+    }
 }
 
 // MARK: - Данные для AddToTrackListSheet
@@ -143,8 +176,8 @@ struct BatchTagEditSheetData: Identifiable, Equatable {
     /// Идентификатор sheet.
     let id: UUID
 
-    /// Сохранение массовых изменений тегов.
-    let onSave: () async -> Void
+    /// Зафиксированное массовое действие для feature-local загрузки metadata.
+    let pendingAction: PendingBulkTrackAction
 
     static func == (
         lhs: BatchTagEditSheetData,
@@ -158,14 +191,14 @@ struct BatchTagEditSheetData: Identifiable, Equatable {
 
 /// Данные для показа sheet массового переименования файлов.
 struct BatchFilenameRenameSheetData: Identifiable, Equatable {
-    /// Идентификатор sheet.
-    let id = UUID()
+    /// Идентификатор конкретного открытия sheet.
+    let id: UUID
 
-    /// Flow массового переименования файлов.
-    let flow: BatchFilenameRenameFlow
+    /// Зафиксированное массовое действие текущей feature-сессии.
+    let pendingAction: PendingBulkTrackAction
 
-    /// Применение подготовленного плана переименования.
-    let onApply: () async -> Void
+    /// Неизменяемый снимок строк, позволяющий sheet открыться до загрузки runtime metadata.
+    let tracks: [BatchFilenameRenameTrackSeed]
 
     static func == (
         lhs: BatchFilenameRenameSheetData,
@@ -178,25 +211,9 @@ struct BatchFilenameRenameSheetData: Identifiable, Equatable {
 
 // MARK: - Перечень шитов
 
-enum AppSheetKind: Equatable {
-    case moveToFolder
-    case trackDetail
-    case addToTrackList
-    case renameTrackList
-    case renameTrackFile
-    case saveTrackList
-    case newTrackListSelection
-    case batchTagEdit
-    case batchFilenameRename
-    case batchAddToTrackList
-    case createTrackList
-    case exportProgress
-}
-
 enum AppSheet: Identifiable, Equatable {
     case moveToFolder(MoveToFolderSheetData)
-    case trackDetail(any TrackDisplayable)
-    case trackDetailEdit(any TrackDisplayable)
+    case trackDetail(TrackDetailSheetData)
     case addToTrackList(AddToTrackListSheetData)
     case renameTrackList(RenameTrackListSheetData)
     case renameTrackFile(RenameTrackFileSheetData)
@@ -205,15 +222,14 @@ enum AppSheet: Identifiable, Equatable {
     case batchTagEdit(BatchTagEditSheetData)
     case batchFilenameRename(BatchFilenameRenameSheetData)
     case batchAddToTrackList(AddToTrackListSheetData)
-    case createTrackList
-    case exportProgress
+    case createTrackList(CreateTrackListSheetData)
+    case exportProgress(ExportDetailsSheetRoute)
     
 
     var id: String {
         switch self {
         case .moveToFolder(let data): return "moveToFolder_\(data.id)"
-        case .trackDetail(let track): return "trackDetail_\(track.id)"
-        case .trackDetailEdit(let track): return "trackDetailEdit_\(track.id)"
+        case .trackDetail(let data): return "trackDetail_\(data.id)"
         case .addToTrackList(let data): return "addToTrackList_\(data.id)"
         case .renameTrackList(let data): return "renameTrackList_\(data.id)"
         case .renameTrackFile(let data): return "renameTrackFile_\(data.id)"
@@ -222,8 +238,8 @@ enum AppSheet: Identifiable, Equatable {
         case .batchTagEdit(let data): return "batchTagEdit_\(data.id)"
         case .batchFilenameRename(let data): return "batchFilenameRename_\(data.id)"
         case .batchAddToTrackList(let data): return "batchAddToTrackList_\(data.id)"
-        case .createTrackList: return "createTrackList"
-        case .exportProgress: return "exportProgress"
+        case .createTrackList(let data): return "createTrackList_\(data.id)"
+        case .exportProgress(let route): return "exportProgress_\(route.id)"
         }
     }
 
@@ -231,24 +247,6 @@ enum AppSheet: Identifiable, Equatable {
         lhs.id == rhs.id
     }
 
-    /// Тип sheet без payload для принятия решений после dismiss.
-    var kind: AppSheetKind {
-        switch self {
-        case .moveToFolder: return .moveToFolder
-        case .trackDetail,
-             .trackDetailEdit: return .trackDetail
-        case .addToTrackList: return .addToTrackList
-        case .renameTrackList: return .renameTrackList
-        case .renameTrackFile: return .renameTrackFile
-        case .saveTrackList: return .saveTrackList
-        case .newTrackListSelection: return .newTrackListSelection
-        case .batchTagEdit: return .batchTagEdit
-        case .batchFilenameRename: return .batchFilenameRename
-        case .batchAddToTrackList: return .batchAddToTrackList
-        case .createTrackList: return .createTrackList
-        case .exportProgress: return .exportProgress
-        }
-    }
 }
 
 // MARK: - SheetManager
@@ -258,96 +256,102 @@ final class SheetManager: ObservableObject {
 
     static let shared = SheetManager()
 
-    /// Текущий отображаемый шит
-    @Published var activeSheet: AppSheet?   /// Текущий отображаемый шит
+    /// Текущий отображаемый sheet.
+    ///
+    /// SwiftUI при интерактивном закрытии сначала записывает `nil` в binding,
+    /// а затем вызывает `onDismiss`. Поэтому здесь фиксируется route, который
+    /// действительно начал закрываться, если закрытие инициировано не через `closeActive()`.
+    @Published var activeSheet: AppSheet? {
+        didSet {
+            guard activeSheet == nil,
+                  let previouslyActiveSheet = oldValue,
+                  dismissingSheet == nil else {
+                return
+            }
 
-    /// Следующий шит, который должен открыться после dismiss текущего
+            dismissingSheet = previouslyActiveSheet
+        }
+    }
+
+    /// Sheet, закрытие которого уже началось и ожидает подтверждения от SwiftUI `onDismiss`.
+    /// Хранится отдельно от `activeSheet`, чтобы новый route не мог быть принят за закрытый.
+    private var dismissingSheet: AppSheet?
+
+    /// Единственный следующий sheet, который откроется после подтверждённого dismiss.
+    /// При повторном запросе во время закрытия последнее намерение заменяет предыдущее.
     private var pendingSheet: AppSheet?
-
-    /// Последний показанный sheet для корректной очистки состояния после dismiss.
-    private var lastActiveSheet: AppSheet?
 
     /// ID строки для выделения в списках
     @Published var highlightedRowID: UUID?
     
-    /// Счётчик закрытий sheet’ов.
-    /// Используется как единая точка UX-commit после dismiss.
-    @Published private(set) var dismissCounter: Int = 0
-
-    /// Тип последнего закрытого sheet для точечной реакции экранов на dismiss.
-    @Published private(set) var lastDismissedSheetKind: AppSheetKind?
-
-    /// Flow массового редактирования тегов.
-    @Published var batchTagEditFlow = BatchTagEditFlow(
-        pendingAction: nil,
-        phase: .editing,
-        tracks: [],
-        fields: [],
-        trackFieldOverrides: [:],
-        artwork: BatchTagArtworkEditState(
-            summary: .none,
-            previewSummary: BatchTagArtworkPreviewSummary(
-                selectedCount: 0,
-                artworkCount: 0,
-                missingArtworkCount: 0
-            ),
-            previewItems: [],
-            selectedTarget: nil
-        )
-    )
-
-    /// Проверяет, не открыт ли уже sheet массового переименования.
-    private var isBatchFilenameRenamePresentedOrPending: Bool {
-        if case .batchFilenameRename = activeSheet {
-            return true
-        }
-
-        if case .batchFilenameRename = pendingSheet {
-            return true
-        }
-
-        return false
-    }
-
-    private init() {}
+    /// Основной код приложения использует `shared`, а internal-инициализатор нужен целевым
+    /// модульным тестам для проверки независимого жизненного цикла без изменения глобального состояния приложения.
+    init() {}
 
 
     // MARK: - ОСНОВНОЙ МЕТОД ПОКАЗА ШИТОВ
 
     func present(_ sheet: AppSheet) {
-        highlightedRowID = sheet.relatedRowId
-
-        if activeSheet == nil {
-            // Можно открыть сразу
-            activeSheet = sheet
-            lastActiveSheet = sheet
-        } else {
-            // Шит уже на экране → откроем после dismiss
-            pendingSheet = sheet
-            activeSheet = nil  // закрываем текущий
+        guard activeSheet == nil, dismissingSheet == nil else {
+            replaceActive(with: sheet)
+            return
         }
+
+        presentImmediately(sheet)
     }
 
+    /// Атомарно заменяет текущий sheet следующим route.
+    ///
+    /// Новый route не назначается в `activeSheet` до `onDismiss`: это сохраняет
+    /// связь между системным dismiss и route, для которого нужно очистить временное состояние.
+    func replaceActive(with sheet: AppSheet) {
+        if activeSheet != nil {
+            pendingSheet = sheet
+            closeActive()
+            return
+        }
+
+        if dismissingSheet != nil {
+            // Одного pending route достаточно для текущих сценариев. Последний запрос
+            // отражает актуальное пользовательское намерение и заменяет предыдущий.
+            pendingSheet = sheet
+            return
+        }
+
+        presentImmediately(sheet)
+    }
+
+
+    // MARK: - ЗАКРЫТИЕ И ПОДТВЕРЖДЕНИЕ DISMISS
+
+    /// Начинает закрытие текущего sheet без назначения следующего route.
+    func closeActive() {
+        guard let activeSheet else { return }
+
+        dismissingSheet = activeSheet
+        self.activeSheet = nil
+    }
 
     // MARK: - ВЫЗЫВАЕТСЯ ИЗ ContentView.onDismiss
   
     func handleDismiss() {
-        let dismissedSheet = activeSheet ?? lastActiveSheet
-        lastDismissedSheetKind = dismissedSheet?.kind
+        guard let dismissedSheet = dismissingSheet else {
+            return
+        }
 
-        // Фиксируем факт закрытия sheet — UX-commit
-        dismissCounter += 1
-
-        resetTransientStateIfNeeded(for: dismissedSheet)
-
+        dismissingSheet = nil
         if let next = pendingSheet {
             pendingSheet = nil
-            activeSheet = next
-            lastActiveSheet = next
+            presentImmediately(next)
         } else {
-            lastActiveSheet = nil
             highlightedRowID = nil
         }
+    }
+
+    /// Назначает route только тогда, когда никакой dismiss не ожидает подтверждения.
+    private func presentImmediately(_ sheet: AppSheet) {
+        activeSheet = sheet
+        highlightedRowID = sheet.relatedRowId
     }
     
     
@@ -373,12 +377,26 @@ final class SheetManager: ObservableObject {
     }
 
     func presentTrackDetail(_ track: any TrackDisplayable) {
-        present(.trackDetail(track))
+        present(
+            .trackDetail(
+                TrackDetailSheetData(
+                    track: track,
+                    initialMode: .view
+                )
+            )
+        )
     }
 
     /// Открывает карточку трека сразу в режиме редактирования тегов.
     func presentTrackDetailForEditing(_ track: any TrackDisplayable) {
-        present(.trackDetailEdit(track))
+        present(
+            .trackDetail(
+                TrackDetailSheetData(
+                    track: track,
+                    initialMode: .edit
+                )
+            )
+        )
     }
 
     func presentAddToTrackList(
@@ -402,10 +420,6 @@ final class SheetManager: ObservableObject {
         present(.batchAddToTrackList(data))
     }
 
-    func closeActive() {
-        activeSheet = nil
-    }
-    
     func presentRenameTrackList(
         trackListId: UUID,
         currentName: String
@@ -450,86 +464,142 @@ final class SheetManager: ObservableObject {
     }
 
     func presentCreateTrackList() {
-        activeSheet = .createTrackList
-        lastActiveSheet = .createTrackList
+        present(.createTrackList(CreateTrackListSheetData()))
     }
 
-    /// Показывает sheet массового редактирования тегов.
-    func presentBatchTagEdit(
-        flow: BatchTagEditFlow,
-        onSave: @escaping () async -> Void
+    // MARK: - Route-specific dismiss
+
+    /// Закрывает только совпадающий route выбора папки.
+    func dismissMoveToFolder(_ routeID: UUID) {
+        guard case let .moveToFolder(data)? = activeSheet,
+              data.id == routeID else {
+            return
+        }
+
+        closeActive()
+    }
+
+    /// Закрывает только совпадающий route карточки трека.
+    func dismissTrackDetail(_ routeID: UUID) {
+        guard case let .trackDetail(data)? = activeSheet,
+              data.id == routeID else {
+            return
+        }
+
+        closeActive()
+    }
+
+    /// Закрывает только совпадающий route добавления в треклист.
+    func dismissAddToTrackList(_ routeID: UUID) {
+        guard let activeSheet else {
+            return
+        }
+
+        let activeRouteID: UUID
+        switch activeSheet {
+        case let .addToTrackList(data), let .batchAddToTrackList(data):
+            activeRouteID = data.id
+
+        default:
+            return
+        }
+
+        guard activeRouteID == routeID else {
+            return
+        }
+
+        closeActive()
+    }
+
+    /// Закрывает только совпадающий route переименования треклиста.
+    func dismissRenameTrackList(_ routeID: UUID) {
+        guard case let .renameTrackList(data)? = activeSheet,
+              data.id == routeID else {
+            return
+        }
+
+        closeActive()
+    }
+
+    /// Закрывает только совпадающий route ручного переименования файла.
+    func dismissRenameTrackFile(_ routeID: UUID) {
+        guard case let .renameTrackFile(data)? = activeSheet,
+              data.id == routeID else {
+            return
+        }
+
+        closeActive()
+    }
+
+    /// Закрывает только совпадающий route сохранения очереди.
+    func dismissSaveTrackList(_ routeID: UUID) {
+        guard case let .saveTrackList(data)? = activeSheet,
+              data.id == routeID else {
+            return
+        }
+
+        closeActive()
+    }
+
+    /// Закрывает только совпадающий route выбора треков для треклиста.
+    func dismissNewTrackListSelection(_ routeID: UUID) {
+        guard case let .newTrackListSelection(data)? = activeSheet,
+              data.id == routeID else {
+            return
+        }
+
+        closeActive()
+    }
+
+    /// Закрывает только совпадающий route массового редактирования тегов.
+    func dismissBatchTagEdit(_ routeID: UUID) {
+        guard case let .batchTagEdit(data)? = activeSheet,
+              data.id == routeID else {
+            return
+        }
+
+        closeActive()
+    }
+
+    /// Закрывает только совпадающий route массового переименования файлов.
+    func dismissBatchFilenameRename(_ routeID: UUID) {
+        guard case let .batchFilenameRename(data)? = activeSheet,
+              data.id == routeID else {
+            return
+        }
+
+        closeActive()
+    }
+
+    /// Закрывает только совпадающий route создания треклиста.
+    func dismissCreateTrackList(_ routeID: UUID) {
+        guard case let .createTrackList(data)? = activeSheet,
+              data.id == routeID else {
+            return
+        }
+
+        closeActive()
+    }
+
+    /// Заменяет текущую форму создания выбором треков только для исходного route.
+    func presentTrackSelectionForCreate(
+        name: String,
+        from routeID: UUID
     ) {
-        batchTagEditFlow = flow
-        present(
-            .batchTagEdit(
-                BatchTagEditSheetData(
-                    id: UUID(),
-                    onSave: onSave
+        guard case let .createTrackList(data)? = activeSheet,
+              data.id == routeID else {
+            return
+        }
+
+        replaceActive(
+            with: .newTrackListSelection(
+                NewTrackListSelectionSheetData(
+                    mode: .create(trackListName: name)
                 )
             )
         )
     }
 
-    /// Показывает sheet массового переименования файлов.
-    func presentBatchFilenameRename(
-        flow: BatchFilenameRenameFlow,
-        onApply: @escaping () async -> Void
-    ) {
-        guard !isBatchFilenameRenamePresentedOrPending else { return }
-
-        let data = BatchFilenameRenameSheetData(
-            flow: flow,
-            onApply: onApply
-        )
-
-        present(.batchFilenameRename(data))
-    }
-
-    /// Сбрасывает временные состояния sheet после закрытия.
-    private func resetTransientStateIfNeeded(for sheet: AppSheet?) {
-        switch sheet {
-        case .batchTagEdit:
-            resetBatchTagEditFlow()
-
-        case .batchFilenameRename(let data):
-            data.flow.reset()
-
-        case .moveToFolder,
-             .trackDetail,
-             .trackDetailEdit,
-             .addToTrackList,
-             .batchAddToTrackList,
-             .renameTrackList,
-             .renameTrackFile,
-             .saveTrackList,
-             .newTrackListSelection,
-             .createTrackList,
-             .exportProgress,
-             nil:
-            return
-        }
-    }
-
-    /// Сбрасывает flow массового редактирования тегов.
-    private func resetBatchTagEditFlow() {
-        batchTagEditFlow = BatchTagEditFlow(
-            pendingAction: nil,
-            phase: .editing,
-            tracks: [],
-            fields: [],
-            trackFieldOverrides: [:],
-            artwork: BatchTagArtworkEditState(
-                summary: .none,
-                previewSummary: BatchTagArtworkPreviewSummary(
-                    selectedCount: 0,
-                    artworkCount: 0,
-                    missingArtworkCount: 0
-                ),
-                previewItems: [],
-                selectedTarget: nil
-            )
-        )
-    }
 }
 
 
@@ -539,8 +609,7 @@ private extension AppSheet {
     var relatedRowId: UUID? {
         switch self {
         case .moveToFolder(let d): return d.track.id
-        case .trackDetail(let t): return t.id
-        case .trackDetailEdit(let t): return t.id
+        case .trackDetail(let data): return data.track.id
         case .addToTrackList(let data): return data.firstTrack?.id
         case .renameTrackList: return nil
         case .renameTrackFile(let data): return data.rowId
@@ -563,14 +632,21 @@ extension SheetManager: TrackListsPresenting {}
 
 extension SheetManager: ExportDetailsRouting {
 
-    /// Открывает глобальный sheet с подробностями текущего экспорта.
-    func presentExportDetails() {
-        present(.exportProgress)
+    /// Открывает глобальный sheet с неизменяемой идентичностью конкретного Export route.
+    func presentExportDetails() -> ExportDetailsSheetRoute {
+        if case let .exportProgress(route)? = activeSheet {
+            return route
+        }
+
+        let route = ExportDetailsSheetRoute()
+        present(.exportProgress(route))
+        return route
     }
 
-    /// Закрывает только открытый sheet подробностей экспорта.
-    func closeExportDetailsIfNeeded() {
-        guard case .exportProgress = activeSheet else {
+    /// Закрывает только совпадающий активный route подробностей экспорта.
+    func dismissExportDetails(_ route: ExportDetailsSheetRoute) {
+        guard case let .exportProgress(activeRoute)? = activeSheet,
+              activeRoute == route else {
             return
         }
 

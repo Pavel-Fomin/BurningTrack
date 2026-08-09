@@ -28,8 +28,6 @@ struct LibraryTracksScreenState: Equatable {
     var selectedTrackIDs = OrderedSelection<UUID>()
     var selectionActionBarState: LibrarySelectionActionBarState?
     var trackListMembershipsById: [UUID: [TrackListMembership]] = [:]
-    /// Достаточно для View открыть существующий sheet; сам mutable flow остаётся в его handler-е.
-    var isBatchFilenameRenameFlowActive = false
 
     /// Пустота считается только после завершения первой загрузки, поэтому loader не меняет UI-поведение.
     var isEmpty: Bool {

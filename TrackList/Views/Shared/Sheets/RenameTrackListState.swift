@@ -11,7 +11,9 @@ import Foundation
 
 struct RenameTrackListState {
     /// Текущее название треклиста в форме.
-    var name: String
+    let name: String
     /// Можно ли подтвердить переименование с текущим названием.
-    var canSubmit: Bool
+    let canSubmit: Bool
+    /// Выполняется ли доменная команда переименования.
+    let isSubmitting: Bool
 }

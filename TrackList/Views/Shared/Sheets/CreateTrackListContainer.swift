@@ -14,36 +14,34 @@ struct CreateTrackListContainer: View {
 
     // MARK: - State
 
-    /// Название нового треклиста.
-    @State private var name = generateDefaultTrackListName()
+    /// ViewModel формы уже собрана feature-factory и удерживается на время sheet-flow.
+    @StateObject private var viewModel: CreateTrackListViewModel
+
+    // MARK: - Init
+
+    init(viewModel: CreateTrackListViewModel) {
+        _viewModel = StateObject(wrappedValue: viewModel)
+    }
 
     // MARK: - UI
 
     var body: some View {
-        let state = CreateTrackListStateBuilder().build(name: name)
-        let actionHandler = CreateTrackListActionHandler(
-            name: state.name,
-            onNameChanged: { newName in
-                name = newName
-            }
-        )
-
         CreateTrackListSheet(
             name: Binding(
-                get: { name },
+                get: { viewModel.state.name },
                 set: { newName in
-                    actionHandler.handle(.nameChanged(newName))
+                    viewModel.handle(.nameChanged(newName))
                 }
             ),
-            canSubmit: state.canSubmit,
+            canSubmit: viewModel.state.canSubmit,
             onCreateEmpty: {
-                actionHandler.handle(.createEmpty)
+                viewModel.handle(.createEmpty)
             },
             onAddTracks: {
-                actionHandler.handle(.addTracks)
+                viewModel.handle(.addTracks)
             },
             onCancel: {
-                actionHandler.handle(.cancel)
+                viewModel.handle(.cancel)
             }
         )
     }

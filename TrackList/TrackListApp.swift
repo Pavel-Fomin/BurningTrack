@@ -25,16 +25,12 @@ struct TrackListApp: App {
     /// Единый менеджер фонотеки приложения.
     let musicLibraryManager: MusicLibraryManager
     let playerViewModel: PlayerViewModel
-    /// Capability состояния «Избранного» для глобальных sheet-сценариев.
-    let favoriteTrackIdsProvider: any FavoriteTrackIdsProviding
     /// Capability проверки занятости файла для глобальных файловых sheet-сценариев.
     let fileBusyChecker: any TrackFileBusyChecking
     /// Capability согласованного освобождения текущего файла.
     let playbackFileReleaser: any CurrentPlaybackFileReleasing
     /// Единый обработчик «Избранного» передаётся во все production-сценарии приложения.
     let favoriteTrackActionHandler: FavoriteTrackActionHandler
-    /// Готовый обработчик переименования файлов сохраняется на весь жизненный цикл приложения.
-    let renameActionHandler: TrackFileRenameActionHandler
     /// Готовая фабрика экранного flow плеера с явными production-зависимостями.
     let playerScreenViewModelFactory: PlayerScreenViewModelFactory
     /// Готовые фабрики feature фонотеки с явными production-зависимостями.
@@ -45,6 +41,26 @@ struct TrackListApp: App {
     let trackListFeatureDependencies: TrackListFeatureDependencies
     /// Единый ActionHandler master-flow треклистов для tab- и sidebar-компоновок.
     let trackListsActionHandler: TrackListsActionHandler
+    /// Готовая factory связанного flow создания и выбора треклиста.
+    let createTrackListFlowFactory: CreateTrackListFlowFactory
+    /// Готовая factory feature-flow переименования треклиста.
+    let renameTrackListFeatureFactory: RenameTrackListFeatureFactory
+    /// Готовая factory feature-flow добавления треков в треклист.
+    let addToTrackListFeatureFactory: AddToTrackListFeatureFactory
+    /// Готовая factory feature-flow сохранения очереди плеера в треклист.
+    let saveTrackListFeatureFactory: SaveTrackListFeatureFactory
+    /// Готовая factory feature-flow ручного переименования файла трека.
+    let renameTrackFileFeatureFactory: RenameTrackFileFeatureFactory
+    /// Готовая factory feature-flow просмотра и редактирования одного трека.
+    let trackDetailFeatureFactory: TrackDetailFeatureFactory
+    /// Готовая factory feature-flow выбора папки и файловой операции.
+    let moveToFolderFeatureFactory: MoveToFolderFeatureFactory
+    /// Готовая factory feature-local массового редактирования тегов.
+    let batchTagEditFeatureFactory: BatchTagEditFeatureFactory
+    /// Готовая factory feature-local массового переименования файлов.
+    let batchFilenameRenameFeatureFactory: BatchFilenameRenameFeatureFactory
+    /// Единственный ActionHandler пользовательских действий и Sheet Flow Export-feature.
+    let exportActionHandler: ExportFeatureActionHandler
 
     /// Глобальная ViewModel сохраняет экспорт при смене вкладок и закрытии picker-а.
     @StateObject private var exportProgressViewModel: ExportProgressViewModel
@@ -182,6 +198,25 @@ struct TrackListApp: App {
             actionHandlerFactory: trackListActionHandlerFactory
         )
 
+        let libraryTracksScreenFactory = LibraryTracksScreenFactory(
+            tracksProvider: FastLibraryTracksProvider(),
+            badgeProvider: DefaultTrackListBadgeProvider(),
+            makeEventProvider: { NotificationLibraryTrackEventProvider() },
+            settingsManager: appSettingsManager,
+            trackRegistry: trackRegistry,
+            musicLibraryManager: musicLibraryManager,
+            playbackStateProvider: playbackStateProvider,
+            playbackController: playbackController,
+            favoriteTrackIdsProvider: favoriteTrackIdsProvider,
+            renameActionHandler: renameActionHandler,
+            favoriteTrackActionHandler: favoriteTrackActionHandler,
+            sheetManager: sheetManager,
+            cloudAvailabilityManager: cloudTrackAvailabilityManager,
+            collectionNavigationHandler: trackCollectionNavigationHandler,
+            trackShareActionHandler: trackShareActionHandler,
+            commandExecutor: commandExecutor,
+            toastManager: toastManager
+        )
         let libraryFeatureDependencies = LibraryFeatureDependencies(
             screenViewModelFactory: LibraryScreenViewModelFactory(
                 navigationCoordinator: navigationCoordinator,
@@ -222,32 +257,16 @@ struct TrackListApp: App {
                 summaryProvider: summaryProvider,
                 eventProvider: NotificationLibraryTrackEventProvider()
             ),
-            tracksScreenFactory: LibraryTracksScreenFactory(
-                tracksProvider: FastLibraryTracksProvider(),
-                badgeProvider: DefaultTrackListBadgeProvider(),
-                makeEventProvider: { NotificationLibraryTrackEventProvider() },
-                settingsManager: appSettingsManager,
-                trackRegistry: trackRegistry,
-                musicLibraryManager: musicLibraryManager,
-                playbackStateProvider: playbackStateProvider,
-                playbackController: playbackController,
-                favoriteTrackIdsProvider: favoriteTrackIdsProvider,
-                fileBusyChecker: fileBusyChecker,
-                renameActionHandler: renameActionHandler,
-                favoriteTrackActionHandler: favoriteTrackActionHandler,
-                sheetManager: sheetManager,
-                cloudAvailabilityManager: cloudTrackAvailabilityManager,
-                collectionNavigationHandler: trackCollectionNavigationHandler,
-                trackShareActionHandler: trackShareActionHandler,
-                commandExecutor: commandExecutor,
-                toastManager: toastManager,
-                sheetActionCoordinator: sheetActionCoordinator
-            ),
+            tracksScreenFactory: libraryTracksScreenFactory,
             playbackStateProvider: playbackStateProvider,
             playbackController: playbackController,
             favoriteTrackIdsProvider: favoriteTrackIdsProvider,
-            fileBusyChecker: fileBusyChecker,
-            trackFileRenameActionHandler: renameActionHandler
+            trackFileRenameActionHandler: renameActionHandler,
+            purchasedITunesTrackActionDependencies: PurchasedITunesTrackActionDependencies(
+                sheetManager: sheetManager,
+                commandExecutor: commandExecutor,
+                toastPresenter: toastManager
+            )
         )
 
         let searchViewModelFactory = SearchViewModelFactory(
@@ -264,7 +283,6 @@ struct TrackListApp: App {
             playbackController: playbackController,
             navigationCoordinator: navigationCoordinator,
             sheetManager: sheetManager,
-            sheetActionCoordinator: sheetActionCoordinator,
             fileRenamer: renameActionHandler
         )
 
@@ -283,6 +301,83 @@ struct TrackListApp: App {
         let navigationViewModel = MainNavigationViewModel(
             scenePhaseHandler: scenePhaseHandler
         )
+        let createTrackListFlowFactory = CreateTrackListFlowFactory(
+            trackListsManager: trackListsManager,
+            toastPresenter: toastManager,
+            createRouter: sheetManager,
+            selectionRouter: sheetManager,
+            foldersProvider: musicLibraryManager,
+            libraryTracksScreenFactory: libraryTracksScreenFactory,
+            favoriteTrackIdsProvider: favoriteTrackIdsProvider
+        )
+        let renameTrackListFeatureFactory = RenameTrackListFeatureFactory(
+            trackListsService: trackListsManager,
+            toastPresenter: toastManager,
+            router: sheetManager
+        )
+        let addToTrackListFeatureFactory = AddToTrackListFeatureFactory(
+            trackListsService: trackListsManager,
+            commandExecutor: commandExecutor,
+            toastPresenter: toastManager,
+            router: sheetManager
+        )
+        let saveTrackListFeatureFactory = SaveTrackListFeatureFactory(
+            queueProvider: playlistManager,
+            trackListsService: trackListsManager,
+            toastPresenter: toastManager,
+            router: sheetManager
+        )
+        let renameTrackFileFeatureFactory = RenameTrackFileFeatureFactory(
+            fileBusyChecker: fileBusyChecker,
+            playbackFileReleaser: playbackFileReleaser,
+            commandExecutor: commandExecutor,
+            toastPresenter: toastManager,
+            router: sheetManager,
+            proposalBuilder: FileRenameProposalBuilder()
+        )
+        let trackDetailFeatureFactory = TrackDetailFeatureFactory(
+            snapshotProvider: runtimeSnapshotStore,
+            snapshotBuilder: runtimeSnapshotBuilder,
+            fileURLResolver: BookmarkTrackDetailFileURLResolver(),
+            commandExecutor: commandExecutor,
+            fileBusyChecker: fileBusyChecker,
+            playbackFileReleaser: playbackFileReleaser,
+            toastPresenter: toastManager,
+            router: sheetManager,
+            eventProvider: NotificationTrackDetailEventProvider()
+        )
+        let moveToFolderFeatureFactory = MoveToFolderFeatureFactory(
+            trackRegistry: trackRegistry,
+            library: musicLibraryManager,
+            fileBusyChecker: fileBusyChecker,
+            commandExecutor: commandExecutor,
+            toastPresenter: toastManager,
+            router: sheetManager
+        )
+        let batchTagEditFeatureFactory = BatchTagEditFeatureFactory(
+            metadataLoader: BatchTagMetadataLoader(
+                runtimeStore: runtimeSnapshotStore,
+                snapshotBuilder: runtimeSnapshotBuilder
+            ),
+            saveExecutor: BatchTagEditSaveExecutor(
+                appCommandExecutor: commandExecutor
+            ),
+            artworkDataProvider: runtimeSnapshotStore,
+            artworkPreparer: BatchTagArtworkPreparer(),
+            artworkCompressor: BatchTagArtworkCompressionService(),
+            toastPresenter: toastManager,
+            router: sheetManager
+        )
+        let batchFilenameRenameFeatureFactory = BatchFilenameRenameFeatureFactory(
+            metadataLoader: BatchFilenameRenameMetadataLoader(
+                runtimeStore: runtimeSnapshotStore,
+                snapshotBuilder: runtimeSnapshotBuilder
+            ),
+            planBuilder: BatchFilenameRenamePlanBuilder(),
+            commandExecutor: commandExecutor,
+            fileBusyChecker: fileBusyChecker,
+            router: sheetManager
+        )
 
         self.sheetManager = sheetManager
         self.toastManager = toastManager
@@ -290,24 +385,33 @@ struct TrackListApp: App {
         self.appSettingsManager = appSettingsManager
         self.musicLibraryManager = musicLibraryManager
         self.playerViewModel = playerVM
-        self.favoriteTrackIdsProvider = favoriteTrackIdsProvider
         self.fileBusyChecker = fileBusyChecker
         self.playbackFileReleaser = playbackFileReleaser
         self.favoriteTrackActionHandler = favoriteTrackActionHandler
-        self.renameActionHandler = renameActionHandler
         self.playerScreenViewModelFactory = playerScreenViewModelFactory
         self.libraryFeatureDependencies = libraryFeatureDependencies
         self.searchViewModelFactory = searchViewModelFactory
         self.trackListFeatureDependencies = trackListFeatureDependencies
         self.trackListsActionHandler = trackListsActionHandler
+        self.createTrackListFlowFactory = createTrackListFlowFactory
+        self.renameTrackListFeatureFactory = renameTrackListFeatureFactory
+        self.addToTrackListFeatureFactory = addToTrackListFeatureFactory
+        self.saveTrackListFeatureFactory = saveTrackListFeatureFactory
+        self.renameTrackFileFeatureFactory = renameTrackFileFeatureFactory
+        self.trackDetailFeatureFactory = trackDetailFeatureFactory
+        self.moveToFolderFeatureFactory = moveToFolderFeatureFactory
+        self.batchTagEditFeatureFactory = batchTagEditFeatureFactory
+        self.batchFilenameRenameFeatureFactory = batchFilenameRenameFeatureFactory
         // Фабрика получает подготовленные production-зависимости и собирает только export feature.
         let exportFeatureFactory = ExportFeatureFactory(
             exporter: exportManager,
             toastPresenter: toastManager,
             detailsRouter: sheetManager
         )
+        let exportFeature = exportFeatureFactory.makeFeature()
+        exportActionHandler = exportFeature.actionHandler
         _exportProgressViewModel = StateObject(
-            wrappedValue: exportFeatureFactory.makeExportProgressViewModel()
+            wrappedValue: exportFeature.progressViewModel
         )
         _trackListsViewModel = StateObject(
             wrappedValue: trackListsViewModel
@@ -321,11 +425,9 @@ struct TrackListApp: App {
         WindowGroup {
             ContentView(
                 playerViewModel: playerViewModel,
-                favoriteTrackIdsProvider: favoriteTrackIdsProvider,
                 fileBusyChecker: fileBusyChecker,
                 playbackFileReleaser: playbackFileReleaser,
                 favoriteTrackActionHandler: favoriteTrackActionHandler,
-                renameActionHandler: renameActionHandler,
                 trackListsViewModel: trackListsViewModel,
                 navigationViewModel: navigationViewModel,
                 sheetManager: sheetManager,
@@ -335,10 +437,20 @@ struct TrackListApp: App {
                 libraryFeatureDependencies: libraryFeatureDependencies,
                 searchViewModelFactory: searchViewModelFactory,
                 trackListFeatureDependencies: trackListFeatureDependencies,
-                trackListsActionHandler: trackListsActionHandler
+                trackListsActionHandler: trackListsActionHandler,
+                createTrackListFlowFactory: createTrackListFlowFactory,
+                renameTrackListFeatureFactory: renameTrackListFeatureFactory,
+                addToTrackListFeatureFactory: addToTrackListFeatureFactory,
+                saveTrackListFeatureFactory: saveTrackListFeatureFactory,
+                renameTrackFileFeatureFactory: renameTrackFileFeatureFactory,
+                trackDetailFeatureFactory: trackDetailFeatureFactory,
+                moveToFolderFeatureFactory: moveToFolderFeatureFactory,
+                batchTagEditFeatureFactory: batchTagEditFeatureFactory,
+                batchFilenameRenameFeatureFactory: batchFilenameRenameFeatureFactory
             )
             .environmentObject(sheetManager)
             .environmentObject(exportProgressViewModel)
+            .environmentObject(exportActionHandler)
         }
     }
 }

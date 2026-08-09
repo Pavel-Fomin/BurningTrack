@@ -19,16 +19,12 @@ import SwiftUI
 struct ContentView: View {
 
     @ObservedObject var playerViewModel: PlayerViewModel
-    /// Published-состояние «Избранного» передаётся в глобальные sheet-сценарии.
-    let favoriteTrackIdsProvider: any FavoriteTrackIdsProviding
     /// Проверяет занятость файла в глобальных файловых sheet-сценариях.
     let fileBusyChecker: any TrackFileBusyChecking
     /// Освобождает текущий файл через согласованное playback-состояние.
     let playbackFileReleaser: any CurrentPlaybackFileReleasing
     /// Единый обработчик «Избранного» передаётся в корневые feature-контейнеры.
     let favoriteTrackActionHandler: FavoriteTrackActionHandler
-    /// Готовый app-level обработчик переименования передаётся в sheet выбора треков.
-    let renameActionHandler: TrackFileRenameActionHandler
     /// Единая ViewModel master-flow треклистов, которой владеет TrackListApp.
     @ObservedObject var trackListsViewModel: TrackListsViewModel
     /// Единая ViewModel корневой навигации, которой владеет TrackListApp.
@@ -49,6 +45,24 @@ struct ContentView: View {
     let trackListFeatureDependencies: TrackListFeatureDependencies
     /// Единый ActionHandler master-flow треклистов.
     let trackListsActionHandler: TrackListsActionHandler
+    /// Готовая factory связанного flow создания и выбора треклиста.
+    let createTrackListFlowFactory: CreateTrackListFlowFactory
+    /// Готовая factory feature-flow переименования треклиста.
+    let renameTrackListFeatureFactory: RenameTrackListFeatureFactory
+    /// Готовая factory feature-flow добавления треков в треклист.
+    let addToTrackListFeatureFactory: AddToTrackListFeatureFactory
+    /// Готовая factory feature-flow сохранения очереди плеера в треклист.
+    let saveTrackListFeatureFactory: SaveTrackListFeatureFactory
+    /// Готовая factory feature-flow ручного переименования файла трека.
+    let renameTrackFileFeatureFactory: RenameTrackFileFeatureFactory
+    /// Готовая factory feature-flow просмотра и редактирования одного трека.
+    let trackDetailFeatureFactory: TrackDetailFeatureFactory
+    /// Готовая factory feature-flow выбора папки и файловой операции.
+    let moveToFolderFeatureFactory: MoveToFolderFeatureFactory
+    /// Готовая factory feature-local массового редактирования тегов.
+    let batchTagEditFeatureFactory: BatchTagEditFeatureFactory
+    /// Готовая factory feature-local массового переименования файлов.
+    let batchFilenameRenameFeatureFactory: BatchFilenameRenameFeatureFactory
 
     /// Единое состояние экспорта передаётся в корневой контейнер вкладок.
     @EnvironmentObject private var exportProgressViewModel: ExportProgressViewModel
@@ -97,11 +111,16 @@ struct ContentView: View {
         }
         .sheetHost(
             sheetManager: sheetManager,
-            toastManager: toastManager,
-            favoriteTrackIdsProvider: favoriteTrackIdsProvider,
             fileBusyChecker: fileBusyChecker,
-            playbackFileReleaser: playbackFileReleaser,
-            renameActionHandler: renameActionHandler
+            moveToFolderFeatureFactory: moveToFolderFeatureFactory,
+            createTrackListFlowFactory: createTrackListFlowFactory,
+            renameTrackListFeatureFactory: renameTrackListFeatureFactory,
+            addToTrackListFeatureFactory: addToTrackListFeatureFactory,
+            saveTrackListFeatureFactory: saveTrackListFeatureFactory,
+            renameTrackFileFeatureFactory: renameTrackFileFeatureFactory,
+            trackDetailFeatureFactory: trackDetailFeatureFactory,
+            batchTagEditFeatureFactory: batchTagEditFeatureFactory,
+            batchFilenameRenameFeatureFactory: batchFilenameRenameFeatureFactory
         )
         .toastHost(toastManager: toastManager)
     }
