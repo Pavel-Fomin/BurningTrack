@@ -19,6 +19,8 @@ struct MainTabView: View {
     // MARK: - Зависимости
 
     @ObservedObject var playerViewModel: PlayerViewModel
+    /// Неизменяемый feature graph сохраняет один action flow во всех вкладках.
+    let miniPlayerFeature: MiniPlayerFeature
 
     /// Глобальная ViewModel экспорта передаётся в обе точки запуска операции.
     @ObservedObject var exportProgressViewModel: ExportProgressViewModel
@@ -76,7 +78,7 @@ struct MainTabView: View {
                     viewModelFactory: playerScreenViewModelFactory
                 )
                 .globalBottomPanelsHost(
-                    playerViewModel: playerViewModel,
+                    miniPlayerFeature: miniPlayerFeature,
                     exportProgressViewModel: exportProgressViewModel,
                     showsMiniPlayer: showsMiniPlayer
                 )
@@ -95,7 +97,7 @@ struct MainTabView: View {
                     dependencies: libraryFeatureDependencies
                 )
                 .globalBottomPanelsHost(
-                    playerViewModel: playerViewModel,
+                    miniPlayerFeature: miniPlayerFeature,
                     exportProgressViewModel: exportProgressViewModel,
                     showsMiniPlayer: showsMiniPlayer
                 )
@@ -117,7 +119,7 @@ struct MainTabView: View {
                     trackListFeatureDependencies: trackListFeatureDependencies
                 )
                 .globalBottomPanelsHost(
-                    playerViewModel: playerViewModel,
+                    miniPlayerFeature: miniPlayerFeature,
                     exportProgressViewModel: exportProgressViewModel,
                     showsMiniPlayer: showsMiniPlayer
                 )
@@ -132,7 +134,7 @@ struct MainTabView: View {
             ) {
                 SettingsScreen()
                 .globalBottomPanelsHost(
-                    playerViewModel: playerViewModel,
+                    miniPlayerFeature: miniPlayerFeature,
                     exportProgressViewModel: exportProgressViewModel,
                     showsMiniPlayer: showsMiniPlayer
                 )
@@ -152,7 +154,7 @@ struct MainTabView: View {
                     isSearchActive: $isSearchActive
                 )
                 .globalBottomPanelsHost(
-                    playerViewModel: playerViewModel,
+                    miniPlayerFeature: miniPlayerFeature,
                     exportProgressViewModel: exportProgressViewModel,
                     showsMiniPlayer: showsMiniPlayer
                 )

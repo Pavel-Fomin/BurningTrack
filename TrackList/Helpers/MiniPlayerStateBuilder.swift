@@ -23,7 +23,8 @@ final class MiniPlayerStateBuilder {
     @MainActor
     static func buildStaticState(
         track: any TrackDisplayable,
-        snapshot: TrackRuntimeSnapshot?
+        snapshot: TrackRuntimeSnapshot?,
+        isTagReadingEnabled: Bool
     ) -> MiniPlayerStaticState {
 
         if let purchasedTrack = track as? (any TrackDisplayable & PurchasedITunesTrackRepresentable),
@@ -33,7 +34,7 @@ final class MiniPlayerStateBuilder {
             )
         }
 
-        let shouldShowTags = AppSettingsManager.shared.settings.visible.metadata.isTagReadingEnabled
+        let shouldShowTags = isTagReadingEnabled
 
         // Название из позднего snapshot имеет приоритет, затем используется сохранённый тег ранней display-модели.
         // Имя файла остаётся fallback только при действительно отсутствующем названии.

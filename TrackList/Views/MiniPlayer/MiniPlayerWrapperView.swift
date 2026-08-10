@@ -13,14 +13,13 @@ struct MiniPlayerWrapperView: View {
 
     // MARK: - Input
 
-    @ObservedObject var playerViewModel: PlayerViewModel
+    /// Неизменяемый feature graph передаёт wrapper-у только готовую точку presentation-сборки.
+    let feature: MiniPlayerFeature
 
     // MARK: - Body
 
     var body: some View {
-        MiniPlayerView(
-            playerViewModel: playerViewModel
-        )
+        MiniPlayerContainer(feature: feature)
         // Сохраняем горизонтальный внешний отступ мини-плеера от краёв интерфейса.
         .padding(.horizontal, 8)
         .padding(.bottom, 8)

@@ -15,6 +15,8 @@ struct MainSidebarView: View {
     // MARK: - Зависимости
 
     @ObservedObject var playerViewModel: PlayerViewModel
+    /// Неизменяемый feature graph передаёт MiniPlayer в единственную detail-область iPad.
+    let miniPlayerFeature: MiniPlayerFeature
     @ObservedObject var exportProgressViewModel: ExportProgressViewModel
     /// Единый обработчик «Избранного» передаётся в detail-сценарии без глобального доступа из View.
     let favoriteTrackActionHandler: FavoriteTrackActionHandler
@@ -94,7 +96,7 @@ struct MainSidebarView: View {
             detailContent
                 // Один владелец глобальных панелей находится только в detail-области iPad.
                 .globalBottomPanelsHost(
-                    playerViewModel: playerViewModel,
+                    miniPlayerFeature: miniPlayerFeature,
                     exportProgressViewModel: exportProgressViewModel,
                     showsMiniPlayer: showsMiniPlayer
                 )

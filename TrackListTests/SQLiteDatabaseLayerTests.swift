@@ -3212,6 +3212,10 @@ private final class TrackListsSettingsManagerSpy: SettingsManaging {
         currentSettings.visible.library.isPurchasedITunesSourceVisible = value
     }
 
+    func setMiniPlayerExpanded(_ value: Bool) {
+        currentSettings.internalSettings.isMiniPlayerExpanded = value
+    }
+
     func setLibraryRootDisplayMode(_ mode: LibraryRootDisplayMode) throws {
         currentSettings.internalSettings.libraryRootDisplayMode = mode
     }

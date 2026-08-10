@@ -110,6 +110,8 @@ final class PlayerViewModel: ObservableObject {
     private let isLibraryAccessRestored: @MainActor () -> Bool
     /// Слой генерации скрывает AVAssetReader и файловый кэш от ViewModel.
     private let waveformGenerator: any WaveformGenerating
+    /// Читает только настройку, нужную для построения static state мини-плеера.
+    private let isTagReadingEnabled: @MainActor () -> Bool
     /// Показывает, что текущий трек восстановлен для интерфейса, но ещё не загружен в PlayerManager.
     private var isCurrentTrackPreparedForPlayback = false
     /// Не допускает параллельную подготовку одного ранне восстановленного трека по быстрым повторным нажатиям Play.
@@ -229,6 +231,7 @@ final class PlayerViewModel: ObservableObject {
         fastLibraryTrackProvider: (any FastLibraryTrackProviding)? = nil,
         isLibraryAccessRestored: (@MainActor () -> Bool)? = nil,
         waveformGenerator: (any WaveformGenerating)? = nil,
+        isTagReadingEnabled: @escaping @MainActor () -> Bool = { true },
         favoritesService: any FavoritesServicing,
         favoriteActionHandler: FavoriteTrackActionHandler,
         favoritesEvents: any FavoritesEventsObserving
@@ -258,6 +261,7 @@ final class PlayerViewModel: ObservableObject {
             generator: WaveformGenerator(),
             cache: WaveformFileCache()
         )
+        self.isTagReadingEnabled = isTagReadingEnabled
         if self.statePersistence == nil {
             PersistentLogger.log("PlayerViewModel: не удалось создать хранилище состояния плеера")
         }
@@ -1596,7 +1600,8 @@ final class PlayerViewModel: ObservableObject {
         let snapshot = runtimeSnapshotController.snapshot(for: track.trackId)
         miniPlayerStaticState = MiniPlayerStateBuilder.buildStaticState(
             track: track,
-            snapshot: snapshot
+            snapshot: snapshot,
+            isTagReadingEnabled: isTagReadingEnabled()
         )
 
         updateMiniPlayerState()

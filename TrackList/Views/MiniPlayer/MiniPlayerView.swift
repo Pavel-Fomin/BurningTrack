@@ -11,36 +11,28 @@ import SwiftUI
 import UIKit
 
 struct MiniPlayerView: View {
-    let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
+    private let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
 
-    @ObservedObject var playerViewModel: PlayerViewModel
-    /// Менеджер общих настроек используется только для сохранения состояния интерфейса.
-    private let settingsManager: AppSettingsManager
-    /// Обработчик передаёт действия мини-плеера в сценарий представления.
-    private let actionHandler: MiniPlayerActionHandler
+    /// Готовое presentation-состояние не раскрывает View playback- и domain-зависимости.
+    let state: MiniPlayerScreenState
+    /// Единственный выход внешних пользовательских намерений из чистой View.
+    let onAction: (MiniPlayerAction) -> Void
 
     /// Состояние раскрытия относится к интерфейсу, а не к состоянию плеера.
     @State private var isExpanded: Bool
 
     init(
-        playerViewModel: PlayerViewModel,
-        settingsManager: AppSettingsManager? = nil,
-        actionHandler: MiniPlayerActionHandler? = nil
+        state: MiniPlayerScreenState,
+        onAction: @escaping (MiniPlayerAction) -> Void
     ) {
-        self.playerViewModel = playerViewModel
-
-        let resolvedSettingsManager = settingsManager ?? AppSettingsManager.shared
-        self.settingsManager = resolvedSettingsManager
-        self.actionHandler = actionHandler ?? MiniPlayerActionHandler(
-            playerViewModel: playerViewModel,
-            sheetActionCoordinator: SheetActionCoordinator.shared
-        )
+        self.state = state
+        self.onAction = onAction
         _isExpanded = State(
-            initialValue: resolvedSettingsManager.settings.internalSettings.isMiniPlayerExpanded
+            initialValue: state.initialIsExpanded
         )
     }
 
-    /// Изменяет состояние карточки и сохраняет его после фактического изменения интерфейса.
+    /// Немедленно меняет локальное состояние карточки и отдельно передаёт persistence-действие.
     private func setExpanded(_ newValue: Bool) {
         guard newValue != isExpanded else { return }
 
@@ -48,7 +40,7 @@ struct MiniPlayerView: View {
             isExpanded = newValue
         }
 
-        settingsManager.setMiniPlayerExpanded(newValue)
+        onAction(.setExpanded(newValue))
     }
 
     /// Визуальный индикатор сохраняет прозрачную зону, которая гасит жесты только в пустых местах карточки.
@@ -99,105 +91,44 @@ struct MiniPlayerView: View {
         }
     }
 
-    /// Данные для общей разметки мини-плеера, вычисленные из единого состояния.
-    private struct DisplayContent {
-        let artworkRequest: ArtworkRequest?
-        let title: String
-        let artist: String
-        let currentTime: TimeInterval
-        let duration: TimeInterval
-        let isPlaying: Bool
-    }
-
-    /// Переводит состояние ViewModel в данные для общей разметки мини-плеера.
-    private var displayContent: DisplayContent {
-        switch playerViewModel.miniPlayerState {
-        case .empty:
-            return DisplayContent(
-                artworkRequest: nil,
-                title: "Nothing Playing",
-                artist: "",
-                currentTime: 0,
-                duration: 0,
-                isPlaying: false
-            )
-
-        case let .playing(staticState, progressState),
-             let .paused(staticState, progressState):
-            return DisplayContent(
-                artworkRequest: staticState.artworkRequest,
-                title: staticState.title,
-                artist: PlayerPresentationText.miniPlayerArtist(for: staticState.artist),
-                currentTime: progressState.currentTime,
-                duration: progressState.duration,
-                isPlaying: progressState.isPlaying
-            )
-
-        case let .loading(staticState):
-            return DisplayContent(
-                artworkRequest: staticState?.artworkRequest,
-                title: staticState?.title ?? "Loading Track",
-                artist: staticState.map {
-                    PlayerPresentationText.miniPlayerArtist(for: $0.artist)
-                } ?? "",
-                currentTime: 0,
-                duration: 0,
-                isPlaying: false
-            )
-
-        case .error:
-            return DisplayContent(
-                artworkRequest: nil,
-                title: "Playback Error",
-                artist: "",
-                currentTime: 0,
-                duration: 0,
-                isPlaying: false
-            )
-        }
-    }
-
     var body: some View {
-        let content = displayContent
-        let hasTrack = playerViewModel.currentTrackDisplayable != nil
-        let playbackMode = playerViewModel.playbackMode
-
-        return VStack(spacing: 0) {
+        VStack(spacing: 0) {
             dragIndicator
 
             MiniPlayerHeaderView(
-                artworkRequest: content.artworkRequest,
-                title: content.title,
-                artist: content.artist,
-                isPlaying: content.isPlaying,
-                isFavorite: playerViewModel.isCurrentTrackFavorite,
-                isFavoriteEnabled: hasTrack,
+                artworkRequest: state.artworkRequest,
+                title: state.title,
+                artist: state.artist,
+                isPlaying: state.isPlaying,
+                isFavorite: state.isFavorite,
+                isFavoriteEnabled: state.isFavoriteEnabled,
                 // Пустое состояние не конкурирует визуально с содержимым трека.
-                titleColorOverride: hasTrack ? nil : .secondary,
+                titleColorOverride: state.isPlaybackEnabled ? nil : .secondary,
                 onContentTap: {
-                    guard hasTrack else { return }
-                    playerViewModel.togglePlayPause()
+                    guard state.isPlaybackEnabled else { return }
+                    onAction(.playPause)
                 },
                 onContentSwipePrevious: {
-                    guard hasTrack else { return }
-                    playerViewModel.playPreviousTrack()
+                    guard state.isPlaybackEnabled else { return }
+                    onAction(.playPrevious)
                 },
                 onContentSwipeNext: {
-                    guard hasTrack else { return }
-                    playerViewModel.playNextTrack()
+                    guard state.isPlaybackEnabled else { return }
+                    onAction(.playNext)
                 },
                 onFavorite: {
-                    playerViewModel.toggleCurrentTrackFavorite()
+                    guard state.isFavoriteEnabled else { return }
+                    onAction(.toggleFavorite)
                 }
             )
 
             MiniPlayerProgressView(
-                currentTime: content.currentTime,
-                duration: content.duration,
-                waveformState: playerViewModel.waveformState,
+                currentTime: state.currentTime,
+                duration: state.duration,
+                waveformState: state.waveformState,
                 onSeek: { time in
-                    guard hasTrack else { return }
-                    playerViewModel.seek(to: time)
+                    guard state.isPlaybackEnabled else { return }
+                    onAction(.seek(time))
                 }
             )
 
@@ -206,23 +137,23 @@ struct MiniPlayerView: View {
             if isExpanded {
                 MiniPlayerExpandedContent(
                     // Кнопка всегда остаётся в разметке и отключается без доступного действия.
-                    showInLibraryAction: actionHandler.canShowCurrentTrackInLibrary ? {
-                        actionHandler.handle(.showCurrentTrackInLibrary)
+                    showInLibraryAction: state.canShowCurrentTrackInLibrary ? {
+                        onAction(.showCurrentTrackInLibrary)
                     } : nil,
                     // В пустом состоянии режимы не должны менять состояние плеера.
-                    shuffleAction: hasTrack ? {
-                        playerViewModel.toggleShuffle()
+                    shuffleAction: state.isPlaybackEnabled ? {
+                        onAction(.toggleShuffle)
                     } : nil,
-                    repeatAction: hasTrack ? {
-                        playerViewModel.toggleRepeatAll()
+                    repeatAction: state.isPlaybackEnabled ? {
+                        onAction(.toggleRepeatAll)
                     } : nil,
-                    repeatOneAction: hasTrack ? {
-                        playerViewModel.toggleRepeatOne()
+                    repeatOneAction: state.isPlaybackEnabled ? {
+                        onAction(.toggleRepeatOne)
                     } : nil,
                     airPlayAction: nil,
-                    isShuffleEnabled: playbackMode.isShuffleEnabled,
-                    isRepeatAllEnabled: playbackMode.repeatMode == .all,
-                    isRepeatOneEnabled: playbackMode.repeatMode == .one
+                    isShuffleEnabled: state.isShuffleEnabled,
+                    isRepeatAllEnabled: state.isRepeatAllEnabled,
+                    isRepeatOneEnabled: state.isRepeatOneEnabled
                 )
                 .padding(.top, 8)
                 .transition(.opacity.combined(with: .move(edge: .top)))

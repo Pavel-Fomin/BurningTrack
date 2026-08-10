@@ -33,6 +33,8 @@ struct TrackListApp: App {
     let favoriteTrackActionHandler: FavoriteTrackActionHandler
     /// Готовая фабрика экранного flow плеера с явными production-зависимостями.
     let playerScreenViewModelFactory: PlayerScreenViewModelFactory
+    /// Неизменяемый feature graph MiniPlayer, собранный один раз в composition root.
+    let miniPlayerFeature: MiniPlayerFeature
     /// Готовые фабрики feature фонотеки с явными production-зависимостями.
     let libraryFeatureDependencies: LibraryFeatureDependencies
     /// Готовая фабрика ViewModel поиска с явными production-зависимостями.
@@ -120,10 +122,20 @@ struct TrackListApp: App {
             isLibraryAccessRestored: {
                 musicLibraryManager.isAccessRestored
             },
+            isTagReadingEnabled: {
+                appSettingsManager.settings.visible.metadata.isTagReadingEnabled
+            },
             favoritesService: favoritesService,
             favoriteActionHandler: favoriteTrackActionHandler,
             favoritesEvents: favoritesEventCenter
         )
+        // MiniPlayer получает только собранный feature graph, а не production-singleton-ы из View.
+        let miniPlayerFeature = MiniPlayerFeatureFactory(
+            settingsManager: appSettingsManager,
+            favoriteActionHandler: favoriteTrackActionHandler,
+            libraryRouter: sheetActionCoordinator
+        )
+        .make(playerViewModel: playerVM)
         // Один production-экземпляр плеера передаётся feature только через их узкие capability.
         let playbackStateProvider: any PlaybackStateProviding = playerVM
         let playbackController: any TrackPlaybackControlling = playerVM
@@ -389,6 +401,7 @@ struct TrackListApp: App {
         self.playbackFileReleaser = playbackFileReleaser
         self.favoriteTrackActionHandler = favoriteTrackActionHandler
         self.playerScreenViewModelFactory = playerScreenViewModelFactory
+        self.miniPlayerFeature = miniPlayerFeature
         self.libraryFeatureDependencies = libraryFeatureDependencies
         self.searchViewModelFactory = searchViewModelFactory
         self.trackListFeatureDependencies = trackListFeatureDependencies
@@ -425,6 +438,7 @@ struct TrackListApp: App {
         WindowGroup {
             ContentView(
                 playerViewModel: playerViewModel,
+                miniPlayerFeature: miniPlayerFeature,
                 fileBusyChecker: fileBusyChecker,
                 playbackFileReleaser: playbackFileReleaser,
                 favoriteTrackActionHandler: favoriteTrackActionHandler,

@@ -19,8 +19,8 @@ struct GlobalBottomPanelsHostModifier: ViewModifier {
 
     // MARK: - Input
 
-    /// Использует общую ViewModel плеера, созданную в composition root приложения.
-    @ObservedObject var playerViewModel: PlayerViewModel
+    /// Использует единый feature graph MiniPlayer, созданный в composition root приложения.
+    let miniPlayerFeature: MiniPlayerFeature
     /// Использует общее состояние экспорта без создания локальной операции.
     @ObservedObject var exportProgressViewModel: ExportProgressViewModel
     /// Передаёт UI-намерения в typed Export-feature ActionHandler.
@@ -57,7 +57,7 @@ struct GlobalBottomPanelsHostModifier: ViewModifier {
                     } bottomPanel: {
                         if showsMiniPlayer {
                             MiniPlayerWrapperView(
-                                playerViewModel: playerViewModel
+                                feature: miniPlayerFeature
                             )
                         }
                     }
@@ -68,10 +68,6 @@ struct GlobalBottomPanelsHostModifier: ViewModifier {
                     .animation(
                         .easeOut(duration: 0.25),
                         value: showsMiniPlayer
-                    )
-                    .animation(
-                        .easeOut(duration: 0.25),
-                        value: playerViewModel.currentTrackDisplayable?.id
                     )
                 }
             }
@@ -108,13 +104,13 @@ extension View {
 
     /// Подключает общие панели к корню конкретной вкладки.
     func globalBottomPanelsHost(
-        playerViewModel: PlayerViewModel,
+        miniPlayerFeature: MiniPlayerFeature,
         exportProgressViewModel: ExportProgressViewModel,
         showsMiniPlayer: Bool
     ) -> some View {
         modifier(
             GlobalBottomPanelsHostModifier(
-                playerViewModel: playerViewModel,
+                miniPlayerFeature: miniPlayerFeature,
                 exportProgressViewModel: exportProgressViewModel,
                 showsMiniPlayer: showsMiniPlayer
             )

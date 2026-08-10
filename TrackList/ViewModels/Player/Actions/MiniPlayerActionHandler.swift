@@ -9,45 +9,41 @@
 
 import Foundation
 
-/// Передаёт действия раскрытого мини-плеера в существующий сценарий представления приложения.
+/// Передаёт внешние пользовательские действия MiniPlayer в существующие capability приложения.
 @MainActor
 final class MiniPlayerActionHandler {
 
     // MARK: - Зависимости
 
-    /// ViewModel плеера предоставляет текущий отображаемый трек.
-    private let playerViewModel: PlayerViewModel
+    /// Предоставляет только данные текущего playback, нужные action flow MiniPlayer.
+    private let playbackProvider: any MiniPlayerPlaybackProviding
+
+    /// Выполняет только playback-команды, доступные MiniPlayer.
+    private let playbackController: any MiniPlayerPlaybackControlling
+
+    /// Повторно использует общий domain-flow «Избранного».
+    private let favoriteActionHandler: FavoriteTrackActionHandler
+
+    /// Сохраняет только состояние раскрытия через существующие настройки приложения.
+    private let settingsManager: any SettingsManaging
 
     /// Координатор выполняет переход из действия над треком.
-    private let sheetActionCoordinator: SheetActionCoordinator
+    private let libraryRouter: any MiniPlayerLibraryRouting
 
     // MARK: - Инициализация
 
     init(
-        playerViewModel: PlayerViewModel,
-        sheetActionCoordinator: SheetActionCoordinator
+        playbackProvider: any MiniPlayerPlaybackProviding,
+        playbackController: any MiniPlayerPlaybackControlling,
+        favoriteActionHandler: FavoriteTrackActionHandler,
+        settingsManager: any SettingsManaging,
+        libraryRouter: any MiniPlayerLibraryRouting
     ) {
-        self.playerViewModel = playerViewModel
-        self.sheetActionCoordinator = sheetActionCoordinator
-    }
-
-    // MARK: - Доступность
-
-    /// Определяет, можно ли показать текущий трек в фонотеке.
-    var canShowCurrentTrackInLibrary: Bool {
-        switch playerViewModel.miniPlayerState {
-        case .empty, .error:
-            return false
-
-        case .loading, .playing, .paused:
-            break
-        }
-
-        guard let track = playerViewModel.currentTrackDisplayable else {
-            return false
-        }
-
-        return canShowInLibrary(track)
+        self.playbackProvider = playbackProvider
+        self.playbackController = playbackController
+        self.favoriteActionHandler = favoriteActionHandler
+        self.settingsManager = settingsManager
+        self.libraryRouter = libraryRouter
     }
 
     // MARK: - Действия
@@ -55,8 +51,33 @@ final class MiniPlayerActionHandler {
     /// Выполняет действие, выбранное в мини-плеере.
     func handle(_ action: MiniPlayerAction) {
         switch action {
+        case .playPause:
+            guard hasCurrentTrack else { return }
+            playbackController.togglePlayPause()
+        case .playPrevious:
+            guard hasCurrentTrack else { return }
+            playbackController.playPreviousTrack()
+        case .playNext:
+            guard hasCurrentTrack else { return }
+            playbackController.playNextTrack()
+        case .seek(let time):
+            guard hasCurrentTrack else { return }
+            playbackController.seek(to: time)
+        case .toggleFavorite:
+            toggleFavorite()
+        case .toggleShuffle:
+            guard hasCurrentTrack else { return }
+            playbackController.toggleShuffle()
+        case .toggleRepeatAll:
+            guard hasCurrentTrack else { return }
+            playbackController.toggleRepeatAll()
+        case .toggleRepeatOne:
+            guard hasCurrentTrack else { return }
+            playbackController.toggleRepeatOne()
         case .showCurrentTrackInLibrary:
             showCurrentTrackInLibrary()
+        case .setExpanded(let isExpanded):
+            settingsManager.setMiniPlayerExpanded(isExpanded)
         }
     }
 
@@ -64,34 +85,30 @@ final class MiniPlayerActionHandler {
 
     /// Передаёт текущий трек в существующий координатор перехода к фонотеке.
     private func showCurrentTrackInLibrary() {
-        guard let track = playerViewModel.currentTrackDisplayable,
-              canShowInLibrary(track) else {
+        guard let track = playbackProvider.currentTrackDisplayable,
+              MiniPlayerActionAvailability.canShowInLibrary(
+                miniPlayerState: playbackProvider.miniPlayerState,
+                track: track
+              ) else {
             return
         }
 
-        sheetActionCoordinator.showInLibrary(track)
+        libraryRouter.showInLibrary(track)
     }
 
-    /// Принимает типизированные модели очереди и повторно использует правила меню плеера.
-    private func canShowInLibrary(_ track: any TrackDisplayable) -> Bool {
-        switch track {
-        case is LibraryTrack:
-            return true
-
-        case let sourceTrack as any PurchasedITunesTrackRepresentable:
-            return canShowInLibrary(source: sourceTrack.source)
-
-        default:
-            return false
+    /// Передаёт актуальную display-модель в общий domain-flow без оптимистического изменения UI.
+    private func toggleFavorite() {
+        guard let track = playbackProvider.currentTrackDisplayable else {
+            return
         }
+
+        favoriteActionHandler.toggle(
+            FavoriteTrackInput(playerTrack: track)
+        )
     }
 
-    /// Проверяет доступность действия для известного источника модели очереди или треклиста.
-    private func canShowInLibrary(source: TrackSource) -> Bool {
-        TrackMenuActionAvailability.isAvailable(
-            .showInLibrary,
-            source: source,
-            context: .player
-        )
+    /// Все playback-действия MiniPlayer требуют конкретного текущего трека.
+    private var hasCurrentTrack: Bool {
+        playbackProvider.currentTrackDisplayable != nil
     }
 }

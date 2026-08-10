@@ -2,7 +2,7 @@
 //  MiniPlayerView+Preview.swift
 //  TrackList
 //
-//  Xcode Preview для мини-плеера.
+//  Xcode Preview для чистого MiniPlayerScreenState.
 //
 //  Created by Pavel Fomin on 13.06.2026.
 //
@@ -10,53 +10,106 @@
 #if DEBUG
 import SwiftUI
 
-/// Создаёт изолированный заголовок мини-плеера без PlayerViewModel и его тяжёлых зависимостей.
-private func makeMiniPlayerHeaderPreview(
-    isFavorite: Bool,
-    isFavoriteEnabled: Bool,
-    title: String,
-    artist: String
+/// Строит изолированный MiniPlayer из готовых presentation-данных без production-зависимостей.
+private func makeMiniPlayerPreview(
+    state: MiniPlayerScreenState
 ) -> some View {
-    MiniPlayerHeaderView(
-        artworkRequest: nil,
-        title: title,
-        artist: artist,
-        isPlaying: false,
-        isFavorite: isFavorite,
-        isFavoriteEnabled: isFavoriteEnabled,
-        titleColorOverride: isFavoriteEnabled ? nil : .secondary,
-        onContentTap: {},
-        onContentSwipePrevious: {},
-        onContentSwipeNext: {},
-        onFavorite: {}
+    MiniPlayerView(
+        state: state,
+        onAction: { _ in }
     )
     .padding()
 }
 
-#Preview("Трек не в Избранном") {
-    makeMiniPlayerHeaderPreview(
-        isFavorite: false,
-        isFavoriteEnabled: true,
-        title: "Midnight Drive",
-        artist: "Neon Coast"
-    )
-}
+/// Готовые состояния позволяют проверить разметку без реального PlayerManager, настроек и навигации.
+private enum MiniPlayerPreviewStates {
 
-#Preview("Трек в Избранном") {
-    makeMiniPlayerHeaderPreview(
+    static let empty = MiniPlayerScreenState(
+        artworkRequest: nil,
+        title: "Nothing Playing",
+        artist: "",
+        currentTime: 0,
+        duration: 0,
+        isPlaying: false,
+        isPlaybackEnabled: false,
+        isFavorite: false,
+        isFavoriteEnabled: false,
+        waveformState: .unavailable,
+        canShowCurrentTrackInLibrary: false,
+        isShuffleEnabled: false,
+        isRepeatAllEnabled: false,
+        isRepeatOneEnabled: false,
+        initialIsExpanded: false
+    )
+
+    static let playing = MiniPlayerScreenState(
+        artworkRequest: nil,
+        title: "Midnight Drive",
+        artist: "Neon Coast",
+        currentTime: 96,
+        duration: 248,
+        isPlaying: true,
+        isPlaybackEnabled: true,
         isFavorite: true,
         isFavoriteEnabled: true,
+        waveformState: .ready([0.15, 0.38, 0.72, 0.44, 0.91]),
+        canShowCurrentTrackInLibrary: true,
+        isShuffleEnabled: true,
+        isRepeatAllEnabled: false,
+        isRepeatOneEnabled: false,
+        initialIsExpanded: true
+    )
+
+    static let paused = MiniPlayerScreenState(
+        artworkRequest: nil,
         title: "Midnight Drive",
-        artist: "Neon Coast"
+        artist: "Neon Coast",
+        currentTime: 96,
+        duration: 248,
+        isPlaying: false,
+        isPlaybackEnabled: true,
+        isFavorite: false,
+        isFavoriteEnabled: true,
+        waveformState: .ready([0.15, 0.38, 0.72, 0.44, 0.91]),
+        canShowCurrentTrackInLibrary: true,
+        isShuffleEnabled: false,
+        isRepeatAllEnabled: true,
+        isRepeatOneEnabled: false,
+        initialIsExpanded: false
+    )
+
+    static let loading = MiniPlayerScreenState(
+        artworkRequest: nil,
+        title: "Loading Track",
+        artist: "",
+        currentTime: 0,
+        duration: 0,
+        isPlaying: false,
+        isPlaybackEnabled: false,
+        isFavorite: false,
+        isFavoriteEnabled: false,
+        waveformState: .loading,
+        canShowCurrentTrackInLibrary: false,
+        isShuffleEnabled: false,
+        isRepeatAllEnabled: false,
+        isRepeatOneEnabled: false,
+        initialIsExpanded: false
     )
 }
 
 #Preview("Пустой мини-плеер") {
-    makeMiniPlayerHeaderPreview(
-        isFavorite: false,
-        isFavoriteEnabled: false,
-        title: "Nothing Playing",
-        artist: ""
-    )
+    makeMiniPlayerPreview(state: MiniPlayerPreviewStates.empty)
+}
+
+#Preview("Воспроизведение") {
+    makeMiniPlayerPreview(state: MiniPlayerPreviewStates.playing)
+}
+
+#Preview("Пауза") {
+    makeMiniPlayerPreview(state: MiniPlayerPreviewStates.paused)
+}
+
+#Preview("Загрузка") {
+    makeMiniPlayerPreview(state: MiniPlayerPreviewStates.loading)
 }
 #endif

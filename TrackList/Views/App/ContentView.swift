@@ -19,6 +19,8 @@ import SwiftUI
 struct ContentView: View {
 
     @ObservedObject var playerViewModel: PlayerViewModel
+    /// Неизменяемый feature graph MiniPlayer передаётся от composition root в обе корневые компоновки.
+    let miniPlayerFeature: MiniPlayerFeature
     /// Проверяет занятость файла в глобальных файловых sheet-сценариях.
     let fileBusyChecker: any TrackFileBusyChecking
     /// Освобождает текущий файл через согласованное playback-состояние.
@@ -80,6 +82,7 @@ struct ContentView: View {
             if horizontalSizeClass == .regular {
                 MainSidebarView(
                     playerViewModel: playerViewModel,
+                    miniPlayerFeature: miniPlayerFeature,
                     exportProgressViewModel: exportProgressViewModel,
                     favoriteTrackActionHandler: favoriteTrackActionHandler,
                     trackListsViewModel: trackListsViewModel,
@@ -95,6 +98,7 @@ struct ContentView: View {
             } else {
                 MainTabView(
                     playerViewModel: playerViewModel,
+                    miniPlayerFeature: miniPlayerFeature,
                     exportProgressViewModel: exportProgressViewModel,
                     favoriteTrackActionHandler: favoriteTrackActionHandler,
                     trackListsViewModel: trackListsViewModel,
