@@ -12,38 +12,23 @@ struct SearchScreen: View {
 
     // MARK: - Dependencies
 
-    /// Единый обработчик «Избранного» передаётся в ActionHandler поиска.
-    let favoriteTrackActionHandler: FavoriteTrackActionHandler
-    /// Готовая фабрика ViewModel поиска с явными production-зависимостями.
-    let viewModelFactory: SearchViewModelFactory
     /// MainTabView использует состояние для синхронного скрытия MiniPlayer и резерва.
     @Binding private var isSearchActive: Bool
-
-    // MARK: - ViewModel
-
-    @StateObject private var viewModel: SearchViewModel
+    /// ViewModel единственного экранного графа Search.
+    @ObservedObject private var viewModel: SearchViewModel
+    /// Обработчик действий единственного экранного графа Search.
+    private let actionHandler: SearchActionHandler
 
     // MARK: - Init
 
     init(
-        favoriteTrackActionHandler: FavoriteTrackActionHandler,
-        viewModelFactory: SearchViewModelFactory,
+        viewModel: SearchViewModel,
+        actionHandler: SearchActionHandler,
         isSearchActive: Binding<Bool>
     ) {
-        self.favoriteTrackActionHandler = favoriteTrackActionHandler
-        self.viewModelFactory = viewModelFactory
         self._isSearchActive = isSearchActive
-        self._viewModel = StateObject(
-            wrappedValue: viewModelFactory.make()
-        )
-    }
-
-    /// Обработчик действий экрана поиска.
-    private var actionHandler: SearchActionHandler {
-        viewModelFactory.makeActionHandler(
-            viewModel: viewModel,
-            favoriteActionHandler: favoriteTrackActionHandler
-        )
+        self._viewModel = ObservedObject(wrappedValue: viewModel)
+        self.actionHandler = actionHandler
     }
 
     /// Системный поиск пишет изменения в ViewModel через action layer.

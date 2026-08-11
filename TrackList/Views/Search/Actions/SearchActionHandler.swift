@@ -20,6 +20,14 @@ final class SearchActionHandler {
     private let fileRenamer: TrackFileRenameActionHandler
     /// Общий обработчик «Избранного» не зависит от состояния конкретного экрана поиска.
     private let favoriteActionHandler: FavoriteTrackActionHandler
+    /// Общий обработчик шаринга передаётся из Composition Root.
+    private let trackShareActionHandler: TrackShareActionHandler
+    /// Общий исполнитель команд приложения передаётся из Composition Root.
+    private let commandExecutor: AppCommandExecutor
+    /// Презентер результатов команд сохраняет единое пользовательское сообщение.
+    private let commandToastPresenter: AppCommandToastPresenter
+    /// Презентер fallback-ошибок не требует доступа к глобальному ToastManager.
+    private let toastPresenter: any ToastPresenting
 
     init(
         viewModel: SearchViewModel,
@@ -28,7 +36,11 @@ final class SearchActionHandler {
         navigationCoordinator: NavigationCoordinator,
         sheetManager: SheetManager,
         fileRenamer: TrackFileRenameActionHandler,
-        favoriteActionHandler: FavoriteTrackActionHandler
+        favoriteActionHandler: FavoriteTrackActionHandler,
+        trackShareActionHandler: TrackShareActionHandler,
+        commandExecutor: AppCommandExecutor,
+        commandToastPresenter: AppCommandToastPresenter,
+        toastPresenter: any ToastPresenting
     ) {
         self.viewModel = viewModel
         self.playbackStateProvider = playbackStateProvider
@@ -37,6 +49,10 @@ final class SearchActionHandler {
         self.sheetManager = sheetManager
         self.fileRenamer = fileRenamer
         self.favoriteActionHandler = favoriteActionHandler
+        self.trackShareActionHandler = trackShareActionHandler
+        self.commandExecutor = commandExecutor
+        self.commandToastPresenter = commandToastPresenter
+        self.toastPresenter = toastPresenter
     }
 
     /// Передаёт действия View в SearchViewModel без бизнес-логики в SwiftUI.
@@ -73,7 +89,7 @@ final class SearchActionHandler {
             sheetManager.presentTrackDetail(result)
 
         case .share(let result):
-            TrackShareActionHandler.shared.shareLocalTrack(
+            trackShareActionHandler.shareLocalTrack(
                 trackID: result.trackId
             )
 
@@ -117,18 +133,14 @@ final class SearchActionHandler {
     private func addToPlayer(trackId: UUID) {
         Task {
             do {
-                let result = try await AppCommandExecutor.shared.addTrackToPlayer(
+                let result = try await commandExecutor.addTrackToPlayer(
                     trackId: trackId
                 )
-                AppCommandToastPresenter(
-                    toastPresenter: ToastManager.shared
-                ).present(result)
+                commandToastPresenter.present(result)
             } catch let appError as AppError {
-                AppCommandToastPresenter(
-                    toastPresenter: ToastManager.shared
-                ).present(appError)
+                commandToastPresenter.present(appError)
             } catch {
-                ToastManager.shared.handle(
+                toastPresenter.handle(
                     .operationFailed(
                         message: PlayerPresentationText.addTrackToPlayerFailedMessage
                     )

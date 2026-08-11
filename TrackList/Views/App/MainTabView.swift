@@ -36,8 +36,8 @@ struct MainTabView: View {
     let playerScreenViewModelFactory: PlayerScreenViewModelFactory
     /// Готовые фабрики feature фонотеки.
     let libraryFeatureDependencies: LibraryFeatureDependencies
-    /// Готовая фабрика ViewModel поиска.
-    let searchViewModelFactory: SearchViewModelFactory
+    /// Готовая фабрика feature Search.
+    let searchFeatureFactory: SearchFeatureFactory
     /// Готовые фабрики detail-flow одного треклиста.
     let trackListFeatureDependencies: TrackListFeatureDependencies
     /// Единый ActionHandler master-flow треклистов.
@@ -148,9 +148,8 @@ struct MainTabView: View {
                 value: ScenePhaseHandler.Tab.search,
                 role: .search
             ) {
-                SearchScreen(
-                    favoriteTrackActionHandler: favoriteTrackActionHandler,
-                    viewModelFactory: searchViewModelFactory,
+                SearchContainer(
+                    featureFactory: searchFeatureFactory,
                     isSearchActive: $isSearchActive
                 )
                 .globalBottomPanelsHost(

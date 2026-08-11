@@ -28,10 +28,10 @@ final class SearchService: SearchServicing {
     private let trackListManager: TrackListManager
 
     init(
-        trackRegistry: TrackRegistry = .shared,
-        trackListBadgeIndex: TrackListBadgeIndex = .shared,
-        trackListsManager: TrackListsManager = .shared,
-        trackListManager: TrackListManager = .shared
+        trackRegistry: TrackRegistry,
+        trackListBadgeIndex: TrackListBadgeIndex,
+        trackListsManager: TrackListsManager,
+        trackListManager: TrackListManager
     ) {
         self.trackRegistry = trackRegistry
         self.trackListBadgeIndex = trackListBadgeIndex

@@ -1,15 +1,15 @@
 //
-//  SearchViewModelFactory.swift
+//  SearchFeatureFactory.swift
 //  TrackList
 //
-//  Фабрика ViewModel раздела поиска.
+//  Фабрика feature Search.
 //  Created by Pavel Fomin on 07.07.2026.
 //
 
 import Foundation
 
 @MainActor
-struct SearchViewModelFactory {
+struct SearchFeatureFactory {
 
     /// Доменный сервис поиска, подготовленный Composition Root.
     private let searchService: any SearchServicing
@@ -29,6 +29,14 @@ struct SearchViewModelFactory {
     private let sheetManager: SheetManager
     /// Общий обработчик переименования файла, подготовленный Composition Root.
     private let fileRenamer: TrackFileRenameActionHandler
+    /// Общий обработчик «Избранного», подготовленный Composition Root.
+    private let favoriteActionHandler: FavoriteTrackActionHandler
+    /// Общий обработчик шаринга, подготовленный Composition Root.
+    private let trackShareActionHandler: TrackShareActionHandler
+    /// Общий исполнитель команд приложения, подготовленный Composition Root.
+    private let commandExecutor: AppCommandExecutor
+    /// Презентер результатов общих команд, подготовленный Composition Root.
+    private let commandToastPresenter: AppCommandToastPresenter
 
     /// Получает готовые production-зависимости и не разрешает singleton самостоятельно.
     init(
@@ -40,7 +48,11 @@ struct SearchViewModelFactory {
         playbackController: any TrackPlaybackControlling,
         navigationCoordinator: NavigationCoordinator,
         sheetManager: SheetManager,
-        fileRenamer: TrackFileRenameActionHandler
+        fileRenamer: TrackFileRenameActionHandler,
+        favoriteActionHandler: FavoriteTrackActionHandler,
+        trackShareActionHandler: TrackShareActionHandler,
+        commandExecutor: AppCommandExecutor,
+        commandToastPresenter: AppCommandToastPresenter
     ) {
         self.searchService = searchService
         self.settingsManager = settingsManager
@@ -51,11 +63,15 @@ struct SearchViewModelFactory {
         self.navigationCoordinator = navigationCoordinator
         self.sheetManager = sheetManager
         self.fileRenamer = fileRenamer
+        self.favoriteActionHandler = favoriteActionHandler
+        self.trackShareActionHandler = trackShareActionHandler
+        self.commandExecutor = commandExecutor
+        self.commandToastPresenter = commandToastPresenter
     }
 
-    /// Собирает ViewModel без доступа к глобальному графу зависимостей.
-    func make() -> SearchViewModel {
-        SearchViewModel(
+    /// Собирает единый граф состояния и действий Search без доступа к глобальному графу зависимостей.
+    func makeScreenStore() -> SearchScreenStore {
+        let viewModel = SearchViewModel(
             searchService: searchService,
             runtimeController: LibraryTrackRuntimeController(),
             settingsManager: settingsManager,
@@ -64,21 +80,24 @@ struct SearchViewModelFactory {
             toastPresenter: toastPresenter,
             presenter: SearchPresenter()
         )
-    }
 
-    /// Собирает ActionHandler поиска с теми же capability production-экземпляра плеера.
-    func makeActionHandler(
-        viewModel: SearchViewModel,
-        favoriteActionHandler: FavoriteTrackActionHandler
-    ) -> SearchActionHandler {
-        SearchActionHandler(
+        let actionHandler = SearchActionHandler(
             viewModel: viewModel,
             playbackStateProvider: playbackStateProvider,
             playbackController: playbackController,
             navigationCoordinator: navigationCoordinator,
             sheetManager: sheetManager,
             fileRenamer: fileRenamer,
-            favoriteActionHandler: favoriteActionHandler
+            favoriteActionHandler: favoriteActionHandler,
+            trackShareActionHandler: trackShareActionHandler,
+            commandExecutor: commandExecutor,
+            commandToastPresenter: commandToastPresenter,
+            toastPresenter: toastPresenter
+        )
+
+        return SearchScreenStore(
+            viewModel: viewModel,
+            actionHandler: actionHandler
         )
     }
 }

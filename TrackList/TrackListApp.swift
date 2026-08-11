@@ -37,8 +37,8 @@ struct TrackListApp: App {
     let miniPlayerFeature: MiniPlayerFeature
     /// Готовые фабрики feature фонотеки с явными production-зависимостями.
     let libraryFeatureDependencies: LibraryFeatureDependencies
-    /// Готовая фабрика ViewModel поиска с явными production-зависимостями.
-    let searchViewModelFactory: SearchViewModelFactory
+    /// Готовая фабрика feature Search с явными production-зависимостями.
+    let searchFeatureFactory: SearchFeatureFactory
     /// Готовые фабрики detail-flow одного треклиста с явными production-зависимостями.
     let trackListFeatureDependencies: TrackListFeatureDependencies
     /// Единый ActionHandler master-flow треклистов для tab- и sidebar-компоновок.
@@ -281,7 +281,7 @@ struct TrackListApp: App {
             )
         )
 
-        let searchViewModelFactory = SearchViewModelFactory(
+        let searchFeatureFactory = SearchFeatureFactory(
             searchService: SearchService(
                 trackRegistry: trackRegistry,
                 trackListBadgeIndex: trackListBadgeIndex,
@@ -295,7 +295,13 @@ struct TrackListApp: App {
             playbackController: playbackController,
             navigationCoordinator: navigationCoordinator,
             sheetManager: sheetManager,
-            fileRenamer: renameActionHandler
+            fileRenamer: renameActionHandler,
+            favoriteActionHandler: favoriteTrackActionHandler,
+            trackShareActionHandler: trackShareActionHandler,
+            commandExecutor: commandExecutor,
+            commandToastPresenter: AppCommandToastPresenter(
+                toastPresenter: toastManager
+            )
         )
 
         let trackListsViewModel = TrackListsViewModelFactory(
@@ -403,7 +409,7 @@ struct TrackListApp: App {
         self.playerScreenViewModelFactory = playerScreenViewModelFactory
         self.miniPlayerFeature = miniPlayerFeature
         self.libraryFeatureDependencies = libraryFeatureDependencies
-        self.searchViewModelFactory = searchViewModelFactory
+        self.searchFeatureFactory = searchFeatureFactory
         self.trackListFeatureDependencies = trackListFeatureDependencies
         self.trackListsActionHandler = trackListsActionHandler
         self.createTrackListFlowFactory = createTrackListFlowFactory
@@ -449,7 +455,7 @@ struct TrackListApp: App {
                 navigationCoordinator: navigationCoordinator,
                 playerScreenViewModelFactory: playerScreenViewModelFactory,
                 libraryFeatureDependencies: libraryFeatureDependencies,
-                searchViewModelFactory: searchViewModelFactory,
+                searchFeatureFactory: searchFeatureFactory,
                 trackListFeatureDependencies: trackListFeatureDependencies,
                 trackListsActionHandler: trackListsActionHandler,
                 createTrackListFlowFactory: createTrackListFlowFactory,

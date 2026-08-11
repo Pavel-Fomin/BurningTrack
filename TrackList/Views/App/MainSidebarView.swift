@@ -26,8 +26,8 @@ struct MainSidebarView: View {
     let playerScreenViewModelFactory: PlayerScreenViewModelFactory
     /// Готовые фабрики feature фонотеки.
     let libraryFeatureDependencies: LibraryFeatureDependencies
-    /// Готовая фабрика ViewModel поиска.
-    let searchViewModelFactory: SearchViewModelFactory
+    /// Готовая фабрика feature Search.
+    let searchFeatureFactory: SearchFeatureFactory
     /// Готовые фабрики detail-flow одного треклиста.
     let trackListFeatureDependencies: TrackListFeatureDependencies
     /// Единый ActionHandler master-flow треклистов.
@@ -133,9 +133,8 @@ struct MainSidebarView: View {
                 dependencies: libraryFeatureDependencies
             )
         case .search:
-            SearchScreen(
-                favoriteTrackActionHandler: favoriteTrackActionHandler,
-                viewModelFactory: searchViewModelFactory,
+            SearchContainer(
+                featureFactory: searchFeatureFactory,
                 isSearchActive: $isSearchActive
             )
         case .settings:

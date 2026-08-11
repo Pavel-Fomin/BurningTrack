@@ -41,8 +41,8 @@ struct ContentView: View {
     let playerScreenViewModelFactory: PlayerScreenViewModelFactory
     /// Готовые фабрики feature фонотеки.
     let libraryFeatureDependencies: LibraryFeatureDependencies
-    /// Готовая фабрика ViewModel поиска.
-    let searchViewModelFactory: SearchViewModelFactory
+    /// Готовая фабрика feature Search.
+    let searchFeatureFactory: SearchFeatureFactory
     /// Готовые фабрики detail-flow одного треклиста.
     let trackListFeatureDependencies: TrackListFeatureDependencies
     /// Единый ActionHandler master-flow треклистов.
@@ -89,7 +89,7 @@ struct ContentView: View {
                     navigationViewModel: navigationViewModel,
                     playerScreenViewModelFactory: playerScreenViewModelFactory,
                     libraryFeatureDependencies: libraryFeatureDependencies,
-                    searchViewModelFactory: searchViewModelFactory,
+                    searchFeatureFactory: searchFeatureFactory,
                     trackListFeatureDependencies: trackListFeatureDependencies,
                     trackListsActionHandler: trackListsActionHandler,
                     navigationCoordinator: navigationCoordinator,
@@ -105,7 +105,7 @@ struct ContentView: View {
                     navigationViewModel: navigationViewModel,
                     playerScreenViewModelFactory: playerScreenViewModelFactory,
                     libraryFeatureDependencies: libraryFeatureDependencies,
-                    searchViewModelFactory: searchViewModelFactory,
+                    searchFeatureFactory: searchFeatureFactory,
                     trackListFeatureDependencies: trackListFeatureDependencies,
                     trackListsActionHandler: trackListsActionHandler,
                     navigationCoordinator: navigationCoordinator,
