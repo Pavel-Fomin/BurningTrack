@@ -104,13 +104,6 @@ struct LibraryScreen: View {
         )
     }
 
-    /// Собирает обработчик действий iTunes с существующим глобальным экспортом.
-    private var purchasedITunesActionHandler: PurchasedITunesMusicActionHandler {
-        dependencies.purchasedITunesActionHandlerFactory.make(
-            exportProgressViewModel: exportProgressViewModel
-        )
-    }
-
     /// Binding пути навигации, который отправляет изменения через action.
     private var libraryPathBinding: Binding<[NavigationCoordinator.LibraryRoute]> {
         Binding(
@@ -220,18 +213,11 @@ struct LibraryScreen: View {
                 .navigationTitle("Library")
 
         case .purchasedITunes(let revealRequest):
-            PurchasedITunesMusicView(
-                playbackStateProvider: dependencies.playbackStateProvider,
-                playbackController: dependencies.playbackController,
-                favoriteTrackIdsProvider: dependencies.favoriteTrackIdsProvider,
-                favoriteTrackActionHandler: favoriteTrackActionHandler,
-                trackActionDependencies: dependencies.purchasedITunesTrackActionDependencies,
+            dependencies.purchasedITunesFeatureFactory.makeContainer(
+                exportProgressViewModel: exportProgressViewModel,
                 revealRequest: revealRequest,
                 onRevealHandled: { requestId in
                     viewModel.handle(.revealHandled(requestId))
-                },
-                onAction: { action in
-                    purchasedITunesActionHandler.handle(action)
                 }
             )
 

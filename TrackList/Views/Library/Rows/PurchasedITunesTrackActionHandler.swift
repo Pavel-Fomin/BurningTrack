@@ -9,84 +9,73 @@
 
 import Foundation
 
-/// Явные production-зависимости sheet- и command-действий строки iTunes.
-@MainActor
-struct PurchasedITunesTrackActionDependencies {
-    /// Открывает единый lifecycle-managed Sheet Flow.
-    let sheetManager: SheetManager
-    /// Выполняет добавление iTunes-трека в очередь плеера.
-    let commandExecutor: AppCommandExecutor
-    /// Показывает feedback команды добавления в плеер.
-    let toastPresenter: any ToastPresenting
-}
-
 /// Выполняет действия строки iTunes без смешивания с LibraryTrack и без логики во View.
 @MainActor
-struct PurchasedITunesTrackActionHandler {
+final class PurchasedITunesTrackActionHandler {
     // MARK: - Зависимости
 
-    /// Готовый snapshot строки не раскрывает ActionHandler-у PlayerViewModel.
-    let playbackState: PlaybackStateSnapshot
+    /// Узкий provider отдаёт актуальный snapshot только в момент действия пользователя.
+    private let playbackStateProvider: any PlaybackStateProviding
     /// Команды запуска и toggle не раскрывают handler-у PlayerViewModel.
-    let playbackController: any TrackPlaybackControlling
-    /// Менеджер sheet-состояния для выбора треклиста и папки назначения.
-    private let sheetManager: SheetManager
+    private let playbackController: any TrackPlaybackControlling
+    /// Маршрутизатор sheet-состояния для выбора треклиста, папки и карточки трека.
+    private let sheetRouter: any PurchasedITunesTrackRouting
     /// Исполнитель бизнес-команд приложения.
-    private let commandExecutor: AppCommandExecutor
+    private let commandExecutor: any PurchasedITunesTrackPlayerAdding
+    /// Общий presentation-адаптер результатов AppCommandExecutor.
+    private let commandToastPresenter: AppCommandToastPresenter
     /// Презентер пользовательских сообщений.
     private let toastPresenter: any ToastPresenting
     /// Общий обработчик «Избранного» использует тот же сервис, что и остальные источники треков.
     private let favoriteActionHandler: FavoriteTrackActionHandler
+    /// Явно переданный единый share-flow не создаётся и не разрешается строкой.
+    private let trackShareActionHandler: any PurchasedITunesTrackSharing
 
     // MARK: - Инициализация
 
     /// Создаёт обработчик строки iTunes с явным маршрутом «Избранного».
     init(
-        playbackState: PlaybackStateSnapshot,
+        playbackStateProvider: any PlaybackStateProviding,
         playbackController: any TrackPlaybackControlling,
-        actionDependencies: PurchasedITunesTrackActionDependencies,
-        favoriteActionHandler: FavoriteTrackActionHandler
+        sheetRouter: any PurchasedITunesTrackRouting,
+        commandExecutor: any PurchasedITunesTrackPlayerAdding,
+        commandToastPresenter: AppCommandToastPresenter,
+        toastPresenter: any ToastPresenting,
+        favoriteActionHandler: FavoriteTrackActionHandler,
+        trackShareActionHandler: any PurchasedITunesTrackSharing
     ) {
-        self.playbackState = playbackState
+        self.playbackStateProvider = playbackStateProvider
         self.playbackController = playbackController
-        self.sheetManager = actionDependencies.sheetManager
-        self.commandExecutor = actionDependencies.commandExecutor
-        self.toastPresenter = actionDependencies.toastPresenter
+        self.sheetRouter = sheetRouter
+        self.commandExecutor = commandExecutor
+        self.commandToastPresenter = commandToastPresenter
+        self.toastPresenter = toastPresenter
         self.favoriteActionHandler = favoriteActionHandler
-    }
-
-    // MARK: - Состояние строки
-
-    /// Проверяет, является ли трек текущим в контексте купленных iTunes-треков.
-    func isCurrent(_ track: PurchasedITunesPlayableTrack) -> Bool {
-        playbackState.currentDisplayableId == track.id
-            && playbackState.currentContext == .purchasedITunes
-    }
-
-    /// Проверяет, играет ли текущий iTunes-трек.
-    func isPlaying(_ track: PurchasedITunesPlayableTrack) -> Bool {
-        isCurrent(track) && playbackState.isPlaying
+        self.trackShareActionHandler = trackShareActionHandler
     }
 
     // MARK: - Действия
 
     /// Выполняет пользовательское действие строки iTunes.
-    func handle(_ action: PurchasedITunesTrackAction) {
+    func handle(
+        _ action: PurchasedITunesTrackAction,
+        playbackContext: [PurchasedITunesPlayableTrack]
+    ) {
         switch action {
-        case .play(let track, let context):
-            play(track: track, context: context)
+        case .play(let track):
+            play(track: track, context: playbackContext)
 
         case .copy(let track):
-            sheetManager.presentCopyPurchasedITunesToFolder(for: track)
+            sheetRouter.presentCopyPurchasedITunesToFolder(for: track)
 
         case .details(let track):
             showDetails(track)
 
         case .share(let track):
-            TrackShareActionHandler.shared.sharePurchasedITunesTrack(track)
+            trackShareActionHandler.sharePurchasedITunesTrack(track)
 
         case .addToTrackList(let track):
-            sheetManager.presentAddToTrackList(for: track)
+            sheetRouter.presentAddToTrackList(for: track, sourceTrackListId: nil)
 
         case .addToPlayer(let track):
             addToPlayer(track)
@@ -102,7 +91,7 @@ struct PurchasedITunesTrackActionHandler {
     private func showDetails(
         _ track: PurchasedITunesPlayableTrack
     ) {
-        sheetManager.presentTrackDetail(track)
+        sheetRouter.presentTrackDetail(track)
     }
 
     /// Запускает или ставит на паузу текущий iTunes-трек.
@@ -110,7 +99,11 @@ struct PurchasedITunesTrackActionHandler {
         track: PurchasedITunesPlayableTrack,
         context: [PurchasedITunesPlayableTrack]
     ) {
-        if isCurrent(track) {
+        let playbackState = playbackStateProvider.playbackState
+        let isCurrent = playbackState.currentDisplayableId == track.id
+            && playbackState.currentContext == .purchasedITunes
+
+        if isCurrent {
             playbackController.togglePlayPause()
         } else {
             playbackController.play(
@@ -130,13 +123,9 @@ struct PurchasedITunesTrackActionHandler {
                 let result = try await commandExecutor.addPurchasedITunesTrackToPlayer(
                     track
                 )
-                AppCommandToastPresenter(
-                    toastPresenter: toastPresenter
-                ).present(result)
+                commandToastPresenter.present(result)
             } catch let appError as AppError {
-                AppCommandToastPresenter(
-                    toastPresenter: toastPresenter
-                ).present(appError)
+                commandToastPresenter.present(appError)
             } catch {
                 toastPresenter.handle(
                     .operationFailed(

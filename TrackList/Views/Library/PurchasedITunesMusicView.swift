@@ -14,40 +14,17 @@ struct PurchasedITunesMusicView: View {
 
     // MARK: - Входные данные
 
-    /// Реактивное playback-состояние для подсветки и прокрутки текущего iTunes-трека.
-    let playbackStateProvider: any PlaybackStateProviding
-    /// Команды запуска и toggle строки iTunes.
-    let playbackController: any TrackPlaybackControlling
-    /// Подтверждённое состояние «Избранного» для готовых строк iTunes.
-    let favoriteTrackIdsProvider: any FavoriteTrackIdsProviding
-    /// Единый обработчик «Избранного» передаётся в контейнеры строк iTunes.
-    let favoriteTrackActionHandler: FavoriteTrackActionHandler
-    /// Sheet- и command-зависимости строки подготовлены Composition Root.
-    let trackActionDependencies: PurchasedITunesTrackActionDependencies
+    /// Готовый снимок не раскрывает View provider-ы, handler-ы и domain-зависимости.
+    let state: PurchasedITunesScreenState
     /// Одноразовый intent прокрутки к треку, полученный из общего сценария фонотеки.
     let revealRequest: LibraryRevealRequest?
     /// Подтверждает владельцу общего reveal-intent завершение обработки прокрутки.
     let onRevealHandled: (UUID) -> Void
     /// Передаёт действия всего экрана в экранный action handler.
     let onAction: (PurchasedITunesMusicAction) -> Void
+    /// Передаёт действия строки стабильному handler-у из ScreenStore.
+    let onTrackAction: (PurchasedITunesTrackAction) -> Void
     @Environment(\.scenePhase) private var scenePhase
-
-    // MARK: - Модель представления
-
-    /// Модель представления владеет запросом доступа и чтением системной медиатеки.
-    @StateObject private var viewModel = PurchasedITunesMusicViewModel()
-    /// Собирает готовое состояние строки iTunes до передачи в её контейнер.
-    private let rowStateBuilder = PurchasedITunesTrackRowStateBuilder()
-    /// Локальный snapshot сохраняет реактивность без наблюдения PlayerViewModel.
-    @State private var playbackState = PlaybackStateSnapshot(
-        currentDisplayableId: nil,
-        currentTrackId: nil,
-        currentContext: nil,
-        currentContextSource: nil,
-        isPlaying: false
-    )
-    /// Локальный snapshot сохраняет реактивность состояния «Избранного» без PlayerViewModel.
-    @State private var favoriteTrackIds = Set<UUID>()
 
     // MARK: - Интерфейс
 
@@ -60,28 +37,26 @@ struct PurchasedITunesMusicView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 PurchasedITunesToolbarMenuButton(
-                    selectedSortMode: viewModel.sortMode,
-                    onSortModeSelection: viewModel.selectSortMode,
-                    isExportEnabled: exportableTracks.isEmpty == false,
-                    onExport: exportAllTracks
+                    selectedSortMode: state.sortMode,
+                    onSortModeSelection: {
+                        onAction(.sortModeSelected($0))
+                    },
+                    isExportEnabled: state.canExport,
+                    onExport: {
+                        onAction(.exportTracks)
+                    }
                 )
             }
         }
         .task {
-            await viewModel.load()
-        }
-        .onReceive(playbackStateProvider.playbackStatePublisher) { playbackState in
-            self.playbackState = playbackState
-        }
-        .onReceive(favoriteTrackIdsProvider.favoriteTrackIdsPublisher) { favoriteTrackIds in
-            self.favoriteTrackIds = favoriteTrackIds
+            onAction(.appeared)
         }
     }
 
     @ViewBuilder
     private var content: some View {
-        switch viewModel.state {
-        case .idle, .loading:
+        switch state.content {
+        case .loading:
             loadingView
 
         case .denied:
@@ -90,24 +65,9 @@ struct PurchasedITunesMusicView: View {
         case .empty:
             messageView(LibraryPresentationText.purchasedITunesEmptyMessage)
 
-        case .loaded:
-            tracksList(exportableTracks)
+        case .loaded(let rows):
+            tracksList(rows: rows, tracks: state.tracks)
         }
-    }
-
-    /// Собирает общий набор адаптеров для списка, playback-контекста и экспорта.
-    private var exportableTracks: [PurchasedITunesPlayableTrack] {
-        guard case .loaded(let tracks) = viewModel.state else {
-            return []
-        }
-
-        return tracks.map(PurchasedITunesPlayableTrack.init(track:))
-    }
-
-    /// Передаёт все доступные треки раздела в текущем отображаемом порядке.
-    private func exportAllTracks() {
-        guard exportableTracks.isEmpty == false else { return }
-        onAction(.exportTracks(exportableTracks))
     }
 
     /// Показывает состояние чтения системной медиатеки.
@@ -140,26 +100,18 @@ struct PurchasedITunesMusicView: View {
 
     /// Показывает список локальных треков, найденных в системной медиатеке.
     private func tracksList(
-        _ tracks: [PurchasedITunesPlayableTrack]
+        rows: [PurchasedITunesTrackRowState],
+        tracks: [PurchasedITunesPlayableTrack]
     ) -> some View {
         ScrollViewReader { proxy in
             List {
                 Section {
-                    ForEach(tracks) { track in
-                        let rowState = rowStateBuilder.build(
-                            track: track,
-                            favoriteTrackIds: favoriteTrackIds
-                        )
-
+                    ForEach(rows, id: \.track.id) { rowState in
                         PurchasedITunesTrackRowContainer(
                             state: rowState,
-                            context: tracks,
-                            playbackState: playbackState,
-                            playbackController: playbackController,
-                            favoriteTrackActionHandler: favoriteTrackActionHandler,
-                            actionDependencies: trackActionDependencies
+                            onAction: onTrackAction
                         )
-                        .id(track.id)
+                        .id(rowState.track.id)
                     }
                 }
             }
@@ -169,7 +121,7 @@ struct PurchasedITunesMusicView: View {
             .onAppear {
                 scrollToCurrentTrackIfNeeded(
                     using: proxy,
-                    tracks: tracks,
+                    rows: rows,
                     animated: false
                 )
                 revealTrackIfNeeded(
@@ -183,17 +135,10 @@ struct PurchasedITunesMusicView: View {
                     tracks: tracks
                 )
             }
-            .onChange(of: playbackState.currentDisplayableId) { _, _ in
+            .onChange(of: currentTrackID(in: rows)) { _, _ in
                 scrollToCurrentTrackIfNeeded(
                     using: proxy,
-                    tracks: tracks,
-                    animated: true
-                )
-            }
-            .onChange(of: playbackState.currentContext) { _, _ in
-                scrollToCurrentTrackIfNeeded(
-                    using: proxy,
-                    tracks: tracks,
+                    rows: rows,
                     animated: true
                 )
             }
@@ -201,7 +146,7 @@ struct PurchasedITunesMusicView: View {
                 // После смены порядка сохраняем существующее поведение фокуса на текущем треке.
                 scrollToCurrentTrackIfNeeded(
                     using: proxy,
-                    tracks: tracks,
+                    rows: rows,
                     animated: true
                 )
             }
@@ -209,34 +154,28 @@ struct PurchasedITunesMusicView: View {
                 guard newPhase == .active else { return }
                 scrollToCurrentTrackIfNeeded(
                     using: proxy,
-                    tracks: tracks,
+                    rows: rows,
                     animated: true
                 )
             }
         }
     }
 
-    /// Находит текущий iTunes-трек внутри отображаемого списка.
-    private func currentPurchasedITunesTrackId(
-        in tracks: [PurchasedITunesPlayableTrack]
+    /// Возвращает идентификатор строки, уже помеченной Presenter-ом как текущая.
+    private func currentTrackID(
+        in rows: [PurchasedITunesTrackRowState]
     ) -> UUID? {
-        guard playbackState.currentContext == .purchasedITunes,
-              let currentDisplayableId = playbackState.currentDisplayableId,
-              tracks.contains(where: { $0.id == currentDisplayableId }) else {
-            return nil
-        }
-
-        return currentDisplayableId
+        rows.first(where: \.isCurrent)?.track.id
     }
 
     /// Прокручивает список к текущему iTunes-треку, если он есть на экране.
     private func scrollToCurrentTrackIfNeeded(
         using proxy: ScrollViewProxy,
-        tracks: [PurchasedITunesPlayableTrack],
+        rows: [PurchasedITunesTrackRowState],
         animated: Bool
     ) {
-        guard let targetTrackId = currentPurchasedITunesTrackId(
-            in: tracks
+        guard let targetTrackId = currentTrackID(
+            in: rows
         ) else {
             return
         }
@@ -278,7 +217,7 @@ struct PurchasedITunesMusicView: View {
 private struct PurchasedITunesToolbarMenuButton: UIViewRepresentable {
     /// Текущий режим нужен системе для checkmark активного направления.
     let selectedSortMode: PurchasedITunesTrackSortMode
-    /// Передаёт пользовательский выбор обратно во ViewModel.
+    /// Передаёт пользовательский выбор в ActionHandler feature.
     let onSortModeSelection: (PurchasedITunesTrackSortMode) -> Void
     /// Определяет доступность обычного экспорта загруженного списка.
     let isExportEnabled: Bool

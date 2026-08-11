@@ -24,8 +24,8 @@ struct LibraryFeatureDependencies {
     let allTracksActionHandlerFactory: LibraryAllTracksActionHandlerFactory
     /// Собирает ActionHandler экспорта значения коллекции.
     let collectionTracksActionHandlerFactory: LibraryCollectionTracksActionHandlerFactory
-    /// Собирает ActionHandler раздела купленных iTunes-треков.
-    let purchasedITunesActionHandlerFactory: PurchasedITunesMusicActionHandlerFactory
+    /// Собирает изолированный graph раздела купленных iTunes-треков.
+    let purchasedITunesFeatureFactory: PurchasedITunesFeatureFactory
     /// Собирает ViewModel экрана папки фонотеки.
     let folderViewModelFactory: LibraryFolderViewModelFactory
     /// Собирает screen-local объекты и View экрана треков папки.
@@ -38,6 +38,4 @@ struct LibraryFeatureDependencies {
     let favoriteTrackIdsProvider: any FavoriteTrackIdsProviding
     /// Выполняет общий flow переименования файлов без создания handler-а во View.
     let trackFileRenameActionHandler: TrackFileRenameActionHandler
-    /// Передаёт строкам iTunes явные sheet- и command-зависимости.
-    let purchasedITunesTrackActionDependencies: PurchasedITunesTrackActionDependencies
 }

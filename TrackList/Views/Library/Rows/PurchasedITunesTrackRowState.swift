@@ -10,7 +10,7 @@
 import Foundation
 
 /// Хранит подготовленные данные строки iTunes без действий и зависимостей от ViewModel.
-struct PurchasedITunesTrackRowState {
+struct PurchasedITunesTrackRowState: Equatable {
     let track: PurchasedITunesPlayableTrack
     let artworkRequest: ArtworkRequest
     let title: String?
@@ -19,4 +19,8 @@ struct PurchasedITunesTrackRowState {
     /// Текущее подтверждённое состояние «Избранного» для меню строки.
     let isFavorite: Bool
     let artworkBadgeState: TrackArtworkBadgeState
+    /// Строка представляет текущий iTunes-трек в активном playback-контексте.
+    let isCurrent: Bool
+    /// Текущая строка находится в состоянии воспроизведения.
+    let isPlaying: Bool
 }

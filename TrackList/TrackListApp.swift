@@ -229,6 +229,22 @@ struct TrackListApp: App {
             commandExecutor: commandExecutor,
             toastManager: toastManager
         )
+        let purchasedITunesFeatureFactory = PurchasedITunesFeatureFactory(
+            musicProvider: PurchasedITunesMusicProvider(),
+            sortModePersistence: appSettingsManager,
+            playbackStateProvider: playbackStateProvider,
+            playbackController: playbackController,
+            favoriteTrackIdsProvider: favoriteTrackIdsProvider,
+            favoriteActionHandler: favoriteTrackActionHandler,
+            trackShareActionHandler: trackShareActionHandler,
+            sheetManager: sheetManager,
+            commandExecutor: commandExecutor,
+            commandToastPresenter: AppCommandToastPresenter(
+                toastPresenter: toastManager
+            ),
+            toastPresenter: toastManager,
+            viewControllerProvider: viewControllerProvider
+        )
         let libraryFeatureDependencies = LibraryFeatureDependencies(
             screenViewModelFactory: LibraryScreenViewModelFactory(
                 navigationCoordinator: navigationCoordinator,
@@ -258,10 +274,7 @@ struct TrackListApp: App {
                 viewControllerProvider: viewControllerProvider,
                 toastPresenter: toastManager
             ),
-            purchasedITunesActionHandlerFactory: PurchasedITunesMusicActionHandlerFactory(
-                viewControllerProvider: viewControllerProvider,
-                toastPresenter: toastManager
-            ),
+            purchasedITunesFeatureFactory: purchasedITunesFeatureFactory,
             folderViewModelFactory: LibraryFolderViewModelFactory(
                 navigationCoordinator: navigationCoordinator,
                 viewControllerProvider: viewControllerProvider,
@@ -273,12 +286,7 @@ struct TrackListApp: App {
             playbackStateProvider: playbackStateProvider,
             playbackController: playbackController,
             favoriteTrackIdsProvider: favoriteTrackIdsProvider,
-            trackFileRenameActionHandler: renameActionHandler,
-            purchasedITunesTrackActionDependencies: PurchasedITunesTrackActionDependencies(
-                sheetManager: sheetManager,
-                commandExecutor: commandExecutor,
-                toastPresenter: toastManager
-            )
+            trackFileRenameActionHandler: renameActionHandler
         )
 
         let searchFeatureFactory = SearchFeatureFactory(

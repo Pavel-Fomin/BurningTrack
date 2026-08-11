@@ -7,30 +7,16 @@
 //  Created by Pavel Fomin on 02.07.2026.
 //
 
+import Combine
 import Foundation
 
 @MainActor
 final class PurchasedITunesMusicViewModel: ObservableObject {
 
-    enum State: Equatable {
-        /// Экран создан, но чтение медиатеки ещё не запускалось.
-        case idle
-        /// Идёт запрос доступа или чтение системной медиатеки.
-        case loading
-        /// Пользователь или система запретили доступ к медиатеке.
-        case denied
-        /// Доступ есть, но подходящих локальных треков не найдено.
-        case empty
-        /// Найдены локальные треки, доступные через assetURL.
-        case loaded([PurchasedITunesTrack])
-    }
-
     // MARK: - Выходные данные
 
-    /// Текущее состояние экрана для SwiftUI.
-    @Published private(set) var state: State = .idle
-    /// Выбранный режим, восстановленный из SQLite-настроек фонотеки.
-    @Published private(set) var sortMode: PurchasedITunesTrackSortMode
+    /// Готовое состояние экрана публикуется после преобразования Presenter-ом.
+    @Published private(set) var screenState: PurchasedITunesScreenState
 
     // MARK: - Зависимости
 
@@ -38,35 +24,61 @@ final class PurchasedITunesMusicViewModel: ObservableObject {
     private let provider: any PurchasedITunesMusicProviding
     /// Узкий контракт сохранения выбранного режима сортировки.
     private let sortModePersistence: any PurchasedITunesTrackSortModePersisting
+    /// Подтверждённое состояние «Избранного» участвует только в подготовке строк Presenter-ом.
+    private let favoriteTrackIdsProvider: any FavoriteTrackIdsProviding
+    /// Узкий playback-снимок нужен Presenter-у для готовых флагов текущей строки.
+    private let playbackStateProvider: any PlaybackStateProviding
+    /// Чистый presentation-слой не выполняет запросы доступа и не управляет UIKit.
+    private let presenter: PurchasedITunesPresenter
 
     // MARK: - Загруженные данные
 
     /// Исходные треки хранятся отдельно, чтобы смена сортировки не читала MPMediaItem повторно.
     private var loadedTracks: [PurchasedITunesTrack] = []
+    /// Текущее состояние процесса не раскрывается View и становится ScreenState только через Presenter.
+    private var content: PurchasedITunesMusicContent = .idle
+    /// Выбранный режим сортировки хранится рядом с исходными данными до успешного сохранения в SQLite.
+    private var sortMode: PurchasedITunesTrackSortMode
+    /// Подписки feature собираются рядом с данными, а не в SwiftUI View.
+    private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Инициализация
 
     init(
-        provider: any PurchasedITunesMusicProviding = PurchasedITunesMusicProvider(),
-        sortModePersistence: (any PurchasedITunesTrackSortModePersisting)? = nil
+        provider: any PurchasedITunesMusicProviding,
+        sortModePersistence: any PurchasedITunesTrackSortModePersisting,
+        favoriteTrackIdsProvider: any FavoriteTrackIdsProviding,
+        playbackStateProvider: any PlaybackStateProviding,
+        presenter: PurchasedITunesPresenter
     ) {
-        let resolvedPersistence = sortModePersistence ?? AppSettingsManager.shared
-
         self.provider = provider
-        self.sortModePersistence = resolvedPersistence
-        self.sortMode = resolvedPersistence.purchasedITunesTrackSortMode
+        self.sortModePersistence = sortModePersistence
+        self.favoriteTrackIdsProvider = favoriteTrackIdsProvider
+        self.playbackStateProvider = playbackStateProvider
+        self.presenter = presenter
+        self.sortMode = sortModePersistence.purchasedITunesTrackSortMode
+        self.screenState = presenter.present(
+            content: .idle,
+            sortMode: sortMode,
+            favoriteTrackIds: favoriteTrackIdsProvider.favoriteTrackIds,
+            playbackState: playbackStateProvider.playbackState
+        )
+
+        observePresentationDependencies()
     }
 
     // MARK: - Действия
 
     /// Запрашивает доступ и загружает локальные треки медиатеки.
     func load() async {
-        state = .loading
+        content = .loading
         loadedTracks = []
+        presentCurrentState()
 
         let accessState = await provider.requestAccessIfNeeded()
         guard accessState == .authorized else {
-            state = .denied
+            content = .denied
+            presentCurrentState()
             return
         }
 
@@ -100,17 +112,44 @@ final class PurchasedITunesMusicViewModel: ObservableObject {
     /// Пересобирает готовый плоский список из кэшированного исходного массива.
     private func rebuildLoadedState() {
         guard loadedTracks.isEmpty == false else {
-            if case .loading = state {
-                state = .empty
+            if case .loading = content {
+                content = .empty
             }
+            presentCurrentState()
             return
         }
 
-        state = .loaded(
+        content = .loaded(
             PurchasedITunesTrackSorter.sort(
                 loadedTracks,
                 mode: sortMode
             )
         )
+        presentCurrentState()
+    }
+
+    /// Пересобирает снимок при изменении данных, сортировки, favorite или playback runtime-состояния.
+    private func presentCurrentState() {
+        screenState = presenter.present(
+            content: content,
+            sortMode: sortMode,
+            favoriteTrackIds: favoriteTrackIdsProvider.favoriteTrackIds,
+            playbackState: playbackStateProvider.playbackState
+        )
+    }
+
+    /// Подписки на узкие runtime-контракты не позволяют SwiftUI View самостоятельно собирать строки.
+    private func observePresentationDependencies() {
+        favoriteTrackIdsProvider.favoriteTrackIdsPublisher
+            .sink { [weak self] _ in
+                self?.presentCurrentState()
+            }
+            .store(in: &cancellables)
+
+        playbackStateProvider.playbackStatePublisher
+            .sink { [weak self] _ in
+                self?.presentCurrentState()
+            }
+            .store(in: &cancellables)
     }
 }

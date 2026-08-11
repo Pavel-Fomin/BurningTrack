@@ -7,6 +7,7 @@
 //  Created by Pavel Fomin on 23.07.2026.
 //
 
+import Combine
 import XCTest
 @testable import TrackList
 
@@ -186,28 +187,105 @@ final class PurchasedITunesMusicViewModelTests: XCTestCase {
         let persistence = PurchasedITunesSortModePersistenceStub(mode: .titleAsc)
         let viewModel = PurchasedITunesMusicViewModel(
             provider: provider,
-            sortModePersistence: persistence
+            sortModePersistence: persistence,
+            favoriteTrackIdsProvider: PurchasedITunesFavoriteTrackIdsProviderStub(),
+            playbackStateProvider: PurchasedITunesPlaybackStateProviderStub(),
+            presenter: PurchasedITunesPresenter(
+                artworkBadgeStateFactory: TrackArtworkBadgeStateFactory()
+            )
         )
 
         await viewModel.load()
-        XCTAssertEqual(loadedIds(from: viewModel.state), [2, 1])
+        XCTAssertEqual(loadedTitles(from: viewModel.screenState), ["Alpha", "Beta"])
 
         viewModel.selectSortMode(.artistDesc)
 
-        XCTAssertEqual(loadedIds(from: viewModel.state), [1, 2])
+        XCTAssertEqual(loadedTitles(from: viewModel.screenState), ["Beta", "Alpha"])
         XCTAssertEqual(provider.loadTracksCallCount, 1)
         XCTAssertEqual(persistence.mode, .artistDesc)
         XCTAssertEqual(persistence.saveCallCount, 1)
     }
 
-    /// Извлекает идентификаторы только из готового loaded-состояния.
-    private func loadedIds(
-        from state: PurchasedITunesMusicViewModel.State
-    ) -> [UInt64]? {
-        guard case .loaded(let tracks) = state else {
+    /// Проверяет подготовку пустого состояния после разрешённого запроса без треков.
+    func testLoadPresentsEmptyStateForAuthorizedEmptyLibrary() async {
+        let viewModel = makeViewModel(
+            provider: PurchasedITunesMusicProviderStub(tracks: [])
+        )
+
+        await viewModel.load()
+
+        XCTAssertEqual(viewModel.screenState.content, .empty)
+        XCTAssertFalse(viewModel.screenState.canExport)
+    }
+
+    /// Проверяет, что запрет доступа не обращается к чтению медиатеки.
+    func testLoadPresentsDeniedStateWithoutReadingTracks() async {
+        let provider = PurchasedITunesMusicProviderStub(
+            tracks: [],
+            requestedAccessState: .denied
+        )
+        let viewModel = makeViewModel(provider: provider)
+
+        await viewModel.load()
+
+        XCTAssertEqual(viewModel.screenState.content, .denied)
+        XCTAssertEqual(provider.loadTracksCallCount, 0)
+    }
+
+    /// Проверяет возврат видимого режима и порядка, если SQLite отклонил сохранение.
+    func testSelectSortModeRestoresPreviousStateWhenPersistenceFails() async {
+        let provider = PurchasedITunesMusicProviderStub(
+            tracks: [
+                makeTrack(id: 1, title: "Beta", artist: "Beta"),
+                makeTrack(id: 2, title: "Alpha", artist: "Alpha")
+            ]
+        )
+        let persistence = PurchasedITunesSortModePersistenceStub(
+            mode: .titleAsc,
+            shouldFailOnSave: true
+        )
+        let viewModel = makeViewModel(
+            provider: provider,
+            persistence: persistence
+        )
+
+        await viewModel.load()
+        viewModel.selectSortMode(.artistDesc)
+
+        XCTAssertEqual(viewModel.screenState.sortMode, .titleAsc)
+        XCTAssertEqual(loadedTitles(from: viewModel.screenState), ["Alpha", "Beta"])
+        XCTAssertEqual(persistence.mode, .titleAsc)
+        XCTAssertEqual(persistence.saveCallCount, 1)
+    }
+
+    /// Собирает feature ViewModel с явными runtime-провайдерами для изолированной проверки.
+    private func makeViewModel(
+        provider: PurchasedITunesMusicProviderStub,
+        persistence: PurchasedITunesSortModePersistenceStub? = nil
+    ) -> PurchasedITunesMusicViewModel {
+        let resolvedPersistence = persistence ?? PurchasedITunesSortModePersistenceStub(
+            mode: .titleAsc
+        )
+
+        return PurchasedITunesMusicViewModel(
+            provider: provider,
+            sortModePersistence: resolvedPersistence,
+            favoriteTrackIdsProvider: PurchasedITunesFavoriteTrackIdsProviderStub(),
+            playbackStateProvider: PurchasedITunesPlaybackStateProviderStub(),
+            presenter: PurchasedITunesPresenter(
+                artworkBadgeStateFactory: TrackArtworkBadgeStateFactory()
+            )
+        )
+    }
+
+    /// Извлекает отображаемые заголовки только из готового screen-состояния.
+    private func loadedTitles(
+        from state: PurchasedITunesScreenState
+    ) -> [String]? {
+        guard case .loaded = state.content else {
             return nil
         }
-        return tracks.map(\.id)
+        return state.tracks.map { $0.title ?? "" }
     }
 
     /// Создаёт минимальную runtime-модель для проверки ViewModel.
@@ -234,18 +312,23 @@ final class PurchasedITunesMusicViewModelTests: XCTestCase {
 /// Stub фиксирует количество чтений системной медиатеки.
 private final class PurchasedITunesMusicProviderStub: PurchasedITunesMusicProviding {
     let tracks: [PurchasedITunesTrack]
+    let requestedAccessState: PurchasedITunesMusicAccessState
     private(set) var loadTracksCallCount = 0
 
-    init(tracks: [PurchasedITunesTrack]) {
+    init(
+        tracks: [PurchasedITunesTrack],
+        requestedAccessState: PurchasedITunesMusicAccessState = .authorized
+    ) {
         self.tracks = tracks
+        self.requestedAccessState = requestedAccessState
     }
 
     func accessState() -> PurchasedITunesMusicAccessState {
-        .authorized
+        requestedAccessState
     }
 
     func requestAccessIfNeeded() async -> PurchasedITunesMusicAccessState {
-        .authorized
+        requestedAccessState
     }
 
     func loadTracks() -> [PurchasedITunesTrack] {
@@ -258,18 +341,70 @@ private final class PurchasedITunesMusicProviderStub: PurchasedITunesMusicProvid
 @MainActor
 private final class PurchasedITunesSortModePersistenceStub: PurchasedITunesTrackSortModePersisting {
     var mode: PurchasedITunesTrackSortMode
+    let shouldFailOnSave: Bool
     private(set) var saveCallCount = 0
 
     var purchasedITunesTrackSortMode: PurchasedITunesTrackSortMode {
         mode
     }
 
-    init(mode: PurchasedITunesTrackSortMode) {
+    init(
+        mode: PurchasedITunesTrackSortMode,
+        shouldFailOnSave: Bool = false
+    ) {
         self.mode = mode
+        self.shouldFailOnSave = shouldFailOnSave
     }
 
     func setPurchasedITunesTrackSortMode(_ mode: PurchasedITunesTrackSortMode) throws {
-        self.mode = mode
         saveCallCount += 1
+        guard shouldFailOnSave == false else {
+            throw PurchasedITunesSortModePersistenceError.failed
+        }
+        self.mode = mode
+    }
+}
+
+/// Ошибка памяти позволяет проверить откат состояния без SQLite.
+private enum PurchasedITunesSortModePersistenceError: Error {
+    case failed
+}
+
+/// Публикует подтверждённые favorite-ID для feature ViewModel без PlayerViewModel.
+@MainActor
+private final class PurchasedITunesFavoriteTrackIdsProviderStub: FavoriteTrackIdsProviding {
+    private let subject = CurrentValueSubject<Set<UUID>, Never>([])
+
+    var favoriteTrackIds: Set<UUID> {
+        subject.value
+    }
+
+    var favoriteTrackIdsPublisher: AnyPublisher<Set<UUID>, Never> {
+        subject.eraseToAnyPublisher()
+    }
+}
+
+/// Публикует минимальный playback-снимок для чистых тестов presentation-состояния.
+@MainActor
+private final class PurchasedITunesPlaybackStateProviderStub: PlaybackStateProviding {
+    private let subject = CurrentValueSubject<PlaybackStateSnapshot, Never>(
+        PlaybackStateSnapshot(
+            currentDisplayableId: nil,
+            currentTrackId: nil,
+            currentContext: nil,
+            currentContextSource: nil,
+            isPlaying: false
+        )
+    )
+
+    var playbackState: PlaybackStateSnapshot { subject.value }
+    var currentDisplayableId: UUID? { playbackState.currentDisplayableId }
+    var currentTrackId: UUID? { playbackState.currentTrackId }
+    var currentContext: PlaybackContext? { playbackState.currentContext }
+    var currentContextSource: PlaybackContextSource? { playbackState.currentContextSource }
+    var isPlaying: Bool { playbackState.isPlaying }
+
+    var playbackStatePublisher: AnyPublisher<PlaybackStateSnapshot, Never> {
+        subject.eraseToAnyPublisher()
     }
 }

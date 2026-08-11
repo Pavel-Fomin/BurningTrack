@@ -7,6 +7,7 @@
 //  Created by Pavel Fomin on 23.07.2026.
 //
 
+import Combine
 import Foundation
 import UIKit
 import XCTest
@@ -104,7 +105,25 @@ final class PurchasedITunesMusicActionHandlerTests: XCTestCase {
     func testExportUsesAllTracksInDisplayOrderWithoutNumbering() async {
         let exporter = ExportRequestSpy()
         let toastPresenter = ExportRequestToastPresenterSpy()
+        let firstSourceTrack = makeSourceTrack(
+            id: 1,
+            title: "First",
+            artist: "Artist",
+            assetURL: URL(fileURLWithPath: "/tmp/first.m4a")
+        )
+        let secondSourceTrack = makeSourceTrack(
+            id: 2,
+            title: "Second",
+            artist: nil,
+            assetURL: URL(fileURLWithPath: "/tmp/second.m4a")
+        )
+        let viewModel = makeViewModel(
+            tracks: [secondSourceTrack, firstSourceTrack]
+        )
+        await viewModel.load()
+        let displayOrder = viewModel.screenState.tracks
         let handler = PurchasedITunesMusicActionHandler(
+            viewModel: viewModel,
             exportProgressViewModel: makeExportProgressViewModelForRequestTests(
                 exporter: exporter,
                 toastPresenter: toastPresenter
@@ -114,27 +133,14 @@ final class PurchasedITunesMusicActionHandlerTests: XCTestCase {
             ),
             toastPresenter: toastPresenter
         )
-        let firstTrack = makePlayableTrack(
-            id: 1,
-            title: "First",
-            artist: "Artist",
-            assetURL: URL(fileURLWithPath: "/tmp/first.m4a")
-        )
-        let secondTrack = makePlayableTrack(
-            id: 2,
-            title: "Second",
-            artist: nil,
-            assetURL: URL(fileURLWithPath: "/tmp/second.m4a")
-        )
-
-        handler.handle(.exportTracks([secondTrack, firstTrack]))
+        handler.handle(.exportTracks)
         await yieldToExportTask()
 
         XCTAssertEqual(exporter.exportCallCount, 1)
         XCTAssertEqual(exporter.exportFolderNames, ["Purchased iTunes"])
         XCTAssertEqual(
             exporter.exportedTrackIDs,
-            [[secondTrack.trackId, firstTrack.trackId]]
+            [displayOrder.map(\.trackId)]
         )
         XCTAssertEqual(
             exporter.exportedSources,
@@ -142,7 +148,7 @@ final class PurchasedITunesMusicActionHandlerTests: XCTestCase {
         )
         XCTAssertEqual(
             exporter.exportedAssetURLs,
-            [[secondTrack.assetURL, firstTrack.assetURL]]
+            [displayOrder.map(\.assetURL)]
         )
         guard let fileNamingMode = exporter.fileNamingModes.first else {
             return XCTFail("Режим именования не передан в общий экспорт")
@@ -158,7 +164,10 @@ final class PurchasedITunesMusicActionHandlerTests: XCTestCase {
     func testEmptySectionDoesNotStartExport() async {
         let exporter = ExportRequestSpy()
         let toastPresenter = ExportRequestToastPresenterSpy()
+        let viewModel = makeViewModel(tracks: [])
+        await viewModel.load()
         let handler = PurchasedITunesMusicActionHandler(
+            viewModel: viewModel,
             exportProgressViewModel: makeExportProgressViewModelForRequestTests(
                 exporter: exporter,
                 toastPresenter: toastPresenter
@@ -169,12 +178,55 @@ final class PurchasedITunesMusicActionHandlerTests: XCTestCase {
             toastPresenter: toastPresenter
         )
 
-        handler.handle(.exportTracks([]))
+        handler.handle(.exportTracks)
         await yieldToExportTask()
 
         XCTAssertEqual(exporter.exportCallCount, 0)
         XCTAssertTrue(toastPresenter.events.isEmpty)
         XCTAssertTrue(toastPresenter.errors.isEmpty)
+    }
+
+    /// Проверяет, что load и сортировка проходят через типизированный экранный handler.
+    func testAppearedAndSortActionsUpdateFeatureViewModel() async {
+        let firstSourceTrack = makeSourceTrack(
+            id: 1,
+            title: "Beta",
+            artist: "Alpha",
+            assetURL: URL(fileURLWithPath: "/tmp/beta.m4a")
+        )
+        let secondSourceTrack = makeSourceTrack(
+            id: 2,
+            title: "Alpha",
+            artist: "Beta",
+            assetURL: URL(fileURLWithPath: "/tmp/alpha.m4a")
+        )
+        let provider = PurchasedITunesMusicActionProviderStub(
+            tracks: [firstSourceTrack, secondSourceTrack]
+        )
+        let viewModel = makeViewModel(provider: provider)
+        let toastPresenter = ExportRequestToastPresenterSpy()
+        let handler = PurchasedITunesMusicActionHandler(
+            viewModel: viewModel,
+            exportProgressViewModel: makeExportProgressViewModelForRequestTests(
+                exporter: ExportRequestSpy(),
+                toastPresenter: toastPresenter
+            ),
+            viewControllerProvider: ExportRequestViewControllerProviderSpy(
+                presenter: UIViewController()
+            ),
+            toastPresenter: toastPresenter
+        )
+
+        handler.handle(.appeared)
+        await yieldToExportTask()
+        handler.handle(.sortModeSelected(.artistDesc))
+
+        XCTAssertEqual(provider.loadTracksCallCount, 1)
+        XCTAssertEqual(viewModel.screenState.sortMode, .artistDesc)
+        XCTAssertEqual(
+            viewModel.screenState.tracks.map(\.title),
+            ["Alpha", "Beta"]
+        )
     }
 
     /// Создаёт runtime-адаптер без обращения к MediaPlayer.
@@ -185,17 +237,56 @@ final class PurchasedITunesMusicActionHandlerTests: XCTestCase {
         assetURL: URL
     ) -> PurchasedITunesPlayableTrack {
         PurchasedITunesPlayableTrack(
-            track: PurchasedITunesTrack(
+            track: makeSourceTrack(
                 id: id,
                 title: title,
                 artist: artist,
-                album: nil,
-                year: nil,
-                genre: nil,
-                dateAdded: Date(timeIntervalSince1970: 0),
-                artworkData: nil,
-                duration: 1,
                 assetURL: assetURL
+            )
+        )
+    }
+
+    /// Создаёт исходную runtime-модель для загрузки ViewModel без MediaPlayer.
+    private func makeSourceTrack(
+        id: UInt64,
+        title: String,
+        artist: String?,
+        assetURL: URL
+    ) -> PurchasedITunesTrack {
+        PurchasedITunesTrack(
+            id: id,
+            title: title,
+            artist: artist,
+            album: nil,
+            year: nil,
+            genre: nil,
+            dateAdded: Date(timeIntervalSince1970: 0),
+            artworkData: nil,
+            duration: 1,
+            assetURL: assetURL
+        )
+    }
+
+    /// Собирает ViewModel с явными тестовыми runtime-зависимостями.
+    private func makeViewModel(
+        tracks: [PurchasedITunesTrack]
+    ) -> PurchasedITunesMusicViewModel {
+        makeViewModel(
+            provider: PurchasedITunesMusicActionProviderStub(tracks: tracks)
+        )
+    }
+
+    /// Собирает ViewModel с переданным provider-ом для проверки запуска загрузки через handler.
+    private func makeViewModel(
+        provider: PurchasedITunesMusicActionProviderStub
+    ) -> PurchasedITunesMusicViewModel {
+        PurchasedITunesMusicViewModel(
+            provider: provider,
+            sortModePersistence: PurchasedITunesMusicActionSortPersistenceStub(),
+            favoriteTrackIdsProvider: PurchasedITunesMusicActionFavoriteProviderStub(),
+            playbackStateProvider: PurchasedITunesMusicActionPlaybackProviderStub(),
+            presenter: PurchasedITunesPresenter(
+                artworkBadgeStateFactory: TrackArtworkBadgeStateFactory()
             )
         )
     }
@@ -205,5 +296,70 @@ final class PurchasedITunesMusicActionHandlerTests: XCTestCase {
         for _ in 0..<6 {
             await Task.yield()
         }
+    }
+}
+
+/// Подменяет чтение медиатеки и фиксирует единственное обращение handler-а к ViewModel.
+private final class PurchasedITunesMusicActionProviderStub: PurchasedITunesMusicProviding {
+    let tracks: [PurchasedITunesTrack]
+    private(set) var loadTracksCallCount = 0
+
+    init(tracks: [PurchasedITunesTrack]) {
+        self.tracks = tracks
+    }
+
+    func accessState() -> PurchasedITunesMusicAccessState { .authorized }
+    func requestAccessIfNeeded() async -> PurchasedITunesMusicAccessState { .authorized }
+
+    func loadTracks() -> [PurchasedITunesTrack] {
+        loadTracksCallCount += 1
+        return tracks
+    }
+}
+
+/// Хранит сортировку в памяти, чтобы тест экранного handler-а не затрагивал SQLite.
+@MainActor
+private final class PurchasedITunesMusicActionSortPersistenceStub: PurchasedITunesTrackSortModePersisting {
+    private(set) var purchasedITunesTrackSortMode: PurchasedITunesTrackSortMode = .titleAsc
+
+    func setPurchasedITunesTrackSortMode(_ mode: PurchasedITunesTrackSortMode) throws {
+        purchasedITunesTrackSortMode = mode
+    }
+}
+
+/// Отдаёт пустое подтверждённое избранное без PlayerViewModel.
+@MainActor
+private final class PurchasedITunesMusicActionFavoriteProviderStub: FavoriteTrackIdsProviding {
+    private let subject = CurrentValueSubject<Set<UUID>, Never>([])
+
+    var favoriteTrackIds: Set<UUID> { subject.value }
+
+    var favoriteTrackIdsPublisher: AnyPublisher<Set<UUID>, Never> {
+        subject.eraseToAnyPublisher()
+    }
+}
+
+/// Отдаёт нейтральный playback-снимок, достаточный для подготовки ScreenState.
+@MainActor
+private final class PurchasedITunesMusicActionPlaybackProviderStub: PlaybackStateProviding {
+    private let subject = CurrentValueSubject<PlaybackStateSnapshot, Never>(
+        PlaybackStateSnapshot(
+            currentDisplayableId: nil,
+            currentTrackId: nil,
+            currentContext: nil,
+            currentContextSource: nil,
+            isPlaying: false
+        )
+    )
+
+    var playbackState: PlaybackStateSnapshot { subject.value }
+    var currentDisplayableId: UUID? { playbackState.currentDisplayableId }
+    var currentTrackId: UUID? { playbackState.currentTrackId }
+    var currentContext: PlaybackContext? { playbackState.currentContext }
+    var currentContextSource: PlaybackContextSource? { playbackState.currentContextSource }
+    var isPlaying: Bool { playbackState.isPlaying }
+
+    var playbackStatePublisher: AnyPublisher<PlaybackStateSnapshot, Never> {
+        subject.eraseToAnyPublisher()
     }
 }

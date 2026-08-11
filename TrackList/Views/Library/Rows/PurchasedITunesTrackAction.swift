@@ -13,10 +13,7 @@ import Foundation
 /// View отправляет только намерение, а выполнение остаётся в handler.
 enum PurchasedITunesTrackAction {
     /// Пользователь запросил воспроизведение или паузу строки.
-    case play(
-        track: PurchasedITunesPlayableTrack,
-        context: [PurchasedITunesPlayableTrack]
-    )
+    case play(track: PurchasedITunesPlayableTrack)
     /// Пользователь запросил копирование через выбор папки назначения.
     case copy(track: PurchasedITunesPlayableTrack)
     /// Пользователь запросил карточку "О треке" для runtime iTunes-трека.

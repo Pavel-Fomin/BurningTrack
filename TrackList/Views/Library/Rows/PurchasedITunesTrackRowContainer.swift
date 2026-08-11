@@ -15,39 +15,8 @@ struct PurchasedITunesTrackRowContainer: View {
     // MARK: - Входные данные
 
     let state: PurchasedITunesTrackRowState
-    let context: [PurchasedITunesPlayableTrack]
-    /// Готовый snapshot делает строку реактивной без наблюдения PlayerViewModel.
-    let playbackState: PlaybackStateSnapshot
-    /// Команды запуска и toggle не раскрывают строке PlayerViewModel.
-    let playbackController: any TrackPlaybackControlling
-    /// Единый обработчик «Избранного» передаётся в ActionHandler строки.
-    let favoriteTrackActionHandler: FavoriteTrackActionHandler
-    /// Явные зависимости sheet- и command-действий переданы корневой factory.
-    let actionDependencies: PurchasedITunesTrackActionDependencies
-
-    // MARK: - Обработчик действий
-
-    /// Обработчик пользовательских действий строки iTunes.
-    private var actionHandler: PurchasedITunesTrackActionHandler {
-        PurchasedITunesTrackActionHandler(
-            playbackState: playbackState,
-            playbackController: playbackController,
-            actionDependencies: actionDependencies,
-            favoriteActionHandler: favoriteTrackActionHandler
-        )
-    }
-
-    // MARK: - Состояние
-
-    /// Проверяет, является ли строка текущим iTunes-треком плеера.
-    private var isCurrent: Bool {
-        actionHandler.isCurrent(state.track)
-    }
-
-    /// Проверяет, играет ли текущий iTunes-трек.
-    private var isPlaying: Bool {
-        actionHandler.isPlaying(state.track)
-    }
+    /// View передаёт только typed-намерения в стабильный handler screen store.
+    let onAction: (PurchasedITunesTrackAction) -> Void
 
     /// Проверяет доступность пункта меню для раздела "Куплено в iTunes".
     private func isMenuActionAvailable(
@@ -65,8 +34,8 @@ struct PurchasedITunesTrackRowContainer: View {
     var body: some View {
         TrackRowView(
             track: state.track,
-            isCurrent: isCurrent,
-            isPlaying: isPlaying,
+            isCurrent: state.isCurrent,
+            isPlaying: state.isPlaying,
             isHighlighted: false,
             artworkRequest: state.artworkRequest,
             artworkBadgeState: state.artworkBadgeState,
@@ -82,7 +51,7 @@ struct PurchasedITunesTrackRowContainer: View {
             // Заглушка копирования ничего не пишет на диск.
             if isMenuActionAvailable(.copy) {
                 Button {
-                    actionHandler.handle(.copy(track: state.track))
+                    onAction(.copy(track: state.track))
                 } label: {
                     Label("Copy", systemImage: "doc.on.doc")
                 }
@@ -92,7 +61,7 @@ struct PurchasedITunesTrackRowContainer: View {
             // Отправляем намерение добавления в треклист обработчику действий.
             if isMenuActionAvailable(.addToTrackList) {
                 Button {
-                    actionHandler.handle(.addToTrackList(track: state.track))
+                    onAction(.addToTrackList(track: state.track))
                 } label: {
                     Label("Add to Tracklist", systemImage: "list.star")
                 }
@@ -102,7 +71,7 @@ struct PurchasedITunesTrackRowContainer: View {
             // Отправляем намерение добавления в очередь плеера обработчику действий.
             if isMenuActionAvailable(.addToPlayer) {
                 Button {
-                    actionHandler.handle(.addToPlayer(track: state.track))
+                    onAction(.addToPlayer(track: state.track))
                 } label: {
                     Label("Add to Player", systemImage: "waveform")
                 }
@@ -117,7 +86,7 @@ struct PurchasedITunesTrackRowContainer: View {
         // Открытие карточки "О треке" остаётся намерением View и выполняется обработчиком.
         if isMenuActionAvailable(.details) {
             Button {
-                actionHandler.handle(.details(track: state.track))
+                onAction(.details(track: state.track))
             } label: {
                 Label("Track Info", systemImage: "info.circle")
             }
@@ -127,14 +96,14 @@ struct PurchasedITunesTrackRowContainer: View {
             TrackFavoriteMenuContent(
                 isFavorite: state.isFavorite,
                 onToggle: {
-                    actionHandler.handle(.toggleFavorite(track: state.track))
+                    onAction(.toggleFavorite(track: state.track))
                 }
             )
         }
 
         if isMenuActionAvailable(.share) {
             Button {
-                actionHandler.handle(.share(track: state.track))
+                onAction(.share(track: state.track))
             } label: {
                 Label(
                     TrackSharePresentationText.actionTitle,
@@ -145,7 +114,7 @@ struct PurchasedITunesTrackRowContainer: View {
 
         if isMenuActionAvailable(.copy) {
             Button {
-                actionHandler.handle(.copy(track: state.track))
+                onAction(.copy(track: state.track))
             } label: {
                 Label("Copy", systemImage: "doc.on.doc")
             }
@@ -158,21 +127,16 @@ struct PurchasedITunesTrackRowContainer: View {
             addToPlayerTitle: String(localized: "Add to Player"),
             addToTrackListTitle: String(localized: "Add to Tracklist"),
             onAddToPlayer: {
-                actionHandler.handle(.addToPlayer(track: state.track))
+                onAction(.addToPlayer(track: state.track))
             },
             onAddToTrackList: {
-                actionHandler.handle(.addToTrackList(track: state.track))
+                onAction(.addToTrackList(track: state.track))
             }
         )
     }
 
-    /// Передаёт iTunes-трек в общий механизм воспроизведения вместе со всем контекстом списка.
+    /// Передаёт iTunes-трек в screen store, который добавляет актуальный отображаемый контекст.
     private func play() {
-        actionHandler.handle(
-            .play(
-                track: state.track,
-                context: context
-            )
-        )
+        onAction(.play(track: state.track))
     }
 }

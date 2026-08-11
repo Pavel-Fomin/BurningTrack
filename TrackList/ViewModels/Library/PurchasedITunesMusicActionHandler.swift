@@ -15,6 +15,8 @@ final class PurchasedITunesMusicActionHandler {
 
     // MARK: - Dependencies
 
+    /// ViewModel владеет загрузкой и сортировкой, а handler принимает typed-намерения View.
+    private let viewModel: PurchasedITunesMusicViewModel
     /// Глобальный владелец picker-а, progress и жизненного цикла экспорта.
     private let exportProgressViewModel: ExportProgressViewModel
     /// Предоставляет presenter существующего системного выбора папки.
@@ -26,10 +28,12 @@ final class PurchasedITunesMusicActionHandler {
 
     /// Создаёт обработчик с production- или тестовыми зависимостями.
     init(
+        viewModel: PurchasedITunesMusicViewModel,
         exportProgressViewModel: ExportProgressViewModel,
         viewControllerProvider: any ViewControllerProviding,
         toastPresenter: any ToastPresenting
     ) {
+        self.viewModel = viewModel
         self.exportProgressViewModel = exportProgressViewModel
         self.viewControllerProvider = viewControllerProvider
         self.toastPresenter = toastPresenter
@@ -42,8 +46,21 @@ final class PurchasedITunesMusicActionHandler {
         _ action: PurchasedITunesMusicAction
     ) {
         switch action {
-        case .exportTracks(let tracks):
-            exportTracks(tracks)
+        case .appeared:
+            loadTracks()
+
+        case .sortModeSelected(let mode):
+            viewModel.selectSortMode(mode)
+
+        case .exportTracks:
+            exportTracks(viewModel.screenState.tracks)
+        }
+    }
+
+    /// Запускает загрузку вне SwiftUI View и сохраняет текущую асинхронную семантику экрана.
+    private func loadTracks() {
+        Task { [viewModel] in
+            await viewModel.load()
         }
     }
 
