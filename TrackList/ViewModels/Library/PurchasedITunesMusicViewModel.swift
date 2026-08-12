@@ -39,6 +39,10 @@ final class PurchasedITunesMusicViewModel: ObservableObject {
     private var content: PurchasedITunesMusicContent = .idle
     /// Выбранный режим сортировки хранится рядом с исходными данными до успешного сохранения в SQLite.
     private var sortMode: PurchasedITunesTrackSortMode
+    /// Последний подтверждённый publisher-ом набор избранного передаётся Presenter-у без повторного чтения provider.
+    private var favoriteTrackIds: Set<UUID>
+    /// Последний подтверждённый publisher-ом playback-снимок сохраняет синхронность current- и playing-флагов.
+    private var playbackState: PlaybackStateSnapshot
     /// Подписки feature собираются рядом с данными, а не в SwiftUI View.
     private var cancellables = Set<AnyCancellable>()
 
@@ -57,11 +61,13 @@ final class PurchasedITunesMusicViewModel: ObservableObject {
         self.playbackStateProvider = playbackStateProvider
         self.presenter = presenter
         self.sortMode = sortModePersistence.purchasedITunesTrackSortMode
+        self.favoriteTrackIds = favoriteTrackIdsProvider.favoriteTrackIds
+        self.playbackState = playbackStateProvider.playbackState
         self.screenState = presenter.present(
             content: .idle,
             sortMode: sortMode,
-            favoriteTrackIds: favoriteTrackIdsProvider.favoriteTrackIds,
-            playbackState: playbackStateProvider.playbackState
+            favoriteTrackIds: favoriteTrackIds,
+            playbackState: playbackState
         )
 
         observePresentationDependencies()
@@ -133,22 +139,26 @@ final class PurchasedITunesMusicViewModel: ObservableObject {
         screenState = presenter.present(
             content: content,
             sortMode: sortMode,
-            favoriteTrackIds: favoriteTrackIdsProvider.favoriteTrackIds,
-            playbackState: playbackStateProvider.playbackState
+            favoriteTrackIds: favoriteTrackIds,
+            playbackState: playbackState
         )
     }
 
     /// Подписки на узкие runtime-контракты не позволяют SwiftUI View самостоятельно собирать строки.
     private func observePresentationDependencies() {
         favoriteTrackIdsProvider.favoriteTrackIdsPublisher
-            .sink { [weak self] _ in
-                self?.presentCurrentState()
+            .sink { [weak self] favoriteTrackIds in
+                guard let self else { return }
+                self.favoriteTrackIds = favoriteTrackIds
+                self.presentCurrentState()
             }
             .store(in: &cancellables)
 
         playbackStateProvider.playbackStatePublisher
-            .sink { [weak self] _ in
-                self?.presentCurrentState()
+            .sink { [weak self] playbackState in
+                guard let self else { return }
+                self.playbackState = playbackState
+                self.presentCurrentState()
             }
             .store(in: &cancellables)
     }

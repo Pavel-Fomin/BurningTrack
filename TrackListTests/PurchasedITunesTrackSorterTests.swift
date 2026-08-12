@@ -258,20 +258,109 @@ final class PurchasedITunesMusicViewModelTests: XCTestCase {
         XCTAssertEqual(persistence.saveCallCount, 1)
     }
 
+    /// Проверяет, что presentation использует именно emitted favorite-снимок, даже пока синхронное свойство provider устарело.
+    func testFavoritePublisherSnapshotUpdatesOnlyMatchingRowsWithoutProviderLag() async {
+        let firstTrack = makeTrack(id: 1, title: "First", artist: "Artist")
+        let secondTrack = makeTrack(id: 2, title: "Second", artist: "Artist")
+        let thirdTrack = makeTrack(id: 3, title: "Third", artist: "Artist")
+        let firstPlayableTrack = PurchasedITunesPlayableTrack(track: firstTrack)
+        let secondPlayableTrack = PurchasedITunesPlayableTrack(track: secondTrack)
+        let thirdPlayableTrack = PurchasedITunesPlayableTrack(track: thirdTrack)
+        let favoritesProvider = PurchasedITunesDelayedFavoriteProvider(
+            favoriteTrackIds: []
+        )
+        let viewModel = makeViewModel(
+            provider: PurchasedITunesMusicProviderStub(
+                tracks: [firstTrack, secondTrack, thirdTrack]
+            ),
+            favoriteTrackIdsProvider: favoritesProvider
+        )
+
+        await viewModel.load()
+
+        favoritesProvider.emit([firstPlayableTrack.trackId])
+        XCTAssertEqual(favoriteTrackIDs(from: viewModel.screenState), [firstPlayableTrack.trackId])
+        XCTAssertTrue(favoritesProvider.favoriteTrackIds.isEmpty)
+
+        favoritesProvider.emit([firstPlayableTrack.trackId, secondPlayableTrack.trackId])
+        XCTAssertEqual(
+            favoriteTrackIDs(from: viewModel.screenState),
+            [firstPlayableTrack.trackId, secondPlayableTrack.trackId]
+        )
+
+        favoritesProvider.emit([thirdPlayableTrack.trackId])
+        XCTAssertEqual(favoriteTrackIDs(from: viewModel.screenState), [thirdPlayableTrack.trackId])
+
+        favoritesProvider.emit([])
+        XCTAssertTrue(favoriteTrackIDs(from: viewModel.screenState).isEmpty)
+    }
+
+    /// Проверяет, что presentation использует emitted playback-снимок, а не устаревшее свойство provider.
+    func testPlaybackPublisherSnapshotUpdatesCurrentAndPlayingRowsWithoutProviderLag() async {
+        let firstTrack = makeTrack(id: 1, title: "First", artist: "Artist")
+        let secondTrack = makeTrack(id: 2, title: "Second", artist: "Artist")
+        let firstPlayableTrack = PurchasedITunesPlayableTrack(track: firstTrack)
+        let secondPlayableTrack = PurchasedITunesPlayableTrack(track: secondTrack)
+        let initialPlaybackState = makePlaybackState(
+            track: firstPlayableTrack,
+            isPlaying: false
+        )
+        let playbackProvider = PurchasedITunesDelayedPlaybackProvider(
+            playbackState: initialPlaybackState
+        )
+        let viewModel = makeViewModel(
+            provider: PurchasedITunesMusicProviderStub(
+                tracks: [firstTrack, secondTrack]
+            ),
+            playbackStateProvider: playbackProvider
+        )
+
+        await viewModel.load()
+        playbackProvider.emit(
+            makePlaybackState(track: secondPlayableTrack, isPlaying: true)
+        )
+
+        let rows = loadedRows(from: viewModel.screenState)
+        XCTAssertEqual(rows.first(where: { $0.track.trackId == firstPlayableTrack.trackId })?.isCurrent, false)
+        XCTAssertEqual(rows.first(where: { $0.track.trackId == firstPlayableTrack.trackId })?.isPlaying, false)
+        XCTAssertEqual(rows.first(where: { $0.track.trackId == secondPlayableTrack.trackId })?.isCurrent, true)
+        XCTAssertEqual(rows.first(where: { $0.track.trackId == secondPlayableTrack.trackId })?.isPlaying, true)
+        XCTAssertEqual(playbackProvider.playbackState, initialPlaybackState)
+    }
+
+    /// Подтверждает единый устойчивый идентификатор для строки, favorites и SwiftUI identity.
+    func testPurchasedTrackIdentityMatchesFavoriteInputIdentity() {
+        let playableTrack = PurchasedITunesPlayableTrack(
+            track: makeTrack(id: 42, title: "Track", artist: "Artist")
+        )
+
+        XCTAssertEqual(playableTrack.id, playableTrack.trackId)
+        XCTAssertEqual(
+            FavoriteTrackInput(purchasedITunesTrack: playableTrack).trackId,
+            playableTrack.trackId
+        )
+    }
+
     /// Собирает feature ViewModel с явными runtime-провайдерами для изолированной проверки.
     private func makeViewModel(
         provider: PurchasedITunesMusicProviderStub,
-        persistence: PurchasedITunesSortModePersistenceStub? = nil
+        persistence: PurchasedITunesSortModePersistenceStub? = nil,
+        favoriteTrackIdsProvider: (any FavoriteTrackIdsProviding)? = nil,
+        playbackStateProvider: (any PlaybackStateProviding)? = nil
     ) -> PurchasedITunesMusicViewModel {
         let resolvedPersistence = persistence ?? PurchasedITunesSortModePersistenceStub(
             mode: .titleAsc
         )
+        let resolvedFavoriteTrackIdsProvider = favoriteTrackIdsProvider
+            ?? PurchasedITunesFavoriteTrackIdsProviderStub()
+        let resolvedPlaybackStateProvider = playbackStateProvider
+            ?? PurchasedITunesPlaybackStateProviderStub()
 
         return PurchasedITunesMusicViewModel(
             provider: provider,
             sortModePersistence: resolvedPersistence,
-            favoriteTrackIdsProvider: PurchasedITunesFavoriteTrackIdsProviderStub(),
-            playbackStateProvider: PurchasedITunesPlaybackStateProviderStub(),
+            favoriteTrackIdsProvider: resolvedFavoriteTrackIdsProvider,
+            playbackStateProvider: resolvedPlaybackStateProvider,
             presenter: PurchasedITunesPresenter(
                 artworkBadgeStateFactory: TrackArtworkBadgeStateFactory()
             )
@@ -286,6 +375,39 @@ final class PurchasedITunesMusicViewModelTests: XCTestCase {
             return nil
         }
         return state.tracks.map { $0.title ?? "" }
+    }
+
+    /// Возвращает готовые строки для проверки presentation-флагов без SwiftUI View.
+    private func loadedRows(
+        from state: PurchasedITunesScreenState
+    ) -> [PurchasedITunesTrackRowState] {
+        guard case .loaded(let rows) = state.content else {
+            return []
+        }
+        return rows
+    }
+
+    /// Возвращает только отмеченные favorite строки в текущем ScreenState.
+    private func favoriteTrackIDs(
+        from state: PurchasedITunesScreenState
+    ) -> [UUID] {
+        loadedRows(from: state)
+            .filter(\.isFavorite)
+            .map { $0.track.trackId }
+    }
+
+    /// Создаёт текущий iTunes playback-снимок без зависимости от PlayerViewModel.
+    private func makePlaybackState(
+        track: PurchasedITunesPlayableTrack,
+        isPlaying: Bool
+    ) -> PlaybackStateSnapshot {
+        PlaybackStateSnapshot(
+            currentDisplayableId: track.id,
+            currentTrackId: track.trackId,
+            currentContext: .purchasedITunes,
+            currentContextSource: .purchasedITunes,
+            isPlaying: isPlaying
+        )
     }
 
     /// Создаёт минимальную runtime-модель для проверки ViewModel.
@@ -406,5 +528,56 @@ private final class PurchasedITunesPlaybackStateProviderStub: PlaybackStateProvi
 
     var playbackStatePublisher: AnyPublisher<PlaybackStateSnapshot, Never> {
         subject.eraseToAnyPublisher()
+    }
+}
+
+/// Эмулирует publisher, который уже подтвердил новый favorite-набор, пока синхронное свойство намеренно ещё старое.
+@MainActor
+private final class PurchasedITunesDelayedFavoriteProvider: FavoriteTrackIdsProviding {
+    private let subject = PassthroughSubject<Set<UUID>, Never>()
+    private let storedFavoriteTrackIds: Set<UUID>
+
+    init(favoriteTrackIds: Set<UUID>) {
+        self.storedFavoriteTrackIds = favoriteTrackIds
+    }
+
+    var favoriteTrackIds: Set<UUID> {
+        storedFavoriteTrackIds
+    }
+
+    var favoriteTrackIdsPublisher: AnyPublisher<Set<UUID>, Never> {
+        subject.eraseToAnyPublisher()
+    }
+
+    /// Отправляет подтверждённый новый снимок, не меняя синхронное свойство до завершения проверки.
+    func emit(_ favoriteTrackIds: Set<UUID>) {
+        subject.send(favoriteTrackIds)
+    }
+}
+
+/// Эмулирует новый playback publisher event при намеренно устаревшем синхронном снимке.
+@MainActor
+private final class PurchasedITunesDelayedPlaybackProvider: PlaybackStateProviding {
+    private let subject = PassthroughSubject<PlaybackStateSnapshot, Never>()
+    private let storedPlaybackState: PlaybackStateSnapshot
+
+    init(playbackState: PlaybackStateSnapshot) {
+        self.storedPlaybackState = playbackState
+    }
+
+    var playbackState: PlaybackStateSnapshot { storedPlaybackState }
+    var currentDisplayableId: UUID? { playbackState.currentDisplayableId }
+    var currentTrackId: UUID? { playbackState.currentTrackId }
+    var currentContext: PlaybackContext? { playbackState.currentContext }
+    var currentContextSource: PlaybackContextSource? { playbackState.currentContextSource }
+    var isPlaying: Bool { playbackState.isPlaying }
+
+    var playbackStatePublisher: AnyPublisher<PlaybackStateSnapshot, Never> {
+        subject.eraseToAnyPublisher()
+    }
+
+    /// Отправляет новый snapshot до обновления синхронного свойства production-provider-а.
+    func emit(_ playbackState: PlaybackStateSnapshot) {
+        subject.send(playbackState)
     }
 }
