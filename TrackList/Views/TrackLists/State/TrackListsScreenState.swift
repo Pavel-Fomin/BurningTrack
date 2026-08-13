@@ -21,17 +21,15 @@ struct TrackListsScreenState {
     let selectedSortMode: TrackListsSortMode?
 }
 
-struct TrackListsRowState: Identifiable {
+struct TrackListsRowState: Identifiable, Equatable {
     /// Идентификатор треклиста.
     let id: UUID
-    /// Модель треклиста для типизированной навигации.
-    let trackList: TrackList
     /// Название треклиста.
     let title: String
-    /// Дата создания треклиста.
-    let createdAt: Date
-    /// Количество треков в треклисте.
-    let tracksCount: Int
+    /// Готовая дата создания, отсутствующая у системного треклиста.
+    let createdAtText: String?
+    /// Готовая локализованная подпись количества треков.
+    let tracksCountText: String
     /// Доступно ли удаление треклиста из списка.
     let canDelete: Bool
     /// Доступно ли изменение позиции треклиста в списке.

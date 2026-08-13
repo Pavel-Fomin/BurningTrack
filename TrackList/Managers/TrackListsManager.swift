@@ -99,7 +99,7 @@ final class TrackListsManager {
             }
 
             if didChangeTrackLists {
-                postTrackListsDidChange()
+                publishTrackListsDidChange()
             }
 
             return favorites
@@ -123,7 +123,8 @@ final class TrackListsManager {
         }
     }
 
-    private func postTrackListsDidChange() {
+    /// Публикует invalidation после завершённой mutation, чтобы владельцы feature-state загрузили новый снимок.
+    func publishTrackListsDidChange() {
         NotificationCenter.default.post(
             name: .trackListsDidChange,
             object: nil
@@ -171,7 +172,7 @@ final class TrackListsManager {
                 name: .trackListTracksDidChange,
                 object: id
             )
-            postTrackListsDidChange()
+            publishTrackListsDidChange()
             return created
         } catch {
             throw AppError.trackListSaveFailed
@@ -251,7 +252,7 @@ final class TrackListsManager {
             }
 
             try databaseStore.deleteTrackList(id: id)
-            postTrackListsDidChange()
+            publishTrackListsDidChange()
         } catch let appError as AppError {
             throw appError
         } catch TrackListDatabaseStoreError.trackListNotFound {
@@ -275,7 +276,7 @@ final class TrackListsManager {
             }
 
             try databaseStore.renameTrackList(id: id, to: newName)
-            postTrackListsDidChange()
+            publishTrackListsDidChange()
         } catch let appError as AppError {
             throw appError
         } catch TrackListDatabaseStoreError.trackListNotFound {
@@ -288,9 +289,8 @@ final class TrackListsManager {
     /// Сохраняет порядок обычных треклистов и сообщает экранам об изменении.
     func updateTrackListsOrder(_ orderedIds: [UUID]) throws {
         do {
-            let regularIds = try regularTrackListIDs(from: orderedIds)
-            try databaseStore.updateTrackListsOrder(regularIds)
-            postTrackListsDidChange()
+            try databaseStore.updateDisplayedTrackListsOrder(orderedIds)
+            publishTrackListsDidChange()
         } catch let appError as AppError {
             throw appError
         } catch TrackListDatabaseStoreError.trackListNotFound {
@@ -298,33 +298,6 @@ final class TrackListsManager {
         } catch {
             throw AppError.trackListSaveFailed
         }
-    }
-
-    /// Проверяет актуальный полный порядок и возвращает последовательность обычных треклистов для SQLite.
-    private func regularTrackListIDs(from orderedIds: [UUID]) throws -> [UUID] {
-        let metas = try databaseStore.fetchMetas()
-        let metasByID = Dictionary(uniqueKeysWithValues: metas.map { ($0.id, $0) })
-        let activeIds = Set(metasByID.keys)
-
-        if let unknownId = orderedIds.first(where: { metasByID[$0] == nil }) {
-            throw TrackListDatabaseStoreError.trackListNotFound(unknownId)
-        }
-        guard Set(orderedIds).count == orderedIds.count,
-              Set(orderedIds) == activeIds
-        else {
-            throw AppError.trackListReorderNotAllowed
-        }
-
-        let orderedMetas = orderedIds.compactMap { metasByID[$0] }
-        let favorites = metas.filter { $0.kind == .favorites }
-        guard favorites.count == 1,
-              orderedMetas.first?.kind == .favorites,
-              orderedMetas.dropFirst().allSatisfy({ $0.kind == .regular })
-        else {
-            throw AppError.trackListReorderNotAllowed
-        }
-
-        return orderedMetas.map(\.id).filter { metasByID[$0]?.kind.canReorder == true }
     }
 
     // MARK: - Системный треклист

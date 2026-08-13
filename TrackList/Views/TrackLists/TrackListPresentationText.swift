@@ -192,19 +192,3 @@ enum TrackListPresentationText {
         String(localized: "Tracklist")
     }
 }
-
-extension TrackListsRowState {
-
-    /// Дата создания показывается только у пользовательского треклиста.
-    var createdAtText: String? {
-        TrackListPresentationText.createdAt(
-            for: trackList.kind,
-            date: createdAt
-        )
-    }
-
-    /// Количество треков формируется только в presentation-слое.
-    var tracksCountText: String {
-        TrackListPresentationText.trackCount(tracksCount)
-    }
-}

@@ -33,15 +33,11 @@ struct TrackListRowView: View {
     let onGoToArtist: () -> Void /// Переход к артисту трека
     let onGoToAlbum: () -> Void /// Переход к альбому трека
 
-    /// Проверяет доступность пункта меню для строки треклиста.
+    /// Использует подготовленную capability строки без policy-вызова из View.
     private func isMenuActionAvailable(
         _ action: TrackMenuAction
     ) -> Bool {
-        TrackMenuActionAvailability.isAvailable(
-            action,
-            source: state.source,
-            context: .trackList
-        )
+        state.availableActions.contains(action)
     }
     
     // MARK: - UI
@@ -141,10 +137,8 @@ struct TrackListRowView: View {
         }
 
         TrackGoToDestinationMenuContent(
-            canGoToArtist: isMenuActionAvailable(.goToArtist) &&
-                state.collectionNavigationTarget?.artist != nil,
-            canGoToAlbum: isMenuActionAvailable(.goToAlbum) &&
-                state.collectionNavigationTarget?.album != nil,
+            canGoToArtist: isMenuActionAvailable(.goToArtist),
+            canGoToAlbum: isMenuActionAvailable(.goToAlbum),
             goToTitle: TrackListPresentationText.goTo,
             goToArtistTitle: TrackListPresentationText.goToArtist,
             goToAlbumTitle: TrackListPresentationText.goToAlbum,

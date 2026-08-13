@@ -11,7 +11,8 @@ import Foundation
 import SwiftUI
 
 struct TrackListScreen: View {
-    let trackList: TrackList
+    /// Неизменяемый идентификатор detail-маршрута без snapshot из master-flow.
+    let trackListId: UUID
     @ObservedObject var exportProgressViewModel: ExportProgressViewModel
     /// Единый обработчик «Избранного» передаётся в фабрику detail-flow.
     let favoriteTrackActionHandler: FavoriteTrackActionHandler
@@ -23,81 +24,112 @@ struct TrackListScreen: View {
     private var actionHandler: TrackListFlowActionHandler {
         dependencies.actionHandlerFactory.make(
             reader: viewModel,
-            mutator: viewModel,
-            renamer: viewModel,
             exportProgressViewModel: exportProgressViewModel,
             favoriteTrackActionHandler: favoriteTrackActionHandler
         )
     }
 
     init(
-        trackList: TrackList,
+        trackListId: UUID,
         exportProgressViewModel: ExportProgressViewModel,
         favoriteTrackActionHandler: FavoriteTrackActionHandler,
         dependencies: TrackListFeatureDependencies
     ) {
-        self.trackList = trackList
+        self.trackListId = trackListId
         self.exportProgressViewModel = exportProgressViewModel
         self.favoriteTrackActionHandler = favoriteTrackActionHandler
         self.dependencies = dependencies
         _viewModel = StateObject(
             wrappedValue: dependencies.viewModelFactory.make(
-                trackList: trackList
+                trackListId: trackListId
             )
         )
     }
-    
+
     var body: some View {
         VStack(spacing: 0) {
-            if let screenState = viewModel.screenState {
+            switch viewModel.content {
+            case .loading:
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            case .loaded(let screenState):
                 TrackListView(
                     state: screenState,
                     onAction: { action in
                         actionHandler.handle(action)
-                    },
-                    onRequestSnapshot: { trackId in
-                        viewModel.requestSnapshotIfNeeded(for: trackId)
                     }
                 )
+
+            case .notFound:
+                ContentUnavailableView(
+                    "Tracklist Not Found",
+                    systemImage: "music.note.list"
+                )
+
+            case .failed:
+                ContentUnavailableView {
+                    Label("Could Not Load Tracklist", systemImage: "exclamationmark.triangle")
+                } description: {
+                    Text("Try loading this tracklist again.")
+                } actions: {
+                    Button("Retry") {
+                        viewModel.retryInitialLoad()
+                    }
+                }
             }
         }
-        .navigationTitle(viewModel.screenState?.title ?? viewModel.displayName)
+        .task {
+            viewModel.loadIfNeeded()
+        }
+        .navigationTitle(loadedScreenState?.title ?? "Tracklist")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .principal) {
                 ScreenToolbarTitleView(
-                    title: viewModel.screenState?.title ?? viewModel.displayName,
-                    subtitle: viewModel.screenState?.summary.map(
+                    title: loadedScreenState?.title ?? "Tracklist",
+                    subtitle: loadedScreenState?.summary.map(
                         SharedPresentationText.trackCollectionSummary
                     )
                 )
             }
 
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button {
-                        actionHandler.handle(.addTrack)
-                    } label: {
-                        Label("Add Tracks", systemImage: "plus.app")
-                    }
-
-                    Button {
-                        actionHandler.handle(.export)
-                    } label: {
-                        Label("Export", systemImage: "externaldrive")
-                    }
-
-                    if viewModel.screenState?.canRenameTrackList == true {
+            if let screenState = loadedScreenState {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
                         Button {
-                            actionHandler.handle(.renameTrackList)
+                            actionHandler.handle(.addTrack)
                         } label: {
-                            Label("Rename", systemImage: "textformat")
+                            Label("Add Tracks", systemImage: "plus.app")
                         }
+
+                        Button {
+                            actionHandler.handle(.export)
+                        } label: {
+                            Label("Export", systemImage: "externaldrive")
+                        }
+
+                        if screenState.canRenameTrackList {
+                            Button {
+                                actionHandler.handle(.renameTrackList)
+                            } label: {
+                                Label("Rename", systemImage: "textformat")
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis")
                     }
-                } label: {
-                    Image(systemName: "ellipsis")
                 }
             }
         }
+    }
+
+    /// Возвращает готовый ScreenState только для loaded detail-снимка.
+    private var loadedScreenState: TrackListScreenState? {
+        guard case .loaded(let screenState) = viewModel.content else {
+            return nil
+        }
+
+        return screenState
     }
 }

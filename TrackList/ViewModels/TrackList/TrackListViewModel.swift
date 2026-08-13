@@ -2,106 +2,108 @@
 //  TrackListViewModel.swift
 //  TrackList
 //
-//  Управляет одним треклистом:
-//  - загрузка треков по ID
-//  - сохранение треков
-//  - перемещение
-//  - удаление
-//  - переименование файлов треков
+//  Состояние detail-flow одного треклиста и его реактивные presentation-данные.
 //
 //  Created by Pavel Fomin on 28.04.2025.
 //
 
-
+import Combine
 import Foundation
 import SwiftUI
-import Combine
 
 @MainActor
 final class TrackListViewModel: ObservableObject {
 
-    @Published var name: String = ""
-    @Published var tracks: [Track] = []
-    @Published var currentListId: UUID?
-    @Published private(set) var snapshotsByTrackId: [UUID: TrackRuntimeSnapshot] = [:] /// Runtime snapshot треков по id
-    /// Готовое состояние экрана одного треклиста.
-    @Published private(set) var screenState: TrackListScreenState?
-    /// Назначение текущего треклиста для построения доступных действий detail-экрана.
-    private var kind: TrackListKind = .regular
+    // MARK: - Состояние экрана
 
-    /// Локализованное название системного треклиста или сохранённое имя пользовательского.
-    var displayName: String {
-        TrackListPresentationText.title(
-            for: kind,
-            storedName: name
-        )
-    }
+    /// Неизменяемый маршрут detail-экрана; master не передаёт в него устаревающий TrackList snapshot.
+    let trackListId: UUID
+    /// Контент различает первое чтение, корректно пустой список и ошибку загрузки.
+    @Published private(set) var content: TrackListScreenContent = .loading
 
-    /// Запускает общий rename-flow файлов треков.
-    private let fileRenamer: any TrackFileRenaming
-    /// Управляет содержимым одного треклиста.
-    private let trackListManager: any TrackListManaging
-    /// Управляет списком треклистов.
-    private let trackListsManager: any TrackListsManaging
-    /// Показывает пользовательские сообщения.
+    // MARK: - Зависимости
+
+    /// Читает согласованный снимок одного треклиста без передачи ViewModel mutation API.
+    private let detailLoader: any TrackListDetailLoading
+    /// Показывает ошибку initial/reload чтения, не участвуя в пользовательских mutation-командах.
     private let toastPresenter: any ToastPresenting
-    /// Выполняет команды изменения одного треклиста.
-    private let commandExecutor: any TrackListCommandExecuting
-    /// Предоставляет события, влияющие на экран одного треклиста.
+    /// Предоставляет invalidation-события, влияющие на detail presentation state.
     private let eventProvider: any TrackListEventProviding
-    /// Даёт snapshot настроек, влияющих на отображение строк треклиста.
+    /// Даёт сохранённый presentation snapshot настроек строк.
     private let settingsManager: any SettingsManaging
-    /// Предоставляет playback-состояние без прямой подписки View на PlayerViewModel.
+    /// Предоставляет immutable playback snapshot для строк треклиста.
     private let playbackStateProvider: any PlaybackStateProviding
-    /// Предоставляет published-снимок «Избранного» без доступа к FavoritesService.
+    /// Предоставляет подтверждённый published snapshot идентификаторов «Избранного».
     private let favoriteTrackIdsProvider: any FavoriteTrackIdsProviding
-    /// Предоставляет сохранённые runtime snapshot треков.
+    /// Возвращает уже сохранённые runtime snapshot треков.
     private let runtimeSnapshotProvider: any TrackRuntimeSnapshotProviding
-    /// Создаёт runtime snapshot треков.
+    /// Строит runtime snapshot обычного локального трека.
     private let runtimeSnapshotBuilder: any TrackRuntimeSnapshotBuilding
-    /// Получает SQLite-статистику отдельно от массива отображаемых строк.
+    /// Возвращает SQLite-статистику отдельно от отображаемых строк.
     private let summaryProvider: any TrackCollectionSummaryProviding
-    /// Даёт сохранённые metadata локальных треков для переходов к коллекции.
-    private let trackRegistry: TrackRegistry
-    /// Собирает готовое состояние экрана одного треклиста.
+    /// Читает сохранённые metadata локальных строк для prepared navigation targets.
+    private let collectionMetadataLoader: any TrackCollectionMetadataLoading
+    /// Собирает готовое состояние экрана из feature-local snapshots.
     private let screenStateBuilder = TrackListScreenStateBuilder()
-    /// Готовый вторичный текст заголовка, не зависящий от runtime snapshot строк.
-    /// Семантическая статистика, которую View локализует при отображении.
+
+    // MARK: - Загруженный detail snapshot
+
+    /// Последнее успешно прочитанное имя; при reload failure оно не заменяется пустым значением.
+    private(set) var name = ""
+    /// Назначение треклиста определяет системный title и доступность rename list.
+    private var kind: TrackListKind = .regular
+    /// Последний успешно прочитанный состав и порядок строк треклиста.
+    private(set) var tracks: [Track] = []
+    /// Был ли хотя бы один согласованный detail snapshot успешно применён.
+    private var hasLoadedDetail = false
+    /// Несколько синхронных invalidation-сигналов объединяются в один detail reload.
+    private var isDetailReloadScheduled = false
+
+    // MARK: - Реактивные presentation snapshots
+
+    /// Семантическая статистика заголовка, не зависящая от runtime snapshot строк.
     private var summary: TrackCollectionSummary?
-    /// Незавершённый запрос статистики, который отменяется при следующем релевантном событии.
+    /// Последняя задача статистики отменяется при следующем релевантном invalidation.
     private var summaryTask: Task<Void, Never>?
-    /// Пропускает собственное событие сохранения перестановки, не меняющее итоговые суммы.
-    private var skipsNextTrackListTracksChangeAfterReorder = false
-    /// Идентификатор текущего TrackDisplayable; для Track это id строки треклиста.
+    /// Идентификатор текущего TrackDisplayable; для Track это ID строки треклиста.
     private var currentTrackId: UUID?
     /// Контекст текущего воспроизведения.
     private var currentContext: PlaybackContext?
     /// Активно ли воспроизведение текущей строки.
-    private var isPlaybackActive: Bool = false
+    private var isPlaybackActive = false
     /// Идентификатор подсвеченной строки треклиста.
     private var highlightedRowId: UUID?
-    /// Последнее значение настройки чтения тегов, ожидающее metadata-сигнал после очистки кэшей.
+    /// Снимок «Избранного» из publisher хранится локально, чтобы builder не перечитывал потенциально старое свойство provider.
+    private var favoriteTrackIds: Set<UUID>
+    /// Последнее значение настройки чтения тегов после очистки metadata cache.
     private var lastTagReadingEnabled: Bool
-    /// Последнее значение настройки отображения формата файла.
+    /// Последнее значение настройки показа формата файла.
     private var lastFileFormatVisible: Bool
-    /// Снимок настроек для консистентной сборки presentation state строк.
+    /// Консистентный snapshot настроек для каждого rebuild ScreenState.
     private var rowPresentationSettings: AppSettings
-    /// Сохранённые metadata локальных треков для перехода к музыкальной коллекции.
+    /// Подготовленные metadata локальных треков для переходов к артисту и альбому.
     private var collectionNavigationTargetsByTrackId: [UUID: TrackCollectionNavigationTarget] = [:]
-    /// Незавершённая загрузка metadata отменяется при изменении состава треклиста.
+    /// Незавершённая batch-загрузка metadata отменяется при изменении состава треклиста.
     private var collectionNavigationTargetLoadTask: Task<Void, Never>?
 
+    // MARK: - Runtime snapshot lifecycle
+
+    /// Последние подтверждённые runtime snapshots ключуются physical trackId и используются всеми повторными строками.
+    private var snapshotsByTrackId: [UUID: TrackRuntimeSnapshot] = [:]
+    /// Для каждого physical trackId существует не более одного активного build-запроса.
+    private var snapshotTasksByTrackId: [UUID: Task<Void, Never>] = [:]
+    /// Локальное поколение не даёт отменённому, но уже завершившемуся build затереть каноничный update.
+    private var snapshotGenerationByTrackId: [UUID: UInt] = [:]
+
+    /// Combine-подписки принадлежат времени жизни detail feature, а не SwiftUI View.
     private var cancellables = Set<AnyCancellable>()
 
-    // MARK: - Init
-    
+    // MARK: - Инициализация
+
     init(
-        trackList: TrackList,
-        fileRenamer: any TrackFileRenaming,
-        trackListManager: any TrackListManaging,
-        trackListsManager: any TrackListsManaging,
+        trackListId: UUID,
+        detailLoader: any TrackListDetailLoading,
         toastPresenter: any ToastPresenting,
-        commandExecutor: any TrackListCommandExecuting,
         eventProvider: any TrackListEventProviding,
         settingsManager: any SettingsManaging,
         playbackStateProvider: any PlaybackStateProviding,
@@ -109,13 +111,11 @@ final class TrackListViewModel: ObservableObject {
         runtimeSnapshotProvider: any TrackRuntimeSnapshotProviding,
         runtimeSnapshotBuilder: any TrackRuntimeSnapshotBuilding,
         summaryProvider: any TrackCollectionSummaryProviding,
-        trackRegistry: TrackRegistry
+        collectionMetadataLoader: any TrackCollectionMetadataLoading
     ) {
-        self.fileRenamer = fileRenamer
-        self.trackListManager = trackListManager
-        self.trackListsManager = trackListsManager
+        self.trackListId = trackListId
+        self.detailLoader = detailLoader
         self.toastPresenter = toastPresenter
-        self.commandExecutor = commandExecutor
         self.eventProvider = eventProvider
         self.settingsManager = settingsManager
         self.playbackStateProvider = playbackStateProvider
@@ -123,57 +123,135 @@ final class TrackListViewModel: ObservableObject {
         self.runtimeSnapshotProvider = runtimeSnapshotProvider
         self.runtimeSnapshotBuilder = runtimeSnapshotBuilder
         self.summaryProvider = summaryProvider
-        self.trackRegistry = trackRegistry
+        self.collectionMetadataLoader = collectionMetadataLoader
+        self.favoriteTrackIds = favoriteTrackIdsProvider.favoriteTrackIds
         self.lastTagReadingEnabled = settingsManager.settings.visible.metadata.isTagReadingEnabled
         self.lastFileFormatVisible = settingsManager.settings.visible.library.isFileFormatVisible
         self.rowPresentationSettings = settingsManager.settings
-        self.currentListId = trackList.id
-        self.name = trackList.name
-        self.kind = trackList.kind
-        self.tracks = trackList.tracks
-        applyPlaybackState(playbackStateProvider.playbackState)
 
+        applyPlaybackState(playbackStateProvider.playbackState)
+        observePresentationDependencies()
+    }
+
+    deinit {
+        // После закрытия detail никакой поздний runtime/summary результат не должен публиковать UI state.
+        summaryTask?.cancel()
+        collectionNavigationTargetLoadTask?.cancel()
+        snapshotTasksByTrackId.values.forEach { $0.cancel() }
+    }
+
+    // MARK: - Загрузка detail
+
+    /// Выполняет initial read только один раз; повторная попытка разрешена после initial failure.
+    func loadIfNeeded() {
+        guard hasLoadedDetail == false else {
+            return
+        }
+
+        loadDetail(isInitialLoad: true)
+    }
+
+    /// Повторяет только initial read после error/not-found presentation state.
+    func retryInitialLoad() {
+        guard hasLoadedDetail == false else {
+            return
+        }
+
+        content = .loading
+        loadDetail(isInitialLoad: true)
+    }
+
+    /// Перечитывает detail после invalidation, сохраняя последний успешный ScreenState при временной ошибке.
+    private func reloadDetail() {
+        guard hasLoadedDetail else {
+            loadIfNeeded()
+            return
+        }
+
+        loadDetail(isInitialLoad: false)
+    }
+
+    /// Применяет новый полный snapshot только после успешного чтения meta и строк одного ID.
+    private func loadDetail(isInitialLoad: Bool) {
+        do {
+            applyLoadedDetail(try detailLoader.loadTrackList(id: trackListId))
+        } catch let appError as AppError {
+            applyDetailLoadFailure(appError, isInitialLoad: isInitialLoad)
+        } catch {
+            applyDetailLoadFailure(.trackListLoadFailed, isInitialLoad: isInitialLoad)
+        }
+    }
+
+    /// Initial failure получает собственный content state, reload failure сохраняет последний успешный экран.
+    private func applyDetailLoadFailure(
+        _ error: AppError,
+        isInitialLoad: Bool
+    ) {
+        if isInitialLoad {
+            content = error == .trackListNotFound ? .notFound : .failed
+        }
+
+        toastPresenter.handle(error)
+    }
+
+    /// Сохраняет только актуальные runtime snapshots строк нового detail-снимка и отменяет удалённые задачи.
+    private func applyLoadedDetail(_ detail: TrackList) {
+        let currentTrackIds = Set(detail.tracks.map(\.trackId))
+        let removedTrackIds = Set(tracks.map(\.trackId)).subtracting(currentTrackIds)
+
+        for trackId in removedTrackIds {
+            invalidateSnapshotRequest(for: trackId)
+            snapshotsByTrackId.removeValue(forKey: trackId)
+            collectionNavigationTargetsByTrackId.removeValue(forKey: trackId)
+        }
+
+        name = detail.name
+        kind = detail.kind
+        tracks = detail.tracks
+        hasLoadedDetail = true
+        rebuildScreenState()
+        reloadSummary()
+        reloadCollectionNavigationTargets()
+    }
+
+    // MARK: - Reactive subscriptions
+
+    /// Подписывает ViewModel на presentation invalidations; пользовательские команды остаются в handlers.
+    private func observePresentationDependencies() {
         playbackStateProvider.playbackStatePublisher
             .sink { [weak self] playbackState in
-                guard let self else { return }
-
                 Task { @MainActor in
-                    self.applyPlaybackState(playbackState)
+                    self?.applyPlaybackState(playbackState)
                 }
             }
             .store(in: &cancellables)
 
         favoriteTrackIdsProvider.favoriteTrackIdsPublisher
-            .sink { [weak self] _ in
-                guard let self else { return }
-
+            .sink { [weak self] favoriteTrackIds in
                 Task { @MainActor in
-                    self.rebuildScreenState()
+                    // Payload publisher является подтверждённым snapshot, даже если synchronous property provider ещё не обновилось.
+                    self?.favoriteTrackIds = favoriteTrackIds
+                    self?.rebuildScreenState()
                 }
             }
             .store(in: &cancellables)
-        
+
         eventProvider.trackDidUpdate
             .sink { [weak self] updateEvent in
-                guard let self else { return }
-                
                 Task { @MainActor in
-                    self.applyTrackUpdateEvent(updateEvent)
-                }
-            }
-            .store(in: &cancellables)
-        
-        eventProvider.appSettingsDidChange
-            .sink { [weak self] _ in
-                guard let self else { return }
-                
-                Task { @MainActor in
-                    self.handleMetadataSettingsDidChange()
+                    self?.applyTrackUpdateEvent(updateEvent)
                 }
             }
             .store(in: &cancellables)
 
-        // Лёгкое изменение формата файла пересобирает только presentation state текущего треклиста.
+        eventProvider.appSettingsDidChange
+            .sink { [weak self] _ in
+                Task { @MainActor in
+                    self?.handleMetadataSettingsDidChange()
+                }
+            }
+            .store(in: &cancellables)
+
         settingsManager.settingsPublisher
             .sink { [weak self] settings in
                 Task { @MainActor in
@@ -181,170 +259,98 @@ final class TrackListViewModel: ObservableObject {
                 }
             }
             .store(in: &cancellables)
-        
+
         eventProvider.trackListTracksDidChange
             .sink { [weak self] changedId in
-                guard let self else { return }
-                
                 Task { @MainActor in
-                    guard changedId == self.currentListId else { return }
-
-                    if self.skipsNextTrackListTracksChangeAfterReorder {
-                        self.skipsNextTrackListTracksChangeAfterReorder = false
+                    guard changedId == self?.trackListId else {
                         return
                     }
 
-                    self.loadTracks()
-                    self.reloadSummary()
+                    self?.scheduleDetailReload()
                 }
             }
             .store(in: &cancellables)
 
         eventProvider.libraryDataDidChange
             .sink { [weak self] _ in
-                guard let self else { return }
-
                 Task { @MainActor in
-                    // Синхронизация может обновить file_size треков, уже входящих в этот треклист.
-                    self.reloadSummary()
+                    guard self?.hasLoadedDetail == true else {
+                        return
+                    }
+
+                    // Синхронизация фонотеки может изменить сохранённый file_size строк detail.
+                    self?.reloadSummary()
                 }
             }
             .store(in: &cancellables)
-        
+
         eventProvider.trackListsDidChange
             .sink { [weak self] _ in
-                guard let self else { return }
-                
                 Task { @MainActor in
-                    self.refreshMeta()
+                    // Rename и внешнее удаление должны читать тот же согласованный detail snapshot, что и initial load.
+                    self?.scheduleDetailReload()
                 }
             }
             .store(in: &cancellables)
-
-        reloadSummary()
-        reloadCollectionNavigationTargets()
     }
 
-    deinit {
-        // Результат отменённого агрегирующего запроса не нужен после закрытия экрана.
-        summaryTask?.cancel()
-    }
-
-    // MARK: - Rename
-
-    /// Запускает сценарий переименования файла трека из треклиста.
-    func renameTrack(
-        rowId: UUID,
-        strategy: FileRenameStrategy
-    ) {
-        guard let track = tracks.first(where: { $0.id == rowId }) else {
-            return
-        }
-        guard canRename(track) else { return }
-
-        let snapshot = snapshotsByTrackId[track.trackId]
-        let request = TrackFileRenameRequest(
-            trackId: track.trackId,
-            rowId: track.id,
-            currentFileName: snapshot?.fileName ?? track.fileName,
-            artist: snapshot?.artist,
-            title: snapshot?.title,
-            strategy: strategy
-        )
-        fileRenamer.handle(request)
-    }
-
-    /// Проверяет, можно ли запускать файловое переименование для строки треклиста.
-    private func canRename(
-        _ track: Track
-    ) -> Bool {
-        guard track.isPurchasedITunesRuntimeTrack else {
-            return true
-        }
-
-        toastPresenter.handle(
-            .operationFailed(
-                message: PlayerPresentationText.purchasedITunesActionUnavailableMessage
-            )
-        )
-        return false
-    }
-
-    // MARK: - Loading
-
-    func loadTracks() {
-        guard let id = currentListId else {
-            print("⚠️ Плейлист не выбран")
+    /// Объединяет парные события сохранения строк и метаданных без параллельных reload одной детали.
+    private func scheduleDetailReload() {
+        guard isDetailReloadScheduled == false else {
             return
         }
 
-        do {
-            let loadedTracks = try trackListManager.loadTracks(for: id)
-            self.tracks = loadedTracks
-            rebuildScreenState()
-            reloadCollectionNavigationTargets()
-            print("📥 Загружено \(tracks.count) треков из треклиста \(id)")
-        } catch let appError as AppError {
-            tracks = []
-            rebuildScreenState()
-            toastPresenter.handle(appError)
-        } catch {
-            tracks = []
-            rebuildScreenState()
-            toastPresenter.handle(AppError.trackListLoadFailed)
+        isDetailReloadScheduled = true
+        Task { @MainActor [weak self] in
+            guard let self else {
+                return
+            }
+
+            self.isDetailReloadScheduled = false
+            self.reloadDetail()
         }
     }
 
+    // MARK: - Screen state
 
-    // MARK: - Save
-
-    private func save() -> Bool {
-        guard let id = currentListId else { return false }
-
-        let didSave = trackListManager.saveTracks(tracks, for: id)
-        if !didSave {
-            PersistentLogger.log("TrackListViewModel: saveTracks failed id=\(id)")
-        }
-        return didSave
-    }
-
-    // MARK: - Screen State
-
-    /// Применяет playback-состояние к локальному состоянию экрана.
+    /// Применяет immutable playback snapshot без перечитывания provider во время deferred rebuild.
     private func applyPlaybackState(_ playbackState: PlaybackStateSnapshot) {
         currentTrackId = playbackState.currentDisplayableId
         currentContext = playbackState.currentContext
         isPlaybackActive = playbackState.isPlaying
-
         rebuildScreenState()
     }
 
-    /// Пересобирает готовое состояние экрана одного треклиста.
+    /// Публикует loaded content только из согласованных feature-local snapshots.
     private func rebuildScreenState() {
-        guard let id = currentListId else {
-            screenState = nil
+        guard hasLoadedDetail else {
             return
         }
 
-        screenState = screenStateBuilder.build(
-            id: id,
-            title: name,
-            kind: kind,
-            canRenameTrackList: kind.canRename,
-            summary: summary,
-            tracks: tracks,
-            snapshotsByTrackId: snapshotsByTrackId,
-            currentTrackId: currentTrackId,
-            currentContext: currentContext,
-            isPlaying: isPlaybackActive,
-            highlightedRowId: highlightedRowId,
-            favoriteTrackIds: favoriteTrackIdsProvider.favoriteTrackIds,
-            settings: rowPresentationSettings,
-            collectionNavigationTargetsByTrackId: collectionNavigationTargetsByTrackId
+        content = .loaded(
+            screenStateBuilder.build(
+                id: trackListId,
+                title: name,
+                kind: kind,
+                canRenameTrackList: kind.canRename,
+                summary: summary,
+                tracks: tracks,
+                snapshotsByTrackId: snapshotsByTrackId,
+                currentTrackId: currentTrackId,
+                currentContext: currentContext,
+                isPlaying: isPlaybackActive,
+                highlightedRowId: highlightedRowId,
+                favoriteTrackIds: favoriteTrackIds,
+                settings: rowPresentationSettings,
+                collectionNavigationTargetsByTrackId: collectionNavigationTargetsByTrackId
+            )
         )
     }
 
-    /// Загружает сохранённые metadata обычных локальных строк без чтения их файлов.
+    // MARK: - Prepared collection navigation
+
+    /// Загружает metadata обычных локальных строк единым запросом, не читая их файлы.
     private func reloadCollectionNavigationTargets() {
         let trackIds = Set(
             tracks
@@ -353,8 +359,8 @@ final class TrackListViewModel: ObservableObject {
         )
         collectionNavigationTargetLoadTask?.cancel()
 
-        collectionNavigationTargetLoadTask = Task { [weak self] in
-            let metadataByTrackId = await trackRegistry.cachedMetadata(
+        collectionNavigationTargetLoadTask = Task { [weak self, collectionMetadataLoader] in
+            let metadataByTrackId = await collectionMetadataLoader.cachedMetadata(
                 forTrackIds: Array(trackIds)
             )
             guard Task.isCancelled == false,
@@ -370,93 +376,145 @@ final class TrackListViewModel: ObservableObject {
             self.collectionNavigationTargetsByTrackId = metadataByTrackId.reduce(
                 into: [:]
             ) { targets, item in
-                targets[item.key] = TrackCollectionNavigationTarget(
-                    metadata: item.value
-                )
+                targets[item.key] = TrackCollectionNavigationTarget(metadata: item.value)
             }
             self.rebuildScreenState()
         }
     }
-    
-    
-    // MARK: - Snapshot
 
-    /// Запрашивает runtime snapshot трека, если он ещё не загружен.
-    /// - Parameter trackId: Идентификатор трека
+    // MARK: - Runtime snapshots
+
+    /// Запрашивает runtime snapshot только для присутствующего обычного трека и не дублирует active build.
     func requestSnapshotIfNeeded(for trackId: UUID) {
-        guard !tracks.contains(where: { track in
-            track.trackId == trackId &&
-            track.isPurchasedITunesRuntimeTrack
+        guard tracks.contains(where: {
+            $0.trackId == trackId && $0.isPurchasedITunesRuntimeTrack == false
         }) else {
             return
         }
+        guard snapshotsByTrackId[trackId] == nil,
+              snapshotTasksByTrackId[trackId] == nil else {
+            return
+        }
 
-        if snapshotsByTrackId[trackId] != nil { return }
-        
+        let generation = snapshotGenerationByTrackId[trackId, default: 0]
         let runtimeSnapshotProvider = runtimeSnapshotProvider
         let runtimeSnapshotBuilder = runtimeSnapshotBuilder
 
-        Task {
+        snapshotTasksByTrackId[trackId] = Task { [weak self] in
+            defer {
+                if let self,
+                   self.snapshotGenerationByTrackId[trackId, default: 0] == generation {
+                    // Не оставляет завершившуюся неуспешную задачу вечной блокировкой следующего запроса.
+                    self.snapshotTasksByTrackId.removeValue(forKey: trackId)
+                }
+            }
+
             let snapshot: TrackRuntimeSnapshot?
 
             if let storedSnapshot = runtimeSnapshotProvider.snapshot(forTrackId: trackId) {
                 snapshot = storedSnapshot
             } else {
-                snapshot = try? await runtimeSnapshotBuilder.buildSnapshot(forTrackId: trackId)
+                do {
+                    snapshot = try await runtimeSnapshotBuilder.buildSnapshot(forTrackId: trackId)
+                } catch is CancellationError {
+                    return
+                } catch {
+                    PersistentLogger.log("TrackListViewModel: runtime snapshot loading failed trackId=\(trackId) error=\(error)")
+                    return
+                }
             }
 
-            guard let snapshot else { return }
-
-            await MainActor.run {
-                snapshotsByTrackId[trackId] = snapshot
-                rebuildScreenState()
+            guard Task.isCancelled == false,
+                  let snapshot,
+                  let self,
+                  self.isCurrentSnapshotResult(trackId: trackId, generation: generation) else {
+                return
             }
+
+            self.snapshotsByTrackId[trackId] = snapshot
+            self.rebuildScreenState()
         }
     }
 
-    /// Пересобирает runtime snapshot загруженных треков после изменения настроек приложения.
+    /// Обновление settings отменяет старые file reads до очистки локальных runtime snapshots.
     private func reloadSnapshotsAfterSettingsChange() {
+        let localTrackIds = Set(
+            tracks
+                .filter { $0.isPurchasedITunesRuntimeTrack == false }
+                .map(\.trackId)
+        )
+
+        for trackId in localTrackIds {
+            invalidateSnapshotRequest(for: trackId)
+        }
+
         snapshotsByTrackId.removeAll()
         rebuildScreenState()
-        for track in tracks {
-            requestSnapshotIfNeeded(for: track.trackId)
+
+        for trackId in localTrackIds {
+            requestSnapshotIfNeeded(for: trackId)
         }
     }
 
-    /// Реагирует на единственное общее событие, которое означает изменение runtime metadata трека.
+    /// Делает прежний task неактуальным даже в случае позднего завершения после cancellation.
+    private func invalidateSnapshotRequest(for trackId: UUID) {
+        snapshotGenerationByTrackId[trackId, default: 0] &+= 1
+        snapshotTasksByTrackId[trackId]?.cancel()
+        snapshotTasksByTrackId.removeValue(forKey: trackId)
+    }
+
+    /// Проверяет поколение, присутствие physical track и наличие именно данного active task перед публикацией результата.
+    private func isCurrentSnapshotResult(
+        trackId: UUID,
+        generation: UInt
+    ) -> Bool {
+        snapshotGenerationByTrackId[trackId, default: 0] == generation &&
+        tracks.contains(where: {
+            $0.trackId == trackId && $0.isPurchasedITunesRuntimeTrack == false
+        })
+    }
+
+    // MARK: - Settings and track events
+
+    /// Metadata-сигнал приходит после очистки общих cache, поэтому только он инвалидирует file snapshots.
     private func handleMetadataSettingsDidChange() {
         let settings = settingsManager.settings
         let isTagReadingEnabled = settings.visible.metadata.isTagReadingEnabled
-        guard lastTagReadingEnabled != isTagReadingEnabled else { return }
+        guard lastTagReadingEnabled != isTagReadingEnabled else {
+            return
+        }
 
         lastTagReadingEnabled = isTagReadingEnabled
-        // Metadata-сигнал приходит после очистки кэшей, поэтому фиксируем согласованный snapshot для строк.
         rowPresentationSettings = settings
         reloadSnapshotsAfterSettingsChange()
     }
 
-    /// Применяет только настройку, меняющую готовые строки без чтения metadata и artwork.
+    /// File-format меняет только готовую строку и не требует нового чтения runtime metadata.
     private func handleRowPresentationSettingsChange(_ settings: AppSettings) {
         rowPresentationSettings = settings
 
         let isFileFormatVisible = settings.visible.library.isFileFormatVisible
-        guard lastFileFormatVisible != isFileFormatVisible else { return }
+        guard lastFileFormatVisible != isFileFormatVisible else {
+            return
+        }
 
         lastFileFormatVisible = isFileFormatVisible
         rebuildScreenState()
     }
 
-    /// Применяет единое событие обновления трека к состоянию треклиста.
-    ///
-    /// - Parameter updateEvent: Событие обновления трека
+    /// Принимает каноничный event только для physical track, представленного в текущем detail snapshot.
     private func applyTrackUpdateEvent(_ updateEvent: TrackUpdateEvent) {
+        guard tracks.contains(where: { $0.trackId == updateEvent.trackId }) else {
+            return
+        }
+
+        // Каноничный snapshot имеет приоритет над любым прежним асинхронным file read.
+        invalidateSnapshotRequest(for: updateEvent.trackId)
         snapshotsByTrackId[updateEvent.trackId] = updateEvent.snapshot
         rebuildScreenState()
         reloadCollectionNavigationTargets()
 
-        // Runtime snapshot без новой длительности не меняет итоговую статистику треклиста.
-        guard updateEvent.changedFields.contains(.duration),
-              tracks.contains(where: { $0.trackId == updateEvent.trackId }) else {
+        guard updateEvent.changedFields.contains(.duration) else {
             return
         }
 
@@ -465,115 +523,63 @@ final class TrackListViewModel: ObservableObject {
 
     // MARK: - Summary
 
-    /// Загружает статистику отдельно от строк и применяет только результат текущего треклиста.
+    /// Перечитывает агрегаты независимо от строк, отменяя только предыдущий запрос этого detail ID.
     private func reloadSummary() {
-        guard let trackListId = currentListId else { return }
+        guard hasLoadedDetail else {
+            return
+        }
 
         summaryTask?.cancel()
         let summaryProvider = summaryProvider
+        let trackListId = trackListId
 
         summaryTask = Task { [weak self] in
             do {
                 let summary = try await summaryProvider.summaryForTrackList(trackListId: trackListId)
                 guard Task.isCancelled == false,
                       let self,
-                      self.currentListId == trackListId else {
+                      self.trackListId == trackListId,
+                      self.hasLoadedDetail else {
                     return
                 }
 
                 self.summary = summary
                 self.rebuildScreenState()
             } catch is CancellationError {
-                // Отмена ожидаема при новом составе треклиста или закрытии экрана.
+                // Отмена ожидаема при следующем invalidation или закрытии detail.
             } catch {
                 guard Task.isCancelled == false,
                       let self,
-                      self.currentListId == trackListId else {
+                      self.trackListId == trackListId else {
                     return
                 }
 
-                // Не показываем отдельный toast, чтобы ошибка статистики не блокировала экран треклиста.
+                // Временная ошибка агрегатов не должна стирать последний успешно показанный summary.
                 PersistentLogger.log("TrackListViewModel: summary loading failed trackListId=\(trackListId) error=\(error)")
-                self.summary = nil
-                self.rebuildScreenState()
             }
         }
     }
+}
 
-    // MARK: - Reorder
+// MARK: - TrackListReading
 
-    func moveTrack(from source: IndexSet, to destination: Int) {
-        let previousTracks = tracks
-        tracks.move(fromOffsets: source, toOffset: destination)
-        rebuildScreenState()
-
-        // saveTracks публикует общий event, но перестановка не меняет состав, длительность и размер.
-        skipsNextTrackListTracksChangeAfterReorder = true
-        guard save() else {
-            skipsNextTrackListTracksChangeAfterReorder = false
-            tracks = previousTracks
-            rebuildScreenState()
-            toastPresenter.handle(AppError.trackListSaveFailed)
-            return
-        }
-        print("↕️ Порядок треков обновлён и сохранён")
+extension TrackListViewModel: TrackListReading {
+    /// Возвращает текущую строку по row identity, не смешивая её с physical trackId.
+    func track(forRowId rowId: UUID) -> Track? {
+        tracks.first { $0.id == rowId }
     }
 
-
-    // MARK: - Remove
-
-    func removeTrack(at offsets: IndexSet) {
-        guard
-            let index = offsets.first,
-            let listId = currentListId
-        else { return }
-
-        let listItemId = tracks[index].id
-
-        Task {
-            do {
-                let result = try await commandExecutor.removeTrackFromTrackList(
-                    listItemId: listItemId,
-                    trackListId: listId
-                )
-                await AppCommandToastPresenter(
-                    toastPresenter: toastPresenter
-                ).present(result)
-            } catch let appError as AppError {
-                AppCommandToastPresenter(
-                    toastPresenter: toastPresenter
-                ).present(appError)
-            } catch {
-                await MainActor.run {
-                    toastPresenter.handle(AppError.trackListSaveFailed)
-                }
-            }
+    /// Возвращает подготовленный target без повторного чтения TrackRegistry в action handler.
+    func collectionNavigationTarget(forRowId rowId: UUID) -> TrackCollectionNavigationTarget? {
+        guard let track = track(forRowId: rowId) else {
+            return nil
         }
+
+        return collectionNavigationTargetsByTrackId[track.trackId]
     }
 
- 
-    // MARK: - Refresh meta
-
-    func refreshMeta() {
-        guard let id = currentListId else { return }
-
-        let metas: [TrackListMeta]
-        do {
-            metas = try trackListsManager.loadTrackListMetas()
-        } catch let appError as AppError {
-            toastPresenter.handle(appError)
-            return
-        } catch {
-            toastPresenter.handle(AppError.trackListLoadFailed)
-            return
-        }
-
-        guard let meta = metas.first(where: { $0.id == id }) else { return }
-
-        if name != meta.name || kind != meta.kind {
-            name = meta.name
-            kind = meta.kind
-            rebuildScreenState()
-        }
+    /// Возвращает runtime snapshot, нужный rename handler для построения точного request.
+    func runtimeSnapshot(forTrackId trackId: UUID) -> TrackRuntimeSnapshot? {
+        snapshotsByTrackId[trackId]
     }
 }

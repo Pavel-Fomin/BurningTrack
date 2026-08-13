@@ -210,4 +210,13 @@ final class AppSettingsManager: ObservableObject, SettingsManaging, PlaybackMode
         // Сортировка уже применяется инициировавшей TrackListsViewModel и не касается плеера.
     }
 
+    /// Синхронизирует published-снимок после внешней общей транзакции порядка и режима master-списка.
+    func applyPersistedTrackListsSortMode(_ mode: TrackListsSortMode?) {
+        guard settings.internalSettings.trackListsSortMode != mode else {
+            return
+        }
+
+        settings.internalSettings.trackListsSortMode = mode
+    }
+
 }

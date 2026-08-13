@@ -13,6 +13,9 @@ import Foundation
 /// View отправляет эти действия наверх, но не выполняет бизнес-логику сама.
 enum TrackListAction {
 
+    /// Строка появилась на экране и запросила подготовку runtime snapshot.
+    case requestRuntimeSnapshot(trackId: UUID)
+
     /// Пользователь нажал на строку трека.
     case rowTapped(rowId: UUID)
 

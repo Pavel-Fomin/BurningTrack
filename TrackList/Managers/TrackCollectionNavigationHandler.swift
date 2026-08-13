@@ -45,6 +45,31 @@ final class TrackCollectionNavigationHandler {
         )
     }
 
+    /// Открывает заранее подготовленного артиста без повторного чтения TrackRegistry.
+    func openArtist(target: TrackCollectionNavigationTarget) {
+        guard let artist = target.artist else {
+            return
+        }
+
+        navigationCoordinator.openCollectionValueFromApp(
+            category: .artists,
+            value: artist
+        )
+    }
+
+    /// Открывает заранее подготовленный альбом без повторного чтения TrackRegistry.
+    func openAlbum(target: TrackCollectionNavigationTarget) {
+        guard let album = target.album else {
+            return
+        }
+
+        navigationCoordinator.openCollectionValueFromApp(
+            category: .albums,
+            value: album,
+            artistKey: target.albumArtistKey
+        )
+    }
+
     /// Запрашивает metadata без чтения файла и передаёт значение в существующую навигацию фонотеки.
     private func openCollectionValue(
         trackId: UUID,
@@ -80,3 +105,5 @@ final class TrackCollectionNavigationHandler {
         }
     }
 }
+
+extension TrackCollectionNavigationHandler: TrackCollectionNavigating {}

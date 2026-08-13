@@ -180,17 +180,14 @@ struct TrackListApp: App {
             preconditionFailure("Не удалось подготовить SQLite-провайдер статистики: \(error)")
         }
         let trackListViewModelFactory = TrackListViewModelFactory(
-            fileRenamer: renameActionHandler,
-            trackListManager: trackListManager,
-            trackListsManager: trackListsManager,
+            detailLoader: trackListManager,
             toastPresenter: toastManager,
-            commandExecutor: commandExecutor,
             eventProvider: NotificationTrackListEventProvider(),
             settingsManager: appSettingsManager,
             runtimeSnapshotProvider: runtimeSnapshotStore,
             runtimeSnapshotBuilder: runtimeSnapshotBuilder,
             summaryProvider: summaryProvider,
-            trackRegistry: trackRegistry,
+            collectionMetadataLoader: trackRegistry,
             playbackStateProvider: playbackStateProvider,
             favoriteTrackIdsProvider: favoriteTrackIdsProvider
         )
@@ -198,6 +195,8 @@ struct TrackListApp: App {
             sheetManager: sheetManager,
             sheetActionCoordinator: sheetActionCoordinator,
             commandExecutor: commandExecutor,
+            trackListManager: trackListManager,
+            fileRenamer: renameActionHandler,
             toastPresenter: toastManager,
             collectionNavigationHandler: trackCollectionNavigationHandler,
             trackShareActionHandler: trackShareActionHandler,
@@ -312,20 +311,35 @@ struct TrackListApp: App {
             )
         )
 
+        let navigationViewModel = MainNavigationViewModel(
+            scenePhaseHandler: scenePhaseHandler
+        )
+        let trackListsOrderingStore: any TrackListsOrderingPersisting
+        do {
+            // Оба persistence-представления master-команды используют единственный executor уже открытой базы.
+            trackListsOrderingStore = try TrackListsOrderingDatabaseStore(
+                database: appDatabase
+            )
+        } catch {
+            preconditionFailure("Не удалось подготовить атомарное сохранение порядка треклистов: \(error)")
+        }
         let trackListsViewModel = TrackListsViewModelFactory(
             trackListsManager: trackListsManager,
             trackListManager: trackListManager,
-            toastPresenter: toastManager,
             settingsManager: appSettingsManager,
-            eventProvider: NotificationTrackListsEventProvider()
+            loadFailurePresenter: toastManager,
+            eventProvider: NotificationTrackListsEventProvider(),
+            navigationPruning: navigationViewModel
         ).make()
         let trackListsActionHandler = TrackListsActionHandlerFactory(
-            presenter: sheetManager
+            trackListsManager: trackListsManager,
+            settingsManager: appSettingsManager,
+            orderingStore: trackListsOrderingStore,
+            toastPresenter: toastManager,
+            presenter: sheetManager,
+            externalOpenRequests: navigationCoordinator
         ).make(
             viewModel: trackListsViewModel
-        )
-        let navigationViewModel = MainNavigationViewModel(
-            scenePhaseHandler: scenePhaseHandler
         )
         let createTrackListFlowFactory = CreateTrackListFlowFactory(
             trackListsManager: trackListsManager,

@@ -2,23 +2,22 @@
 //  TrackListsViewModel.swift
 //  TrackList
 //
-//  ViewModel для списка всех треклистов
-//  - загрузка треклистов через manager-слой
-//  - удаление
-//  - обновление UI списка
+//  Состояние master-flow списка треклистов.
 //
 //  Created by Pavel Fomin on 07.11.2025.
 //
 
-import Foundation
 import Combine
+import Foundation
 import SwiftUI
 
 @MainActor
 final class TrackListsViewModel: ObservableObject {
 
     // MARK: - Состояния
-    @Published var trackLists: [TrackList] = []
+
+    /// Последний успешно загруженный полный master-снимок.
+    @Published private(set) var trackLists: [TrackList] = []
     /// Путь выбранных треклистов для типизированной навигации master-flow.
     @Published var navigationPath: [UUID] = []
     /// Последняя сортировка, выбранная через меню; nil означает ручной порядок.
@@ -30,46 +29,156 @@ final class TrackListsViewModel: ObservableObject {
         isShowingDeleteConfirmation: false,
         selectedSortMode: nil
     )
-    /// Собирает состояние экрана из текущего списка треклистов.
-    private let stateBuilder = TrackListsScreenStateBuilder()
-    /// Управляет метаданными списка треклистов.
-    private let trackListsManager: any TrackListsManaging
-    /// Управляет содержимым одного треклиста.
-    private let trackListManager: any TrackListManaging
-    /// Показывает пользовательские сообщения об ошибках.
-    private let toastPresenter: any ToastPresenting
-    /// Управляет сохранёнными настройками отображения списка треклистов.
-    private let settingsManager: any SettingsManaging
-    /// Поставляет события изменения списка треклистов.
-    private let eventProvider: any TrackListsEventProviding
+
     /// Идентификатор треклиста, ожидающего подтверждения удаления.
     private var pendingDeleteTrackListId: UUID?
     /// Защищает общий master-flow от повторной начальной загрузки при смене корневой компоновки.
-    private var hasLoadedTrackLists = false
+    private(set) var hasLoadedTrackLists = false
+
+    // MARK: - Зависимости
+
+    /// Загружает полный master-снимок без передачи ViewModel mutation-контрактов.
+    private let loader: any TrackListsLoading
+    /// Показывает только ошибки автоматической загрузки, не раскрывая ViewModel общий Toast API.
+    private let loadFailurePresenter: any TrackListsLoadFailurePresenting
+    /// Поставляет invalidation-события изменения списка треклистов.
+    private let eventProvider: any TrackListsEventProviding
+    /// Возвращает iPad sidebar в master, если внешний reload удалил выбранный detail.
+    private let navigationPruning: any TrackListsNavigationPruning
+    /// Собирает готовое состояние экрана из текущего master-снимка.
+    private let stateBuilder = TrackListsScreenStateBuilder()
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Init
 
     init(
-        trackListsManager: any TrackListsManaging,
-        trackListManager: any TrackListManaging,
-        toastPresenter: any ToastPresenting,
-        settingsManager: any SettingsManaging,
-        eventProvider: any TrackListsEventProviding
+        loader: any TrackListsLoading,
+        initialSortMode: TrackListsSortMode?,
+        loadFailurePresenter: any TrackListsLoadFailurePresenting,
+        eventProvider: any TrackListsEventProviding,
+        navigationPruning: any TrackListsNavigationPruning
     ) {
-        self.trackListsManager = trackListsManager
-        self.trackListManager = trackListManager
-        self.toastPresenter = toastPresenter
-        self.settingsManager = settingsManager
+        self.loader = loader
+        self.sortMode = initialSortMode
+        self.loadFailurePresenter = loadFailurePresenter
         self.eventProvider = eventProvider
-        self.sortMode = settingsManager.settings.internalSettings.trackListsSortMode
+        self.navigationPruning = navigationPruning
 
         eventProvider.trackListsDidChange
             .receive(on: DispatchQueue.main)
             .sink { [weak self] in
-                self?.refresh()
+                // Событие является invalidation, поэтому ViewModel перечитывает полный согласованный снимок.
+                self?.reloadTrackLists()
             }
             .store(in: &cancellables)
+    }
+
+    // MARK: - Загрузка
+
+    /// Загружает master-снимок при первом появлении; ошибка не блокирует следующую попытку.
+    @discardableResult
+    func loadTrackListsIfNeeded() -> Bool {
+        guard hasLoadedTrackLists == false else {
+            return true
+        }
+
+        return reloadTrackLists()
+    }
+
+    /// Перечитывает snapshot после invalidation, сохраняя последний успешный state при ошибке.
+    @discardableResult
+    func reloadTrackLists() -> Bool {
+        do {
+            applyLoadedTrackLists(try loader.loadTrackLists())
+            return true
+        } catch let appError as AppError {
+            loadFailurePresenter.presentTrackListsLoadFailure(appError)
+            return false
+        } catch {
+            loadFailurePresenter.presentTrackListsLoadFailure(.trackListLoadFailed)
+            return false
+        }
+    }
+
+    /// Публикует новый полный snapshot только после успешной загрузки всех зависимых данных detail-flow.
+    func applyLoadedTrackLists(_ loadedTrackLists: [TrackList]) {
+        trackLists = displayOrderedTrackLists(from: loadedTrackLists)
+        hasLoadedTrackLists = true
+        pruneNavigation(validTrackListIDs: Set(trackLists.map(\.id)))
+        updateScreenState()
+    }
+
+    // MARK: - Presentation state
+
+    /// Применяет уже атомарно сохранённый порядок до публикации invalidation-события.
+    func applyPersistedOrdering(
+        _ orderedTrackLists: [TrackList],
+        sortMode mode: TrackListsSortMode?
+    ) {
+        sortMode = mode
+        trackLists = displayOrderedTrackLists(from: orderedTrackLists)
+        updateScreenState()
+    }
+
+    /// Запоминает ожидающий удаления regular-треклист после валидации user-команды в handler.
+    func requestDeleteTrackList(id: UUID) {
+        pendingDeleteTrackListId = id
+        updateScreenState()
+    }
+
+    /// Скрывает подтверждение удаления, не меняя master-снимок.
+    func cancelDeleteTrackList() {
+        pendingDeleteTrackListId = nil
+        updateScreenState()
+    }
+
+    /// Проверяет, относится ли подтверждение к ещё актуальному запросу удаления.
+    func isDeleteRequested(for id: UUID) -> Bool {
+        pendingDeleteTrackListId == id
+    }
+
+    // MARK: - Navigation
+
+    /// Добавляет уже проверенный route пользовательского открытия в compact navigation stack.
+    func appendNavigationPath(id: UUID) {
+        navigationPath.append(id)
+    }
+
+    /// Заменяет detail route внешним app-level запросом.
+    func replaceNavigationPath(with id: UUID) {
+        navigationPath = [id]
+    }
+
+    /// Возвращает треклист для построения detail-экрана по route id.
+    func trackList(for id: UUID) -> TrackList? {
+        trackLists.first { $0.id == id }
+    }
+
+    /// Проверяет, существует ли треклист в последнем успешно загруженном master-снимке.
+    func containsTrackList(id: UUID) -> Bool {
+        trackList(for: id) != nil
+    }
+
+    // MARK: - Private
+
+    /// Применяет выбранную сортировку после каждого reload, чтобы settings и отображение не расходились после create/rename.
+    private func displayOrderedTrackLists(from trackLists: [TrackList]) -> [TrackList] {
+        guard let sortMode else {
+            return TrackListsSortMode.manualOrder(from: trackLists)
+        }
+
+        return sortMode.applying(to: trackLists)
+    }
+
+    /// Убирает маршруты и iPad detail, которые больше не существуют в опубликованном snapshot.
+    private func pruneNavigation(validTrackListIDs: Set<UUID>) {
+        navigationPath.removeAll { validTrackListIDs.contains($0) == false }
+        navigationPruning.pruneTrackListSelection(validTrackListIDs: validTrackListIDs)
+
+        if let pendingDeleteTrackListId,
+           validTrackListIDs.contains(pendingDeleteTrackListId) == false {
+            self.pendingDeleteTrackListId = nil
+        }
     }
 
     /// Пересобирает состояние экрана с учётом подтверждения удаления.
@@ -85,223 +194,5 @@ final class TrackListsViewModel: ObservableObject {
             isShowingDeleteConfirmation: pendingDeleteTrackListId != nil,
             selectedSortMode: baseState.selectedSortMode
         )
-    }
-
-    // MARK: - Загрузка всех треклистов
-
-    /// Загружает треклисты и обрабатывает ошибки чтения данных.
-    private func loadTrackLists() -> [TrackList] {
-        let metas: [TrackListMeta]
-        do {
-            // Системный треклист должен существовать до публикации итогового списка в интерфейс.
-            _ = try trackListsManager.ensureFavoritesTrackList()
-            metas = try trackListsManager.loadTrackListMetas()
-        } catch let appError as AppError {
-            toastPresenter.handle(appError)
-            return []
-        } catch {
-            toastPresenter.handle(AppError.trackListLoadFailed)
-            return []
-        }
-
-        var trackLoadError: AppError?
-        var didFailToLoadTracks = false
-
-        let loadedTrackLists = metas.map { meta in
-            let tracks: [Track]
-            do {
-                tracks = try trackListManager.loadTracks(for: meta.id)
-            } catch let appError as AppError {
-                trackLoadError = appError
-                didFailToLoadTracks = true
-                tracks = []
-            } catch {
-                didFailToLoadTracks = true
-                tracks = []
-            }
-            return TrackList(
-                id: meta.id,
-                name: meta.name,
-                createdAt: meta.createdAt,
-                kind: meta.kind,
-                tracks: tracks
-            )
-        }
-
-        if didFailToLoadTracks {
-            toastPresenter.handle(trackLoadError ?? AppError.trackListLoadFailed)
-        }
-
-        return displayOrderedTrackLists(from: loadedTrackLists)
-    }
-
-    func refresh() {
-        self.trackLists = loadTrackLists()
-        updateScreenState()
-        hasLoadedTrackLists = true
-
-        print("📥 Загружено \(trackLists.count) треклистов")
-    }
-
-    /// Загружает треклисты только при первом появлении общего master-flow.
-    func loadTrackListsIfNeeded() {
-        guard hasLoadedTrackLists == false else {
-            return
-        }
-
-        refresh()
-    }
-
-    // MARK: - Navigation
-
-    /// Открывает выбранный треклист через состояние навигации.
-    func openTrackList(id: UUID) {
-        guard trackLists.contains(where: { $0.id == id }) else {
-            toastPresenter.handle(AppError.trackListNotFound)
-            return
-        }
-
-        navigationPath.append(id)
-    }
-
-    /// Открывает треклист по внешнему app-level запросу, заменяя текущий detail route.
-    func openTrackListFromApp(id: UUID) {
-        if trackLists.contains(where: { $0.id == id }) == false {
-            refresh()
-        }
-
-        guard trackLists.contains(where: { $0.id == id }) else {
-            toastPresenter.handle(AppError.trackListNotFound)
-            return
-        }
-
-        navigationPath = [id]
-    }
-
-    /// Возвращает треклист для построения detail-экрана по route id.
-    func trackList(for id: UUID) -> TrackList? {
-        trackLists.first { $0.id == id }
-    }
-
-    // MARK: - Sort
-
-    /// Сортирует треклисты, сохраняет новый фактический порядок в SQLite и показывает caption режима.
-    func setSortMode(_ mode: TrackListsSortMode) {
-        let previousSortMode = sortMode
-        let favorites = trackLists.filter { $0.kind == .favorites }
-        var regularTrackLists = trackLists.filter { $0.kind == .regular }
-
-        switch mode {
-        case .createdAt:
-            regularTrackLists.sort {
-                $0.createdAt > $1.createdAt
-            }
-        case .name:
-            regularTrackLists.sort {
-                $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
-            }
-        }
-
-        let updatedTrackLists = favorites + regularTrackLists
-
-        do {
-            try settingsManager.setTrackListsSortMode(mode)
-            try trackListsManager.updateTrackListsOrder(updatedTrackLists.map(\.id))
-            trackLists = updatedTrackLists
-            sortMode = mode
-            updateScreenState()
-        } catch let appError as AppError {
-            try? settingsManager.setTrackListsSortMode(previousSortMode)
-            toastPresenter.handle(appError)
-            refresh()
-        } catch {
-            try? settingsManager.setTrackListsSortMode(previousSortMode)
-            toastPresenter.handle(AppError.trackListSaveFailed)
-            refresh()
-        }
-    }
-
-    // MARK: - Reorder
-
-    /// Сохраняет новый порядок треклистов в SQLite и обновляет состояние экрана.
-    func moveTrackList(from source: IndexSet, to destination: Int) {
-        let favoritesCount = trackLists.filter { $0.kind == .favorites }.count
-        guard source.isEmpty == false,
-              source.allSatisfy({ trackLists.indices.contains($0) }),
-              source.allSatisfy({ trackLists[$0].kind.canReorder }),
-              destination >= favoritesCount,
-              destination <= trackLists.count
-        else {
-            toastPresenter.handle(AppError.trackListReorderNotAllowed)
-            return
-        }
-
-        let previousSortMode = sortMode
-        let favorites = trackLists.filter { $0.kind == .favorites }
-        var regularTrackLists = trackLists.filter { $0.kind == .regular }
-        let regularSource = IndexSet(source.map { $0 - favoritesCount })
-        let regularDestination = destination - favoritesCount
-        regularTrackLists.move(fromOffsets: regularSource, toOffset: regularDestination)
-        let updatedTrackLists = favorites + regularTrackLists
-
-        do {
-            try settingsManager.setTrackListsSortMode(nil)
-            try trackListsManager.updateTrackListsOrder(updatedTrackLists.map(\.id))
-            trackLists = updatedTrackLists
-            sortMode = nil
-            updateScreenState()
-        } catch let appError as AppError {
-            try? settingsManager.setTrackListsSortMode(previousSortMode)
-            toastPresenter.handle(appError)
-            refresh()
-        } catch {
-            try? settingsManager.setTrackListsSortMode(previousSortMode)
-            toastPresenter.handle(AppError.trackListSaveFailed)
-            refresh()
-        }
-    }
-
-    /// Формирует единственный порядок отображения: системный треклист, затем сохранённый порядок обычных.
-    private func displayOrderedTrackLists(from trackLists: [TrackList]) -> [TrackList] {
-        let favorites = trackLists.filter { $0.kind == .favorites }
-        let regular = trackLists.filter { $0.kind == .regular }
-        return favorites + regular
-    }
-
-
-    // MARK: - Удаление
-
-    /// Запрашивает подтверждение удаления треклиста.
-    func requestDeleteTrackList(id: UUID) {
-        guard let trackList = trackLists.first(where: { $0.id == id }) else {
-            toastPresenter.handle(AppError.trackListNotFound)
-            return
-        }
-        guard trackList.kind.canDelete else {
-            toastPresenter.handle(AppError.trackListDeletionNotAllowed)
-            return
-        }
-
-        pendingDeleteTrackListId = id
-        updateScreenState()
-    }
-
-    /// Отменяет подтверждение удаления треклиста.
-    func cancelDeleteTrackList() {
-        pendingDeleteTrackListId = nil
-        updateScreenState()
-    }
-
-    func deleteTrackList(id: UUID) {
-        do {
-            try trackListsManager.deleteTrackList(id: id)
-            pendingDeleteTrackListId = nil
-            refresh()
-            print("🗑️ Треклист \(id) удалён")
-        } catch let appError as AppError {
-            toastPresenter.handle(appError)
-        } catch {
-            toastPresenter.handle(AppError.trackListSaveFailed)
-        }
     }
 }

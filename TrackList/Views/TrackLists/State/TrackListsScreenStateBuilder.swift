@@ -18,13 +18,17 @@ struct TrackListsScreenStateBuilder {
         let rows = trackLists.map { trackList in
             TrackListsRowState(
                 id: trackList.id,
-                trackList: trackList,
                 title: TrackListPresentationText.title(
                     for: trackList.kind,
                     storedName: trackList.name
                 ),
-                createdAt: trackList.createdAt,
-                tracksCount: trackList.tracks.count,
+                createdAtText: TrackListPresentationText.createdAt(
+                    for: trackList.kind,
+                    date: trackList.createdAt
+                ),
+                tracksCountText: TrackListPresentationText.trackCount(
+                    trackList.tracks.count
+                ),
                 canDelete: trackList.kind.canDelete,
                 canReorder: trackList.kind.canReorder
             )

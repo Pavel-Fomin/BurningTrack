@@ -15,17 +15,13 @@ struct TrackListView: View {
     @Environment(\.scenePhase) private var scenePhase
     private let state: TrackListScreenState
     private let onAction: (TrackListAction) -> Void
-    /// Запрашивает runtime snapshot трека для строки.
-    private let onRequestSnapshot: (UUID) -> Void
 
     init(
         state: TrackListScreenState,
-        onAction: @escaping (TrackListAction) -> Void,
-        onRequestSnapshot: @escaping (UUID) -> Void
+        onAction: @escaping (TrackListAction) -> Void
     ) {
         self.state = state
         self.onAction = onAction
-        self.onRequestSnapshot = onRequestSnapshot
     }
 
     var body: some View {
@@ -40,7 +36,9 @@ struct TrackListView: View {
                     } else {
                         TrackListRowsView(
                             rows: state.rows,
-                            onRequestSnapshot: onRequestSnapshot,
+                            onRequestSnapshot: { trackId in
+                                onAction(.requestRuntimeSnapshot(trackId: trackId))
+                            },
                             onTap: { rowId in
                                 onAction(.rowTapped(rowId: rowId))
                             },
@@ -147,16 +145,12 @@ struct TrackListView: View {
                 let onGoToAlbum: (UUID) -> Void
                 let onMove: (IndexSet, Int) -> Void
 
-                /// Проверяет доступность пункта меню для строки треклиста.
+                /// Использует capability, подготовленную ScreenStateBuilder для строки.
                 private func isMenuActionAvailable(
                     _ action: TrackMenuAction,
                     for row: TrackListRowState
                 ) -> Bool {
-                    TrackMenuActionAvailability.isAvailable(
-                        action,
-                        source: row.source,
-                        context: .trackList
-                    )
+                    row.availableActions.contains(action)
                 }
 
                 var body: some View {
@@ -252,4 +246,5 @@ struct TrackListView: View {
                     }
                     .onMove(perform: onMove)
                 }
+
             }

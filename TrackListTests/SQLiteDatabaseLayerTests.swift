@@ -1863,11 +1863,14 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
         )
         let trackListsManager = TrackListsLoadingOrderSpy(metas: [favorites])
         let viewModel = TrackListsViewModel(
-            trackListsManager: trackListsManager,
-            trackListManager: TrackListLoadingOrderSpy(),
-            toastPresenter: TrackListsToastPresenterSpy(),
-            settingsManager: TrackListsSettingsManagerSpy(),
-            eventProvider: TrackListsEventProviderSpy()
+            loader: TrackListsLoader(
+                trackListsManager: trackListsManager,
+                trackListManager: TrackListLoadingOrderSpy()
+            ),
+            initialSortMode: nil,
+            loadFailurePresenter: TrackListsToastPresenterSpy(),
+            eventProvider: TrackListsEventProviderSpy(),
+            navigationPruning: TrackListsNavigationPruningSpy()
         )
 
         viewModel.loadTrackListsIfNeeded()
@@ -1940,11 +1943,14 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
             metas: try store.fetchMetas()
         )
         let viewModel = TrackListsViewModel(
-            trackListsManager: trackListsManager,
-            trackListManager: TrackListLoadingOrderSpy(),
-            toastPresenter: TrackListsToastPresenterSpy(),
-            settingsManager: TrackListsSettingsManagerSpy(),
-            eventProvider: TrackListsEventProviderSpy()
+            loader: TrackListsLoader(
+                trackListsManager: trackListsManager,
+                trackListManager: TrackListLoadingOrderSpy()
+            ),
+            initialSortMode: nil,
+            loadFailurePresenter: TrackListsToastPresenterSpy(),
+            eventProvider: TrackListsEventProviderSpy(),
+            navigationPruning: TrackListsNavigationPruningSpy()
         )
 
         viewModel.loadTrackListsIfNeeded()
@@ -1954,60 +1960,6 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
             [favorites.id, regularA.id, regularB.id]
         )
         XCTAssertEqual(viewModel.trackLists.dropFirst().map(\.name), ["B", "A"])
-    }
-
-    @MainActor
-    func testTrackListsViewModelConvertsFullMoveIndexesToRegularOrder() throws {
-        let favorites = TrackListMeta(
-            id: UUID(),
-            name: "Избранное",
-            createdAt: Date(timeIntervalSince1970: 100),
-            kind: .favorites
-        )
-        let regularA = TrackListMeta(
-            id: UUID(),
-            name: "A",
-            createdAt: Date(timeIntervalSince1970: 200),
-            kind: .regular
-        )
-        let regularB = TrackListMeta(
-            id: UUID(),
-            name: "B",
-            createdAt: Date(timeIntervalSince1970: 300),
-            kind: .regular
-        )
-        let regularC = TrackListMeta(
-            id: UUID(),
-            name: "C",
-            createdAt: Date(timeIntervalSince1970: 400),
-            kind: .regular
-        )
-        let trackListsManager = TrackListsLoadingOrderSpy(
-            metas: [favorites, regularA, regularB, regularC]
-        )
-        let viewModel = TrackListsViewModel(
-            trackListsManager: trackListsManager,
-            trackListManager: TrackListLoadingOrderSpy(),
-            toastPresenter: TrackListsToastPresenterSpy(),
-            settingsManager: TrackListsSettingsManagerSpy(),
-            eventProvider: TrackListsEventProviderSpy()
-        )
-
-        viewModel.loadTrackListsIfNeeded()
-        viewModel.moveTrackList(from: IndexSet(integer: 3), to: 1)
-
-        XCTAssertEqual(
-            trackListsManager.calls,
-            [
-                .ensureFavorites,
-                .loadMetas,
-                .updateOrder([favorites.id, regularC.id, regularA.id, regularB.id])
-            ]
-        )
-        XCTAssertEqual(
-            viewModel.trackLists.map(\.id),
-            [favorites.id, regularC.id, regularA.id, regularB.id]
-        )
     }
 
     @MainActor
@@ -2074,6 +2026,66 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
                 try trackListStore.fetch(id: regularB.id)?.sortOrder
             ],
             initialOrders
+        )
+    }
+
+    func testTrackListsOrderingStoreRollsBackOrderWhenSettingsWriteFails() throws {
+        let database = try makeDatabase()
+        let executor = try database.databaseExecutor()
+        let store = TrackListDatabaseStore(executor: executor)
+        let trackListStore = SQLiteTrackListStore(executor: executor)
+        let regularA = try store.createTrackList(
+            id: UUID(),
+            name: "A",
+            kind: .regular,
+            createdAt: Date(timeIntervalSince1970: 100),
+            tracks: []
+        )
+        let regularB = try store.createTrackList(
+            id: UUID(),
+            name: "B",
+            kind: .regular,
+            createdAt: Date(timeIntervalSince1970: 200),
+            tracks: []
+        )
+        let favorites = try store.createTrackList(
+            id: UUID(),
+            name: "Favorites",
+            kind: .favorites,
+            createdAt: Date(timeIntervalSince1970: 300),
+            tracks: []
+        )
+        try store.updateTrackListsOrder([regularA.id, regularB.id])
+        let initialRegularOrders = [
+            try trackListStore.fetch(id: regularA.id)?.sortOrder,
+            try trackListStore.fetch(id: regularB.id)?.sortOrder
+        ]
+        let settingsStore = FailingTrackListsOrderingSettingsStore()
+        let orderingStore = TrackListsOrderingDatabaseStore(
+            executor: executor,
+            trackListsStore: store,
+            libraryViewSettingsStore: settingsStore
+        )
+
+        XCTAssertThrowsError(
+            try orderingStore.persist(
+                sortMode: .name,
+                orderedTrackListIDs: [favorites.id, regularB.id, regularA.id]
+            )
+        ) { error in
+            guard let appError = error as? AppError,
+                  case .trackListSaveFailed = appError
+            else {
+                return XCTFail("Ожидалась ошибка сохранения общей master-транзакции")
+            }
+        }
+
+        XCTAssertEqual(
+            [
+                try trackListStore.fetch(id: regularA.id)?.sortOrder,
+                try trackListStore.fetch(id: regularB.id)?.sortOrder
+            ],
+            initialRegularOrders
         )
     }
 
@@ -2177,11 +2189,14 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
         )
 
         let viewModel = TrackListsViewModel(
-            trackListsManager: TrackListsLoadingOrderSpy(metas: reloadedMetas),
-            trackListManager: TrackListLoadingOrderSpy(),
-            toastPresenter: TrackListsToastPresenterSpy(),
-            settingsManager: TrackListsSettingsManagerSpy(),
-            eventProvider: TrackListsEventProviderSpy()
+            loader: TrackListsLoader(
+                trackListsManager: TrackListsLoadingOrderSpy(metas: reloadedMetas),
+                trackListManager: TrackListLoadingOrderSpy()
+            ),
+            initialSortMode: nil,
+            loadFailurePresenter: TrackListsToastPresenterSpy(),
+            eventProvider: TrackListsEventProviderSpy(),
+            navigationPruning: TrackListsNavigationPruningSpy()
         )
         viewModel.loadTrackListsIfNeeded()
 
@@ -2189,48 +2204,6 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
             viewModel.trackLists.map(\.id),
             [favorites.id, regularC.id, regularA.id, regularB.id]
         )
-    }
-
-    @MainActor
-    func testDeletingRegularKeepsFavoritesFirstAndRegularOrder() throws {
-        let favorites = TrackListMeta(
-            id: UUID(),
-            name: "Избранное",
-            createdAt: Date(timeIntervalSince1970: 100),
-            kind: .favorites
-        )
-        let regularA = TrackListMeta(
-            id: UUID(),
-            name: "A",
-            createdAt: Date(timeIntervalSince1970: 200),
-            kind: .regular
-        )
-        let regularB = TrackListMeta(
-            id: UUID(),
-            name: "B",
-            createdAt: Date(timeIntervalSince1970: 300),
-            kind: .regular
-        )
-        let trackListsManager = TrackListsLoadingOrderSpy(
-            metas: [regularB, favorites, regularA]
-        )
-        let viewModel = TrackListsViewModel(
-            trackListsManager: trackListsManager,
-            trackListManager: TrackListLoadingOrderSpy(),
-            toastPresenter: TrackListsToastPresenterSpy(),
-            settingsManager: TrackListsSettingsManagerSpy(),
-            eventProvider: TrackListsEventProviderSpy()
-        )
-
-        viewModel.loadTrackListsIfNeeded()
-        viewModel.deleteTrackList(id: regularB.id)
-
-        XCTAssertEqual(
-            viewModel.trackLists.map(\.id),
-            [favorites.id, regularA.id]
-        )
-        XCTAssertFalse(viewModel.screenState.rows[0].canReorder)
-        XCTAssertTrue(viewModel.screenState.rows[1].canReorder)
     }
 
     func testTrackListDatabaseStorePersistsBusinessModels() throws {
@@ -3183,6 +3156,18 @@ private final class TrackListsToastPresenterSpy: ToastPresenting {
     func handle(_ error: AppError) {}
 }
 
+extension TrackListsToastPresenterSpy: TrackListsLoadFailurePresenting {
+
+    func presentTrackListsLoadFailure(_ error: AppError) {}
+}
+
+// Не меняет реальную sidebar-навигацию в изолированной проверке загрузки master-снимка.
+@MainActor
+private final class TrackListsNavigationPruningSpy: TrackListsNavigationPruning {
+
+    func pruneTrackListSelection(validTrackListIDs: Set<UUID>) {}
+}
+
 // Предоставляет ViewModel минимальные настройки без обращения к рабочему глобальному объекту.
 @MainActor
 private final class TrackListsSettingsManagerSpy: SettingsManaging {
@@ -3237,4 +3222,39 @@ private final class TrackListsEventProviderSpy: TrackListsEventProviding {
     var trackListsDidChange: AnyPublisher<Void, Never> {
         subject.eraseToAnyPublisher()
     }
+}
+
+// Имитирует сбой второй записи общей master-команды после изменения порядка треклистов.
+private final class FailingTrackListsOrderingSettingsStore: LibraryViewSettingsDatabaseReading, LibraryViewSettingsDatabaseWriting {
+    private let model = LibraryViewSettingsDatabaseModel(
+        id: 1,
+        sortMode: "fileDateDesc",
+        purchasedITunesSortMode: "titleAsc",
+        trackListsSortMode: nil,
+        groupMode: "none",
+        showTrackListBadges: true,
+        showUnavailableTracks: false,
+        showFileFormat: true,
+        showPurchasedITunesSource: true,
+        libraryRootDisplayMode: "folders",
+        lastOpenedFolderId: nil,
+        updatedAt: Date(timeIntervalSince1970: 100)
+    )
+
+    func fetch() throws -> LibraryViewSettingsDatabaseModel? {
+        model
+    }
+
+    func insert(_ model: LibraryViewSettingsDatabaseModel) throws {}
+    func update(_ model: LibraryViewSettingsDatabaseModel) throws {}
+
+    func upsert(_ model: LibraryViewSettingsDatabaseModel) throws {
+        throw TrackListsOrderingSettingsWriteError.failed
+    }
+
+    func delete() throws {}
+}
+
+private enum TrackListsOrderingSettingsWriteError: Error {
+    case failed
 }

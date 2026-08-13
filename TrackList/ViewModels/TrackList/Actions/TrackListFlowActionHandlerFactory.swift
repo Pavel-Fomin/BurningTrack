@@ -17,10 +17,14 @@ struct TrackListFlowActionHandlerFactory {
     private let sheetActionCoordinator: SheetActionCoordinator
     /// Исполнитель команд приложения, подготовленный Composition Root.
     private let commandExecutor: AppCommandExecutor
+    /// Менеджер сохраняет порядок строк одного треклиста и публикует invalidation-события.
+    private let trackListManager: any TrackListManaging
+    /// Общий handler файлового rename-flow, подготовленный Composition Root.
+    private let fileRenamer: any TrackFileRenaming
     /// Презентер пользовательских сообщений, подготовленный Composition Root.
     private let toastPresenter: any ToastPresenting
     /// Обработчик переходов к значениям музыкальной коллекции, подготовленный Composition Root.
-    private let collectionNavigationHandler: TrackCollectionNavigationHandler
+    private let collectionNavigationHandler: any TrackCollectionNavigating
     /// Общий action flow отправки трека, подготовленный Composition Root.
     private let trackShareActionHandler: TrackShareActionHandler
     /// Провайдер системного контроллера, подготовленный Composition Root.
@@ -35,8 +39,10 @@ struct TrackListFlowActionHandlerFactory {
         sheetManager: SheetManager,
         sheetActionCoordinator: SheetActionCoordinator,
         commandExecutor: AppCommandExecutor,
+        trackListManager: any TrackListManaging,
+        fileRenamer: any TrackFileRenaming,
         toastPresenter: any ToastPresenting,
-        collectionNavigationHandler: TrackCollectionNavigationHandler,
+        collectionNavigationHandler: any TrackCollectionNavigating,
         trackShareActionHandler: TrackShareActionHandler,
         viewControllerProvider: any ViewControllerProviding,
         playbackStateProvider: any PlaybackStateProviding,
@@ -45,6 +51,8 @@ struct TrackListFlowActionHandlerFactory {
         self.sheetManager = sheetManager
         self.sheetActionCoordinator = sheetActionCoordinator
         self.commandExecutor = commandExecutor
+        self.trackListManager = trackListManager
+        self.fileRenamer = fileRenamer
         self.toastPresenter = toastPresenter
         self.collectionNavigationHandler = collectionNavigationHandler
         self.trackShareActionHandler = trackShareActionHandler
@@ -56,8 +64,6 @@ struct TrackListFlowActionHandlerFactory {
     /// Создаёт production action handler для detail-flow одного треклиста.
     func make(
         reader: any TrackListReading,
-        mutator: any TrackListMutating,
-        renamer: any TrackListRenaming,
         exportProgressViewModel: ExportProgressViewModel,
         favoriteTrackActionHandler: FavoriteTrackActionHandler
     ) -> TrackListFlowActionHandler {
@@ -65,8 +71,9 @@ struct TrackListFlowActionHandlerFactory {
             reader: reader,
             playbackStateProvider: playbackStateProvider,
             playbackController: playbackController,
-            mutator: mutator,
-            renamer: renamer,
+            trackListManager: trackListManager,
+            commandExecutor: commandExecutor,
+            fileRenamer: fileRenamer,
             presenter: SheetTrackListPresenter(
                 sheetManager: sheetManager,
                 sheetActionCoordinator: sheetActionCoordinator
@@ -74,7 +81,7 @@ struct TrackListFlowActionHandlerFactory {
             exportProgressViewModel: exportProgressViewModel,
             viewControllerProvider: viewControllerProvider,
             toastPresenter: toastPresenter,
-            commandExecutor: commandExecutor,
+            appCommandExecutor: commandExecutor,
             collectionNavigationHandler: collectionNavigationHandler,
             trackShareActionHandler: trackShareActionHandler,
             favoriteTrackActionHandler: favoriteTrackActionHandler

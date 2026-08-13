@@ -22,4 +22,11 @@ protocol SettingsManaging: AnyObject {
     func setLibraryRootDisplayMode(_ mode: LibraryRootDisplayMode) throws
     func setLibraryTrackSortMode(_ mode: LibraryTrackSortMode) throws
     func setTrackListsSortMode(_ mode: TrackListsSortMode?) throws
+    func applyPersistedTrackListsSortMode(_ mode: TrackListsSortMode?)
+}
+
+extension SettingsManaging {
+
+    /// Базовая реализация сохраняет обратную совместимость узких тестовых реализаций настроек.
+    func applyPersistedTrackListsSortMode(_ mode: TrackListsSortMode?) {}
 }

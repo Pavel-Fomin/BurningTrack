@@ -128,7 +128,7 @@ final class TrackListExportHandlerTests: XCTestCase {
 private final class TrackListReaderSpy: TrackListReading {
 
     /// Идентификатор тестового треклиста.
-    let currentListId: UUID? = UUID()
+    let trackListId = UUID()
 
     /// Отображаемое имя треклиста для экспортной папки.
     let name: String

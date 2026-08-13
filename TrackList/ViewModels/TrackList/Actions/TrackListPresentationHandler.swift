@@ -22,9 +22,9 @@ final class TrackListPresentationHandler {
     private let toastPresenter: any ToastPresenting
 
     /// Исполнитель команд приложения для runtime-действий iTunes-треков.
-    private let commandExecutor: AppCommandExecutor
+    private let commandExecutor: any PurchasedITunesTrackPlayerAdding
     /// Обработчик переходов к значениям музыкальной коллекции.
-    private let collectionNavigationHandler: TrackCollectionNavigationHandler
+    private let collectionNavigationHandler: any TrackCollectionNavigating
     /// Общий action flow отправки трека.
     private let trackShareActionHandler: TrackShareActionHandler
     /// Общий обработчик «Избранного» выполняет сохранение вне UI и списка.
@@ -35,8 +35,8 @@ final class TrackListPresentationHandler {
         reader: any TrackListReading,
         presenter: any TrackListPresenting,
         toastPresenter: any ToastPresenting,
-        commandExecutor: AppCommandExecutor,
-        collectionNavigationHandler: TrackCollectionNavigationHandler,
+        commandExecutor: any PurchasedITunesTrackPlayerAdding,
+        collectionNavigationHandler: any TrackCollectionNavigating,
         trackShareActionHandler: TrackShareActionHandler,
         favoriteActionHandler: FavoriteTrackActionHandler
     ) {
@@ -51,38 +51,34 @@ final class TrackListPresentationHandler {
 
     /// Открывает выбор трека для добавления в текущий треклист.
     func presentAddTrack() {
-        guard let trackListId = reader.currentListId else { return }
-
-        presenter.presentAddTrack(to: trackListId)
+        presenter.presentAddTrack(to: reader.trackListId)
     }
 
     /// Открывает переименование текущего треклиста.
     func presentRenameTrackList() {
-        guard let trackListId = reader.currentListId else { return }
-
         presenter.presentRenameTrackList(
-            trackListId: trackListId,
+            trackListId: reader.trackListId,
             currentName: reader.name
         )
     }
 
     /// Открывает детали трека из строки треклиста.
     func presentTrackDetail(rowId: UUID) {
-        guard let track = reader.tracks.first(where: { $0.id == rowId }) else { return }
+        guard let track = reader.track(forRowId: rowId) else { return }
 
         presenter.presentTrackDetail(track)
     }
 
     /// Передаёт локальный или iTunes-трек в общий flow подготовки и системной отправки.
     func shareTrack(rowId: UUID) {
-        guard let track = reader.tracks.first(where: { $0.id == rowId }) else { return }
+        guard let track = reader.track(forRowId: rowId) else { return }
 
         trackShareActionHandler.share(track)
     }
 
     /// Открывает сценарий копирования iTunes-трека из строки треклиста.
     func copyTrack(rowId: UUID) {
-        guard let track = reader.tracks.first(where: { $0.id == rowId }) else { return }
+        guard let track = reader.track(forRowId: rowId) else { return }
         guard let purchasedTrack = track.asPurchasedITunesPlayableTrack() else { return }
 
         presenter.presentCopyPurchasedITunesTrack(purchasedTrack)
@@ -90,7 +86,7 @@ final class TrackListPresentationHandler {
 
     /// Добавляет iTunes-трек из треклиста в очередь плеера.
     func addToPlayer(rowId: UUID) {
-        guard let track = reader.tracks.first(where: { $0.id == rowId }) else { return }
+        guard let track = reader.track(forRowId: rowId) else { return }
         guard let purchasedTrack = track.asPurchasedITunesPlayableTrack() else { return }
 
         Task {
@@ -117,14 +113,14 @@ final class TrackListPresentationHandler {
 
     /// Передаёт строку треклиста в общий доменный маршрут «Избранного».
     func toggleFavorite(rowId: UUID) {
-        guard let track = reader.tracks.first(where: { $0.id == rowId }) else { return }
+        guard let track = reader.track(forRowId: rowId) else { return }
 
         favoriteActionHandler.toggle(FavoriteTrackInput(track: track))
     }
 
     /// Открывает редактирование тегов строки треклиста.
     func presentTrackTagsEditor(rowId: UUID) {
-        guard let track = reader.tracks.first(where: { $0.id == rowId }) else { return }
+        guard let track = reader.track(forRowId: rowId) else { return }
         guard canUseFileActions(track) else { return }
 
         presenter.presentTrackTagsEditor(track)
@@ -132,7 +128,7 @@ final class TrackListPresentationHandler {
 
     /// Показывает трек из строки треклиста в фонотеке.
     func showInLibrary(rowId: UUID) {
-        guard let track = reader.tracks.first(where: { $0.id == rowId }) else { return }
+        guard let track = reader.track(forRowId: rowId) else { return }
         guard canShowInLibrary(track) else { return }
 
         presenter.showInLibrary(track)
@@ -140,7 +136,7 @@ final class TrackListPresentationHandler {
 
     /// Открывает перемещение файла трека в папку.
     func moveToFolder(rowId: UUID) {
-        guard let track = reader.tracks.first(where: { $0.id == rowId }) else { return }
+        guard let track = reader.track(forRowId: rowId) else { return }
         guard canUseFileActions(track) else { return }
 
         presenter.moveToFolder(track)
@@ -148,22 +144,22 @@ final class TrackListPresentationHandler {
 
     /// Открывает артиста обычной локальной строки треклиста.
     func goToArtist(rowId: UUID) {
-        guard let track = reader.tracks.first(where: { $0.id == rowId }),
-              track.source == .library else {
+        guard reader.track(forRowId: rowId)?.source == .library,
+              let target = reader.collectionNavigationTarget(forRowId: rowId) else {
             return
         }
 
-        collectionNavigationHandler.openArtist(trackId: track.trackId)
+        collectionNavigationHandler.openArtist(target: target)
     }
 
     /// Открывает альбом обычной локальной строки треклиста.
     func goToAlbum(rowId: UUID) {
-        guard let track = reader.tracks.first(where: { $0.id == rowId }),
-              track.source == .library else {
+        guard reader.track(forRowId: rowId)?.source == .library,
+              let target = reader.collectionNavigationTarget(forRowId: rowId) else {
             return
         }
 
-        collectionNavigationHandler.openAlbum(trackId: track.trackId)
+        collectionNavigationHandler.openAlbum(target: target)
     }
 
     /// Проверяет, можно ли запускать файловый flow для строки треклиста.

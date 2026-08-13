@@ -20,7 +20,7 @@ struct TrackListsRowView: View {
     ) {
         self.title = row.title
         self.createdAtText = row.createdAtText
-        self.tracksCountText = TrackListPresentationText.trackCount(row.tracksCount)
+        self.tracksCountText = row.tracksCountText
         self.onTap = onTap
     }
 

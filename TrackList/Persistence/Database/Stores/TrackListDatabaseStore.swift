@@ -245,6 +245,38 @@ final class TrackListDatabaseStore {
         }
     }
 
+    /// Проверяет полный порядок master-списка и сохраняет только позиции обычных треклистов.
+    func updateDisplayedTrackListsOrder(_ orderedIds: [UUID]) throws {
+        let metas = try fetchMetas()
+        let metasByID = Dictionary(uniqueKeysWithValues: metas.map { ($0.id, $0) })
+        let activeIDs = Set(metasByID.keys)
+
+        if let unknownID = orderedIds.first(where: { metasByID[$0] == nil }) {
+            throw TrackListDatabaseStoreError.trackListNotFound(unknownID)
+        }
+
+        guard Set(orderedIds).count == orderedIds.count,
+              Set(orderedIds) == activeIDs
+        else {
+            throw AppError.trackListReorderNotAllowed
+        }
+
+        let orderedMetas = orderedIds.compactMap { metasByID[$0] }
+        let favorites = metas.filter { $0.kind == .favorites }
+        guard favorites.count == 1,
+              orderedMetas.first?.kind == .favorites,
+              orderedMetas.dropFirst().allSatisfy({ $0.kind == .regular })
+        else {
+            throw AppError.trackListReorderNotAllowed
+        }
+
+        try updateTrackListsOrder(
+            orderedMetas
+                .filter { $0.kind.canReorder }
+                .map(\.id)
+        )
+    }
+
     // MARK: - Internal Mapping
 
     /// Возвращает активные SQLite-модели метаданных.

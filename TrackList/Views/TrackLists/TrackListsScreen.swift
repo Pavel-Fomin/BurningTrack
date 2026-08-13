@@ -37,9 +37,9 @@ struct TrackListsScreen: View {
             .navigationTitle("Tracklists")
             .navigationDestination(for: UUID.self) { id in
                 // Detail-экран строится по route id, чтобы строка списка оставалась обычной Button-строкой без шеврона.
-                if let trackList = trackListsViewModel.trackList(for: id) {
+                if trackListsViewModel.trackList(for: id) != nil {
                     TrackListScreen(
-                        trackList: trackList,
+                        trackListId: id,
                         exportProgressViewModel: exportProgressViewModel,
                         favoriteTrackActionHandler: favoriteTrackActionHandler,
                         dependencies: trackListFeatureDependencies
@@ -58,23 +58,11 @@ struct TrackListsScreen: View {
             }
         }
         .onAppear {
-            handlePendingTrackListOpenRequest()
+            actionHandler.handlePendingExternalOpenRequest()
         }
         .onChange(of: navigationCoordinator.pendingTrackListOpenRequest) { _, _ in
-            handlePendingTrackListOpenRequest()
+            actionHandler.handlePendingExternalOpenRequest()
         }
-    }
-
-    /// Потребляет внешний запрос навигации и открывает треклист штатным master-detail flow.
-    private func handlePendingTrackListOpenRequest() {
-        guard let request = navigationCoordinator.pendingTrackListOpenRequest else {
-            return
-        }
-
-        actionHandler.handle(.openTrackListFromApp(request.trackListId))
-        navigationCoordinator.clearTrackListOpenRequest(
-            requestId: request.requestId
-        )
     }
 }
 

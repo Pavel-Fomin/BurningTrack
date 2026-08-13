@@ -12,6 +12,9 @@ import Foundation
 @MainActor
 final class TrackListFlowActionHandler {
 
+    /// Читает detail snapshot для технических lifecycle-действий строки.
+    private let reader: any TrackListReading
+
     /// Обработчик presentation-действий одного треклиста.
     private let presentationHandler: TrackListPresentationHandler
 
@@ -32,22 +35,24 @@ final class TrackListFlowActionHandler {
         reader: any TrackListReading,
         playbackStateProvider: any PlaybackStateProviding,
         playbackController: any TrackPlaybackControlling,
-        mutator: any TrackListMutating,
-        renamer: any TrackListRenaming,
+        trackListManager: any TrackListManaging,
+        commandExecutor: any TrackListCommandExecuting,
+        fileRenamer: any TrackFileRenaming,
         presenter: any TrackListPresenting,
         exportProgressViewModel: ExportProgressViewModel,
         viewControllerProvider: any ViewControllerProviding,
         toastPresenter: any ToastPresenting,
-        commandExecutor: AppCommandExecutor,
-        collectionNavigationHandler: TrackCollectionNavigationHandler,
+        appCommandExecutor: any PurchasedITunesTrackPlayerAdding,
+        collectionNavigationHandler: any TrackCollectionNavigating,
         trackShareActionHandler: TrackShareActionHandler,
         favoriteTrackActionHandler: FavoriteTrackActionHandler
     ) {
+        self.reader = reader
         self.presentationHandler = TrackListPresentationHandler(
             reader: reader,
             presenter: presenter,
             toastPresenter: toastPresenter,
-            commandExecutor: commandExecutor,
+            commandExecutor: appCommandExecutor,
             collectionNavigationHandler: collectionNavigationHandler,
             trackShareActionHandler: trackShareActionHandler,
             favoriteActionHandler: favoriteTrackActionHandler
@@ -57,19 +62,31 @@ final class TrackListFlowActionHandler {
             playbackStateProvider: playbackStateProvider,
             playbackController: playbackController
         )
-        self.mutationHandler = TrackListMutationHandler(mutator: mutator)
+        self.mutationHandler = TrackListMutationHandler(
+            reader: reader,
+            trackListManager: trackListManager,
+            commandExecutor: commandExecutor,
+            toastPresenter: toastPresenter
+        )
         self.exportHandler = TrackListExportHandler(
             reader: reader,
             exportProgressViewModel: exportProgressViewModel,
             viewControllerProvider: viewControllerProvider,
             toastPresenter: toastPresenter
         )
-        self.renameHandler = TrackListRenameHandler(renamer: renamer)
+        self.renameHandler = TrackListRenameHandler(
+            reader: reader,
+            fileRenamer: fileRenamer,
+            toastPresenter: toastPresenter
+        )
     }
 
     /// Выполняет действие detail-flow одного треклиста.
     func handle(_ action: TrackListAction) {
         switch action {
+
+        case .requestRuntimeSnapshot(let trackId):
+            reader.requestSnapshotIfNeeded(for: trackId)
 
         case .addTrack:
             presentationHandler.presentAddTrack()

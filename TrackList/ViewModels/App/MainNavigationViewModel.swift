@@ -144,3 +144,19 @@ final class MainNavigationViewModel: ObservableObject {
         }
     }
 }
+
+// MARK: - TrackListsNavigationPruning
+
+extension MainNavigationViewModel: TrackListsNavigationPruning {
+
+    /// Возвращает sidebar в master, если внешнее изменение удалило выбранный detail-треклист.
+    func pruneTrackListSelection(validTrackListIDs: Set<UUID>) {
+        guard case let .trackList(id) = sidebarSelection,
+              validTrackListIDs.contains(id) == false
+        else {
+            return
+        }
+
+        sidebarSelection = .allTrackLists
+    }
+}

@@ -54,6 +54,9 @@ struct TrackListRowState: Identifiable {
     /// Источник трека для контекстного меню.
     let source: TrackSource
 
+    /// Готовый набор доступных действий без policy-вызовов из SwiftUI View.
+    let availableActions: Set<TrackMenuAction>
+
     /// Длительность трека.
     let duration: TimeInterval
 

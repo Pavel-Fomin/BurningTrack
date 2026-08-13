@@ -33,17 +33,17 @@ final class TrackListPlaybackHandler {
 
     /// Обрабатывает нажатие на строку трека.
     func handleRowTap(rowId: UUID) {
-        guard let track = reader.tracks.first(where: { $0.id == rowId }) else { return }
+        guard let track = reader.track(forRowId: rowId) else { return }
 
         if track.isAvailable {
             if playbackStateProvider.currentDisplayableId == track.id,
                playbackStateProvider.currentContext == .trackList {
                 playbackController.togglePlayPause()
-            } else if let trackListId = reader.currentListId {
+            } else {
                 playbackController.play(
                     track: track,
                     context: reader.tracks.map { $0 as any TrackDisplayable },
-                    source: .trackList(id: trackListId)
+                    source: .trackList(id: reader.trackListId)
                 )
             }
         } else {

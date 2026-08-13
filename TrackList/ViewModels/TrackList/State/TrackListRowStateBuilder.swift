@@ -73,6 +73,11 @@ struct TrackListRowStateBuilder {
     ) -> TrackListRowState {
         let shouldShowTags = settings.visible.metadata.isTagReadingEnabled
         let shouldShowFileFormat = settings.visible.library.isFileFormatVisible
+        let availableActions = availableActions(
+            for: track,
+            collectionNavigationTarget: collectionNavigationTarget
+        )
+
         if track.isPurchasedITunesRuntimeTrack {
             return TrackListRowState(
                 id: track.id,
@@ -81,6 +86,7 @@ struct TrackListRowStateBuilder {
                 artist: track.artist ?? "",
                 fileName: track.fileName,
                 source: track.source,
+                availableActions: availableActions,
                 duration: track.duration,
                 isAvailable: track.isAvailable,
                 isCurrent: isCurrent,
@@ -126,6 +132,7 @@ struct TrackListRowStateBuilder {
             artist: artist,
             fileName: displayFileName,
             source: track.source,
+            availableActions: availableActions,
             duration: snapshot?.duration ?? track.duration,
             isAvailable: snapshot?.isAvailable ?? track.isAvailable,
             isCurrent: isCurrent,
@@ -142,5 +149,25 @@ struct TrackListRowStateBuilder {
             renameArtist: snapshot?.artist,
             renameTitle: snapshot?.title
         )
+    }
+
+    /// Учитывает источник, контекст треклиста и факт подготовки цели навигации до передачи state во View.
+    private func availableActions(
+        for track: Track,
+        collectionNavigationTarget: TrackCollectionNavigationTarget?
+    ) -> Set<TrackMenuAction> {
+        var actions = TrackMenuActionAvailability.availableActions(
+            source: track.source,
+            context: .trackList
+        )
+
+        if collectionNavigationTarget?.artist == nil {
+            actions.remove(.goToArtist)
+        }
+        if collectionNavigationTarget?.album == nil {
+            actions.remove(.goToAlbum)
+        }
+
+        return actions
     }
 }

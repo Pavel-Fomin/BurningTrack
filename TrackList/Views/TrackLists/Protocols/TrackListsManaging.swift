@@ -29,4 +29,13 @@ protocol TrackListsManaging {
 
     /// Проверяет полный отображаемый порядок и сохраняет только порядок активных обычных треклистов.
     func updateTrackListsOrder(_ orderedIds: [UUID]) throws
+
+    /// Публикует invalidation после успешно сохранённой внешней master-операции.
+    func publishTrackListsDidChange()
+}
+
+extension TrackListsManaging {
+
+    /// Не требует от тестовых и узких реализаций поддерживать публикацию, если она не входит в их сценарий.
+    func publishTrackListsDidChange() {}
 }

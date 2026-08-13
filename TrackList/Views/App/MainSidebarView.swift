@@ -149,9 +149,9 @@ struct MainSidebarView: View {
                 trackListFeatureDependencies: trackListFeatureDependencies
             )
         case .trackList(let id):
-            if let trackList = trackListsViewModel.trackList(for: id) {
+            if trackListsViewModel.trackList(for: id) != nil {
                 TrackListScreen(
-                    trackList: trackList,
+                    trackListId: id,
                     exportProgressViewModel: exportProgressViewModel,
                     favoriteTrackActionHandler: favoriteTrackActionHandler,
                     dependencies: trackListFeatureDependencies
