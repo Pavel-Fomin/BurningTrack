@@ -8,7 +8,6 @@
 //
 
 import Foundation
-import UIKit
 import XCTest
 @testable import TrackList
 
@@ -17,78 +16,59 @@ import XCTest
 final class TrackListExportHandlerTests: XCTestCase {
 
     /// Проверяет передачу ручного порядка треклиста с нумерованными именами.
-    func testExportUsesReaderTracksInManualOrderWithNumberedFileNames() async {
+    func testExportUsesReaderTracksInManualOrderWithNumberedFileNames() {
         let firstTrack = makeTrack(fileName: "First.flac")
         let secondTrack = makeTrack(fileName: "Second.FLAC")
         let reader = TrackListReaderSpy(
             name: "Ручной порядок",
             tracks: [secondTrack, firstTrack]
         )
-        let exporter = ExportRequestSpy()
-        let toastPresenter = ExportRequestToastPresenterSpy()
+        let exportRequestHandler = ExportRequestHandlerSpy()
         let handler = makeHandler(
             reader: reader,
-            exportProgressViewModel: makeExportProgressViewModelForRequestTests(
-                exporter: exporter,
-                toastPresenter: toastPresenter
-            ),
-            toastPresenter: toastPresenter
+            exportRequestHandler: exportRequestHandler
         )
 
         handler.exportTracks()
-        await yieldToExportTask()
 
-        XCTAssertEqual(exporter.exportCallCount, 1)
+        XCTAssertEqual(exportRequestHandler.requests.count, 1)
         XCTAssertEqual(
-            exporter.exportedTrackIDs,
-            [[secondTrack.trackId, firstTrack.trackId]]
+            exportRequestHandler.requests.first?.tracks.map(\.trackId),
+            [secondTrack.trackId, firstTrack.trackId]
         )
         XCTAssertEqual(
-            exporter.exportedFileNames,
-            [[secondTrack.fileName, firstTrack.fileName]]
+            exportRequestHandler.requests.first?.tracks.map(\.fileName),
+            [secondTrack.fileName, firstTrack.fileName]
         )
-        XCTAssertEqual(exporter.exportFolderNames, [reader.name])
-        assertNumberedFileNamingMode(exporter.fileNamingModes)
-        XCTAssertTrue(toastPresenter.events.isEmpty)
-        XCTAssertTrue(toastPresenter.errors.isEmpty)
+        XCTAssertEqual(exportRequestHandler.requests.first?.exportFolder, .named(reader.name))
+        assertNumberedFileNamingMode(
+            exportRequestHandler.requests.first?.fileNamingMode
+        )
     }
 
     /// Проверяет передачу semantic AppError, который ToastManager преобразует в warning-событие.
-    func testEmptyTrackListDoesNotStartExport() async {
+    func testEmptyTrackListPassesEmptyRequestToGlobalValidation() {
         let reader = TrackListReaderSpy(name: "Пустой", tracks: [])
-        let exporter = ExportRequestSpy()
-        let toastPresenter = ExportRequestToastPresenterSpy()
+        let exportRequestHandler = ExportRequestHandlerSpy()
         let handler = makeHandler(
             reader: reader,
-            exportProgressViewModel: makeExportProgressViewModelForRequestTests(
-                exporter: exporter,
-                toastPresenter: toastPresenter
-            ),
-            toastPresenter: toastPresenter
+            exportRequestHandler: exportRequestHandler
         )
 
         handler.exportTracks()
-        await yieldToExportTask()
 
-        XCTAssertEqual(exporter.exportCallCount, 0)
-        XCTAssertTrue(toastPresenter.events.isEmpty)
-        XCTAssertEqual(toastPresenter.errors, [.exportNoTracks])
-        XCTAssertEqual(toastPresenter.errors.first?.toastEvent, .noTracksToExport)
+        XCTAssertEqual(exportRequestHandler.requests.count, 1)
+        XCTAssertTrue(exportRequestHandler.requests.first?.tracks.isEmpty == true)
     }
 
     /// Собирает обработчик экспорта сохранённого треклиста с тестовыми зависимостями.
     private func makeHandler(
         reader: any TrackListReading,
-        exportProgressViewModel: ExportProgressViewModel,
-        toastPresenter: ExportRequestToastPresenterSpy
+        exportRequestHandler: any ExportRequestHandling
     ) -> TrackListExportHandler {
         TrackListExportHandler(
             reader: reader,
-            exportProgressViewModel: exportProgressViewModel,
-            viewControllerProvider: ExportRequestViewControllerProviderSpy(
-                presenter: UIViewController()
-            ),
-            toastPresenter: toastPresenter
+            exportRequestHandler: exportRequestHandler
         )
     }
 
@@ -105,8 +85,8 @@ final class TrackListExportHandlerTests: XCTestCase {
     }
 
     /// Проверяет режим формирования нумерованных имён без требования Equatable.
-    private func assertNumberedFileNamingMode(_ modes: [ExportFileNamingMode]) {
-        guard let fileNamingMode = modes.first else {
+    private func assertNumberedFileNamingMode(_ fileNamingMode: ExportFileNamingMode?) {
+        guard let fileNamingMode else {
             return XCTFail("Режим именования не был передан в exporter")
         }
 
@@ -115,12 +95,6 @@ final class TrackListExportHandlerTests: XCTestCase {
         }
     }
 
-    /// Даёт задаче общего экспорта пройти несколько очередей MainActor.
-    private func yieldToExportTask() async {
-        for _ in 0..<6 {
-            await Task.yield()
-        }
-    }
 }
 
 /// Предоставляет данные одного сохранённого треклиста без обращения к базе данных.

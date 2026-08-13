@@ -97,8 +97,22 @@ struct TrackListApp: App {
         let sheetActionCoordinator = SheetActionCoordinator.shared
         let runtimeSnapshotStore = TrackRuntimeStore.shared
         let runtimeSnapshotBuilder = TrackRuntimeSnapshotBuilder.shared
-        let exportManager = ExportManager.shared
         let viewControllerProvider = ApplicationViewControllerProvider()
+        // Export собирается в Composition Root: source features не знают picker и UIKit.
+        let exportDestinationResolver = ExportDestinationResolver(
+            viewControllerProvider: viewControllerProvider
+        )
+        let exportManager = ExportManager(
+            destinationResolver: exportDestinationResolver,
+            trackExportService: TrackExportService()
+        )
+        let exportFeature = ExportFeatureFactory(
+            exporter: exportManager,
+            toastPresenter: toastManager,
+            detailsRouter: sheetManager
+        )
+        .makeFeature()
+        let exportRequestHandler = exportFeature.requestHandler
         let trackShareActionHandler = TrackShareActionHandler(
             preparationService: TrackSharePreparationService(),
             viewControllerProvider: viewControllerProvider,
@@ -167,7 +181,8 @@ struct TrackListApp: App {
             trackRegistry: trackRegistry
         )
         let playerScreenViewModelFactory = PlayerScreenViewModelFactory(
-            dependencies: playerFeatureDependencies
+            dependencies: playerFeatureDependencies,
+            exportRequestHandler: exportRequestHandler
         )
 
         let summaryProvider: any TrackCollectionSummaryProviding
@@ -200,7 +215,7 @@ struct TrackListApp: App {
             toastPresenter: toastManager,
             collectionNavigationHandler: trackCollectionNavigationHandler,
             trackShareActionHandler: trackShareActionHandler,
-            viewControllerProvider: viewControllerProvider,
+            exportRequestHandler: exportRequestHandler,
             playbackStateProvider: playbackStateProvider,
             playbackController: playbackController
         )
@@ -242,7 +257,7 @@ struct TrackListApp: App {
                 toastPresenter: toastManager
             ),
             toastPresenter: toastManager,
-            viewControllerProvider: viewControllerProvider
+            exportRequestHandler: exportRequestHandler
         )
         let libraryFeatureDependencies = LibraryFeatureDependencies(
             screenViewModelFactory: LibraryScreenViewModelFactory(
@@ -266,18 +281,15 @@ struct TrackListApp: App {
                 playbackController: playbackController
             ),
             allTracksActionHandlerFactory: LibraryAllTracksActionHandlerFactory(
-                viewControllerProvider: viewControllerProvider,
-                toastPresenter: toastManager
+                exportRequestHandler: exportRequestHandler
             ),
             collectionTracksActionHandlerFactory: LibraryCollectionTracksActionHandlerFactory(
-                viewControllerProvider: viewControllerProvider,
-                toastPresenter: toastManager
+                exportRequestHandler: exportRequestHandler
             ),
             purchasedITunesFeatureFactory: purchasedITunesFeatureFactory,
             folderViewModelFactory: LibraryFolderViewModelFactory(
                 navigationCoordinator: navigationCoordinator,
-                viewControllerProvider: viewControllerProvider,
-                toastPresenter: toastManager,
+                exportRequestHandler: exportRequestHandler,
                 summaryProvider: summaryProvider,
                 eventProvider: NotificationLibraryTrackEventProvider()
             ),
@@ -443,13 +455,6 @@ struct TrackListApp: App {
         self.moveToFolderFeatureFactory = moveToFolderFeatureFactory
         self.batchTagEditFeatureFactory = batchTagEditFeatureFactory
         self.batchFilenameRenameFeatureFactory = batchFilenameRenameFeatureFactory
-        // Фабрика получает подготовленные production-зависимости и собирает только export feature.
-        let exportFeatureFactory = ExportFeatureFactory(
-            exporter: exportManager,
-            toastPresenter: toastManager,
-            detailsRouter: sheetManager
-        )
-        let exportFeature = exportFeatureFactory.makeFeature()
         exportActionHandler = exportFeature.actionHandler
         _exportProgressViewModel = StateObject(
             wrappedValue: exportFeature.progressViewModel

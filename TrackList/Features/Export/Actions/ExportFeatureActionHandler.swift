@@ -9,7 +9,6 @@
 
 import Combine
 import Foundation
-import UIKit
 
 /// Отделяет действия Export UI от состояния операции и от глобального SheetManager.
 @MainActor
@@ -33,14 +32,6 @@ final class ExportFeatureActionHandler: ObservableObject, ExportActionHandling {
     /// Выполняет пользовательские намерения и lifecycle-события без доступа View к SheetManager.
     func handle(_ action: ExportAction) {
         switch action {
-        case let .start(tracks, exportFolder, fileNamingMode, presenter):
-            progressViewModel.startExport(
-                tracks: tracks,
-                exportFolder: exportFolder,
-                fileNamingMode: fileNamingMode,
-                presenter: presenter
-            )
-
         case .cancel:
             guard progressViewModel.cancelExport() else { return }
             dismissCurrentDetailsRoute()

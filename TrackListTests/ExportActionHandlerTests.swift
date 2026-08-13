@@ -8,7 +8,6 @@
 //
 
 import Foundation
-import UIKit
 import XCTest
 @testable import TrackList
 
@@ -27,10 +26,11 @@ final class ExportActionHandlerTests: XCTestCase {
         var wasAccepted = false
 
         let result = try await handler.startExport(
-            tracks: [],
-            exportFolder: .playerQueue,
-            fileNamingMode: .numbered,
-            presenter: UIViewController(),
+            ExportRequest(
+                tracks: [],
+                exportFolder: .playerQueue,
+                fileNamingMode: .numbered
+            ),
             onExportAccepted: {
                 wasAccepted = true
             },
@@ -40,8 +40,8 @@ final class ExportActionHandlerTests: XCTestCase {
         XCTAssertNil(result)
         XCTAssertFalse(wasAccepted)
         XCTAssertEqual(exporter.exportCallCount, 0)
-        XCTAssertEqual(toastPresenter.events, [.noTracksToExport])
-        XCTAssertTrue(toastPresenter.errors.isEmpty)
+        XCTAssertTrue(toastPresenter.events.isEmpty)
+        XCTAssertEqual(toastPresenter.errors, [.exportNoTracks])
     }
 
     /// Проверяет передачу запроса exporter после принятия сценария.
@@ -56,10 +56,11 @@ final class ExportActionHandlerTests: XCTestCase {
         var wasAccepted = false
 
         let result = try await handler.startExport(
-            tracks: [track],
-            exportFolder: .named("Экспорт"),
-            fileNamingMode: .numbered,
-            presenter: UIViewController(),
+            ExportRequest(
+                tracks: [track],
+                exportFolder: .named("Экспорт"),
+                fileNamingMode: .numbered
+            ),
             onExportAccepted: {
                 wasAccepted = true
             },
@@ -170,6 +171,23 @@ final class ExportActionHandlerTests: XCTestCase {
         XCTAssertTrue(toastPresenter.errors.isEmpty)
     }
 
+    /// Проверяет semantic AppError при отсутствии presenter на platform-границе.
+    func testStartExportWithUnavailablePresenterShowsAppError() async throws {
+        let exporter = ExportingSpy()
+        exporter.errorToThrow = ExportDestinationResolverError.presenterUnavailable
+        let toastPresenter = ToastPresenterSpy()
+        let handler = makeHandler(
+            exporter: exporter,
+            toastPresenter: toastPresenter
+        )
+
+        let result = try await startExport(handler: handler)
+
+        XCTAssertNil(result)
+        XCTAssertEqual(toastPresenter.errors, [.presenterUnavailable])
+        XCTAssertTrue(toastPresenter.events.isEmpty)
+    }
+
     /// Создаёт ActionHandler с управляемыми тестовыми зависимостями.
     private func makeHandler(
         exporter: ExportingSpy,
@@ -186,10 +204,11 @@ final class ExportActionHandlerTests: XCTestCase {
         handler: ExportActionHandler
     ) async throws -> ExportSummary? {
         try await handler.startExport(
-            tracks: [makeTrack()],
-            exportFolder: .playerQueue,
-            fileNamingMode: .numbered,
-            presenter: UIViewController(),
+            ExportRequest(
+                tracks: [makeTrack()],
+                exportFolder: .playerQueue,
+                fileNamingMode: .numbered
+            ),
             onExportAccepted: {},
             onProgress: { _ in }
         )
@@ -236,16 +255,13 @@ private final class ExportingSpy: TrackExporting {
 
     /// Выполняет управляемый тестовый запуск.
     func exportTracks(
-        _ tracks: [Track],
-        exportFolder: ExportFolder,
-        fileNamingMode: ExportFileNamingMode,
-        presenter: UIViewController,
+        _ request: ExportRequest,
         onProgress: @escaping ExportProgressHandler
     ) async throws -> ExportSummary {
         exportCallCount += 1
-        exportFolderNames.append(exportFolder.fileSystemName)
-        fileNamingModes.append(fileNamingMode)
-        exportedTrackIDs.append(tracks.map(\.trackId))
+        exportFolderNames.append(request.exportFolder.fileSystemName)
+        fileNamingModes.append(request.fileNamingMode)
+        exportedTrackIDs.append(request.tracks.map(\.trackId))
 
         if let errorToThrow {
             throw errorToThrow

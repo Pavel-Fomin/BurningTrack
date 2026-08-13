@@ -8,7 +8,6 @@
 //
 
 import Foundation
-import UIKit
 
 /// Хранит единое состояние экспорта для всех экранов приложения.
 ///
@@ -89,18 +88,8 @@ final class ExportProgressViewModel: ObservableObject {
     // MARK: - Export actions
 
     /// Запускает экспорт и оставляет его независимым от жизненного цикла экрана.
-    func startExport(
-        tracks: [Track],
-        exportFolder: ExportFolder,
-        fileNamingMode: ExportFileNamingMode,
-        presenter: UIViewController
-    ) {
-        guard coordinator.startExport(
-            tracks: tracks,
-            exportFolder: exportFolder,
-            fileNamingMode: fileNamingMode,
-            presenter: presenter
-        ) else {
+    func startExport(_ request: ExportRequest) {
+        guard coordinator.startExport(request) else {
             toastPresenter.handle(
                 .operationFailed(
                     message: ExportPresentationText.alreadyRunningMessage

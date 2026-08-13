@@ -122,13 +122,11 @@ struct MainSidebarView: View {
         case .player:
             PlayerScreen(
                 playerViewModel: playerViewModel,
-                exportProgressViewModel: exportProgressViewModel,
                 favoriteTrackActionHandler: favoriteTrackActionHandler,
                 viewModelFactory: playerScreenViewModelFactory
             )
         case .library:
             LibraryScreen(
-                exportProgressViewModel: exportProgressViewModel,
                 favoriteTrackActionHandler: favoriteTrackActionHandler,
                 dependencies: libraryFeatureDependencies
             )
@@ -142,7 +140,6 @@ struct MainSidebarView: View {
         case .allTrackLists:
             TrackListsScreen(
                 trackListsViewModel: trackListsViewModel,
-                exportProgressViewModel: exportProgressViewModel,
                 favoriteTrackActionHandler: favoriteTrackActionHandler,
                 actionHandler: trackListsActionHandler,
                 navigationCoordinator: navigationCoordinator,
@@ -152,7 +149,6 @@ struct MainSidebarView: View {
             if trackListsViewModel.trackList(for: id) != nil {
                 TrackListScreen(
                     trackListId: id,
-                    exportProgressViewModel: exportProgressViewModel,
                     favoriteTrackActionHandler: favoriteTrackActionHandler,
                     dependencies: trackListFeatureDependencies
                 )

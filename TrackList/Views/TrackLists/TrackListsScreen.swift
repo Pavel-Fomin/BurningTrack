@@ -15,7 +15,6 @@ import UIKit
 struct TrackListsScreen: View {
 
     @ObservedObject var trackListsViewModel: TrackListsViewModel
-    @ObservedObject var exportProgressViewModel: ExportProgressViewModel
     /// Единый обработчик «Избранного» передаётся в detail-flow треклистов.
     let favoriteTrackActionHandler: FavoriteTrackActionHandler
     /// Единый ActionHandler master-flow, подготовленный Composition Root.
@@ -40,7 +39,6 @@ struct TrackListsScreen: View {
                 if trackListsViewModel.trackList(for: id) != nil {
                     TrackListScreen(
                         trackListId: id,
-                        exportProgressViewModel: exportProgressViewModel,
                         favoriteTrackActionHandler: favoriteTrackActionHandler,
                         dependencies: trackListFeatureDependencies
                     )

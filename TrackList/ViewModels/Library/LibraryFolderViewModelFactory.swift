@@ -14,10 +14,8 @@ struct LibraryFolderViewModelFactory {
 
     /// Координатор маршрутов фонотеки, подготовленный Composition Root.
     private let navigationCoordinator: NavigationCoordinator
-    /// Провайдер системного контроллера, подготовленный Composition Root.
-    private let viewControllerProvider: any ViewControllerProviding
-    /// Презентер ошибок фонотеки, подготовленный Composition Root.
-    private let toastPresenter: any ToastPresenting
+    /// Типизированный вход в глобальный Export-feature.
+    private let exportRequestHandler: any ExportRequestHandling
     /// SQLite-провайдер статистики, подготовленный Composition Root.
     private let summaryProvider: any TrackCollectionSummaryProviding
     /// Источник событий треков, подготовленный Composition Root.
@@ -26,14 +24,12 @@ struct LibraryFolderViewModelFactory {
     /// Получает готовые production-зависимости и не разрешает singleton самостоятельно.
     init(
         navigationCoordinator: NavigationCoordinator,
-        viewControllerProvider: any ViewControllerProviding,
-        toastPresenter: any ToastPresenting,
+        exportRequestHandler: any ExportRequestHandling,
         summaryProvider: any TrackCollectionSummaryProviding,
         eventProvider: any LibraryTrackEventProvider
     ) {
         self.navigationCoordinator = navigationCoordinator
-        self.viewControllerProvider = viewControllerProvider
-        self.toastPresenter = toastPresenter
+        self.exportRequestHandler = exportRequestHandler
         self.summaryProvider = summaryProvider
         self.eventProvider = eventProvider
     }
@@ -41,15 +37,12 @@ struct LibraryFolderViewModelFactory {
     /// Собирает ViewModel без доступа к глобальному графу зависимостей.
     func make(
         folder: LibraryFolder,
-        exportProgressViewModel: ExportProgressViewModel,
         clearSelectionActionBar: @escaping @MainActor () -> Void
     ) -> LibraryFolderViewModel {
         let stateBuilder = LibraryFolderStateBuilder()
         let actionHandler = LibraryFolderActionHandler(
             navigationCoordinator: navigationCoordinator,
-            exportProgressViewModel: exportProgressViewModel,
-            viewControllerProvider: viewControllerProvider,
-            toastPresenter: toastPresenter,
+            exportRequestHandler: exportRequestHandler,
             exportFolder: .named(folder.name),
             clearSelectionActionBar: clearSelectionActionBar
         )

@@ -15,12 +15,8 @@ final class LibraryFolderActionHandler {
 
     private let navigationCoordinator: NavigationCoordinator
     private let clearSelectionActionBar: @MainActor () -> Void
-    /// Глобальный владелец прогресса и жизненного цикла экспорта.
-    private let exportProgressViewModel: ExportProgressViewModel
-    /// Предоставляет presenter системного picker-а папки назначения.
-    private let viewControllerProvider: any ViewControllerProviding
-    /// Показывает ошибку, если системный picker нельзя презентовать.
-    private let toastPresenter: any ToastPresenting
+    /// Типизированный вход в глобальный Export-feature.
+    private let exportRequestHandler: any ExportRequestHandling
     /// Семантическая дочерняя папка экспортируемого содержимого.
     private let exportFolder: ExportFolder
 
@@ -28,16 +24,12 @@ final class LibraryFolderActionHandler {
 
     init(
         navigationCoordinator: NavigationCoordinator,
-        exportProgressViewModel: ExportProgressViewModel,
-        viewControllerProvider: any ViewControllerProviding,
-        toastPresenter: any ToastPresenting,
+        exportRequestHandler: any ExportRequestHandling,
         exportFolder: ExportFolder,
         clearSelectionActionBar: @escaping @MainActor () -> Void
     ) {
         self.navigationCoordinator = navigationCoordinator
-        self.exportProgressViewModel = exportProgressViewModel
-        self.viewControllerProvider = viewControllerProvider
-        self.toastPresenter = toastPresenter
+        self.exportRequestHandler = exportRequestHandler
         self.exportFolder = exportFolder
         self.clearSelectionActionBar = clearSelectionActionBar
     }
@@ -59,20 +51,14 @@ final class LibraryFolderActionHandler {
 
     /// Запускает общий экспорт треков текущей папки без нумерации имён файлов.
     private func exportTracks(_ libraryTracks: [LibraryTrack]) {
-        guard libraryTracks.isEmpty == false else { return }
-
-        guard let presenter = viewControllerProvider.topViewController() else {
-            toastPresenter.handle(.presenterUnavailable)
-            return
-        }
-
         // Секции уже собраны в текущем порядке отображения, поэтому не пересортировываем треки.
         let tracks = libraryTracks.map(Track.init(libraryTrack:))
-        exportProgressViewModel.startExport(
-            tracks: tracks,
-            exportFolder: exportFolder,
-            fileNamingMode: .original,
-            presenter: presenter
+        exportRequestHandler.startExport(
+            ExportRequest(
+                tracks: tracks,
+                exportFolder: exportFolder,
+                fileNamingMode: .original
+            )
         )
     }
 }

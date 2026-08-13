@@ -21,16 +21,13 @@ struct PurchasedITunesContainer: View {
 
     init(
         featureFactory: PurchasedITunesFeatureFactory,
-        exportProgressViewModel: ExportProgressViewModel,
         revealRequest: LibraryRevealRequest?,
         onRevealHandled: @escaping (UUID) -> Void
     ) {
         self.revealRequest = revealRequest
         self.onRevealHandled = onRevealHandled
         self._store = StateObject(
-            wrappedValue: featureFactory.makeScreenStore(
-                exportProgressViewModel: exportProgressViewModel
-            )
+            wrappedValue: featureFactory.makeScreenStore()
         )
     }
 

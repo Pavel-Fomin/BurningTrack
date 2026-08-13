@@ -13,6 +13,9 @@ import UniformTypeIdentifiers
 
 /// Ошибки, возникающие до запуска копирования при выборе папки.
 enum ExportDestinationResolverError: Error {
+    /// В момент запуска не найден контроллер для системной презентации picker-а.
+    case presenterUnavailable
+
     /// Другой системный picker уже ожидает выбора пользователя.
     case pickerAlreadyPresented
 
@@ -25,9 +28,7 @@ enum ExportDestinationResolverError: Error {
 @MainActor
 protocol ExportDestinationResolving: AnyObject {
     /// Показывает системный выбор папки и возвращает выбранное назначение.
-    func resolveDestination(
-        presenter: UIViewController
-    ) async throws -> ExportDestination
+    func resolveDestination() async throws -> ExportDestination
 
     /// Отменяет активный выбор папки, если он сейчас отображается.
     func cancelCurrentResolution()
@@ -37,18 +38,28 @@ protocol ExportDestinationResolving: AnyObject {
 @MainActor
 final class ExportDestinationResolver: NSObject, ExportDestinationResolving, UIDocumentPickerDelegate {
 
+    /// Предоставляет актуальный UIViewController только на platform-границе picker-а.
+    private let viewControllerProvider: any ViewControllerProviding
+
     /// Продолжение текущего асинхронного выбора папки.
     private var resolutionContinuation: CheckedContinuation<ExportDestination, Error>?
 
     /// Ссылка на активный picker для корректного закрытия при отмене операции.
     private weak var activePicker: UIDocumentPickerViewController?
 
+    /// Создаёт resolver с явно переданным provider-ом системной презентации.
+    init(viewControllerProvider: any ViewControllerProviding) {
+        self.viewControllerProvider = viewControllerProvider
+    }
+
     /// Показывает пользователю системный picker только для выбора папки.
-    func resolveDestination(
-        presenter: UIViewController
-    ) async throws -> ExportDestination {
+    func resolveDestination() async throws -> ExportDestination {
         guard resolutionContinuation == nil else {
             throw ExportDestinationResolverError.pickerAlreadyPresented
+        }
+
+        guard let presenter = viewControllerProvider.topViewController() else {
+            throw ExportDestinationResolverError.presenterUnavailable
         }
 
         let picker = UIDocumentPickerViewController(

@@ -17,17 +17,20 @@ struct PlayerScreenViewModelFactory {
     private let actionHandlerFactory: PlayerFlowActionHandlerFactory
 
     /// Получает подготовленные Composition Root зависимости и не разрешает singleton самостоятельно.
-    init(dependencies: PlayerFeatureDependencies) {
+    init(
+        dependencies: PlayerFeatureDependencies,
+        exportRequestHandler: any ExportRequestHandling
+    ) {
         self.dependencies = dependencies
         self.actionHandlerFactory = PlayerFlowActionHandlerFactory(
-            dependencies: dependencies
+            dependencies: dependencies,
+            exportRequestHandler: exportRequestHandler
         )
     }
 
     /// Создаёт production ViewModel для Player-flow.
     func make(
         playerViewModel: PlayerViewModel,
-        exportProgressViewModel: ExportProgressViewModel,
         favoriteTrackActionHandler: FavoriteTrackActionHandler
     ) -> PlayerScreenViewModel {
         let rowStateBuilder = PlayerTrackRowStateBuilder()
@@ -36,7 +39,6 @@ struct PlayerScreenViewModelFactory {
             playerViewModel: playerViewModel,
             actionHandler: actionHandlerFactory.make(
                 playerViewModel: playerViewModel,
-                exportProgressViewModel: exportProgressViewModel,
                 favoriteTrackActionHandler: favoriteTrackActionHandler
             ),
             sheetManager: dependencies.sheetManager,

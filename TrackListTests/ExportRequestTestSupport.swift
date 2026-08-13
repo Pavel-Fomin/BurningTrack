@@ -8,8 +8,6 @@
 //
 
 import Foundation
-import UIKit
-import XCTest
 @testable import TrackList
 
 /// Сохраняет параметры запроса экспорта без показа picker-а и копирования файлов.
@@ -42,22 +40,19 @@ final class ExportRequestSpy: TrackExporting {
 
     /// Сохраняет параметры и завершает тестовую операцию успешным итогом.
     func exportTracks(
-        _ tracks: [Track],
-        exportFolder: ExportFolder,
-        fileNamingMode: ExportFileNamingMode,
-        presenter: UIViewController,
+        _ request: ExportRequest,
         onProgress: @escaping ExportProgressHandler
     ) async throws -> ExportSummary {
         exportCallCount += 1
-        exportedTrackIDs.append(tracks.map(\.trackId))
-        exportedFileNames.append(tracks.map(\.fileName))
-        exportedSources.append(tracks.map(\.source))
-        exportedAssetURLs.append(tracks.map(\.assetURL))
-        exportFolderNames.append(exportFolder.fileSystemName)
-        fileNamingModes.append(fileNamingMode)
+        exportedTrackIDs.append(request.tracks.map(\.trackId))
+        exportedFileNames.append(request.tracks.map(\.fileName))
+        exportedSources.append(request.tracks.map(\.source))
+        exportedAssetURLs.append(request.tracks.map(\.assetURL))
+        exportFolderNames.append(request.exportFolder.fileSystemName)
+        fileNamingModes.append(request.fileNamingMode)
 
         return ExportSummary(
-            completedFiles: tracks.count,
+            completedFiles: request.tracks.count,
             failedFiles: [],
             state: .completed
         )
@@ -117,20 +112,16 @@ final class ExportDetailsRouterSpy: ExportDetailsRouting {
     }
 }
 
-/// Возвращает заранее подготовленный presenter системного picker-а.
+/// Сохраняет запросы экранов без запуска глобальной операции.
 @MainActor
-final class ExportRequestViewControllerProviderSpy: ViewControllerProviding {
+final class ExportRequestHandlerSpy: ExportRequestHandling {
 
-    /// Presenter, который должен получить экспортный сценарий.
-    private let presenter: UIViewController?
+    /// Запросы, переданные экраном в глобальный Export-feature.
+    private(set) var requests: [ExportRequest] = []
 
-    init(presenter: UIViewController?) {
-        self.presenter = presenter
-    }
-
-    /// Возвращает заданный presenter.
-    func topViewController() -> UIViewController? {
-        presenter
+    /// Сохраняет типизированный запрос без запуска фоновой операции.
+    func startExport(_ request: ExportRequest) {
+        requests.append(request)
     }
 }
 

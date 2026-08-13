@@ -17,26 +17,18 @@ final class PurchasedITunesMusicActionHandler {
 
     /// ViewModel владеет загрузкой и сортировкой, а handler принимает typed-намерения View.
     private let viewModel: PurchasedITunesMusicViewModel
-    /// Глобальный владелец picker-а, progress и жизненного цикла экспорта.
-    private let exportProgressViewModel: ExportProgressViewModel
-    /// Предоставляет presenter существующего системного выбора папки.
-    private let viewControllerProvider: any ViewControllerProviding
-    /// Показывает ошибку, если picker нельзя презентовать.
-    private let toastPresenter: any ToastPresenting
+    /// Типизированный вход в глобальный Export-feature.
+    private let exportRequestHandler: any ExportRequestHandling
 
     // MARK: - Init
 
     /// Создаёт обработчик с production- или тестовыми зависимостями.
     init(
         viewModel: PurchasedITunesMusicViewModel,
-        exportProgressViewModel: ExportProgressViewModel,
-        viewControllerProvider: any ViewControllerProviding,
-        toastPresenter: any ToastPresenting
+        exportRequestHandler: any ExportRequestHandling
     ) {
         self.viewModel = viewModel
-        self.exportProgressViewModel = exportProgressViewModel
-        self.viewControllerProvider = viewControllerProvider
-        self.toastPresenter = toastPresenter
+        self.exportRequestHandler = exportRequestHandler
     }
 
     // MARK: - Handle
@@ -70,24 +62,18 @@ final class PurchasedITunesMusicActionHandler {
     private func exportTracks(
         _ purchasedTracks: [PurchasedITunesPlayableTrack]
     ) {
-        guard purchasedTracks.isEmpty == false else { return }
-
-        guard let presenter = viewControllerProvider.topViewController() else {
-            toastPresenter.handle(.presenterUnavailable)
-            return
-        }
-
-        // Существующая глобальная ViewModel принимает transport-модель Track.
+        // ExportRequest сохраняет transport-модель Track с отдельным iTunes source.
         // Адаптер сохраняет source и assetURL, поэтому ExportJob сразу выбирает
         // iTunes-ветку и не обращается к BookmarkResolver.
         let exportTracks = purchasedTracks.map(
             Track.init(purchasedITunesTrack:)
         )
-        exportProgressViewModel.startExport(
-            tracks: exportTracks,
-            exportFolder: .purchasedITunes,
-            fileNamingMode: .original,
-            presenter: presenter
+        exportRequestHandler.startExport(
+            ExportRequest(
+                tracks: exportTracks,
+                exportFolder: .purchasedITunes,
+                fileNamingMode: .original
+            )
         )
     }
 }

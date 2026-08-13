@@ -8,7 +8,6 @@
 //
 
 import Foundation
-import UIKit
 import XCTest
 @testable import TrackList
 
@@ -17,7 +16,7 @@ import XCTest
 final class PlayerExportActionHandlerTests: XCTestCase {
 
     /// Проверяет передачу очереди в её текущем порядке с нумерованными именами.
-    func testExportUsesCurrentQueueInOrderWithNumberedFileNames() async {
+    func testExportUsesCurrentQueueInOrderWithNumberedFileNames() {
         let playlistManager = PlaylistManager.shared
         let previousTracks = playlistManager.tracks
         defer { playlistManager.tracks = previousTracks }
@@ -26,65 +25,56 @@ final class PlayerExportActionHandlerTests: XCTestCase {
         let secondTrack = makePlayerTrack(fileName: "Second.FLAC")
         playlistManager.tracks = [secondTrack, firstTrack]
 
-        let exporter = ExportRequestSpy()
-        let toastPresenter = ExportRequestToastPresenterSpy()
+        let exportRequestHandler = ExportRequestHandlerSpy()
         let handler = makeHandler(
             playlistManager: playlistManager,
-            exportProgressViewModel: makeExportProgressViewModelForRequestTests(
-                exporter: exporter,
-                toastPresenter: toastPresenter
-            )
+            exportRequestHandler: exportRequestHandler
         )
 
         handler.exportTrackList()
-        await yieldToExportTask()
 
-        XCTAssertEqual(exporter.exportCallCount, 1)
+        XCTAssertEqual(exportRequestHandler.requests.count, 1)
         XCTAssertEqual(
-            exporter.exportedTrackIDs,
-            [[secondTrack.trackId, firstTrack.trackId]]
+            exportRequestHandler.requests.first?.tracks.map(\.trackId),
+            [secondTrack.trackId, firstTrack.trackId]
         )
         XCTAssertEqual(
-            exporter.exportedFileNames,
-            [[secondTrack.fileName, firstTrack.fileName]]
+            exportRequestHandler.requests.first?.tracks.map(\.fileName),
+            [secondTrack.fileName, firstTrack.fileName]
         )
-        XCTAssertEqual(exporter.exportFolderNames, ["Плеер"])
-        assertNumberedFileNamingMode(exporter.fileNamingModes)
+        XCTAssertEqual(exportRequestHandler.requests.first?.exportFolder, .playerQueue)
+        assertNumberedFileNamingMode(
+            exportRequestHandler.requests.first?.fileNamingMode
+        )
     }
 
     /// Проверяет, что пустая очередь не запускает общий экспорт.
-    func testEmptyQueueDoesNotStartExport() async {
+    func testEmptyQueuePassesEmptyRequestToGlobalValidation() {
         let playlistManager = PlaylistManager.shared
         let previousTracks = playlistManager.tracks
         defer { playlistManager.tracks = previousTracks }
         playlistManager.tracks = []
 
-        let exporter = ExportRequestSpy()
-        let toastPresenter = ExportRequestToastPresenterSpy()
+        let exportRequestHandler = ExportRequestHandlerSpy()
         let handler = makeHandler(
             playlistManager: playlistManager,
-            exportProgressViewModel: makeExportProgressViewModelForRequestTests(
-                exporter: exporter,
-                toastPresenter: toastPresenter
-            )
+            exportRequestHandler: exportRequestHandler
         )
 
         handler.exportTrackList()
-        await yieldToExportTask()
 
-        XCTAssertEqual(exporter.exportCallCount, 0)
+        XCTAssertEqual(exportRequestHandler.requests.count, 1)
+        XCTAssertTrue(exportRequestHandler.requests.first?.tracks.isEmpty == true)
     }
 
     /// Собирает обработчик с тестовым глобальным состоянием экспорта.
     private func makeHandler(
         playlistManager: PlaylistManager,
-        exportProgressViewModel: ExportProgressViewModel
+        exportRequestHandler: any ExportRequestHandling
     ) -> PlayerExportActionHandler {
         PlayerExportActionHandler(
             playlistManager: playlistManager,
-            exportProgressViewModel: exportProgressViewModel,
-            toastManager: .shared,
-            presenterProvider: { UIViewController() }
+            exportRequestHandler: exportRequestHandler
         )
     }
 
@@ -101,8 +91,8 @@ final class PlayerExportActionHandlerTests: XCTestCase {
     }
 
     /// Проверяет режим формирования нумерованных имён без требования Equatable.
-    private func assertNumberedFileNamingMode(_ modes: [ExportFileNamingMode]) {
-        guard let fileNamingMode = modes.first else {
+    private func assertNumberedFileNamingMode(_ fileNamingMode: ExportFileNamingMode?) {
+        guard let fileNamingMode else {
             return XCTFail("Режим именования не был передан в exporter")
         }
 
@@ -111,10 +101,4 @@ final class PlayerExportActionHandlerTests: XCTestCase {
         }
     }
 
-    /// Даёт задаче общего экспорта пройти несколько очередей MainActor.
-    private func yieldToExportTask() async {
-        for _ in 0..<6 {
-            await Task.yield()
-        }
-    }
 }

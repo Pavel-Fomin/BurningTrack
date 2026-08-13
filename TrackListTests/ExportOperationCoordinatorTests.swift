@@ -8,7 +8,6 @@
 //
 
 import Foundation
-import UIKit
 import XCTest
 @testable import TrackList
 
@@ -240,10 +239,11 @@ final class ExportOperationCoordinatorTests: XCTestCase {
         _ coordinator: ExportOperationCoordinator
     ) -> Bool {
         coordinator.startExport(
-            tracks: [makeTrack()],
-            exportFolder: .playerQueue,
-            fileNamingMode: .numbered,
-            presenter: UIViewController()
+            ExportRequest(
+                tracks: [makeTrack()],
+                exportFolder: .playerQueue,
+                fileNamingMode: .numbered
+            )
         )
     }
 
@@ -375,10 +375,7 @@ private final class CoordinatorExportingSpy: TrackExporting {
 
     /// Передаёт подготовленные progress-снимки и возвращает итог операции.
     func exportTracks(
-        _ tracks: [Track],
-        exportFolder: ExportFolder,
-        fileNamingMode: ExportFileNamingMode,
-        presenter: UIViewController,
+        _ request: ExportRequest,
         onProgress: @escaping ExportProgressHandler
     ) async throws -> ExportSummary {
         exportCallCount += 1

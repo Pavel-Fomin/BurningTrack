@@ -10,13 +10,9 @@
 //
 
 import Foundation
-import UIKit
 
 @MainActor
 final class ExportManager {
-
-    /// Единый production-фасад, используемый текущими action handler-ами.
-    static let shared = ExportManager()
 
     /// Отдельный сервис выбора папки назначения.
     private let destinationResolver: any ExportDestinationResolving
@@ -24,34 +20,29 @@ final class ExportManager {
     /// Отдельный actor, который выполняет подготовку и копирование файлов.
     private let trackExportService: TrackExportService
 
-    /// Создаёт фасад с production-зависимостями или тестовыми реализациями.
+    /// Создаёт фасад с явно переданными зависимостями выбора назначения и копирования.
     init(
-        destinationResolver: (any ExportDestinationResolving)? = nil,
-        trackExportService: TrackExportService? = nil
+        destinationResolver: any ExportDestinationResolving,
+        trackExportService: TrackExportService
     ) {
-        self.destinationResolver = destinationResolver ?? ExportDestinationResolver()
-        self.trackExportService = trackExportService ?? TrackExportService()
+        self.destinationResolver = destinationResolver
+        self.trackExportService = trackExportService
     }
 
     // MARK: - Экспорт после выбора папки
 
-    /// Выбирает папку и запускает самостоятельное копирование треков.
+    /// Выбирает назначение и запускает самостоятельное копирование треков.
     func exportTracks(
-        _ tracks: [Track],
-        exportFolder: ExportFolder,
-        fileNamingMode: ExportFileNamingMode,
-        presenter: UIViewController,
+        _ request: ExportRequest,
         onProgress: @escaping ExportProgressHandler = { _ in }
     ) async throws -> ExportSummary {
-        let destination = try await destinationResolver.resolveDestination(
-            presenter: presenter
-        )
+        let destination = try await destinationResolver.resolveDestination()
 
         let job = ExportJob(
-            tracks: tracks,
+            tracks: request.tracks,
             destination: destination,
-            exportFolder: exportFolder,
-            fileNamingMode: fileNamingMode
+            exportFolder: request.exportFolder,
+            fileNamingMode: request.fileNamingMode
         )
         return try await trackExportService.export(
             job: job,

@@ -12,7 +12,6 @@ import SwiftUI
 struct PlayerScreen: View {
 
     @ObservedObject var playerViewModel: PlayerViewModel
-    @ObservedObject var exportProgressViewModel: ExportProgressViewModel
     /// Единый обработчик «Избранного» передаётся в фабрику Player-flow.
     let favoriteTrackActionHandler: FavoriteTrackActionHandler
     /// Готовая factory экранного flow с явными production-зависимостями.
@@ -22,18 +21,15 @@ struct PlayerScreen: View {
 
     init(
         playerViewModel: PlayerViewModel,
-        exportProgressViewModel: ExportProgressViewModel,
         favoriteTrackActionHandler: FavoriteTrackActionHandler,
         viewModelFactory: PlayerScreenViewModelFactory
     ) {
         self.playerViewModel = playerViewModel
-        self.exportProgressViewModel = exportProgressViewModel
         self.favoriteTrackActionHandler = favoriteTrackActionHandler
         self.viewModelFactory = viewModelFactory
         _screenViewModel = StateObject(
             wrappedValue: viewModelFactory.make(
                 playerViewModel: playerViewModel,
-                exportProgressViewModel: exportProgressViewModel,
                 favoriteTrackActionHandler: favoriteTrackActionHandler
             )
         )

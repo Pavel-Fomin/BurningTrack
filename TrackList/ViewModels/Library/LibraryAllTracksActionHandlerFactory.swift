@@ -13,28 +13,18 @@ import Foundation
 @MainActor
 struct LibraryAllTracksActionHandlerFactory {
 
-    /// Провайдер системного контроллера, подготовленный Composition Root.
-    private let viewControllerProvider: any ViewControllerProviding
-    /// Презентер пользовательских сообщений, подготовленный Composition Root.
-    private let toastPresenter: any ToastPresenting
+    /// Типизированный вход в глобальный Export-feature.
+    private let exportRequestHandler: any ExportRequestHandling
 
-    /// Получает готовые production-зависимости и не разрешает singleton самостоятельно.
-    init(
-        viewControllerProvider: any ViewControllerProviding,
-        toastPresenter: any ToastPresenting
-    ) {
-        self.viewControllerProvider = viewControllerProvider
-        self.toastPresenter = toastPresenter
+    /// Получает подготовленный Composition Root внешний контракт экспорта.
+    init(exportRequestHandler: any ExportRequestHandling) {
+        self.exportRequestHandler = exportRequestHandler
     }
 
-    /// Создаёт обработчик действий для текущего глобального состояния экспорта.
-    func make(
-        exportProgressViewModel: ExportProgressViewModel
-    ) -> LibraryAllTracksActionHandler {
+    /// Создаёт обработчик действий для типизированного глобального экспорта.
+    func make() -> LibraryAllTracksActionHandler {
         LibraryAllTracksActionHandler(
-            exportProgressViewModel: exportProgressViewModel,
-            viewControllerProvider: viewControllerProvider,
-            toastPresenter: toastPresenter
+            exportRequestHandler: exportRequestHandler
         )
     }
 }

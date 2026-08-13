@@ -15,23 +15,15 @@ final class LibraryAllTracksActionHandler {
 
     // MARK: - Dependencies
 
-    /// Глобальный владелец прогресса и жизненного цикла экспорта.
-    private let exportProgressViewModel: ExportProgressViewModel
-    /// Предоставляет presenter системного picker-а папки назначения.
-    private let viewControllerProvider: any ViewControllerProviding
-    /// Показывает ошибку, если системный picker нельзя презентовать.
-    private let toastPresenter: any ToastPresenting
+    /// Типизированный вход в глобальный Export-feature.
+    private let exportRequestHandler: any ExportRequestHandling
 
     // MARK: - Init
 
     init(
-        exportProgressViewModel: ExportProgressViewModel,
-        viewControllerProvider: any ViewControllerProviding,
-        toastPresenter: any ToastPresenting
+        exportRequestHandler: any ExportRequestHandling
     ) {
-        self.exportProgressViewModel = exportProgressViewModel
-        self.viewControllerProvider = viewControllerProvider
-        self.toastPresenter = toastPresenter
+        self.exportRequestHandler = exportRequestHandler
     }
 
     // MARK: - Handle
@@ -47,20 +39,14 @@ final class LibraryAllTracksActionHandler {
 
     /// Запускает экспорт общего списка треков без нумерации имён файлов.
     private func exportTracks(_ libraryTracks: [LibraryTrack]) {
-        guard libraryTracks.isEmpty == false else { return }
-
-        guard let presenter = viewControllerProvider.topViewController() else {
-            toastPresenter.handle(.presenterUnavailable)
-            return
-        }
-
         // Секции уже собраны в текущем порядке отображения, поэтому не пересортировываем треки.
         let tracks = libraryTracks.map(Track.init(libraryTrack:))
-        exportProgressViewModel.startExport(
-            tracks: tracks,
-            exportFolder: .libraryTracks,
-            fileNamingMode: .original,
-            presenter: presenter
+        exportRequestHandler.startExport(
+            ExportRequest(
+                tracks: tracks,
+                exportFolder: .libraryTracks,
+                fileNamingMode: .original
+            )
         )
     }
 }

@@ -8,7 +8,6 @@
 //
 
 import Foundation
-import UIKit
 
 /// Владеет запуском, отменой и доставкой progress одной операции экспорта.
 @MainActor
@@ -87,12 +86,7 @@ final class ExportOperationCoordinator {
 
     /// Запускает новую операцию, если предыдущая уже завершилась.
     @discardableResult
-    func startExport(
-        tracks: [Track],
-        exportFolder: ExportFolder,
-        fileNamingMode: ExportFileNamingMode,
-        presenter: UIViewController
-    ) -> Bool {
+    func startExport(_ request: ExportRequest) -> Bool {
         guard exportTask == nil else { return false }
 
         let operationID = UUID()
@@ -102,7 +96,9 @@ final class ExportOperationCoordinator {
         liveActivityOperationID = nil
         estimatedEndDate = nil
         isTimeEstimationStarted = false
-        liveActivitySubjectTitle = ExportPresentationText.displaySourceName(for: exportFolder)
+        liveActivitySubjectTitle = ExportPresentationText.displaySourceName(
+            for: request.exportFolder
+        )
         timeEstimator.stop()
 
         exportTask = Task { [weak self] in
@@ -121,10 +117,7 @@ final class ExportOperationCoordinator {
 
             do {
                 _ = try await self.actionHandler.startExport(
-                    tracks: tracks,
-                    exportFolder: exportFolder,
-                    fileNamingMode: fileNamingMode,
-                    presenter: presenter,
+                    request,
                     onExportAccepted: {
                         exportWasAccepted = true
 
@@ -133,7 +126,7 @@ final class ExportOperationCoordinator {
                         #if DEBUG
                         ExportDiagnostics.shared.begin(
                             exportID: operationID,
-                            totalFiles: tracks.count
+                            totalFiles: request.tracks.count
                         )
                         #endif
                     },

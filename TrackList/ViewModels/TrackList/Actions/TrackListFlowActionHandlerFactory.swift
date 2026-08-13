@@ -27,8 +27,8 @@ struct TrackListFlowActionHandlerFactory {
     private let collectionNavigationHandler: any TrackCollectionNavigating
     /// Общий action flow отправки трека, подготовленный Composition Root.
     private let trackShareActionHandler: TrackShareActionHandler
-    /// Провайдер системного контроллера, подготовленный Composition Root.
-    private let viewControllerProvider: any ViewControllerProviding
+    /// Типизированный вход в глобальный Export-feature.
+    private let exportRequestHandler: any ExportRequestHandling
     /// Реактивное playback-состояние, подготовленное Composition Root.
     private let playbackStateProvider: any PlaybackStateProviding
     /// Минимальный набор playback-команд, подготовленный Composition Root.
@@ -44,7 +44,7 @@ struct TrackListFlowActionHandlerFactory {
         toastPresenter: any ToastPresenting,
         collectionNavigationHandler: any TrackCollectionNavigating,
         trackShareActionHandler: TrackShareActionHandler,
-        viewControllerProvider: any ViewControllerProviding,
+        exportRequestHandler: any ExportRequestHandling,
         playbackStateProvider: any PlaybackStateProviding,
         playbackController: any TrackPlaybackControlling
     ) {
@@ -56,7 +56,7 @@ struct TrackListFlowActionHandlerFactory {
         self.toastPresenter = toastPresenter
         self.collectionNavigationHandler = collectionNavigationHandler
         self.trackShareActionHandler = trackShareActionHandler
-        self.viewControllerProvider = viewControllerProvider
+        self.exportRequestHandler = exportRequestHandler
         self.playbackStateProvider = playbackStateProvider
         self.playbackController = playbackController
     }
@@ -64,7 +64,6 @@ struct TrackListFlowActionHandlerFactory {
     /// Создаёт production action handler для detail-flow одного треклиста.
     func make(
         reader: any TrackListReading,
-        exportProgressViewModel: ExportProgressViewModel,
         favoriteTrackActionHandler: FavoriteTrackActionHandler
     ) -> TrackListFlowActionHandler {
         TrackListFlowActionHandler(
@@ -78,8 +77,7 @@ struct TrackListFlowActionHandlerFactory {
                 sheetManager: sheetManager,
                 sheetActionCoordinator: sheetActionCoordinator
             ),
-            exportProgressViewModel: exportProgressViewModel,
-            viewControllerProvider: viewControllerProvider,
+            exportRequestHandler: exportRequestHandler,
             toastPresenter: toastPresenter,
             appCommandExecutor: commandExecutor,
             collectionNavigationHandler: collectionNavigationHandler,

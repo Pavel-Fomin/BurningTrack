@@ -38,7 +38,6 @@ struct LibraryScreen: View {
 
     // MARK: - Зависимости
 
-    @ObservedObject var exportProgressViewModel: ExportProgressViewModel
     /// Единый обработчик «Избранного» передаётся в строки всех источников фонотеки.
     let favoriteTrackActionHandler: FavoriteTrackActionHandler
     /// Готовые фабрики feature фонотеки, подготовленные Composition Root.
@@ -62,11 +61,9 @@ struct LibraryScreen: View {
     // MARK: - Init
 
     init(
-        exportProgressViewModel: ExportProgressViewModel,
         favoriteTrackActionHandler: FavoriteTrackActionHandler,
         dependencies: LibraryFeatureDependencies
     ) {
-        self.exportProgressViewModel = exportProgressViewModel
         self.favoriteTrackActionHandler = favoriteTrackActionHandler
         self.dependencies = dependencies
         self._viewModel = StateObject(
@@ -89,9 +86,7 @@ struct LibraryScreen: View {
 
     /// Обработчик действий экрана всех треков фонотеки.
     private var allTracksActionHandler: LibraryAllTracksActionHandler {
-        dependencies.allTracksActionHandlerFactory.make(
-            exportProgressViewModel: exportProgressViewModel
-        )
+        dependencies.allTracksActionHandlerFactory.make()
     }
 
     /// Собирает обработчик экспорта текущего выбранного значения коллекции.
@@ -99,8 +94,7 @@ struct LibraryScreen: View {
         for source: LibraryTrackListSource
     ) -> LibraryCollectionTracksActionHandler {
         dependencies.collectionTracksActionHandlerFactory.make(
-            source: source,
-            exportProgressViewModel: exportProgressViewModel
+            source: source
         )
     }
 
@@ -214,7 +208,6 @@ struct LibraryScreen: View {
 
         case .purchasedITunes(let revealRequest):
             dependencies.purchasedITunesFeatureFactory.makeContainer(
-                exportProgressViewModel: exportProgressViewModel,
                 revealRequest: revealRequest,
                 onRevealHandled: { requestId in
                     viewModel.handle(.revealHandled(requestId))
@@ -282,7 +275,6 @@ struct LibraryScreen: View {
                 onRevealHandled: { requestId in
                     viewModel.handle(.revealHandled(requestId))
                 },
-                exportProgressViewModel: exportProgressViewModel,
                 viewModelFactory: dependencies.folderViewModelFactory,
                 tracksScreenFactory: dependencies.tracksScreenFactory,
                 selectionActionBarConfig: $selectionActionBarConfig,

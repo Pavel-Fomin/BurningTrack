@@ -8,7 +8,6 @@
 //
 
 import Foundation
-import UIKit
 
 /// Выполняет экспорт текущей очереди плеера.
 @MainActor
@@ -19,27 +18,17 @@ final class PlayerExportActionHandler {
     /// Хранилище очереди плеера.
     private let playlistManager: PlaylistManager
 
-    /// Глобальная ViewModel, владеющая жизненным циклом экспорта.
-    private let exportProgressViewModel: ExportProgressViewModel
-
-    /// Менеджер пользовательских уведомлений.
-    private let toastManager: ToastManager
-
-    /// Возвращает текущий UIViewController для показа системного picker.
-    private let presenterProvider: () -> UIViewController?
+    /// Типизированный вход в глобальный Export-feature.
+    private let exportRequestHandler: any ExportRequestHandling
 
     // MARK: - Инициализация
 
     init(
         playlistManager: PlaylistManager,
-        exportProgressViewModel: ExportProgressViewModel,
-        toastManager: ToastManager,
-        presenterProvider: @escaping () -> UIViewController?
+        exportRequestHandler: any ExportRequestHandling
     ) {
         self.playlistManager = playlistManager
-        self.exportProgressViewModel = exportProgressViewModel
-        self.toastManager = toastManager
-        self.presenterProvider = presenterProvider
+        self.exportRequestHandler = exportRequestHandler
     }
 
     // MARK: - Actions
@@ -48,22 +37,13 @@ final class PlayerExportActionHandler {
     func exportTrackList() {
         let tracks = playlistManager.tracks.map { $0.asTrack() }
 
-        guard !tracks.isEmpty else {
-            toastManager.handle(.noTracksToExport)
-            return
-        }
-
-        guard let topVC = presenterProvider() else {
-            toastManager.handle(.presenterUnavailable)
-            return
-        }
-
-        // Action handler только передаёт команду глобальному владельцу операции.
-        exportProgressViewModel.startExport(
-            tracks: tracks,
-            exportFolder: .playerQueue,
-            fileNamingMode: .numbered,
-            presenter: topVC
+        // Export-feature единообразно проверяет запрос и владеет системным picker-ом.
+        exportRequestHandler.startExport(
+            ExportRequest(
+                tracks: tracks,
+                exportFolder: .playerQueue,
+                fileNamingMode: .numbered
+            )
         )
     }
 }

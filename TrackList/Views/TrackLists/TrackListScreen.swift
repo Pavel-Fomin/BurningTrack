@@ -13,7 +13,6 @@ import SwiftUI
 struct TrackListScreen: View {
     /// Неизменяемый идентификатор detail-маршрута без snapshot из master-flow.
     let trackListId: UUID
-    @ObservedObject var exportProgressViewModel: ExportProgressViewModel
     /// Единый обработчик «Избранного» передаётся в фабрику detail-flow.
     let favoriteTrackActionHandler: FavoriteTrackActionHandler
     /// Готовые фабрики detail-flow, подготовленные Composition Root.
@@ -24,19 +23,16 @@ struct TrackListScreen: View {
     private var actionHandler: TrackListFlowActionHandler {
         dependencies.actionHandlerFactory.make(
             reader: viewModel,
-            exportProgressViewModel: exportProgressViewModel,
             favoriteTrackActionHandler: favoriteTrackActionHandler
         )
     }
 
     init(
         trackListId: UUID,
-        exportProgressViewModel: ExportProgressViewModel,
         favoriteTrackActionHandler: FavoriteTrackActionHandler,
         dependencies: TrackListFeatureDependencies
     ) {
         self.trackListId = trackListId
-        self.exportProgressViewModel = exportProgressViewModel
         self.favoriteTrackActionHandler = favoriteTrackActionHandler
         self.dependencies = dependencies
         _viewModel = StateObject(

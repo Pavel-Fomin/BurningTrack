@@ -9,7 +9,6 @@
 
 import Combine
 import Foundation
-import UIKit
 import XCTest
 @testable import TrackList
 
@@ -18,81 +17,60 @@ import XCTest
 final class LibraryFolderActionHandlerTests: XCTestCase {
 
     /// Проверяет экспорт только видимых треков в отображаемом порядке и без нумерации имён.
-    func testExportUsesVisibleTracksInDisplayOrderWithOriginalFileNames() async {
-        let exporter = FolderExportingSpy()
-        let toastPresenter = FolderToastPresenterSpy()
+    func testExportUsesVisibleTracksInDisplayOrderWithOriginalFileNames() {
+        let exportRequestHandler = ExportRequestHandlerSpy()
         let folder = makeFolder(name: "Текущая папка")
         let viewModel = makeViewModel(
             folder: folder,
-            exportProgressViewModel: makeExportProgressViewModel(
-                exporter: exporter,
-                toastPresenter: toastPresenter
-            ),
-            toastPresenter: toastPresenter
+            exportRequestHandler: exportRequestHandler
         )
         let firstTrack = makeLibraryTrack(fileName: "01 First.flac")
         let secondTrack = makeLibraryTrack(fileName: "02 Second.FLAC")
         let nestedTrack = makeLibraryTrack(fileName: "Nested.flac")
 
         viewModel.handle(.exportTracks([secondTrack, firstTrack]))
-        await yieldToExportTask()
 
-        XCTAssertEqual(exporter.exportCallCount, 1)
-        XCTAssertEqual(exporter.exportFolderNames, [folder.name])
+        XCTAssertEqual(exportRequestHandler.requests.count, 1)
         XCTAssertEqual(
-            exporter.exportedTrackIDs,
-            [[secondTrack.trackId, firstTrack.trackId]]
+            exportRequestHandler.requests.first?.tracks.map(\.trackId),
+            [secondTrack.trackId, firstTrack.trackId]
         )
         XCTAssertEqual(
-            exporter.exportedFileNames,
-            [[secondTrack.fileName, firstTrack.fileName]]
+            exportRequestHandler.requests.first?.tracks.map(\.fileName),
+            [secondTrack.fileName, firstTrack.fileName]
         )
         XCTAssertFalse(
-            exporter.exportedTrackIDs.flatMap { $0 }.contains(nestedTrack.trackId)
+            exportRequestHandler.requests.first?.tracks.map(\.trackId).contains(nestedTrack.trackId) == true
         )
-        guard let fileNamingMode = exporter.fileNamingModes.first else {
-            return XCTFail("Режим именования не был передан в exporter")
+        XCTAssertEqual(exportRequestHandler.requests.first?.exportFolder, .named(folder.name))
+        guard let fileNamingMode = exportRequestHandler.requests.first?.fileNamingMode else {
+            return XCTFail("Режим именования не был передан в ExportRequest")
         }
         guard case .original = fileNamingMode else {
             return XCTFail("Для экспорта папки ожидался режим original")
         }
-        XCTAssertTrue(toastPresenter.events.isEmpty)
-        XCTAssertTrue(toastPresenter.errors.isEmpty)
     }
 
     /// Проверяет, что пустой список видимых треков не запускает экспорт.
-    func testExportWithEmptyVisibleTracksDoesNotStartExport() async {
-        let exporter = FolderExportingSpy()
-        let toastPresenter = FolderToastPresenterSpy()
+    func testEmptyVisibleTracksPassEmptyRequestToGlobalValidation() {
+        let exportRequestHandler = ExportRequestHandlerSpy()
         let viewModel = makeViewModel(
             folder: makeFolder(name: "Пустая папка"),
-            exportProgressViewModel: makeExportProgressViewModel(
-                exporter: exporter,
-                toastPresenter: toastPresenter
-            ),
-            toastPresenter: toastPresenter
+            exportRequestHandler: exportRequestHandler
         )
 
         viewModel.handle(.exportTracks([]))
-        await yieldToExportTask()
 
-        XCTAssertEqual(exporter.exportCallCount, 0)
-        XCTAssertTrue(toastPresenter.events.isEmpty)
-        XCTAssertTrue(toastPresenter.errors.isEmpty)
+        XCTAssertEqual(exportRequestHandler.requests.count, 1)
+        XCTAssertTrue(exportRequestHandler.requests.first?.tracks.isEmpty == true)
     }
 
     /// Проверяет сохранение существующего действия очистки панели выбора при появлении папки.
     func testAppearedClearsSelectionActionBar() {
-        let exporter = FolderExportingSpy()
-        let toastPresenter = FolderToastPresenterSpy()
         var clearSelectionCallCount = 0
         let viewModel = makeViewModel(
             folder: makeFolder(name: "Текущая папка"),
-            exportProgressViewModel: makeExportProgressViewModel(
-                exporter: exporter,
-                toastPresenter: toastPresenter
-            ),
-            toastPresenter: toastPresenter,
+            exportRequestHandler: ExportRequestHandlerSpy(),
             clearSelectionActionBar: {
                 clearSelectionCallCount += 1
             }
@@ -109,15 +87,9 @@ final class LibraryFolderActionHandlerTests: XCTestCase {
         navigationCoordinator.openLibraryRoot()
         defer { navigationCoordinator.openLibraryRoot() }
 
-        let exporter = FolderExportingSpy()
-        let toastPresenter = FolderToastPresenterSpy()
         let viewModel = makeViewModel(
             folder: makeFolder(name: "Текущая папка"),
-            exportProgressViewModel: makeExportProgressViewModel(
-                exporter: exporter,
-                toastPresenter: toastPresenter
-            ),
-            toastPresenter: toastPresenter
+            exportRequestHandler: ExportRequestHandlerSpy()
         )
         let subfolder = makeFolder(name: "Вложенная папка")
 
@@ -132,24 +104,19 @@ final class LibraryFolderActionHandlerTests: XCTestCase {
     /// Собирает ViewModel папки с управляемыми зависимостями обработчика действий.
     private func makeViewModel(
         folder: LibraryFolder,
-        exportProgressViewModel: ExportProgressViewModel,
-        toastPresenter: FolderToastPresenterSpy,
+        exportRequestHandler: any ExportRequestHandling,
         clearSelectionActionBar: @escaping @MainActor () -> Void = {}
     ) -> LibraryFolderViewModel {
         let factory = LibraryFolderViewModelFactory(
             // Фабрика принимает concrete coordinator с private initializer, поэтому без изменения production-контракта
             // тест сохраняет существующий изолированный сбросом singleton только для проверки folder route.
             navigationCoordinator: .shared,
-            viewControllerProvider: FolderViewControllerProviderSpy(
-                presenter: UIViewController()
-            ),
-            toastPresenter: toastPresenter,
+            exportRequestHandler: exportRequestHandler,
             summaryProvider: EmptyTrackCollectionSummaryProvider(),
             eventProvider: LibraryFolderEventProviderStub()
         )
         return factory.make(
             folder: folder,
-            exportProgressViewModel: exportProgressViewModel,
             clearSelectionActionBar: clearSelectionActionBar
         )
     }
@@ -159,22 +126,6 @@ final class LibraryFolderActionHandlerTests: XCTestCase {
         LibraryFolder(
             name: name,
             url: URL(fileURLWithPath: "/tmp/\(name)")
-        )
-    }
-
-    /// Собирает глобальное состояние экспорта с тестовым фасадом.
-    private func makeExportProgressViewModel(
-        exporter: FolderExportingSpy,
-        toastPresenter: FolderToastPresenterSpy
-    ) -> ExportProgressViewModel {
-        ExportProgressViewModel(
-            coordinator: ExportOperationCoordinator(
-                actionHandler: ExportActionHandler(
-                    exporter: exporter,
-                    toastPresenter: toastPresenter
-                )
-            ),
-            toastPresenter: toastPresenter
         )
     }
 
@@ -190,12 +141,6 @@ final class LibraryFolderActionHandlerTests: XCTestCase {
         )
     }
 
-    /// Даёт задаче общего экспорта пройти несколько очередей MainActor.
-    private func yieldToExportTask() async {
-        for _ in 0..<6 {
-            await Task.yield()
-        }
-    }
 }
 
 /// Не обращается к постоянной SQLite-базе в тестах действий папки.
@@ -244,87 +189,5 @@ private final class LibraryFolderEventProviderStub: LibraryTrackEventProvider {
 
     var trackListBadgesDidChange: AnyPublisher<Void, Never> {
         Empty().eraseToAnyPublisher()
-    }
-}
-
-/// Тестовый фасад экспорта, который сохраняет параметры запроса без picker-а и копирования.
-@MainActor
-private final class FolderExportingSpy: TrackExporting {
-
-    /// Количество попыток запуска экспорта.
-    private(set) var exportCallCount = 0
-
-    /// Имена дочерних папок, переданные при экспорте.
-    private(set) var exportFolderNames: [String] = []
-
-    /// Режимы формирования имён файлов, переданные при экспорте.
-    private(set) var fileNamingModes: [ExportFileNamingMode] = []
-
-    /// Идентификаторы треков в порядке, переданном общему экспорту.
-    private(set) var exportedTrackIDs: [[UUID]] = []
-
-    /// Исходные имена файлов в порядке, переданном общему экспорту.
-    private(set) var exportedFileNames: [[String]] = []
-
-    /// Сохраняет параметры запроса и завершает экспорт успешным итогом.
-    func exportTracks(
-        _ tracks: [Track],
-        exportFolder: ExportFolder,
-        fileNamingMode: ExportFileNamingMode,
-        presenter: UIViewController,
-        onProgress: @escaping ExportProgressHandler
-    ) async throws -> ExportSummary {
-        exportCallCount += 1
-        exportFolderNames.append(exportFolder.fileSystemName)
-        fileNamingModes.append(fileNamingMode)
-        exportedTrackIDs.append(tracks.map(\.trackId))
-        exportedFileNames.append(tracks.map(\.fileName))
-
-        return ExportSummary(
-            completedFiles: tracks.count,
-            failedFiles: [],
-            state: .completed
-        )
-    }
-
-    /// Не нужен тестовым сценариям, но сохраняет контракт экспортного фасада.
-    func cancelCurrentExport() {}
-}
-
-/// Тестовый провайдер presenter-а системного picker-а.
-@MainActor
-private final class FolderViewControllerProviderSpy: ViewControllerProviding {
-
-    /// UIViewController, который должен вернуть обработчику папки.
-    private let presenter: UIViewController?
-
-    init(presenter: UIViewController?) {
-        self.presenter = presenter
-    }
-
-    /// Возвращает заранее подготовленный presenter.
-    func topViewController() -> UIViewController? {
-        presenter
-    }
-}
-
-/// Тестовый получатель пользовательских сообщений.
-@MainActor
-private final class FolderToastPresenterSpy: ToastPresenting {
-
-    /// Декларативные события, которые получил обработчик.
-    private(set) var events: [ToastEvent] = []
-
-    /// Ошибки приложения, которые получил обработчик.
-    private(set) var errors: [AppError] = []
-
-    /// Сохраняет событие без показа пользовательского интерфейса.
-    func handle(_ event: ToastEvent, duration: TimeInterval) {
-        events.append(event)
-    }
-
-    /// Сохраняет ошибку приложения без показа пользовательского интерфейса.
-    func handle(_ error: AppError) {
-        errors.append(error)
     }
 }

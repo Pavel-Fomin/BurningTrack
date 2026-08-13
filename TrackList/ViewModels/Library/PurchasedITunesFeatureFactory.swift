@@ -24,7 +24,7 @@ struct PurchasedITunesFeatureFactory {
     private let commandExecutor: AppCommandExecutor
     private let commandToastPresenter: AppCommandToastPresenter
     private let toastPresenter: any ToastPresenting
-    private let viewControllerProvider: any ViewControllerProviding
+    private let exportRequestHandler: any ExportRequestHandling
 
     /// Принимает только уже собранные production-зависимости Composition Root.
     init(
@@ -39,7 +39,7 @@ struct PurchasedITunesFeatureFactory {
         commandExecutor: AppCommandExecutor,
         commandToastPresenter: AppCommandToastPresenter,
         toastPresenter: any ToastPresenting,
-        viewControllerProvider: any ViewControllerProviding
+        exportRequestHandler: any ExportRequestHandling
     ) {
         self.musicProvider = musicProvider
         self.sortModePersistence = sortModePersistence
@@ -52,27 +52,23 @@ struct PurchasedITunesFeatureFactory {
         self.commandExecutor = commandExecutor
         self.commandToastPresenter = commandToastPresenter
         self.toastPresenter = toastPresenter
-        self.viewControllerProvider = viewControllerProvider
+        self.exportRequestHandler = exportRequestHandler
     }
 
     /// Создаёт Container, не раскрывая LibraryScreen внутренние зависимости feature.
     func makeContainer(
-        exportProgressViewModel: ExportProgressViewModel,
         revealRequest: LibraryRevealRequest?,
         onRevealHandled: @escaping (UUID) -> Void
     ) -> PurchasedITunesContainer {
         PurchasedITunesContainer(
             featureFactory: self,
-            exportProgressViewModel: exportProgressViewModel,
             revealRequest: revealRequest,
             onRevealHandled: onRevealHandled
         )
     }
 
     /// Собирает стабильные объекты одного destination до передачи их StateObject-контейнеру.
-    func makeScreenStore(
-        exportProgressViewModel: ExportProgressViewModel
-    ) -> PurchasedITunesScreenStore {
+    func makeScreenStore() -> PurchasedITunesScreenStore {
         let viewModel = PurchasedITunesMusicViewModel(
             provider: musicProvider,
             sortModePersistence: sortModePersistence,
@@ -84,9 +80,7 @@ struct PurchasedITunesFeatureFactory {
         )
         let musicActionHandler = PurchasedITunesMusicActionHandler(
             viewModel: viewModel,
-            exportProgressViewModel: exportProgressViewModel,
-            viewControllerProvider: viewControllerProvider,
-            toastPresenter: toastPresenter
+            exportRequestHandler: exportRequestHandler
         )
         let trackActionHandler = PurchasedITunesTrackActionHandler(
             playbackStateProvider: playbackStateProvider,

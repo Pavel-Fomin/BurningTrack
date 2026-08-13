@@ -13,16 +13,21 @@ struct PlayerFlowActionHandlerFactory {
 
     /// Готовые production-зависимости Player feature.
     private let dependencies: PlayerFeatureDependencies
+    /// Типизированный вход в глобальный Export-feature.
+    private let exportRequestHandler: any ExportRequestHandling
 
     /// Получает подготовленные Composition Root зависимости и не разрешает singleton самостоятельно.
-    init(dependencies: PlayerFeatureDependencies) {
+    init(
+        dependencies: PlayerFeatureDependencies,
+        exportRequestHandler: any ExportRequestHandling
+    ) {
         self.dependencies = dependencies
+        self.exportRequestHandler = exportRequestHandler
     }
 
     /// Создаёт production action handler для экрана плеера.
     func make(
         playerViewModel: PlayerViewModel,
-        exportProgressViewModel: ExportProgressViewModel,
         favoriteTrackActionHandler: FavoriteTrackActionHandler
     ) -> PlayerFlowActionHandler {
         let playbackActionHandler = PlayerPlaybackActionHandler(
@@ -43,14 +48,9 @@ struct PlayerFlowActionHandlerFactory {
             trackShareActionHandler: dependencies.trackShareActionHandler,
             favoriteActionHandler: favoriteTrackActionHandler
         )
-        let viewControllerProvider = ApplicationViewControllerProvider()
         let exportActionHandler = PlayerExportActionHandler(
             playlistManager: dependencies.playlistManager,
-            exportProgressViewModel: exportProgressViewModel,
-            toastManager: dependencies.toastManager,
-            presenterProvider: {
-                viewControllerProvider.topViewController()
-            }
+            exportRequestHandler: exportRequestHandler
         )
         let renameActionHandler = PlayerRenameActionHandler(
             playlistManager: dependencies.playlistManager,

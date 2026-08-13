@@ -8,18 +8,9 @@
 //
 
 import Foundation
-import UIKit
 
-/// Описывает действия пользователя и экранов, относящиеся к глобальному экспорту.
+/// Описывает действия собственного пользовательского интерфейса Export-feature.
 enum ExportAction {
-
-    /// Запускает экспорт выбранных треков в папку, выбранную пользователем.
-    case start(
-        tracks: [Track],
-        exportFolder: ExportFolder,
-        fileNamingMode: ExportFileNamingMode,
-        presenter: UIViewController
-    )
 
     /// Запрашивает отмену текущей операции экспорта.
     case cancel

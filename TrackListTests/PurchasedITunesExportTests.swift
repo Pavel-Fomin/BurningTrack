@@ -9,7 +9,6 @@
 
 import Combine
 import Foundation
-import UIKit
 import XCTest
 @testable import TrackList
 
@@ -103,8 +102,7 @@ final class PurchasedITunesMusicActionHandlerTests: XCTestCase {
 
     /// Проверяет папку, original-режим, порядок и сохранение прямых assetURL.
     func testExportUsesAllTracksInDisplayOrderWithoutNumbering() async {
-        let exporter = ExportRequestSpy()
-        let toastPresenter = ExportRequestToastPresenterSpy()
+        let exportRequestHandler = ExportRequestHandlerSpy()
         let firstSourceTrack = makeSourceTrack(
             id: 1,
             title: "First",
@@ -124,66 +122,46 @@ final class PurchasedITunesMusicActionHandlerTests: XCTestCase {
         let displayOrder = viewModel.screenState.tracks
         let handler = PurchasedITunesMusicActionHandler(
             viewModel: viewModel,
-            exportProgressViewModel: makeExportProgressViewModelForRequestTests(
-                exporter: exporter,
-                toastPresenter: toastPresenter
-            ),
-            viewControllerProvider: ExportRequestViewControllerProviderSpy(
-                presenter: UIViewController()
-            ),
-            toastPresenter: toastPresenter
+            exportRequestHandler: exportRequestHandler
         )
         handler.handle(.exportTracks)
-        await yieldToExportTask()
 
-        XCTAssertEqual(exporter.exportCallCount, 1)
-        XCTAssertEqual(exporter.exportFolderNames, ["Purchased iTunes"])
+        XCTAssertEqual(exportRequestHandler.requests.count, 1)
         XCTAssertEqual(
-            exporter.exportedTrackIDs,
-            [displayOrder.map(\.trackId)]
+            exportRequestHandler.requests.first?.tracks.map(\.trackId),
+            displayOrder.map(\.trackId)
         )
         XCTAssertEqual(
-            exporter.exportedSources,
-            [[.purchasedITunes, .purchasedITunes]]
+            exportRequestHandler.requests.first?.tracks.map(\.source),
+            [.purchasedITunes, .purchasedITunes]
         )
         XCTAssertEqual(
-            exporter.exportedAssetURLs,
-            [displayOrder.map(\.assetURL)]
+            exportRequestHandler.requests.first?.tracks.map(\.assetURL),
+            displayOrder.map(\.assetURL)
         )
-        guard let fileNamingMode = exporter.fileNamingModes.first else {
+        XCTAssertEqual(exportRequestHandler.requests.first?.exportFolder, .purchasedITunes)
+        guard let fileNamingMode = exportRequestHandler.requests.first?.fileNamingMode else {
             return XCTFail("Режим именования не передан в общий экспорт")
         }
         guard case .original = fileNamingMode else {
             return XCTFail("Для iTunes ожидался обычный режим original")
         }
-        XCTAssertTrue(toastPresenter.events.isEmpty)
-        XCTAssertTrue(toastPresenter.errors.isEmpty)
     }
 
-    /// Проверяет, что пустой раздел не открывает системный picker.
-    func testEmptySectionDoesNotStartExport() async {
-        let exporter = ExportRequestSpy()
-        let toastPresenter = ExportRequestToastPresenterSpy()
+    /// Проверяет передачу пустого раздела в единый ingress глобальной валидации.
+    func testEmptySectionPassesEmptyRequestToGlobalValidation() async {
+        let exportRequestHandler = ExportRequestHandlerSpy()
         let viewModel = makeViewModel(tracks: [])
         await viewModel.load()
         let handler = PurchasedITunesMusicActionHandler(
             viewModel: viewModel,
-            exportProgressViewModel: makeExportProgressViewModelForRequestTests(
-                exporter: exporter,
-                toastPresenter: toastPresenter
-            ),
-            viewControllerProvider: ExportRequestViewControllerProviderSpy(
-                presenter: UIViewController()
-            ),
-            toastPresenter: toastPresenter
+            exportRequestHandler: exportRequestHandler
         )
 
         handler.handle(.exportTracks)
-        await yieldToExportTask()
 
-        XCTAssertEqual(exporter.exportCallCount, 0)
-        XCTAssertTrue(toastPresenter.events.isEmpty)
-        XCTAssertTrue(toastPresenter.errors.isEmpty)
+        XCTAssertEqual(exportRequestHandler.requests.count, 1)
+        XCTAssertTrue(exportRequestHandler.requests.first?.tracks.isEmpty == true)
     }
 
     /// Проверяет, что load и сортировка проходят через типизированный экранный handler.
@@ -204,17 +182,9 @@ final class PurchasedITunesMusicActionHandlerTests: XCTestCase {
             tracks: [firstSourceTrack, secondSourceTrack]
         )
         let viewModel = makeViewModel(provider: provider)
-        let toastPresenter = ExportRequestToastPresenterSpy()
         let handler = PurchasedITunesMusicActionHandler(
             viewModel: viewModel,
-            exportProgressViewModel: makeExportProgressViewModelForRequestTests(
-                exporter: ExportRequestSpy(),
-                toastPresenter: toastPresenter
-            ),
-            viewControllerProvider: ExportRequestViewControllerProviderSpy(
-                presenter: UIViewController()
-            ),
-            toastPresenter: toastPresenter
+            exportRequestHandler: ExportRequestHandlerSpy()
         )
 
         handler.handle(.appeared)

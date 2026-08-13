@@ -52,10 +52,15 @@ struct ExportFeatureFactory {
             progressViewModel: progressViewModel,
             detailsRouter: detailsRouter
         )
+        let requestHandler = ExportRequestActionHandler(
+            progressViewModel: progressViewModel,
+            toastPresenter: toastPresenter
+        )
 
         return ExportFeature(
             progressViewModel: progressViewModel,
-            actionHandler: actionHandler
+            actionHandler: actionHandler,
+            requestHandler: requestHandler
         )
     }
 }
@@ -67,6 +72,9 @@ struct ExportFeature {
     /// Долгоживущее состояние операции, независимое от presentation sheet.
     let progressViewModel: ExportProgressViewModel
 
-    /// Единственная точка входа UI-действий и lifecycle-событий Export-feature.
+    /// Обрабатывает действия собственного UI и lifecycle-события Export-feature.
     let actionHandler: ExportFeatureActionHandler
+
+    /// Принимает типизированные запросы запуска из других функций приложения.
+    let requestHandler: any ExportRequestHandling
 }

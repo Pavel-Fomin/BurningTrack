@@ -73,7 +73,6 @@ struct MainTabView: View {
             ) {
                 PlayerScreen(
                     playerViewModel: playerViewModel,
-                    exportProgressViewModel: exportProgressViewModel,
                     favoriteTrackActionHandler: favoriteTrackActionHandler,
                     viewModelFactory: playerScreenViewModelFactory
                 )
@@ -91,9 +90,8 @@ struct MainTabView: View {
                 systemImage: "play.square.stack",
                 value: ScenePhaseHandler.Tab.library
             ) {
-                LibraryScreen(
-                    exportProgressViewModel: exportProgressViewModel,
-                    favoriteTrackActionHandler: favoriteTrackActionHandler,
+            LibraryScreen(
+                favoriteTrackActionHandler: favoriteTrackActionHandler,
                     dependencies: libraryFeatureDependencies
                 )
                 .globalBottomPanelsHost(
@@ -112,7 +110,6 @@ struct MainTabView: View {
             ) {
                 TrackListsScreen(
                     trackListsViewModel: trackListsViewModel,
-                    exportProgressViewModel: exportProgressViewModel,
                     favoriteTrackActionHandler: favoriteTrackActionHandler,
                     actionHandler: trackListsActionHandler,
                     navigationCoordinator: navigationCoordinator,

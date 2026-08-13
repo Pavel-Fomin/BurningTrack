@@ -39,8 +39,7 @@ final class TrackListFlowActionHandler {
         commandExecutor: any TrackListCommandExecuting,
         fileRenamer: any TrackFileRenaming,
         presenter: any TrackListPresenting,
-        exportProgressViewModel: ExportProgressViewModel,
-        viewControllerProvider: any ViewControllerProviding,
+        exportRequestHandler: any ExportRequestHandling,
         toastPresenter: any ToastPresenting,
         appCommandExecutor: any PurchasedITunesTrackPlayerAdding,
         collectionNavigationHandler: any TrackCollectionNavigating,
@@ -70,9 +69,7 @@ final class TrackListFlowActionHandler {
         )
         self.exportHandler = TrackListExportHandler(
             reader: reader,
-            exportProgressViewModel: exportProgressViewModel,
-            viewControllerProvider: viewControllerProvider,
-            toastPresenter: toastPresenter
+            exportRequestHandler: exportRequestHandler
         )
         self.renameHandler = TrackListRenameHandler(
             reader: reader,

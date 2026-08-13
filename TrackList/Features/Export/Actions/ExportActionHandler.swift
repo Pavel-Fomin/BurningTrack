@@ -8,7 +8,6 @@
 //
 
 import Foundation
-import UIKit
 
 /// Выполняет экспорт и преобразует ошибки доменного слоя в пользовательские сообщения.
 @MainActor
@@ -29,18 +28,15 @@ final class ExportActionHandler {
         self.toastPresenter = toastPresenter
     }
 
-    /// Проверяет запрос, запускает экспорт и возвращает его итоговый результат.
-    /// Пустой или неуспешный сценарий уже сопровождается пользовательским сообщением.
+    /// Запускает готовый запрос экспорта и возвращает его итоговый результат.
+    /// Внутренняя проверка сохраняет корректное сообщение при обходе внешнего ingress.
     func startExport(
-        tracks: [Track],
-        exportFolder: ExportFolder,
-        fileNamingMode: ExportFileNamingMode,
-        presenter: UIViewController,
+        _ request: ExportRequest,
         onExportAccepted: () -> Void,
         onProgress: @escaping ExportProgressHandler
     ) async throws -> ExportSummary? {
-        guard tracks.isEmpty == false else {
-            toastPresenter.handle(.noTracksToExport)
+        guard request.tracks.isEmpty == false else {
+            toastPresenter.handle(.exportNoTracks)
             return nil
         }
 
@@ -48,10 +44,7 @@ final class ExportActionHandler {
 
         do {
             return try await exporter.exportTracks(
-                tracks,
-                exportFolder: exportFolder,
-                fileNamingMode: fileNamingMode,
-                presenter: presenter,
+                request,
                 onProgress: onProgress
             )
         } catch is CancellationError {
@@ -70,12 +63,17 @@ final class ExportActionHandler {
                 toastPresenter.handle(.exportFailed)
             }
             return nil
-        } catch is ExportDestinationResolverError {
-            toastPresenter.handle(
-                .operationFailed(
-                    message: ExportPresentationText.destinationSelectionFailedMessage
+        } catch let resolverError as ExportDestinationResolverError {
+            switch resolverError {
+            case .presenterUnavailable:
+                toastPresenter.handle(.presenterUnavailable)
+            case .pickerAlreadyPresented, .selectedItemIsNotDirectory:
+                toastPresenter.handle(
+                    .operationFailed(
+                        message: ExportPresentationText.destinationSelectionFailedMessage
+                    )
                 )
-            )
+            }
             return nil
         } catch {
             toastPresenter.handle(.exportFailed)

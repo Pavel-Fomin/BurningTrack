@@ -5,21 +5,16 @@
 //  Created by Pavel Fomin on 18.06.2026.
 //
 
-import UIKit
-
 /// Выполняет экспорт треков.
 @MainActor
 protocol TrackExporting {
-    /// Выбирает папку и экспортирует треки напрямую в неё.
+    /// Выполняет готовый экспортный запрос.
     @discardableResult
     func exportTracks(
-        _ tracks: [Track],
-        exportFolder: ExportFolder,
-        fileNamingMode: ExportFileNamingMode,
-        presenter: UIViewController,
+        _ request: ExportRequest,
         onProgress: @escaping ExportProgressHandler
     ) async throws -> ExportSummary
 
-    /// Отменяет активный picker или копирование.
+    /// Отменяет системный выбор назначения или текущее копирование.
     func cancelCurrentExport()
 }

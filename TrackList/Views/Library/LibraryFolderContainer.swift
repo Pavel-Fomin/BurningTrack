@@ -18,7 +18,6 @@ struct LibraryFolderContainer: View {
     let folder: LibraryFolder
     let revealRequest: LibraryRevealRequest?
     let onRevealHandled: (UUID) -> Void
-    let exportProgressViewModel: ExportProgressViewModel
     /// Готовая фабрика ViewModel папки с явными production-зависимостями.
     let viewModelFactory: LibraryFolderViewModelFactory
     /// Точка сборки screen-local объектов списка треков папки.
@@ -32,7 +31,6 @@ struct LibraryFolderContainer: View {
         folder: LibraryFolder,
         revealRequest: LibraryRevealRequest? = nil,
         onRevealHandled: @escaping (UUID) -> Void = { _ in },
-        exportProgressViewModel: ExportProgressViewModel,
         viewModelFactory: LibraryFolderViewModelFactory,
         tracksScreenFactory: LibraryTracksScreenFactory,
         selectionActionBarConfig: Binding<SelectionActionBarConfig?>,
@@ -41,7 +39,6 @@ struct LibraryFolderContainer: View {
         self.folder = folder
         self.revealRequest = revealRequest
         self.onRevealHandled = onRevealHandled
-        self.exportProgressViewModel = exportProgressViewModel
         self.viewModelFactory = viewModelFactory
         self.tracksScreenFactory = tracksScreenFactory
         self._selectionActionBarConfig = selectionActionBarConfig
@@ -55,7 +52,6 @@ struct LibraryFolderContainer: View {
             folder: folder,
             revealRequest: revealRequest,
             onRevealHandled: onRevealHandled,
-            exportProgressViewModel: exportProgressViewModel,
             viewModelFactory: viewModelFactory,
             tracksScreenFactory: tracksScreenFactory,
             selectionActionBarConfig: $selectionActionBarConfig,
@@ -72,7 +68,6 @@ private struct LibraryFolderContent: View {
     let folder: LibraryFolder
     let revealRequest: LibraryRevealRequest?
     let onRevealHandled: (UUID) -> Void
-    let exportProgressViewModel: ExportProgressViewModel
     /// Готовая фабрика ViewModel папки с явными production-зависимостями.
     let viewModelFactory: LibraryFolderViewModelFactory
     let tracksScreenFactory: LibraryTracksScreenFactory
@@ -89,7 +84,6 @@ private struct LibraryFolderContent: View {
         folder: LibraryFolder,
         revealRequest: LibraryRevealRequest?,
         onRevealHandled: @escaping (UUID) -> Void,
-        exportProgressViewModel: ExportProgressViewModel,
         viewModelFactory: LibraryFolderViewModelFactory,
         tracksScreenFactory: LibraryTracksScreenFactory,
         selectionActionBarConfig: Binding<SelectionActionBarConfig?>,
@@ -98,7 +92,6 @@ private struct LibraryFolderContent: View {
         self.folder = folder
         self.revealRequest = revealRequest
         self.onRevealHandled = onRevealHandled
-        self.exportProgressViewModel = exportProgressViewModel
         self.viewModelFactory = viewModelFactory
         self.tracksScreenFactory = tracksScreenFactory
         self._selectionActionBarConfig = selectionActionBarConfig
@@ -108,7 +101,6 @@ private struct LibraryFolderContent: View {
         self._viewModel = StateObject(
             wrappedValue: viewModelFactory.make(
                 folder: folder,
-                exportProgressViewModel: exportProgressViewModel,
                 clearSelectionActionBar: {
                     selectionActionBarConfig.wrappedValue = nil
                 }

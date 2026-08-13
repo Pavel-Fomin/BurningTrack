@@ -8,7 +8,6 @@
 //
 
 import Foundation
-import UIKit
 import XCTest
 @testable import TrackList
 
@@ -17,9 +16,8 @@ import XCTest
 final class LibraryCollectionTracksActionHandlerTests: XCTestCase {
 
     /// Проверяет экспорт отображаемых секций в их порядке и с именем выбранного значения.
-    func testExportUsesVisibleTracksInDisplayOrder() async {
-        let exporter = CollectionTracksExportingSpy()
-        let toastPresenter = CollectionTracksToastPresenterSpy()
+    func testExportUsesVisibleTracksInDisplayOrder() {
+        let exportRequestHandler = ExportRequestHandlerSpy()
         let source = LibraryTrackListSource.collectionValue(
             category: .genres,
             rawValue: "Techno",
@@ -27,11 +25,7 @@ final class LibraryCollectionTracksActionHandlerTests: XCTestCase {
         )
         let handler = makeHandler(
             source: source,
-            exportProgressViewModel: makeExportProgressViewModel(
-                exporter: exporter,
-                toastPresenter: toastPresenter
-            ),
-            toastPresenter: toastPresenter
+            exportRequestHandler: exportRequestHandler
         )
         let firstTrack = makeLibraryTrack(fileName: "First.flac")
         let secondTrack = makeLibraryTrack(fileName: "Second.FLAC")
@@ -41,65 +35,51 @@ final class LibraryCollectionTracksActionHandlerTests: XCTestCase {
         ]
 
         handler.handle(.exportTracks(visibleSections.flatMap(\.tracks)))
-        await yieldToExportTask()
 
-        XCTAssertEqual(exporter.exportCallCount, 1)
-        XCTAssertEqual(exporter.exportFolderNames, ["Techno"])
+        XCTAssertEqual(exportRequestHandler.requests.count, 1)
         XCTAssertEqual(
-            exporter.exportedTrackIDs,
-            [[secondTrack.trackId, firstTrack.trackId]]
+            exportRequestHandler.requests.first?.tracks.map(\.trackId),
+            [secondTrack.trackId, firstTrack.trackId]
         )
         XCTAssertEqual(
-            exporter.exportedFileNames,
-            [[secondTrack.fileName, firstTrack.fileName]]
+            exportRequestHandler.requests.first?.tracks.map(\.fileName),
+            [secondTrack.fileName, firstTrack.fileName]
         )
-        assertOriginalFileNamingMode(exporter.fileNamingModes)
-        XCTAssertTrue(toastPresenter.events.isEmpty)
-        XCTAssertTrue(toastPresenter.errors.isEmpty)
+        XCTAssertEqual(exportRequestHandler.requests.first?.exportFolder, .named("Techno"))
+        assertOriginalFileNamingMode(
+            exportRequestHandler.requests.first?.fileNamingMode
+        )
     }
 
     /// Проверяет, что пустой список выбранного значения не запускает экспорт.
-    func testEmptyVisibleTracksDoesNotStartExport() async {
-        let exporter = CollectionTracksExportingSpy()
-        let toastPresenter = CollectionTracksToastPresenterSpy()
+    func testEmptyVisibleTracksPassEmptyRequestToGlobalValidation() {
+        let exportRequestHandler = ExportRequestHandlerSpy()
         let handler = makeHandler(
             source: .collectionValue(
                 category: .labels,
                 rawValue: "Лейбл",
                 artistKey: nil
             ),
-            exportProgressViewModel: makeExportProgressViewModel(
-                exporter: exporter,
-                toastPresenter: toastPresenter
-            ),
-            toastPresenter: toastPresenter
+            exportRequestHandler: exportRequestHandler
         )
 
         handler.handle(.exportTracks([]))
-        await yieldToExportTask()
 
-        XCTAssertEqual(exporter.exportCallCount, 0)
-        XCTAssertTrue(toastPresenter.events.isEmpty)
-        XCTAssertTrue(toastPresenter.errors.isEmpty)
+        XCTAssertEqual(exportRequestHandler.requests.count, 1)
+        XCTAssertTrue(exportRequestHandler.requests.first?.tracks.isEmpty == true)
     }
 
     /// Проверяет, что обработчик значения коллекции не заменяет обработчик общего списка «Треки».
-    func testAllTracksSourceDoesNotStartCollectionValueExport() async {
-        let exporter = CollectionTracksExportingSpy()
-        let toastPresenter = CollectionTracksToastPresenterSpy()
+    func testAllTracksSourceDoesNotStartCollectionValueExport() {
+        let exportRequestHandler = ExportRequestHandlerSpy()
         let handler = makeHandler(
             source: .allLibraryTracks,
-            exportProgressViewModel: makeExportProgressViewModel(
-                exporter: exporter,
-                toastPresenter: toastPresenter
-            ),
-            toastPresenter: toastPresenter
+            exportRequestHandler: exportRequestHandler
         )
 
         handler.handle(.exportTracks([makeLibraryTrack(fileName: "Track.flac")]))
-        await yieldToExportTask()
 
-        XCTAssertEqual(exporter.exportCallCount, 0)
+        XCTAssertTrue(exportRequestHandler.requests.isEmpty)
     }
 
     /// Проверяет явные признаки источников и отображаемые имена экспортных папок.
@@ -135,32 +115,11 @@ final class LibraryCollectionTracksActionHandlerTests: XCTestCase {
     /// Собирает обработчик с управляемыми зависимостями.
     private func makeHandler(
         source: LibraryTrackListSource,
-        exportProgressViewModel: ExportProgressViewModel,
-        toastPresenter: CollectionTracksToastPresenterSpy
+        exportRequestHandler: any ExportRequestHandling
     ) -> LibraryCollectionTracksActionHandler {
         LibraryCollectionTracksActionHandler(
             source: source,
-            exportProgressViewModel: exportProgressViewModel,
-            viewControllerProvider: CollectionTracksViewControllerProviderSpy(
-                presenter: UIViewController()
-            ),
-            toastPresenter: toastPresenter
-        )
-    }
-
-    /// Собирает глобальное состояние экспорта с тестовым фасадом.
-    private func makeExportProgressViewModel(
-        exporter: CollectionTracksExportingSpy,
-        toastPresenter: CollectionTracksToastPresenterSpy
-    ) -> ExportProgressViewModel {
-        ExportProgressViewModel(
-            coordinator: ExportOperationCoordinator(
-                actionHandler: ExportActionHandler(
-                    exporter: exporter,
-                    toastPresenter: toastPresenter
-                )
-            ),
-            toastPresenter: toastPresenter
+            exportRequestHandler: exportRequestHandler
         )
     }
 
@@ -177,8 +136,8 @@ final class LibraryCollectionTracksActionHandlerTests: XCTestCase {
     }
 
     /// Проверяет использование режима сохранения исходного имени файла.
-    private func assertOriginalFileNamingMode(_ modes: [ExportFileNamingMode]) {
-        guard let fileNamingMode = modes.first else {
+    private func assertOriginalFileNamingMode(_ fileNamingMode: ExportFileNamingMode?) {
+        guard let fileNamingMode else {
             return XCTFail("Режим именования не был передан в exporter")
         }
         guard case .original = fileNamingMode else {
@@ -186,84 +145,4 @@ final class LibraryCollectionTracksActionHandlerTests: XCTestCase {
         }
     }
 
-    /// Даёт задаче общего экспорта пройти несколько очередей MainActor.
-    private func yieldToExportTask() async {
-        for _ in 0..<6 {
-            await Task.yield()
-        }
-    }
-}
-
-/// Тестовый фасад экспорта, сохраняющий параметры запроса без picker-а и копирования.
-@MainActor
-private final class CollectionTracksExportingSpy: TrackExporting {
-    /// Количество попыток запуска экспорта.
-    private(set) var exportCallCount = 0
-    /// Имена дочерних папок экспорта.
-    private(set) var exportFolderNames: [String] = []
-    /// Режимы формирования имён файлов.
-    private(set) var fileNamingModes: [ExportFileNamingMode] = []
-    /// Идентификаторы экспортируемых треков в переданном порядке.
-    private(set) var exportedTrackIDs: [[UUID]] = []
-    /// Исходные имена экспортируемых файлов в переданном порядке.
-    private(set) var exportedFileNames: [[String]] = []
-
-    /// Сохраняет параметры и завершает экспорт успешным итогом.
-    func exportTracks(
-        _ tracks: [Track],
-        exportFolder: ExportFolder,
-        fileNamingMode: ExportFileNamingMode,
-        presenter: UIViewController,
-        onProgress: @escaping ExportProgressHandler
-    ) async throws -> ExportSummary {
-        exportCallCount += 1
-        exportFolderNames.append(exportFolder.fileSystemName)
-        fileNamingModes.append(fileNamingMode)
-        exportedTrackIDs.append(tracks.map(\.trackId))
-        exportedFileNames.append(tracks.map(\.fileName))
-
-        return ExportSummary(
-            completedFiles: tracks.count,
-            failedFiles: [],
-            state: .completed
-        )
-    }
-
-    /// Не нужен тестовым сценариям, но сохраняет контракт экспортного фасада.
-    func cancelCurrentExport() {}
-}
-
-/// Тестовый provider presenter-а системного picker-а.
-@MainActor
-private final class CollectionTracksViewControllerProviderSpy: ViewControllerProviding {
-    /// UIViewController, который должен вернуть обработчику.
-    private let presenter: UIViewController?
-
-    init(presenter: UIViewController?) {
-        self.presenter = presenter
-    }
-
-    /// Возвращает заранее подготовленный presenter.
-    func topViewController() -> UIViewController? {
-        presenter
-    }
-}
-
-/// Тестовый получатель пользовательских сообщений.
-@MainActor
-private final class CollectionTracksToastPresenterSpy: ToastPresenting {
-    /// Декларативные события, которые получил обработчик.
-    private(set) var events: [ToastEvent] = []
-    /// Ошибки приложения, которые получил обработчик.
-    private(set) var errors: [AppError] = []
-
-    /// Сохраняет событие без показа пользовательского интерфейса.
-    func handle(_ event: ToastEvent, duration: TimeInterval) {
-        events.append(event)
-    }
-
-    /// Сохраняет ошибку приложения без показа пользовательского интерфейса.
-    func handle(_ error: AppError) {
-        errors.append(error)
-    }
 }
