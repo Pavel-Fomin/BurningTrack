@@ -74,4 +74,8 @@ private final class SettingsManagingSpy: SettingsManaging {
     func setTrackListsSortMode(_ mode: TrackListsSortMode?) throws {
         currentSettings.internalSettings.trackListsSortMode = mode
     }
+
+    func applyPersistedTrackListsSortMode(_: TrackListsSortMode?) {
+        // Этот test double не хранит состояние сортировки треклистов.
+    }
 }

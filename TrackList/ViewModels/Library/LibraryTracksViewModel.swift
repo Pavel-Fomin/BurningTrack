@@ -164,38 +164,6 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding, Li
 
     // MARK: - Инициализация
 
-    convenience init(
-        folderURL: URL,
-        renameActionHandler: TrackFileRenameActionHandler,
-        tracksProvider: LibraryTracksProvider,
-        badgeProvider: TrackListBadgeProvider,
-        eventProvider: LibraryTrackEventProvider,
-        runtimeController: LibraryTrackRuntimeController,
-        settingsManager: any SettingsManaging,
-        trackRegistry: TrackRegistry,
-        musicLibraryManager: MusicLibraryManager,
-        trackURLProvider: @escaping @MainActor (UUID) async -> URL?,
-        batchRenameHandler: LibraryBatchRenameHandler,
-        batchTagEditHandler: LibraryBatchTagEditHandler,
-        usesLibrarySortSettings: Bool = true
-    ) {
-        self.init(
-            source: .folder(folderId: folderURL.libraryFolderId),
-            renameActionHandler: renameActionHandler,
-            tracksProvider: tracksProvider,
-            badgeProvider: badgeProvider,
-            eventProvider: eventProvider,
-            runtimeController: runtimeController,
-            settingsManager: settingsManager,
-            trackRegistry: trackRegistry,
-            musicLibraryManager: musicLibraryManager,
-            trackURLProvider: trackURLProvider,
-            batchRenameHandler: batchRenameHandler,
-            batchTagEditHandler: batchTagEditHandler,
-            usesLibrarySortSettings: usesLibrarySortSettings
-        )
-    }
-
     init(
         source: LibraryTrackListSource,
         renameActionHandler: TrackFileRenameActionHandler,

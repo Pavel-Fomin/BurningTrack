@@ -25,9 +25,7 @@ struct LibraryTrackCommandHandler {
     /// Общий обработчик «Избранного» сохраняет состояние и публикует подтверждённое событие.
     private let favoriteActionHandler: FavoriteTrackActionHandler
     /// Экранный маршрут нужен только для selection, которое относится к LibraryTracks, а не к строке.
-    private let screenActionHandler: LibraryTracksActionHandler?
-    /// Legacy collection flow передаёт замыкание до его отдельного этапа экранной архитектуры.
-    private let onToggleSelection: ((UUID) -> Void)?
+    private let screenActionHandler: LibraryTracksActionHandler
     let onRenameTrack: (UUID, FileRenameStrategy) -> Void
 
     /// Выполняет действие строки.
@@ -58,12 +56,10 @@ struct LibraryTrackCommandHandler {
         case .rename(let trackId, let strategy):
             onRenameTrack(trackId, strategy)
         case .toggleSelection(let trackId):
-            // Selection возвращается в typed screen action, а не меняется Binding-ом строки.
-            if let screenActionHandler {
-                screenActionHandler.handle(.trackSelectionToggled(trackId))
-            } else {
-                onToggleSelection?(trackId)
-            }
+            // Selection всегда проходит через типизированное действие экрана.
+            screenActionHandler.handle(
+                .trackSelectionToggled(trackId)
+            )
         case .requestSnapshot(let trackId):
             presentationHandler.requestSnapshotIfNeeded(for: trackId)
         case .trackDidAppear(let trackId):
@@ -92,8 +88,7 @@ struct LibraryTrackCommandHandler {
         commandExecutor: any LibraryTrackPlayerAdding,
         toastManager: any ToastPresenting,
         favoriteActionHandler: FavoriteTrackActionHandler,
-        screenActionHandler: LibraryTracksActionHandler? = nil,
-        onToggleSelection: ((UUID) -> Void)? = nil,
+        screenActionHandler: LibraryTracksActionHandler,
         onRenameTrack: @escaping (UUID, FileRenameStrategy) -> Void
     ) {
         self.sheetManager = sheetManager
@@ -106,7 +101,6 @@ struct LibraryTrackCommandHandler {
         self.toastManager = toastManager
         self.favoriteActionHandler = favoriteActionHandler
         self.screenActionHandler = screenActionHandler
-        self.onToggleSelection = onToggleSelection
         self.onRenameTrack = onRenameTrack
     }
 

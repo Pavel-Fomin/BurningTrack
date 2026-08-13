@@ -104,7 +104,9 @@ final class TrackArtworkBadgeStateFactoryTests: XCTestCase {
             isCurrent: false,
             isPlaying: false,
             isHighlighted: false,
-            isFavorite: true
+            isFavorite: true,
+            settings: .defaultValue,
+            collectionNavigationTarget: nil
         )
 
         XCTAssertEqual(row.artworkBadgeState, .source(.apple, isFavorite: true))

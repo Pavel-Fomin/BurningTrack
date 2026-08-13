@@ -17,13 +17,11 @@ final class LibraryTrackCommandHandlerTests: XCTestCase {
     func testUnavailableTrackRoutesToToastWithoutPlaybackOrSelection() {
         let toastPresenter = LibraryUnavailableToastPresenterSpy()
         let playbackController = LibraryUnavailablePlaybackControllerSpy()
-        var selectionToggleCount = 0
+        let screenOutput = LibraryUnavailableTracksActionOutputSpy()
         let handler = makeHandler(
             toastPresenter: toastPresenter,
             playbackController: playbackController,
-            onToggleSelection: {
-                selectionToggleCount += 1
-            }
+            screenOutput: screenOutput
         )
         let track = makeTrack(title: "Unavailable")
 
@@ -32,14 +30,14 @@ final class LibraryTrackCommandHandlerTests: XCTestCase {
         XCTAssertEqual(toastPresenter.events, [.trackUnavailable(title: "Unavailable")])
         XCTAssertTrue(playbackController.playedTrackIds.isEmpty)
         XCTAssertEqual(playbackController.togglePlayPauseCount, 0)
-        XCTAssertEqual(selectionToggleCount, 0)
+        XCTAssertTrue(screenOutput.toggledTrackIds.isEmpty)
     }
 
     /// Собирает handler с управляемыми зависимостями, не обращаясь к production ToastManager.
     private func makeHandler(
         toastPresenter: LibraryUnavailableToastPresenterSpy,
         playbackController: LibraryUnavailablePlaybackControllerSpy,
-        onToggleSelection: @escaping () -> Void
+        screenOutput: LibraryUnavailableTracksActionOutputSpy
     ) -> LibraryTrackCommandHandler {
         let playbackState = LibraryUnavailablePlaybackStateProviderSpy()
         let cloudController = LibraryCloudAvailabilityScreenController(
@@ -71,9 +69,7 @@ final class LibraryTrackCommandHandlerTests: XCTestCase {
             favoriteActionHandler: FavoriteTrackActionHandler(
                 favoritesService: LibraryUnavailableFavoritesServiceSpy()
             ),
-            onToggleSelection: { _ in
-                onToggleSelection()
-            },
+            screenActionHandler: LibraryTracksActionHandler(output: screenOutput),
             onRenameTrack: { _, _ in }
         )
     }
@@ -89,6 +85,26 @@ final class LibraryTrackCommandHandlerTests: XCTestCase {
             addedDate: Date()
         )
     }
+}
+
+/// Фиксирует действия selection-flow без обращения к production ViewModel.
+@MainActor
+private final class LibraryUnavailableTracksActionOutputSpy: LibraryTracksActionHandlingOutput {
+    private(set) var toggledTrackIds: [UUID] = []
+
+    func loadTracksIfNeeded() async {}
+    func refreshTracks() async {}
+    func selectSortMode(_: LibraryTrackSortMode) async {}
+    func startSelection() {}
+    func cancelSelection() {}
+
+    func toggleSelection(for trackId: UUID) {
+        toggledTrackIds.append(trackId)
+    }
+
+    func toggleSelectAll() {}
+    func selectBatchAction(_: BulkTrackAction) {}
+    func confirmBatchAction() {}
 }
 
 /// Фиксирует presentation-события без глобального ToastManager.

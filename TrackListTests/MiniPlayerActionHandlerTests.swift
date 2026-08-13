@@ -273,6 +273,10 @@ private final class MiniPlayerSettingsManagerSpy: SettingsManaging {
     func setLibraryRootDisplayMode(_ mode: LibraryRootDisplayMode) throws {}
     func setLibraryTrackSortMode(_ mode: LibraryTrackSortMode) throws {}
     func setTrackListsSortMode(_ mode: TrackListsSortMode?) throws {}
+
+    func applyPersistedTrackListsSortMode(_: TrackListsSortMode?) {
+        // Этот test double не хранит состояние сортировки треклистов.
+    }
 }
 
 /// Фиксирует вызов navigation capability без SheetActionCoordinator.shared.

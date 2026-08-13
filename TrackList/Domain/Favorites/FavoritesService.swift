@@ -18,27 +18,6 @@ final class FavoritesService: FavoritesServicing {
     /// Публикует результат собственной мутации, не заставляя ViewModel знать о сохранении.
     private let favoritesEvents: any FavoritesEventsPublishing
 
-    /// Создаёт сервис с общими менеджерами приложения для рабочих сценариев.
-    convenience init() {
-        self.init(
-            trackListsManager: TrackListsManager.shared,
-            trackListManager: TrackListManager.shared,
-            favoritesEvents: FavoritesEventCenter.shared
-        )
-    }
-
-    /// Сохраняет совместимость изолированных сценариев, передавая в них общий центр событий приложения.
-    convenience init(
-        trackListsManager: TrackListsManaging,
-        trackListManager: TrackListManaging
-    ) {
-        self.init(
-            trackListsManager: trackListsManager,
-            trackListManager: trackListManager,
-            favoritesEvents: FavoritesEventCenter.shared
-        )
-    }
-
     /// Создаёт сервис с явными зависимостями для изолированных сценариев и тестов.
     init(
         trackListsManager: TrackListsManaging,

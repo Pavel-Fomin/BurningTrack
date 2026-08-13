@@ -3212,6 +3212,10 @@ private final class TrackListsSettingsManagerSpy: SettingsManaging {
     func setTrackListsSortMode(_ mode: TrackListsSortMode?) throws {
         currentSettings.internalSettings.trackListsSortMode = mode
     }
+
+    func applyPersistedTrackListsSortMode(_: TrackListsSortMode?) {
+        // Этот test double не хранит состояние сортировки треклистов.
+    }
 }
 
 // Не публикует внешние события, чтобы проверка была ограничена первой загрузкой ViewModel.

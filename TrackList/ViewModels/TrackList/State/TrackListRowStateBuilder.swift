@@ -22,36 +22,7 @@ struct TrackListRowStateBuilder {
         self.artworkBadgeStateFactory = artworkBadgeStateFactory
     }
 
-    /// Собирает состояние строки трека.
-    ///
-    /// - Parameters:
-    ///   - track: Трек из треклиста.
-    ///   - snapshot: Runtime snapshot трека, если он уже загружен.
-    ///   - isCurrent: Является ли строка текущим треком.
-    ///   - isPlaying: Воспроизводится ли текущая строка.
-    ///   - isHighlighted: Нужно ли подсветить строку.
-    /// - Returns: Готовое состояние строки для UI.
-    func build(
-        track: Track,
-        snapshot: TrackRuntimeSnapshot?,
-        isCurrent: Bool,
-        isPlaying: Bool,
-        isHighlighted: Bool,
-        isFavorite: Bool
-    ) -> TrackListRowState {
-        build(
-            track: track,
-            snapshot: snapshot,
-            isCurrent: isCurrent,
-            isPlaying: isPlaying,
-            isHighlighted: isHighlighted,
-            isFavorite: isFavorite,
-            settings: AppSettingsManager.shared.settings,
-            collectionNavigationTarget: nil
-        )
-    }
-
-    /// Собирает состояние строки трека с явным менеджером настроек.
+    /// Собирает состояние строки трека с явным снимком настроек.
     ///
     /// - Parameters:
     ///   - track: Трек из треклиста.

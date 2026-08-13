@@ -35,7 +35,8 @@ final class FavoritesServiceTests: XCTestCase {
         let managers = makeManagers(favorites: favorites)
         let service = FavoritesService(
             trackListsManager: managers.trackLists,
-            trackListManager: managers.trackList
+            trackListManager: managers.trackList,
+            favoritesEvents: FavoritesEventsRecorder()
         )
 
         let result = try service.add(makeInput())
@@ -50,7 +51,8 @@ final class FavoritesServiceTests: XCTestCase {
         let managers = makeManagers(favorites: nil)
         let service = FavoritesService(
             trackListsManager: managers.trackLists,
-            trackListManager: managers.trackList
+            trackListManager: managers.trackList,
+            favoritesEvents: FavoritesEventsRecorder()
         )
 
         XCTAssertFalse(try service.isFavorite(trackId: UUID()))
@@ -81,7 +83,8 @@ final class FavoritesServiceTests: XCTestCase {
         )
         let service = FavoritesService(
             trackListsManager: managers.trackLists,
-            trackListManager: managers.trackList
+            trackListManager: managers.trackList,
+            favoritesEvents: FavoritesEventsRecorder()
         )
         let input = makeInput(
             title: "Local title",
@@ -115,7 +118,8 @@ final class FavoritesServiceTests: XCTestCase {
         let managers = makeManagers(favorites: favorites)
         let service = FavoritesService(
             trackListsManager: managers.trackLists,
-            trackListManager: managers.trackList
+            trackListManager: managers.trackList,
+            favoritesEvents: FavoritesEventsRecorder()
         )
         let input = makeInput()
 
@@ -155,7 +159,8 @@ final class FavoritesServiceTests: XCTestCase {
         )
         let service = FavoritesService(
             trackListsManager: managers.trackLists,
-            trackListManager: managers.trackList
+            trackListManager: managers.trackList,
+            favoritesEvents: FavoritesEventsRecorder()
         )
 
         XCTAssertTrue(try service.isFavorite(trackId: duplicatedTrackId))
@@ -177,7 +182,8 @@ final class FavoritesServiceTests: XCTestCase {
         let managers = makeManagers(favorites: favorites)
         let service = FavoritesService(
             trackListsManager: managers.trackLists,
-            trackListManager: managers.trackList
+            trackListManager: managers.trackList,
+            favoritesEvents: FavoritesEventsRecorder()
         )
         let first = makeInput()
         let second = makeInput()
@@ -201,7 +207,8 @@ final class FavoritesServiceTests: XCTestCase {
         let managers = makeManagers(favorites: favorites)
         let service = FavoritesService(
             trackListsManager: managers.trackLists,
-            trackListManager: managers.trackList
+            trackListManager: managers.trackList,
+            favoritesEvents: FavoritesEventsRecorder()
         )
         let trackId = UUID()
         let original = LibraryTrack(
@@ -235,7 +242,8 @@ final class FavoritesServiceTests: XCTestCase {
         let managers = makeManagers(favorites: favorites)
         let service = FavoritesService(
             trackListsManager: managers.trackLists,
-            trackListManager: managers.trackList
+            trackListManager: managers.trackList,
+            favoritesEvents: FavoritesEventsRecorder()
         )
         let source = PurchasedITunesTrack(
             id: 9001,
@@ -276,7 +284,8 @@ final class FavoritesServiceTests: XCTestCase {
         let managers = makeManagers(favorites: favorites)
         let service = FavoritesService(
             trackListsManager: managers.trackLists,
-            trackListManager: managers.trackList
+            trackListManager: managers.trackList,
+            favoritesEvents: FavoritesEventsRecorder()
         )
         let input = makeInput()
         let first = Task { @MainActor in
@@ -583,8 +592,19 @@ final class FavoritesServiceTests: XCTestCase {
         let favorites = try trackListsManager.ensureFavoritesTrackList()
         let first = makeTrack(trackId: UUID(), title: "First")
         let second = makeTrack(trackId: UUID(), title: "Second")
+        // Повторное вхождение того же трека имеет отдельный listItemId,
+        // потому что каждая строка треклиста хранится как самостоятельный элемент.
+        let secondDuplicate = Track(
+            listItemId: UUID(),
+            trackId: second.trackId,
+            title: second.title,
+            artist: second.artist,
+            duration: second.duration,
+            fileName: second.fileName,
+            isAvailable: second.isAvailable
+        )
 
-        XCTAssertTrue(trackListManager.saveTracks([first, second, second], for: favorites.id))
+        XCTAssertTrue(trackListManager.saveTracks([first, second, secondDuplicate], for: favorites.id))
         XCTAssertEqual(
             eventsRecorder.events,
             [
@@ -603,7 +623,7 @@ final class FavoritesServiceTests: XCTestCase {
             fileName: first.fileName,
             isAvailable: first.isAvailable
         )
-        XCTAssertTrue(trackListManager.saveTracks([second, changedSnapshot, second], for: favorites.id))
+        XCTAssertTrue(trackListManager.saveTracks([second, changedSnapshot, secondDuplicate], for: favorites.id))
         XCTAssertEqual(eventsRecorder.events, [])
 
         XCTAssertTrue(trackListManager.saveTracks([second], for: favorites.id))

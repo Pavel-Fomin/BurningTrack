@@ -12,27 +12,6 @@ import Foundation
 protocol LibraryCollectionValuesProvider {
     /// Возвращает значения выбранного раздела коллекции из сохранённых SQLite metadata.
     func values(for category: LibraryCollectionCategory) async -> [LibraryCollectionValue]
-
-    /// Возвращает значения нескольких разделов из одного общего снимка SQLite metadata.
-    func values(
-        for categories: [LibraryCollectionCategory]
-    ) async -> [LibraryCollectionCategory: [LibraryCollectionValue]]
-}
-
-extension LibraryCollectionValuesProvider {
-    /// Даёт совместимую реализацию пакетной загрузки для provider-ов,
-    /// которые пока умеют читать только один раздел за раз.
-    func values(
-        for categories: [LibraryCollectionCategory]
-    ) async -> [LibraryCollectionCategory: [LibraryCollectionValue]] {
-        var valuesByCategory: [LibraryCollectionCategory: [LibraryCollectionValue]] = [:]
-
-        for category in categories {
-            valuesByCategory[category] = await values(for: category)
-        }
-
-        return valuesByCategory
-    }
 }
 
 /// Provider готовых строк корня режима "Треки".
@@ -49,7 +28,7 @@ final class DefaultLibraryCollectionValuesProvider: LibraryCollectionValuesProvi
 
     // MARK: - Init
 
-    init(trackRegistry: TrackRegistry = .shared) {
+    init(trackRegistry: TrackRegistry) {
         self.trackRegistry = trackRegistry
     }
 
@@ -59,13 +38,6 @@ final class DefaultLibraryCollectionValuesProvider: LibraryCollectionValuesProvi
     func values(for category: LibraryCollectionCategory) async -> [LibraryCollectionValue] {
         let snapshot = await makeSnapshot(for: [category])
         return snapshot.valuesByCategory[category] ?? []
-    }
-
-    /// Возвращает значения всех переданных разделов одним чтением треков и metadata.
-    func values(
-        for categories: [LibraryCollectionCategory]
-    ) async -> [LibraryCollectionCategory: [LibraryCollectionValue]] {
-        await makeSnapshot(for: categories).valuesByCategory
     }
 
     // MARK: - LibraryCollectionRootItemsProvider

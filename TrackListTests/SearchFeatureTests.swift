@@ -308,6 +308,10 @@ private final class SearchSettingsManagerSpy: SettingsManaging {
     func setLibraryRootDisplayMode(_: LibraryRootDisplayMode) throws {}
     func setLibraryTrackSortMode(_: LibraryTrackSortMode) throws {}
     func setTrackListsSortMode(_: TrackListsSortMode?) throws {}
+
+    func applyPersistedTrackListsSortMode(_: TrackListsSortMode?) {
+        // Этот test double не хранит состояние сортировки треклистов.
+    }
 }
 
 /// Предоставляет подтверждённое пустое состояние «Избранного» для ViewModel Search.

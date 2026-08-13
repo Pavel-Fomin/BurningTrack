@@ -48,17 +48,15 @@ final class LibraryScreenViewModel: ObservableObject {
         musicLibraryManager: MusicLibraryManager,
         stateBuilder: LibraryScreenStateBuilder,
         actionHandler: LibraryScreenActionHandler,
-        collectionRootItemsProvider: (any LibraryCollectionRootItemsProvider)? = nil,
-        trackEventProvider: (any LibraryTrackEventProvider)? = nil
+        collectionRootItemsProvider: any LibraryCollectionRootItemsProvider,
+        trackEventProvider: any LibraryTrackEventProvider
     ) {
         self.navigationCoordinator = navigationCoordinator
         self.musicLibraryManager = musicLibraryManager
         self.stateBuilder = stateBuilder
         self.actionHandler = actionHandler
         self.collectionRootItemsProvider = collectionRootItemsProvider
-            ?? DefaultLibraryCollectionValuesProvider()
         self.trackEventProvider = trackEventProvider
-            ?? NotificationLibraryTrackEventProvider()
         self.screenState = stateBuilder.build(
             navigationCoordinator: navigationCoordinator,
             musicLibraryManager: musicLibraryManager
