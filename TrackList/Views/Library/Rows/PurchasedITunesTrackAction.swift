@@ -14,6 +14,8 @@ import Foundation
 enum PurchasedITunesTrackAction {
     /// Пользователь запросил воспроизведение или паузу строки.
     case play(track: PurchasedITunesPlayableTrack)
+    /// Пользователь нажал недоступную строку; обработчик показывает существующий Toast.
+    case unavailableTrackTapped(track: PurchasedITunesPlayableTrack)
     /// Пользователь запросил копирование через выбор папки назначения.
     case copy(track: PurchasedITunesPlayableTrack)
     /// Пользователь запросил карточку "О треке" для runtime iTunes-трека.

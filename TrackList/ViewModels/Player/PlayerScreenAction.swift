@@ -24,6 +24,11 @@ enum PlayerScreenAction {
         queueItemId: UUID
     )
 
+    /// Пользователь нажал недоступный элемент очереди; playback не запускается.
+    case unavailableTrackTapped(
+        queueItemId: UUID
+    )
+
     /// Перемещает выбранные строки в новую позицию плейлиста.
     case moveTracks(
         from: IndexSet,

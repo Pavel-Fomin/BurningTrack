@@ -43,6 +43,9 @@ struct PurchasedITunesTrackRowContainer: View {
             artist: state.artist,
             duration: state.duration,
             onRowTap: play,
+            onUnavailableTap: {
+                onAction(.unavailableTrackTapped(track: state.track))
+            },
             showsFileFormat: false
         ) {
             purchasedITunesActionMenuContent

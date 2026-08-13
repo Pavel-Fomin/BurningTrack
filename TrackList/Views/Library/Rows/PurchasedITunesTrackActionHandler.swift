@@ -65,6 +65,11 @@ final class PurchasedITunesTrackActionHandler {
         case .play(let track):
             play(track: track, context: playbackContext)
 
+        case .unavailableTrackTapped(let track):
+            toastPresenter.handle(
+                .trackUnavailable(title: track.title ?? track.fileName)
+            )
+
         case .copy(let track):
             sheetRouter.presentCopyPurchasedITunesToFolder(for: track)
 

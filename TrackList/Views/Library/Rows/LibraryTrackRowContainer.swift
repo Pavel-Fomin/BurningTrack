@@ -64,6 +64,11 @@ struct LibraryTrackRowContainer: View {
                     )
                 )
             },
+            onUnavailableTap: {
+                commandHandler.handle(
+                    .unavailableTrackTapped(track: rowState.track)
+                )
+            },
             showsSelection: rowState.showsSelection,
             isSelected: rowState.isSelected,
             onToggleSelection: {

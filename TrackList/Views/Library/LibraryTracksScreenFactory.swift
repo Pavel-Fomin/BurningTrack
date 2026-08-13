@@ -9,7 +9,7 @@
 
 import SwiftUI
 
-/// Собирает folder-вариант Library Tracks и удерживает production composition вне SwiftUI View.
+/// Собирает варианты Library Tracks и удерживает production composition вне SwiftUI View.
 @MainActor
 struct LibraryTracksScreenFactory {
     private let tracksProvider: LibraryTracksProvider
@@ -94,12 +94,31 @@ struct LibraryTracksScreenFactory {
         )
     }
 
+    /// Возвращает контейнер списка общего раздела или выбранного значения коллекции.
+    /// Стабильный source передаётся до создания StateObject, чтобы graph не переживал смену collection destination.
+    func makeLibraryCollectionTracksContainer(
+        source: LibraryTrackListSource,
+        selectionActionBarConfig: Binding<SelectionActionBarConfig?>,
+        selectionActionSender: Binding<(any LibraryTracksActionSending)?>,
+        onAllTracksAction: ((LibraryAllTracksAction) -> Void)? = nil,
+        onCollectionTracksAction: ((LibraryCollectionTracksAction) -> Void)? = nil
+    ) -> LibraryCollectionTracksContainer {
+        LibraryCollectionTracksContainer(
+            factory: self,
+            source: source,
+            selectionActionBarConfig: selectionActionBarConfig,
+            selectionActionSender: selectionActionSender,
+            onAllTracksAction: onAllTracksAction,
+            onCollectionTracksAction: onCollectionTracksAction
+        )
+    }
+
     /// Собирает ViewModel папки для selection-flow без создания production-зависимостей во View.
     func makeSelectionTracksViewModel(
         folder: LibraryFolder
     ) -> LibraryTracksViewModel {
         makeTracksViewModel(
-            folder: folder,
+            source: .folder(folderId: folder.id),
             usesLibrarySortSettings: false
         )
     }
@@ -120,7 +139,7 @@ struct LibraryTracksScreenFactory {
         revealRequest: LibraryRevealRequest?
     ) -> LibraryTracksScreenStore {
         let viewModel = makeTracksViewModel(
-            folder: folder,
+            source: .folder(folderId: folder.id),
             usesLibrarySortSettings: true
         )
         let presenter = LibraryTracksPresenter(
@@ -172,13 +191,73 @@ struct LibraryTracksScreenFactory {
         )
     }
 
-    /// Создаёт общую ViewModel папки, изолируя её production-зависимости внутри Library Tracks factory.
+    /// Собирает screen-local graph списка общего раздела или значения коллекции один раз на destination.
+    func makeCollectionScreenStore(
+        source: LibraryTrackListSource
+    ) -> LibraryCollectionTracksScreenStore {
+        let viewModel = makeTracksViewModel(
+            source: source,
+            usesLibrarySortSettings: false
+        )
+        let presenter = LibraryTracksPresenter(
+            output: viewModel,
+            selectionActionBarCoordinator: LibrarySelectionActionBarCoordinator()
+        )
+        let actionHandler = LibraryTracksActionHandler(output: viewModel)
+        viewModel.configure(actionHandler: actionHandler, presenter: presenter)
+
+        let cloudController = LibraryCloudAvailabilityScreenController(
+            availabilityController: CloudTrackAvailabilityController(
+                manager: cloudAvailabilityManager
+            )
+        )
+        let cloudAvailabilityActionHandler = LibraryCloudAvailabilityActionHandler(
+            controller: cloudController
+        )
+        let presentationHandler = LibraryTrackPresentationHandler(metadataProvider: viewModel)
+        let commandHandler = LibraryTrackCommandHandler(
+            sheetManager: sheetManager,
+            playbackHandler: LibraryTrackPlaybackHandler(
+                playbackStateProvider: playbackStateProvider,
+                playbackController: playbackController,
+                source: source.playbackContextSource
+            ),
+            presentationHandler: presentationHandler,
+            cloudAvailabilityActionHandler: cloudAvailabilityActionHandler,
+            collectionNavigationHandler: collectionNavigationHandler,
+            trackShareActionHandler: trackShareActionHandler,
+            commandExecutor: commandExecutor,
+            toastManager: toastManager,
+            favoriteActionHandler: favoriteTrackActionHandler,
+            screenActionHandler: actionHandler,
+            onRenameTrack: { [weak viewModel] trackId, strategy in
+                viewModel?.renameTrack(trackId: trackId, strategy: strategy)
+            }
+        )
+
+        return LibraryCollectionTracksScreenStore(
+            source: source,
+            tracksViewModel: viewModel,
+            cloudAvailabilityController: cloudController,
+            cloudAvailabilityActionHandler: cloudAvailabilityActionHandler,
+            settingsManager: settingsManager,
+            playbackStateController: LibraryTrackPlaybackStateController(
+                playbackStateProvider: playbackStateProvider
+            ),
+            presentationHandler: presentationHandler,
+            commandHandler: commandHandler,
+            favoriteTrackIdsProvider: favoriteTrackIdsProvider,
+            sheetManager: sheetManager
+        )
+    }
+
+    /// Создаёт общую ViewModel списка, изолируя её production-зависимости внутри Library Tracks factory.
     private func makeTracksViewModel(
-        folder: LibraryFolder,
+        source: LibraryTrackListSource,
         usesLibrarySortSettings: Bool
     ) -> LibraryTracksViewModel {
         LibraryTracksViewModel(
-            folderURL: folder.url,
+            source: source,
             renameActionHandler: renameActionHandler,
             tracksProvider: tracksProvider,
             badgeProvider: badgeProvider,

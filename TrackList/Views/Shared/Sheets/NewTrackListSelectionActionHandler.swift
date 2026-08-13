@@ -42,6 +42,13 @@ final class NewTrackListSelectionActionHandler {
         router.dismissNewTrackListSelection(routeID)
     }
 
+    /// Показывает существующее сообщение для недоступного трека, не меняя selection и доменную операцию.
+    func presentUnavailableTrack(_ track: LibraryTrack) {
+        toastPresenter.handle(
+            .trackUnavailable(title: track.title ?? track.fileName)
+        )
+    }
+
     /// Создаёт треклист с выбранными треками или добавляет их в существующий.
     func submit(
         selectedTracks: [LibraryTrack]

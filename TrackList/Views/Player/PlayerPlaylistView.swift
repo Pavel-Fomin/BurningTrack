@@ -22,6 +22,11 @@ struct PlayerPlaylistView: View {
                     .playPause(queueItemId: queueItemId)
                 )
             },
+            onUnavailableTrackTap: { queueItemId in
+                screenViewModel.handle(
+                    .unavailableTrackTapped(queueItemId: queueItemId)
+                )
+            },
             onMoveTracks: { from, to in
                 screenViewModel.handle(
                     .moveTracks(

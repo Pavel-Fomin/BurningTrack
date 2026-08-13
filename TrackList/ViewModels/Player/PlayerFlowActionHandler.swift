@@ -58,6 +58,8 @@ final class PlayerFlowActionHandler {
         switch action {
         case .playPause(let queueItemId):
             playbackActionHandler.playPause(queueItemId: queueItemId)
+        case .unavailableTrackTapped(let queueItemId):
+            presentationActionHandler.presentUnavailableTrack(queueItemId: queueItemId)
         case .moveTracks(let from, let to):
             queueActionHandler.moveTracks(from: from, to: to)
         case .deleteTrack(let queueItemId):

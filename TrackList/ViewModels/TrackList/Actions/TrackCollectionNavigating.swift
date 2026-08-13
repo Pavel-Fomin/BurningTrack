@@ -18,3 +18,15 @@ protocol TrackCollectionNavigating {
     /// Открывает альбом из сохранённой цели строки.
     func openAlbum(target: TrackCollectionNavigationTarget)
 }
+
+/// Открывает значения коллекции по идентификатору трека для строк Library и Player.
+@MainActor
+protocol TrackCollectionIdentifierNavigating {
+    /// Открывает значение артиста текущего трека.
+    func openArtist(trackId: UUID)
+
+    /// Открывает значение альбома текущего трека.
+    func openAlbum(trackId: UUID)
+}
+
+extension TrackCollectionNavigationHandler: TrackCollectionIdentifierNavigating {}

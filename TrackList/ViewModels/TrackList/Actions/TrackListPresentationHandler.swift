@@ -69,6 +69,15 @@ final class TrackListPresentationHandler {
         presenter.presentTrackDetail(track)
     }
 
+    /// Показывает существующее сообщение о недоступности без обращения к playback handler.
+    func presentUnavailableTrack(rowId: UUID) {
+        guard let track = reader.track(forRowId: rowId) else { return }
+
+        toastPresenter.handle(
+            .trackUnavailable(title: track.title ?? track.fileName)
+        )
+    }
+
     /// Передаёт локальный или iTunes-трек в общий flow подготовки и системной отправки.
     func shareTrack(rowId: UUID) {
         guard let track = reader.track(forRowId: rowId) else { return }

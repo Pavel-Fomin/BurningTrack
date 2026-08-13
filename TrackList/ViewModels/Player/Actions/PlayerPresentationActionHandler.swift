@@ -9,6 +9,15 @@
 
 import Foundation
 
+/// Выполняет единственный sheet-навигационный маршрут, который нужен Player presentation-flow.
+@MainActor
+protocol PlayerSheetActionCoordinating {
+    /// Открывает трек в фонотеке через существующий глобальный navigation-flow.
+    func showInLibrary(_ track: any TrackDisplayable)
+}
+
+extension SheetActionCoordinator: PlayerSheetActionCoordinating {}
+
 /// Выполняет presentation-действия экрана плеера.
 ///
 /// Handler отвечает за:
@@ -28,12 +37,12 @@ final class PlayerPresentationActionHandler {
     private let sheetManager: SheetManager
 
     /// Координатор sheet/navigation действий.
-    private let sheetActionCoordinator: SheetActionCoordinator
+    private let sheetActionCoordinator: any PlayerSheetActionCoordinating
 
     /// Презентер пользовательских сообщений.
     private let toastPresenter: any ToastPresenting
     /// Обработчик переходов к значениям музыкальной коллекции.
-    private let collectionNavigationHandler: TrackCollectionNavigationHandler
+    private let collectionNavigationHandler: any TrackCollectionIdentifierNavigating
     /// Общий action flow отправки трека.
     private let trackShareActionHandler: TrackShareActionHandler
     /// Общий обработчик «Избранного» выполняет сохранение ниже Player-flow.
@@ -44,9 +53,9 @@ final class PlayerPresentationActionHandler {
     init(
         playlistManager: PlaylistManager,
         sheetManager: SheetManager,
-        sheetActionCoordinator: SheetActionCoordinator,
+        sheetActionCoordinator: any PlayerSheetActionCoordinating,
         toastPresenter: any ToastPresenting,
-        collectionNavigationHandler: TrackCollectionNavigationHandler,
+        collectionNavigationHandler: any TrackCollectionIdentifierNavigating,
         trackShareActionHandler: TrackShareActionHandler,
         favoriteActionHandler: FavoriteTrackActionHandler
     ) {
@@ -64,6 +73,15 @@ final class PlayerPresentationActionHandler {
     /// Открывает сценарий сохранения плейлиста как треклиста.
     func saveTrackList() {
         sheetManager.presentSaveTrackList()
+    }
+
+    /// Показывает существующее сообщение для недоступного элемента, не выполняя playback-действие.
+    func presentUnavailableTrack(queueItemId: UUID) {
+        guard let track = track(queueItemId: queueItemId) else { return }
+
+        toastPresenter.handle(
+            .trackUnavailable(title: track.title ?? track.fileName)
+        )
     }
 
     /// Открывает расположение элемента очереди плеера в фонотеке.

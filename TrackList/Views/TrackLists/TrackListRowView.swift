@@ -20,6 +20,7 @@ struct TrackListRowView: View {
     
     let state: TrackListRowState /// Готовое состояние строки треклиста
     let onTap: () -> Void        /// Тап по строке (воспроизведение / пауза)
+    let onUnavailableTap: () -> Void /// Нажатие на недоступную строку
     let onDelete: () -> Void     /// Удаление строки (локальное действие)
     let onShareTrack: () -> Void /// Отправка аудиофайла трека
     let onCopyTrack: () -> Void  /// Копирование iTunes-трека
@@ -63,6 +64,7 @@ struct TrackListRowView: View {
             artist: state.artist,
             duration: state.duration,
             onRowTap: onTap,                    /// Правая зона — воспроизведение / пауза
+            onUnavailableTap: onUnavailableTap,
             showsFileFormat: state.showsFileFormat
         ) {
             trackListActionMenuContent

@@ -19,6 +19,8 @@ struct TrackSelectableSectionsView: View {
 
     /// Передаёт действие выбора владельцу состояния sheet.
     let onToggleSelection: (LibraryTrack) -> Void
+    /// Передаёт недоступную строку feature-local action маршруту без мутации выбора.
+    let onUnavailableTap: (LibraryTrack) -> Void
 
     /// Запрашивает runtime snapshot через ViewModel фонотеки.
     let onRequestSnapshot: (UUID) -> Void
@@ -34,6 +36,9 @@ struct TrackSelectableSectionsView: View {
                         state: row,
                         onToggleSelection: {
                             onToggleSelection(row.track)
+                        },
+                        onUnavailableTap: {
+                            onUnavailableTap(row.track)
                         },
                         onRequestSnapshot: onRequestSnapshot
                     )

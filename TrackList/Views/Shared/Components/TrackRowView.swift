@@ -30,6 +30,8 @@ struct TrackRowView<ActionMenuContent: View>: View {
     let artist: String?
     let duration: Double?
     let onRowTap: () -> Void          /// Тап по правой части строки (воспроизведение / пауза)
+    /// Передаёт feature-local намерение для недоступного содержимого без знания Toast во View.
+    let onUnavailableTap: () -> Void
     let showsSelection: Bool          /// Показывать radio или нет
     let isSelected: Bool              /// Radio (пустой / выбранный)
     let onToggleSelection: (() -> Void)?
@@ -56,6 +58,7 @@ struct TrackRowView<ActionMenuContent: View>: View {
         artist: String?,
         duration: Double?,
         onRowTap: @escaping () -> Void,
+        onUnavailableTap: @escaping () -> Void = {},
         showsSelection: Bool = false,
         isSelected: Bool = false,
         onToggleSelection: (() -> Void)? = nil,
@@ -78,6 +81,7 @@ struct TrackRowView<ActionMenuContent: View>: View {
             artist: artist,
             duration: duration,
             onRowTap: onRowTap,
+            onUnavailableTap: onUnavailableTap,
             showsSelection: showsSelection,
             isSelected: isSelected,
             onToggleSelection: onToggleSelection,
@@ -102,6 +106,7 @@ struct TrackRowView<ActionMenuContent: View>: View {
         artist: String?,
         duration: Double?,
         onRowTap: @escaping () -> Void,
+        onUnavailableTap: @escaping () -> Void = {},
         showsSelection: Bool = false,
         isSelected: Bool = false,
         onToggleSelection: (() -> Void)? = nil,
@@ -123,6 +128,7 @@ struct TrackRowView<ActionMenuContent: View>: View {
         self.artist = artist
         self.duration = duration
         self.onRowTap = onRowTap
+        self.onUnavailableTap = onUnavailableTap
         self.showsSelection = showsSelection
         self.isSelected = isSelected
         self.onToggleSelection = onToggleSelection
@@ -210,9 +216,7 @@ struct TrackRowView<ActionMenuContent: View>: View {
     /// Выполняет единое действие строки для основной области строки.
     private func handleRowTap() {
         guard isContentAvailable else {
-            ToastManager.shared.handle(
-                .trackUnavailable(title: track.title ?? track.fileName)
-            )
+            onUnavailableTap()
             return
         }
 
@@ -384,6 +388,7 @@ extension TrackRowView where ActionMenuContent == EmptyView {
         artist: String?,
         duration: Double?,
         onRowTap: @escaping () -> Void,
+        onUnavailableTap: @escaping () -> Void = {},
         showsSelection: Bool = false,
         isSelected: Bool = false,
         onToggleSelection: (() -> Void)? = nil,
@@ -404,6 +409,7 @@ extension TrackRowView where ActionMenuContent == EmptyView {
             artist: artist,
             duration: duration,
             onRowTap: onRowTap,
+            onUnavailableTap: onUnavailableTap,
             showsSelection: showsSelection,
             isSelected: isSelected,
             onToggleSelection: onToggleSelection,

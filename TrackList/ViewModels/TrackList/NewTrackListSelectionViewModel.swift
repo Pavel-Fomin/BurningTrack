@@ -74,6 +74,9 @@ final class NewTrackListSelectionViewModel: ObservableObject {
         case let .toggleTrack(track):
             toggle(track)
 
+        case let .unavailableTrackTapped(track):
+            actionHandler.presentUnavailableTrack(track)
+
         case let .selectAll(tracks):
             selectAll(tracks)
 

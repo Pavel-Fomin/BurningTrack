@@ -15,20 +15,8 @@ struct LibraryCollectionTracksView: View {
 
     /// Источник списка, соответствующий выбранному значению коллекции.
     let source: LibraryTrackListSource
-    /// Реактивное playback-состояние для строк и прокрутки к текущему треку.
-    let playbackStateProvider: any PlaybackStateProviding
-    /// Команды запуска и toggle для строк выбранной коллекции.
-    let playbackController: any TrackPlaybackControlling
-    /// Published-состояние «Избранного» для presentation state строк.
-    let favoriteTrackIdsProvider: any FavoriteTrackIdsProviding
-    /// Общий обработчик одиночного переименования файла.
-    let renameActionHandler: TrackFileRenameActionHandler
-    /// Единый обработчик «Избранного» передаётся в строки выбранной коллекции.
-    let favoriteTrackActionHandler: FavoriteTrackActionHandler
-    /// Тонкий маршрутизатор Batch Tag Edit передаётся из composition root.
-    let batchTagEditHandler: LibraryBatchTagEditHandler
-    /// Тонкий маршрутизатор Batch Filename Rename передаётся из composition root.
-    let batchRenameHandler: LibraryBatchRenameHandler
+    /// Готовый screen-local graph, собранный контейнером через factory.
+    let screenStore: LibraryCollectionTracksScreenStore
     /// Конфигурация нижней панели массового выбора в общем host фонотеки.
     @Binding var selectionActionBarConfig: SelectionActionBarConfig?
     @Binding var selectionActionSender: (any LibraryTracksActionSending)?
@@ -37,18 +25,16 @@ struct LibraryCollectionTracksView: View {
     /// Передаёт действия выбранного значения коллекции отдельному обработчику экспорта.
     let onCollectionTracksAction: ((LibraryCollectionTracksAction) -> Void)?
 
-    // MARK: - Environment
-
     @Environment(\.scenePhase) private var scenePhase
-    /// Передаётся существующим row ActionHandler-ам, но не используется экраном для Sheet lifecycle.
-    @EnvironmentObject var sheetManager: SheetManager
 
     // MARK: - ViewModel
 
-    @StateObject private var tracksViewModel: LibraryTracksViewModel
-    @State private var cloudAvailabilityController = LibraryCloudAvailabilityScreenController()
-    @ObservedObject private var settingsManager = AppSettingsManager.shared
-    @StateObject private var playbackStateController: LibraryTrackPlaybackStateController
+    /// View наблюдает готовые объекты graph, не создавая production-зависимости самостоятельно.
+    @ObservedObject private var tracksViewModel: LibraryTracksViewModel
+    @ObservedObject private var settingsManager: AppSettingsManager
+    @ObservedObject private var playbackStateController: LibraryTrackPlaybackStateController
+    /// Следит за подсветкой строки, которой управляет общий SheetHost.
+    @ObservedObject private var sheetManager: SheetManager
     /// Локальный снимок сохраняет реактивность строк без наблюдения PlayerViewModel.
     @State private var favoriteTrackIds: Set<UUID>
 
@@ -65,64 +51,25 @@ struct LibraryCollectionTracksView: View {
 
     init(
         source: LibraryTrackListSource,
-        playbackStateProvider: any PlaybackStateProviding,
-        playbackController: any TrackPlaybackControlling,
-        favoriteTrackIdsProvider: any FavoriteTrackIdsProviding,
-        renameActionHandler: TrackFileRenameActionHandler,
-        favoriteTrackActionHandler: FavoriteTrackActionHandler,
-        batchTagEditHandler: LibraryBatchTagEditHandler,
-        batchRenameHandler: LibraryBatchRenameHandler,
+        screenStore: LibraryCollectionTracksScreenStore,
         selectionActionBarConfig: Binding<SelectionActionBarConfig?> = .constant(nil),
         selectionActionSender: Binding<(any LibraryTracksActionSending)?> = .constant(nil),
         onAllTracksAction: ((LibraryAllTracksAction) -> Void)? = nil,
         onCollectionTracksAction: ((LibraryCollectionTracksAction) -> Void)? = nil
     ) {
         self.source = source
-        self.playbackStateProvider = playbackStateProvider
-        self.playbackController = playbackController
-        self.favoriteTrackIdsProvider = favoriteTrackIdsProvider
-        self.renameActionHandler = renameActionHandler
-        self.favoriteTrackActionHandler = favoriteTrackActionHandler
-        self.batchTagEditHandler = batchTagEditHandler
-        self.batchRenameHandler = batchRenameHandler
+        self.screenStore = screenStore
         self._selectionActionBarConfig = selectionActionBarConfig
         self._selectionActionSender = selectionActionSender
         self.onAllTracksAction = onAllTracksAction
         self.onCollectionTracksAction = onCollectionTracksAction
         self._favoriteTrackIds = State(
-            initialValue: favoriteTrackIdsProvider.favoriteTrackIds
+            initialValue: screenStore.favoriteTrackIdsProvider.favoriteTrackIds
         )
-        self._playbackStateController = StateObject(
-            wrappedValue: LibraryTrackPlaybackStateController(
-                playbackStateProvider: playbackStateProvider
-            )
-        )
-        let tracksViewModel = LibraryTracksViewModel(
-            source: source,
-            renameActionHandler: renameActionHandler,
-            tracksProvider: FastLibraryTracksProvider(),
-            badgeProvider: DefaultTrackListBadgeProvider(),
-            eventProvider: NotificationLibraryTrackEventProvider(),
-            runtimeController: LibraryTrackRuntimeController(),
-            settingsManager: AppSettingsManager.shared,
-            trackRegistry: TrackRegistry.shared,
-            musicLibraryManager: MusicLibraryManager.shared,
-            trackURLProvider: { trackId in
-                await BookmarkResolver.url(forTrack: trackId)
-            },
-            batchRenameHandler: batchRenameHandler,
-            batchTagEditHandler: batchTagEditHandler
-        )
-        let presenter = LibraryTracksPresenter(
-            output: tracksViewModel,
-            selectionActionBarCoordinator: LibrarySelectionActionBarCoordinator()
-        )
-        let actionHandler = LibraryTracksActionHandler(output: tracksViewModel)
-        tracksViewModel.configure(
-            actionHandler: actionHandler,
-            presenter: presenter
-        )
-        self._tracksViewModel = StateObject(wrappedValue: tracksViewModel)
+        self.tracksViewModel = screenStore.tracksViewModel
+        self.settingsManager = screenStore.settingsManager
+        self.playbackStateController = screenStore.playbackStateController
+        self.sheetManager = screenStore.sheetManager
     }
 
     // MARK: - Производное состояние
@@ -143,13 +90,6 @@ struct LibraryCollectionTracksView: View {
     /// Все видимые треки текущих секций для передачи в строки списком контекста.
     private var allVisibleTracks: [LibraryTrack] {
         tracksViewModel.trackSections.flatMap(\.tracks)
-    }
-
-    /// Обрабатывает iCloud-действия на уровне экрана, а не жизненного цикла каждой строки.
-    private var cloudAvailabilityActionHandler: LibraryCloudAvailabilityActionHandler {
-        LibraryCloudAvailabilityActionHandler(
-            controller: cloudAvailabilityController
-        )
     }
 
     /// Показывает экспорт внутри общего меню только для общего списка фонотеки.
@@ -210,11 +150,11 @@ struct LibraryCollectionTracksView: View {
             .onChange(of: tracksViewModel.bulkSelection.selectedCount) { _, _ in
                 updateSelectionActionBarConfig()
             }
-            .onReceive(favoriteTrackIdsProvider.favoriteTrackIdsPublisher) { favoriteTrackIds in
+            .onReceive(screenStore.favoriteTrackIdsProvider.favoriteTrackIdsPublisher) { favoriteTrackIds in
                 self.favoriteTrackIds = favoriteTrackIds
             }
             .onDisappear {
-                cloudAvailabilityActionHandler.handle(.screenDidDisappear)
+                screenStore.cloudAvailabilityActionHandler.handle(.screenDidDisappear)
                 selectionActionBarConfig = nil
                 selectionActionSender = nil
             }
@@ -273,31 +213,6 @@ struct LibraryCollectionTracksView: View {
 
     /// Список треков с обработчиками прокрутки и lifecycle списка.
     private var tracksListView: some View {
-        let presentationHandler = LibraryTrackPresentationHandler(
-            metadataProvider: tracksViewModel
-        )
-        let commandHandler = LibraryTrackCommandHandler(
-            sheetManager: sheetManager,
-            playbackHandler: LibraryTrackPlaybackHandler(
-                playbackStateProvider: playbackStateProvider,
-                playbackController: playbackController,
-                source: playbackSource
-            ),
-            presentationHandler: presentationHandler,
-            cloudAvailabilityActionHandler: cloudAvailabilityActionHandler,
-            collectionNavigationHandler: .shared,
-            trackShareActionHandler: .shared,
-            commandExecutor: .shared,
-            toastManager: .shared,
-            favoriteActionHandler: favoriteTrackActionHandler,
-            onToggleSelection: { trackId in
-                tracksViewModel.toggleSelection(for: trackId)
-            },
-            onRenameTrack: { trackId, strategy in
-                tracksViewModel.renameTrack(trackId: trackId, strategy: strategy)
-            }
-        )
-
         return ScrollViewReader { proxy in
             List {
                 LibraryTrackSectionsListView(
@@ -306,11 +221,11 @@ struct LibraryCollectionTracksView: View {
                     playbackSource: playbackSource,
                     currentCollectionCategory: source.collectionCategory,
                     trackListMembershipsById: tracksViewModel.trackListMembershipsById,
-                    presentationHandler: presentationHandler,
-                    cloudAvailabilityStateStore: cloudAvailabilityController.stateStore(for:),
-                    cloudAvailabilityActionHandler: cloudAvailabilityActionHandler,
+                    presentationHandler: screenStore.presentationHandler,
+                    cloudAvailabilityStateStore: screenStore.cloudAvailabilityController.stateStore(for:),
+                    cloudAvailabilityActionHandler: screenStore.cloudAvailabilityActionHandler,
                     favoriteTrackIds: favoriteTrackIds,
-                    commandHandler: commandHandler,
+                    commandHandler: screenStore.commandHandler,
                     playbackStateController: playbackStateController,
                     revealedTrackID: nil,
                     highlightedTrackID: sheetManager.highlightedRowID,
@@ -373,7 +288,7 @@ struct LibraryCollectionTracksView: View {
 
     /// Синхронизирует состояние при появлении списка.
     private func handleTracksListAppear() {
-        cloudAvailabilityActionHandler.handle(.screenDidAppear)
+        screenStore.cloudAvailabilityActionHandler.handle(.screenDidAppear)
         requestActiveTrackScrollIfNeeded()
         updateSelectionActionBarConfig()
     }

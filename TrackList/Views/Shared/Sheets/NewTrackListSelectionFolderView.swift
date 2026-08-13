@@ -94,6 +94,9 @@ struct NewTrackListSelectionFolderView: View {
                         onToggleSelection: { track in
                             selectionViewModel.handle(.toggleTrack(track))
                         },
+                        onUnavailableTap: { track in
+                            selectionViewModel.handle(.unavailableTrackTapped(track))
+                        },
                         onRequestSnapshot: { trackId in
                             tracksViewModel.requestSnapshotIfNeeded(for: trackId)
                         }

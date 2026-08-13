@@ -42,6 +42,9 @@ struct TrackListView: View {
                             onTap: { rowId in
                                 onAction(.rowTapped(rowId: rowId))
                             },
+                            onUnavailableTrackTap: { rowId in
+                                onAction(.unavailableTrackTapped(rowId: rowId))
+                            },
                             onDelete: { rowId in
                                 onAction(.deleteTrack(rowId: rowId))
                             },
@@ -131,6 +134,7 @@ struct TrackListView: View {
                 let rows: [TrackListRowState]
                 let onRequestSnapshot: (UUID) -> Void
                 let onTap: (UUID) -> Void
+                let onUnavailableTrackTap: (UUID) -> Void
                 let onDelete: (UUID) -> Void
                 let onShareTrack: (UUID) -> Void
                 let onCopyTrack: (UUID) -> Void
@@ -159,6 +163,9 @@ struct TrackListView: View {
                             state: row,
                             onTap: {
                                 onTap(row.id)
+                            },
+                            onUnavailableTap: {
+                                onUnavailableTrackTap(row.id)
                             },
                             onDelete: {
                                 onDelete(row.id)

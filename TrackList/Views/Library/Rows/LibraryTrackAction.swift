@@ -4,6 +4,8 @@ import Foundation
 /// UI сообщает только намерение, выполнение остаётся в handler.
 enum LibraryTrackAction {
     case tapRow(track: LibraryTrack, context: [LibraryTrack])
+    /// Пользователь нажал недоступную строку; presentation выполняет feature handler.
+    case unavailableTrackTapped(track: LibraryTrack)
     case tapArtwork(track: LibraryTrack)
     case share(track: LibraryTrack)
     case addToPlayer(trackId: UUID)

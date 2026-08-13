@@ -39,6 +39,18 @@ final class SearchActionHandlerTests: XCTestCase {
         XCTAssertEqual(harness.favoritesService.toggledTrackIds, [track.trackId])
     }
 
+    /// Недоступная строка сообщает feature action и не запускает playback.
+    func testUnavailableTrackRoutesToToastWithoutPlayback() {
+        let track = makeSearchTrack(fileName: "Unavailable.m4a", title: "Unavailable")
+        let harness = makeActionHandlerHarness(currentTrackId: nil)
+
+        harness.actionHandler.handle(.unavailableTrackTapped(track))
+
+        XCTAssertEqual(harness.toastPresenter.events, [.trackUnavailable(title: "Unavailable")])
+        XCTAssertTrue(harness.playbackController.playedTrackIds.isEmpty)
+        XCTAssertEqual(harness.playbackController.togglePlayPauseCount, 0)
+    }
+
     /// Собирает SearchActionHandler с наблюдаемыми capability без PlayerViewModel.
     private func makeActionHandlerHarness(
         currentTrackId: UUID?
@@ -86,7 +98,8 @@ final class SearchActionHandlerTests: XCTestCase {
         return SearchActionHandlerHarness(
             actionHandler: actionHandler,
             playbackController: playbackController,
-            favoritesService: favoritesService
+            favoritesService: favoritesService,
+            toastPresenter: toastPresenter
         )
     }
 }
@@ -198,6 +211,7 @@ private struct SearchActionHandlerHarness {
     let actionHandler: SearchActionHandler
     let playbackController: SearchPlaybackControllerSpy
     let favoritesService: SearchFavoritesServiceSpy
+    let toastPresenter: SearchToastPresenterSpy
 }
 
 /// Возвращает подготовленный результат поиска без доступа к SQLite-фонотеке.

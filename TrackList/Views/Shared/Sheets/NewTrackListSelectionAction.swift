@@ -12,6 +12,8 @@ import Foundation
 enum NewTrackListSelectionAction {
     /// Пользователь изменил выбор одного трека.
     case toggleTrack(LibraryTrack)
+    /// Пользователь нажал недоступную строку без изменения selection.
+    case unavailableTrackTapped(LibraryTrack)
     /// Пользователь выбрал все треки открытой папки.
     case selectAll([LibraryTrack])
     /// Пользователь снял выбор со всех треков открытой папки.

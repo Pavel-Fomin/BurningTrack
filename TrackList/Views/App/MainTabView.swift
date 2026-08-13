@@ -38,6 +38,8 @@ struct MainTabView: View {
     let libraryFeatureDependencies: LibraryFeatureDependencies
     /// Готовая фабрика feature Search.
     let searchFeatureFactory: SearchFeatureFactory
+    /// Готовая factory feature настроек.
+    let settingsFeatureFactory: SettingsFeatureFactory
     /// Готовые фабрики detail-flow одного треклиста.
     let trackListFeatureDependencies: TrackListFeatureDependencies
     /// Единый ActionHandler master-flow треклистов.
@@ -129,7 +131,7 @@ struct MainTabView: View {
                 systemImage: "gear",
                 value: ScenePhaseHandler.Tab.settings
             ) {
-                SettingsScreen()
+                SettingsScreen(factory: settingsFeatureFactory)
                 .globalBottomPanelsHost(
                     miniPlayerFeature: miniPlayerFeature,
                     exportProgressViewModel: exportProgressViewModel,

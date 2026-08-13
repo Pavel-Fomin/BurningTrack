@@ -27,7 +27,8 @@ final class NowPlayingSnapshotBuilder: NowPlayingSnapshotBuilding {
         artwork: CGImage?,
         currentTime: TimeInterval,
         fallbackDuration: TimeInterval,
-        isPlaying: Bool
+        isPlaying: Bool,
+        shouldShowTags: Bool
     ) -> NowPlayingSnapshot {
 
         if let purchasedTrack = track as? (any TrackDisplayable & PurchasedITunesTrackRepresentable),
@@ -40,8 +41,6 @@ final class NowPlayingSnapshotBuilder: NowPlayingSnapshotBuilding {
                 isPlaying: isPlaying
             )
         }
-
-        let shouldShowTags = AppSettingsManager.shared.settings.visible.metadata.isTagReadingEnabled
 
         return NowPlayingSnapshot(
             title: shouldShowTags ? (runtimeSnapshot?.title ?? track.fileName) : track.fileName,

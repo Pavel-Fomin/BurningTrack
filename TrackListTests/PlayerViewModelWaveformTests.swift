@@ -209,6 +209,7 @@ final class PlayerViewModelWaveformTests: XCTestCase {
 
         harness.viewModel.play(track: secondTrack)
         await waitForCancellation(of: firstURL, in: generator)
+        await waitForPendingRequest(for: secondURL, in: generator)
 
         XCTAssertEqual(harness.viewModel.waveformState, .loading)
     }
@@ -345,10 +346,15 @@ final class PlayerViewModelWaveformTests: XCTestCase {
             playbackContextStore: PlayerPlaybackContextStore(
                 playbackModePersistence: PlaybackModePersistenceSpy()
             ),
+            runtimeSnapshotController: PlayerRuntimeSnapshotController(),
             eventObserver: PlayerEventObserverSpy(),
             toastPresenter: ToastPresenterSpy(),
             statePersistence: PlayerStatePersistenceSpy(),
             playlistManager: playlistManager,
+            libraryContextLoader: WaveformLibraryContextLoaderSpy(),
+            purchasedITunesContextLoader: WaveformPurchasedITunesContextLoaderSpy(),
+            fastLibraryTrackProvider: WaveformFastLibraryTrackProviderSpy(),
+            isLibraryAccessRestored: { true },
             waveformGenerator: waveformGenerator,
             favoritesService: favoritesService,
             favoriteActionHandler: FavoriteTrackActionHandler(
@@ -425,7 +431,8 @@ final class PlayerViewModelWaveformTests: XCTestCase {
         _ expectedState: PlayerWaveformState,
         in viewModel: PlayerViewModel
     ) async {
-        for _ in 0..<100 {
+        // Файловый кэш на физическом устройстве может завершить actor-задачу позже простого генератора.
+        for _ in 0..<1_000 {
             if viewModel.waveformState == expectedState {
                 return
             }
@@ -749,4 +756,31 @@ private final class ToastPresenterSpy: ToastPresenting {
     func handle(_ event: ToastEvent, duration: TimeInterval) {}
 
     func handle(_ error: AppError) {}
+}
+
+/// Не загружает production-фонотеку в unit-тестах waveform.
+@MainActor
+private final class WaveformLibraryContextLoaderSpy: LibraryPlaybackContextLoading {
+    func loadFolderContext(folderId: UUID) async throws -> [LibraryTrack] { [] }
+
+    func loadRootContext() async throws -> [LibraryTrack] { [] }
+
+    func loadCollectionContext(
+        category: LibraryCollectionCategory,
+        rawValue: String,
+        artistKey: String?
+    ) async throws -> [LibraryTrack] { [] }
+}
+
+/// Не обращается к MediaPlayer в unit-тестах waveform.
+@MainActor
+private final class WaveformPurchasedITunesContextLoaderSpy: PurchasedITunesPlaybackContextLoading {
+    func loadPlaybackContext() async -> PurchasedITunesPlaybackContextLoadResult {
+        .temporarilyUnavailable
+    }
+}
+
+/// Исключает SQLite-lookup в тестах, где восстановление трека не является предметом проверки.
+private final class WaveformFastLibraryTrackProviderSpy: FastLibraryTrackProviding {
+    func track(for trackId: UUID) async -> LibraryTrack? { nil }
 }

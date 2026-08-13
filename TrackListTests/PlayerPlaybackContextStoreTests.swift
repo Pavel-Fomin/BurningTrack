@@ -15,7 +15,9 @@ final class PlayerPlaybackContextStoreTests: XCTestCase {
     func testNextAndPreviousUseQueueItemIdentity() {
         let first = makePlayerTrack(trackId: UUID(), fileName: "first.mp3")
         let second = makePlayerTrack(trackId: UUID(), fileName: "second.mp3")
-        let store = PlayerPlaybackContextStore()
+        let store = PlayerPlaybackContextStore(
+            playbackModePersistence: PlaybackModePersistenceSpy()
+        )
         let queue: [any TrackDisplayable] = [first, second]
 
         _ = store.updateContext(currentTrack: first, context: queue)
@@ -33,7 +35,9 @@ final class PlayerPlaybackContextStoreTests: XCTestCase {
         let sharedTrackId = UUID()
         let first = makePlayerTrack(trackId: sharedTrackId, fileName: "first-copy.mp3")
         let second = makePlayerTrack(trackId: sharedTrackId, fileName: "second-copy.mp3")
-        let store = PlayerPlaybackContextStore()
+        let store = PlayerPlaybackContextStore(
+            playbackModePersistence: PlaybackModePersistenceSpy()
+        )
         let queue: [any TrackDisplayable] = [first, second]
 
         _ = store.updateContext(currentTrack: first, context: queue)
@@ -51,7 +55,9 @@ final class PlayerPlaybackContextStoreTests: XCTestCase {
         let second = makePlayerTrack(trackId: UUID(), fileName: "second.mp3")
         let queue = [first, second]
         let restoredTrack = queue.first(where: { $0.queueItemId == second.queueItemId })
-        let store = PlayerPlaybackContextStore()
+        let store = PlayerPlaybackContextStore(
+            playbackModePersistence: PlaybackModePersistenceSpy()
+        )
         let context: [any TrackDisplayable] = queue
 
         XCTAssertEqual(restoredTrack?.queueItemId, second.queueItemId)
@@ -78,4 +84,14 @@ final class PlayerPlaybackContextStoreTests: XCTestCase {
             isAvailable: true
         )
     }
+}
+
+/// Исключает чтение production-настроек при проверке порядка playback-контекста.
+@MainActor
+private final class PlaybackModePersistenceSpy: PlaybackModePersisting {
+    func loadPlaybackMode() -> PlaybackMode {
+        PlaybackMode(isShuffleEnabled: false, repeatMode: .off)
+    }
+
+    func savePlaybackMode(_ mode: PlaybackMode) {}
 }

@@ -174,7 +174,8 @@ final class PlayerViewModel: ObservableObject {
             artwork: runtimeSnapshotController.nowPlayingArtwork(for: track.trackId),
             currentTime: currentTime,
             fallbackDuration: trackDuration,
-            isPlaying: isPlaying
+            isPlaying: isPlaying,
+            shouldShowTags: isTagReadingEnabled()
         )
     }
 
@@ -218,56 +219,48 @@ final class PlayerViewModel: ObservableObject {
     // MARK: - Инициализация
     
     init(
-        playerManager: any PlayerManaging = PlayerManager(),
-        playbackContextStore: PlayerPlaybackContextStore? = nil,
+        playerManager: any PlayerManaging,
+        playbackContextStore: PlayerPlaybackContextStore,
         nowPlayingSnapshotBuilder: any NowPlayingSnapshotBuilding = NowPlayingSnapshotBuilder(),
-        runtimeSnapshotController: PlayerRuntimeSnapshotController = PlayerRuntimeSnapshotController(),
-        eventObserver: any PlayerEventObserving = NotificationPlayerEventObserver(),
-        toastPresenter: (any ToastPresenting)? = nil,
-        statePersistence: (any PlayerStatePersisting)? = nil,
-        playlistManager: PlaylistManager? = nil,
-        libraryContextLoader: (any LibraryPlaybackContextLoading)? = nil,
-        purchasedITunesContextLoader: (any PurchasedITunesPlaybackContextLoading)? = nil,
-        fastLibraryTrackProvider: (any FastLibraryTrackProviding)? = nil,
-        isLibraryAccessRestored: (@MainActor () -> Bool)? = nil,
-        waveformGenerator: (any WaveformGenerating)? = nil,
+        runtimeSnapshotController: PlayerRuntimeSnapshotController,
+        eventObserver: any PlayerEventObserving,
+        toastPresenter: any ToastPresenting,
+        statePersistence: (any PlayerStatePersisting)?,
+        playlistManager: PlaylistManager,
+        libraryContextLoader: any LibraryPlaybackContextLoading,
+        purchasedITunesContextLoader: any PurchasedITunesPlaybackContextLoading,
+        fastLibraryTrackProvider: any FastLibraryTrackProviding,
+        isLibraryAccessRestored: @escaping @MainActor () -> Bool,
+        waveformGenerator: any WaveformGenerating,
         isTagReadingEnabled: @escaping @MainActor () -> Bool = { true },
         favoritesService: any FavoritesServicing,
         favoriteActionHandler: FavoriteTrackActionHandler,
         favoritesEvents: any FavoritesEventsObserving
     ) {
-        let resolvedPlaylistManager = playlistManager ?? PlaylistManager.shared
-
         self.playerManager = playerManager
-        // Store создаётся внутри main-actor и синхронно восстанавливает режим до первого контекста.
-        self.playbackContextStore = playbackContextStore ?? PlayerPlaybackContextStore()
+        // Composition Root создаёт Store и синхронно восстанавливает режим до первого контекста.
+        self.playbackContextStore = playbackContextStore
         self.nowPlayingSnapshotBuilder = nowPlayingSnapshotBuilder
         self.runtimeSnapshotController = runtimeSnapshotController
         self.eventObserver = eventObserver
         self.favoritesService = favoritesService
         self.favoriteActionHandler = favoriteActionHandler
         self.favoritesEvents = favoritesEvents
-        self.toastPresenter = toastPresenter ?? ToastManager.shared
-        self.statePersistence = statePersistence ?? (try? PlayerStatePersistence())
-        self.playlistManager = resolvedPlaylistManager
-        self.libraryContextLoader = libraryContextLoader ?? LibraryPlaybackContextLoader()
-        self.purchasedITunesContextLoader = purchasedITunesContextLoader ?? PurchasedITunesPlaybackContextLoader()
-        self.fastLibraryTrackProvider = fastLibraryTrackProvider ?? FastLibraryTracksProvider()
-        // Singleton читается внутри MainActor-init, а тесты передают изолированный источник готовности.
-        self.isLibraryAccessRestored = isLibraryAccessRestored ?? {
-            MusicLibraryManager.shared.isAccessRestored
-        }
-        self.waveformGenerator = waveformGenerator ?? WaveformCachedGenerator(
-            generator: WaveformGenerator(),
-            cache: WaveformFileCache()
-        )
+        self.toastPresenter = toastPresenter
+        self.statePersistence = statePersistence
+        self.playlistManager = playlistManager
+        self.libraryContextLoader = libraryContextLoader
+        self.purchasedITunesContextLoader = purchasedITunesContextLoader
+        self.fastLibraryTrackProvider = fastLibraryTrackProvider
+        self.isLibraryAccessRestored = isLibraryAccessRestored
+        self.waveformGenerator = waveformGenerator
         self.isTagReadingEnabled = isTagReadingEnabled
         if self.statePersistence == nil {
             PersistentLogger.log("PlayerViewModel: не удалось создать хранилище состояния плеера")
         }
 
         // Очередь уведомляет ViewModel только после успешной синхронизации с SQLite.
-        resolvedPlaylistManager.onTracksChanged = { [weak self] tracks in
+        playlistManager.onTracksChanged = { [weak self] tracks in
             self?.handlePlaylistChanged(tracks)
         }
 

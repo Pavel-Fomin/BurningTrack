@@ -48,9 +48,7 @@ struct LibraryScreenViewModelFactory {
             toastPresenter: toastPresenter
         )
         // Один provider обслуживает общий builder значений и корневых счётчиков.
-        let collectionValuesProvider = DefaultLibraryCollectionValuesProvider(
-            trackRegistry: trackRegistry
-        )
+        let collectionValuesProvider = makeCollectionValuesProvider()
 
         return LibraryScreenViewModel(
             navigationCoordinator: navigationCoordinator,
@@ -60,5 +58,20 @@ struct LibraryScreenViewModelFactory {
             collectionRootItemsProvider: collectionValuesProvider,
             trackEventProvider: trackEventProvider
         )
+    }
+
+    /// Собирает ViewModel значений коллекции с тем же явно переданным SQLite-реестром.
+    func makeCollectionValuesViewModel(
+        category: LibraryCollectionCategory
+    ) -> LibraryCollectionValuesViewModel {
+        LibraryCollectionValuesViewModel(
+            category: category,
+            provider: makeCollectionValuesProvider()
+        )
+    }
+
+    /// Создаёт provider только из зависимости, уже подготовленной Composition Root.
+    private func makeCollectionValuesProvider() -> DefaultLibraryCollectionValuesProvider {
+        DefaultLibraryCollectionValuesProvider(trackRegistry: trackRegistry)
     }
 }

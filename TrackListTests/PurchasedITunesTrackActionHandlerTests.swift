@@ -99,6 +99,23 @@ final class PurchasedITunesTrackActionHandlerTests: XCTestCase {
         XCTAssertTrue(toastPresenter.errors.isEmpty)
     }
 
+    /// Недоступная строка показывает существующий Toast и не отправляет playback-команду.
+    func testUnavailableTrackPresentsToastWithoutPlayback() {
+        let track = makeTrack()
+        let playbackController = PurchasedITunesPlaybackControllerSpy()
+        let toastPresenter = ExportRequestToastPresenterSpy()
+        let handler = makeHandler(
+            playbackController: playbackController,
+            toastPresenter: toastPresenter
+        )
+
+        handler.handle(.unavailableTrackTapped(track: track), playbackContext: [track])
+
+        XCTAssertEqual(toastPresenter.events, [.trackUnavailable(title: track.title)])
+        XCTAssertTrue(playbackController.playedTrackIDs.isEmpty)
+        XCTAssertEqual(playbackController.toggleCallCount, 0)
+    }
+
     /// Собирает handler с явно подставленными capabilities строкового flow.
     private func makeHandler(
         playbackStateProvider: PurchasedITunesPlaybackStateSpy? = nil,

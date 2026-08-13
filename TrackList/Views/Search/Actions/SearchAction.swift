@@ -16,6 +16,7 @@ enum SearchAction: Equatable {
     case selectSortMode(SearchSortMode)
     case requestTrackSnapshot(UUID)
     case playTrack(SearchTrackResult)
+    case unavailableTrackTapped(SearchTrackResult)
     case openFolder(SearchFolderResult)
     case openTrackList(SearchTrackListResult)
     case showDetails(SearchTrackResult)

@@ -16,6 +16,7 @@ struct TrackSelectableRowWrapper: View {
     
     let state: TrackSelectableRowState
     let onToggleSelection: () -> Void
+    let onUnavailableTap: () -> Void
     let onRequestSnapshot: (UUID) -> Void
     
     // MARK: - UI
@@ -34,6 +35,7 @@ struct TrackSelectableRowWrapper: View {
             onRowTap: {
                 onToggleSelection()
             },
+            onUnavailableTap: onUnavailableTap,
             showsSelection: true,
             isSelected: state.isSelected,
             onToggleSelection: onToggleSelection,

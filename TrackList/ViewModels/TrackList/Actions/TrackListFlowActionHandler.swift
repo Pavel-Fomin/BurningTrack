@@ -97,6 +97,9 @@ final class TrackListFlowActionHandler {
         case .rowTapped(let rowId):
             playbackHandler.handleRowTap(rowId: rowId)
 
+        case .unavailableTrackTapped(let rowId):
+            presentationHandler.presentUnavailableTrack(rowId: rowId)
+
         case .deleteTrack(let rowId):
             mutationHandler.deleteTrack(rowId: rowId)
 

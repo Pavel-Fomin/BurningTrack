@@ -14,6 +14,7 @@ struct PlayerView: View {
     let rows: [PlayerTrackRowState]
     let scrollTargetId: UUID?
     let onTrackTap: (UUID) -> Void
+    let onUnavailableTrackTap: (UUID) -> Void
     let onMoveTracks: (IndexSet, Int) -> Void
     let onDeleteTrack: (UUID) -> Void
     let onShowInLibrary: (UUID) -> Void
@@ -42,6 +43,7 @@ struct PlayerView: View {
                     PlayerRowsView(
                         rows: rows,
                         onTrackTap: onTrackTap,
+                        onUnavailableTrackTap: onUnavailableTrackTap,
                         onMoveTracks: onMoveTracks,
                         onDeleteTrack: onDeleteTrack,
                         onShowInLibrary: onShowInLibrary,
@@ -91,6 +93,7 @@ struct PlayerView: View {
     private struct PlayerRowsView: View {
         let rows: [PlayerTrackRowState]
         let onTrackTap: (UUID) -> Void
+        let onUnavailableTrackTap: (UUID) -> Void
         let onMoveTracks: (IndexSet, Int) -> Void
         let onDeleteTrack: (UUID) -> Void
         let onShowInLibrary: (UUID) -> Void
@@ -112,6 +115,7 @@ struct PlayerView: View {
                     onTap: {
                         onTrackTap(row.id)
                     },
+                    onUnavailableTap: onUnavailableTrackTap,
                     onDeleteTrack: onDeleteTrack,
                     onShowInLibrary: onShowInLibrary,
                     onMoveToFolder: onMoveToFolder,

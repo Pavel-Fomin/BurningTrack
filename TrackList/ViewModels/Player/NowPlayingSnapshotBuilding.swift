@@ -20,6 +20,7 @@ protocol NowPlayingSnapshotBuilding {
         artwork: CGImage?,
         currentTime: TimeInterval,
         fallbackDuration: TimeInterval,
-        isPlaying: Bool
+        isPlaying: Bool,
+        shouldShowTags: Bool
     ) -> NowPlayingSnapshot
 }

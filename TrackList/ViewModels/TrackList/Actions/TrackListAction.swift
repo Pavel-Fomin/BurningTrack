@@ -19,6 +19,9 @@ enum TrackListAction {
     /// Пользователь нажал на строку трека.
     case rowTapped(rowId: UUID)
 
+    /// Пользователь нажал недоступную строку; обработчик показывает существующий Toast без playback.
+    case unavailableTrackTapped(rowId: UUID)
+
     /// Пользователь запросил удаление строки из треклиста.
     case deleteTrack(rowId: UUID)
 

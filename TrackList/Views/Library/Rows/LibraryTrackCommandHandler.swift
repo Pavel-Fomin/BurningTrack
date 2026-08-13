@@ -1,5 +1,13 @@
 import Foundation
 
+/// Добавляет локальный трек в очередь без раскрытия строке AppCommandExecutor.
+protocol LibraryTrackPlayerAdding: AnyObject {
+    /// Выполняет существующую доменную команду добавления трека в плеер.
+    func addTrackToPlayer(trackId: UUID) async throws -> TrackAddedToPlayerSuccess
+}
+
+extension AppCommandExecutor: LibraryTrackPlayerAdding {}
+
 /// Выполняет команды строки фонотеки, не смешивая их с UI.
 @MainActor
 struct LibraryTrackCommandHandler {
@@ -7,12 +15,13 @@ struct LibraryTrackCommandHandler {
     let playbackHandler: LibraryTrackPlaybackHandler
     let presentationHandler: LibraryTrackPresentationHandler
     let cloudAvailabilityActionHandler: LibraryCloudAvailabilityActionHandler
-    let collectionNavigationHandler: TrackCollectionNavigationHandler
+    let collectionNavigationHandler: any TrackCollectionIdentifierNavigating
     /// Share flow передаётся Composition Root, поэтому строка не обращается к singleton.
     let trackShareActionHandler: TrackShareActionHandler
     /// Выполняет команду добавления в плеер без обращения строки к application singleton.
-    let commandExecutor: AppCommandExecutor
-    let toastManager: ToastManager
+    let commandExecutor: any LibraryTrackPlayerAdding
+    /// Контракт сообщения позволяет строковому handler-у не зависеть от конкретного ToastManager.
+    let toastManager: any ToastPresenting
     /// Общий обработчик «Избранного» сохраняет состояние и публикует подтверждённое событие.
     private let favoriteActionHandler: FavoriteTrackActionHandler
     /// Экранный маршрут нужен только для selection, которое относится к LibraryTracks, а не к строке.
@@ -26,6 +35,8 @@ struct LibraryTrackCommandHandler {
         switch action {
         case .tapRow(let track, let context):
             playbackHandler.handleTap(track: track, context: context)
+        case .unavailableTrackTapped(let track):
+            toastManager.handle(.trackUnavailable(title: track.title ?? track.fileName))
         case .tapArtwork(let track):
             sheetManager.presentTrackDetail(track)
         case .share(let track):
@@ -76,10 +87,10 @@ struct LibraryTrackCommandHandler {
         playbackHandler: LibraryTrackPlaybackHandler,
         presentationHandler: LibraryTrackPresentationHandler,
         cloudAvailabilityActionHandler: LibraryCloudAvailabilityActionHandler,
-        collectionNavigationHandler: TrackCollectionNavigationHandler,
+        collectionNavigationHandler: any TrackCollectionIdentifierNavigating,
         trackShareActionHandler: TrackShareActionHandler,
-        commandExecutor: AppCommandExecutor,
-        toastManager: ToastManager,
+        commandExecutor: any LibraryTrackPlayerAdding,
+        toastManager: any ToastPresenting,
         favoriteActionHandler: FavoriteTrackActionHandler,
         screenActionHandler: LibraryTracksActionHandler? = nil,
         onToggleSelection: ((UUID) -> Void)? = nil,

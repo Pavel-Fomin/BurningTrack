@@ -46,13 +46,13 @@ final class PurchasedITunesPlaybackContextLoader: PurchasedITunesPlaybackContext
 
     /// Источник актуальных треков системной медиатеки.
     private let provider: any PurchasedITunesMusicProviding
-    /// Тестовая подмена режима исключает создание SQLite-настроек при изолированной проверке загрузчика.
-    private let sortModePersistence: (any PurchasedITunesTrackSortModePersisting)?
+    /// Явно переданный сохранённый режим сортировки исключает скрытый доступ к настройкам приложения.
+    private let sortModePersistence: any PurchasedITunesTrackSortModePersisting
 
-    /// Создаёт загрузчик без экранного состояния; рабочая настройка выбирается только при фактическом чтении iTunes.
+    /// Создаёт загрузчик с явными provider и сохранённым режимом сортировки.
     init(
-        provider: any PurchasedITunesMusicProviding = PurchasedITunesMusicProvider(),
-        sortModePersistence: (any PurchasedITunesTrackSortModePersisting)? = nil
+        provider: any PurchasedITunesMusicProviding,
+        sortModePersistence: any PurchasedITunesTrackSortModePersisting
     ) {
         self.provider = provider
         self.sortModePersistence = sortModePersistence
@@ -62,8 +62,7 @@ final class PurchasedITunesPlaybackContextLoader: PurchasedITunesPlaybackContext
     func loadPlaybackContext() async -> PurchasedITunesPlaybackContextLoadResult {
         switch provider.accessState() {
         case .authorized:
-            let sortMode = sortModePersistence?.purchasedITunesTrackSortMode ??
-                AppSettingsManager.shared.purchasedITunesTrackSortMode
+            let sortMode = sortModePersistence.purchasedITunesTrackSortMode
             let tracks = PurchasedITunesTrackSorter.sort(
                 provider.loadTracks(),
                 mode: sortMode

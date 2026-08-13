@@ -28,6 +28,8 @@ struct MainSidebarView: View {
     let libraryFeatureDependencies: LibraryFeatureDependencies
     /// Готовая фабрика feature Search.
     let searchFeatureFactory: SearchFeatureFactory
+    /// Готовая factory feature настроек.
+    let settingsFeatureFactory: SettingsFeatureFactory
     /// Готовые фабрики detail-flow одного треклиста.
     let trackListFeatureDependencies: TrackListFeatureDependencies
     /// Единый ActionHandler master-flow треклистов.
@@ -136,7 +138,7 @@ struct MainSidebarView: View {
                 isSearchActive: $isSearchActive
             )
         case .settings:
-            SettingsScreen()
+            SettingsScreen(factory: settingsFeatureFactory)
         case .allTrackLists:
             TrackListsScreen(
                 trackListsViewModel: trackListsViewModel,

@@ -47,7 +47,7 @@ final class LibraryCollectionValuesViewModel: ObservableObject {
 
     init(
         category: LibraryCollectionCategory,
-        provider: LibraryCollectionValuesProvider = DefaultLibraryCollectionValuesProvider()
+        provider: LibraryCollectionValuesProvider
     ) {
         self.category = category
         self.provider = provider

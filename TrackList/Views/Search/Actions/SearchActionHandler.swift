@@ -79,6 +79,11 @@ final class SearchActionHandler {
         case .playTrack(let result):
             playTrack(result)
 
+        case .unavailableTrackTapped(let result):
+            toastPresenter.handle(
+                .trackUnavailable(title: result.title ?? result.fileName)
+            )
+
         case .openFolder(let result):
             openFolder(result)
 

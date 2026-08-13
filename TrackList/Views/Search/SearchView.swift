@@ -247,6 +247,9 @@ private struct SearchTrackRowView: View {
             onRowTap: {
                 onAction(.playTrack(row.result))
             },
+            onUnavailableTap: {
+                onAction(.unavailableTrackTapped(row.result))
+            },
             showsSelection: false,
             isSelected: false,
             onToggleSelection: nil,

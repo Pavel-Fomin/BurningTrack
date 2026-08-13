@@ -39,6 +39,8 @@ struct TrackListApp: App {
     let libraryFeatureDependencies: LibraryFeatureDependencies
     /// Готовая фабрика feature Search с явными production-зависимостями.
     let searchFeatureFactory: SearchFeatureFactory
+    /// Готовая factory feature настроек с application-wide SettingsManaging.
+    let settingsFeatureFactory: SettingsFeatureFactory
     /// Готовые фабрики detail-flow одного треклиста с явными production-зависимостями.
     let trackListFeatureDependencies: TrackListFeatureDependencies
     /// Единый ActionHandler master-flow треклистов для tab- и sidebar-компоновок.
@@ -128,14 +130,45 @@ struct TrackListApp: App {
         let favoriteTrackActionHandler = FavoriteTrackActionHandler(
             favoritesService: favoritesService
         )
+        // Player production graph полностью собирается в Composition Root до создания PlayerViewModel.
         let playerManager = PlayerManager()
+        let playbackContextStore = PlayerPlaybackContextStore(
+            playbackModePersistence: appSettingsManager
+        )
+        let playerStatePersistence: (any PlayerStatePersisting)?
+        do {
+            playerStatePersistence = try PlayerStatePersistence()
+        } catch {
+            // PlayerViewModel сохраняет существующее диагностическое сообщение о недоступном persistent state.
+            playerStatePersistence = nil
+        }
+        let libraryContextLoader = LibraryPlaybackContextLoader()
+        let purchasedITunesContextLoader = PurchasedITunesPlaybackContextLoader(
+            provider: PurchasedITunesMusicProvider(),
+            sortModePersistence: appSettingsManager
+        )
+        let fastLibraryTrackProvider = FastLibraryTracksProvider()
+        let playerEventObserver = NotificationPlayerEventObserver()
+        let runtimeSnapshotController = PlayerRuntimeSnapshotController()
+        let waveformGenerator = WaveformCachedGenerator(
+            generator: WaveformGenerator(),
+            cache: WaveformFileCache()
+        )
         let playerVM = PlayerViewModel(
             playerManager: playerManager,
+            playbackContextStore: playbackContextStore,
+            runtimeSnapshotController: runtimeSnapshotController,
+            eventObserver: playerEventObserver,
             toastPresenter: toastManager,
+            statePersistence: playerStatePersistence,
             playlistManager: playlistManager,
+            libraryContextLoader: libraryContextLoader,
+            purchasedITunesContextLoader: purchasedITunesContextLoader,
+            fastLibraryTrackProvider: fastLibraryTrackProvider,
             isLibraryAccessRestored: {
                 musicLibraryManager.isAccessRestored
             },
+            waveformGenerator: waveformGenerator,
             isTagReadingEnabled: {
                 appSettingsManager.settings.visible.metadata.isTagReadingEnabled
             },
@@ -183,6 +216,9 @@ struct TrackListApp: App {
         let playerScreenViewModelFactory = PlayerScreenViewModelFactory(
             dependencies: playerFeatureDependencies,
             exportRequestHandler: exportRequestHandler
+        )
+        let settingsFeatureFactory = SettingsFeatureFactory(
+            settingsManager: appSettingsManager
         )
 
         let summaryProvider: any TrackCollectionSummaryProviding
@@ -444,6 +480,7 @@ struct TrackListApp: App {
         self.miniPlayerFeature = miniPlayerFeature
         self.libraryFeatureDependencies = libraryFeatureDependencies
         self.searchFeatureFactory = searchFeatureFactory
+        self.settingsFeatureFactory = settingsFeatureFactory
         self.trackListFeatureDependencies = trackListFeatureDependencies
         self.trackListsActionHandler = trackListsActionHandler
         self.createTrackListFlowFactory = createTrackListFlowFactory
@@ -483,6 +520,7 @@ struct TrackListApp: App {
                 playerScreenViewModelFactory: playerScreenViewModelFactory,
                 libraryFeatureDependencies: libraryFeatureDependencies,
                 searchFeatureFactory: searchFeatureFactory,
+                settingsFeatureFactory: settingsFeatureFactory,
                 trackListFeatureDependencies: trackListFeatureDependencies,
                 trackListsActionHandler: trackListsActionHandler,
                 createTrackListFlowFactory: createTrackListFlowFactory,

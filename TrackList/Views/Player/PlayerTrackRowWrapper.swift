@@ -13,6 +13,7 @@ struct PlayerTrackRowWrapper: View {
     
     let row: PlayerTrackRowState                         /// Готовое состояние строки плеера
     let onTap: () -> Void                                /// Обработчик тапа по строке
+    let onUnavailableTap: (UUID) -> Void                  /// Обработчик недоступной строки очереди
     let onDeleteTrack: (UUID) -> Void                    /// Обработчик удаления элемента очереди
     let onShowInLibrary: (UUID) -> Void                  /// Обработчик показа элемента очереди в фонотеке
     let onMoveToFolder: (UUID) -> Void                   /// Обработчик перемещения элемента очереди в папку
@@ -52,6 +53,9 @@ struct PlayerTrackRowWrapper: View {
             artist: row.artist,
             duration: row.duration,
             onRowTap: onTap,
+            onUnavailableTap: {
+                onUnavailableTap(row.id)
+            },
             showsFileFormat: row.showsFileFormat
         ) {
             playerActionMenuContent

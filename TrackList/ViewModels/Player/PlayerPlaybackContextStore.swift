@@ -50,11 +50,10 @@ final class PlayerPlaybackContextStore {
 
     /// Создаёт store с уже восстановленным режимом до построения playback-индексов.
     init(
-        playbackModePersistence: (any PlaybackModePersisting)? = nil
+        playbackModePersistence: any PlaybackModePersisting
     ) {
-        let resolvedPersistence = playbackModePersistence ?? AppSettingsManager.shared
-        self.playbackModePersistence = resolvedPersistence
-        self.playbackMode = resolvedPersistence.loadPlaybackMode().normalized
+        self.playbackModePersistence = playbackModePersistence
+        self.playbackMode = playbackModePersistence.loadPlaybackMode().normalized
     }
 
     /// Проверяет, совпадает ли переданный массив с активным контекстом.

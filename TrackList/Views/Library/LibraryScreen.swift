@@ -215,25 +215,20 @@ struct LibraryScreen: View {
             )
 
         case .allLibraryTracks:
-            LibraryCollectionTracksView(
+            dependencies.tracksScreenFactory.makeLibraryCollectionTracksContainer(
                 source: .allLibraryTracks,
-                playbackStateProvider: dependencies.playbackStateProvider,
-                playbackController: dependencies.playbackController,
-                favoriteTrackIdsProvider: dependencies.favoriteTrackIdsProvider,
-                renameActionHandler: dependencies.trackFileRenameActionHandler,
-                favoriteTrackActionHandler: favoriteTrackActionHandler,
-                batchTagEditHandler: dependencies.tracksScreenFactory.makeBatchTagEditHandler(),
-                batchRenameHandler: dependencies.tracksScreenFactory.makeBatchRenameHandler(),
                 selectionActionBarConfig: $selectionActionBarConfig,
                 selectionActionSender: $selectionActionSender,
                 onAllTracksAction: { action in
                     allTracksActionHandler.handle(action)
                 }
             )
+            .id(LibraryTrackListSource.allLibraryTracks.id)
 
         case .collectionCategory(let category):
             LibraryCollectionValuesView(
-                viewModel: LibraryCollectionValuesViewModel(category: category),
+                viewModel: dependencies.screenViewModelFactory
+                    .makeCollectionValuesViewModel(category: category),
                 playbackStateProvider: dependencies.playbackStateProvider,
                 onValueSelected: { value in
                     viewModel.handle(.collectionValueSelected(value))
@@ -241,31 +236,12 @@ struct LibraryScreen: View {
             )
 
         case .collectionValue(let category, let value, let artistKey):
-            LibraryCollectionTracksView(
+            collectionTracksDestination(
                 source: .collectionValue(
                     category: category,
                     rawValue: value,
                     artistKey: artistKey
-                ),
-                playbackStateProvider: dependencies.playbackStateProvider,
-                playbackController: dependencies.playbackController,
-                favoriteTrackIdsProvider: dependencies.favoriteTrackIdsProvider,
-                renameActionHandler: dependencies.trackFileRenameActionHandler,
-                favoriteTrackActionHandler: favoriteTrackActionHandler,
-                batchTagEditHandler: dependencies.tracksScreenFactory.makeBatchTagEditHandler(),
-                batchRenameHandler: dependencies.tracksScreenFactory.makeBatchRenameHandler(),
-                selectionActionBarConfig: $selectionActionBarConfig,
-                selectionActionSender: $selectionActionSender,
-                onCollectionTracksAction: { action in
-                    collectionTracksActionHandler(
-                        for: .collectionValue(
-                            category: category,
-                            rawValue: value,
-                            artistKey: artistKey
-                        )
-                    )
-                    .handle(action)
-                }
+                )
             )
 
         case .folder(let destination):
@@ -289,6 +265,21 @@ struct LibraryScreen: View {
                     viewModel.handle(.folderMissingAppeared)
                 }
         }
+    }
+
+    /// Создаёт destination выбранного значения коллекции с graph, связанным со стабильной identity источника.
+    private func collectionTracksDestination(
+        source: LibraryTrackListSource
+    ) -> some View {
+        dependencies.tracksScreenFactory.makeLibraryCollectionTracksContainer(
+            source: source,
+            selectionActionBarConfig: $selectionActionBarConfig,
+            selectionActionSender: $selectionActionSender,
+            onCollectionTracksAction: { action in
+                collectionTracksActionHandler(for: source).handle(action)
+            }
+        )
+        .id(source.id)
     }
 
     /// Завершает selection только когда активная папка перестала быть текущим destination.

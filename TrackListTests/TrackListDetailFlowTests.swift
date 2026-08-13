@@ -557,6 +557,39 @@ final class TrackListDetailFlowTests: XCTestCase {
         XCTAssertEqual(reader.collectionTargetRequestCount, 2)
     }
 
+    /// Недоступная строка треклиста использует только presentation-route и не меняет список.
+    func testUnavailableRowRoutesToToastWithoutMutatingTrackList() {
+        let track = makeTrack(fileName: "Unavailable.flac")
+        let reader = DetailReaderSpy(
+            trackListId: UUID(),
+            tracks: [track]
+        )
+        let toastPresenter = DetailToastPresenter()
+        let handler = TrackListPresentationHandler(
+            reader: reader,
+            presenter: DetailTrackListPresenterSpy(),
+            toastPresenter: toastPresenter,
+            commandExecutor: DetailPurchasedITunesPlayerAddingSpy(),
+            collectionNavigationHandler: DetailCollectionNavigatorSpy(),
+            trackShareActionHandler: TrackShareActionHandler(
+                preparationService: TrackSharePreparationService(),
+                viewControllerProvider: DetailViewControllerProvider(),
+                toastPresenter: toastPresenter
+            ),
+            favoriteActionHandler: FavoriteTrackActionHandler(
+                favoritesService: DetailFavoritesServiceSpy()
+            )
+        )
+
+        handler.presentUnavailableTrack(rowId: track.id)
+
+        XCTAssertEqual(
+            toastPresenter.events,
+            [.trackUnavailable(title: "Stored title")]
+        )
+        XCTAssertEqual(reader.tracks, [track])
+    }
+
     /// Изменение metadata текущего трека обновляет prepared capabilities и скрывает исчезнувшую цель.
     func testRelevantTrackUpdateRemovesMissingCollectionNavigationTarget() async {
         let trackListId = UUID()

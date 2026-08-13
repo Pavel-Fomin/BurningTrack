@@ -49,6 +49,23 @@ final class NewTrackListSelectionFlowTests: XCTestCase {
         XCTAssertFalse(viewModel.state.canSubmit)
     }
 
+    /// Недоступная строка показывает Toast и не меняет selection sheet-flow.
+    func testUnavailableTrackShowsToastWithoutChangingSelection() {
+        let toast = NewTrackListSelectionToastSpy()
+        let viewModel = makeViewModel(
+            foldersProvider: NewTrackListSelectionFoldersSpy(folders: []),
+            manager: NewTrackListSelectionManagerSpy(),
+            toast: toast,
+            router: NewTrackListSelectionRouterSpy()
+        )
+        let track = makeLibraryTrack(name: "Unavailable.m4a")
+
+        viewModel.handle(.unavailableTrackTapped(track))
+
+        XCTAssertEqual(toast.events, [.trackUnavailable(title: track.title)])
+        XCTAssertTrue(viewModel.selectedTrackIds.isEmpty)
+    }
+
     /// Повторное подтверждение не запускает вторую доменную операцию до completion первой.
     func testRepeatedSubmitRunsCreateOnlyOnce() async {
         let manager = NewTrackListSelectionManagerSpy()

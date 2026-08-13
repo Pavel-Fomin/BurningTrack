@@ -976,6 +976,7 @@ final class PlayerViewModelRestorationTests: XCTestCase {
             playbackContextStore: PlayerPlaybackContextStore(
                 playbackModePersistence: RestorationPlaybackModePersistenceSpy()
             ),
+            runtimeSnapshotController: PlayerRuntimeSnapshotController(),
             eventObserver: eventObserver ?? RestorationPlayerEventObserverSpy(),
             toastPresenter: RestorationToastPresenterSpy(),
             statePersistence: statePersistence,
@@ -987,6 +988,7 @@ final class PlayerViewModelRestorationTests: XCTestCase {
             purchasedITunesContextLoader: resolvedPurchasedITunesContextLoader,
             fastLibraryTrackProvider: fastTrackProvider,
             isLibraryAccessRestored: { libraryAccessState.isRestored },
+            waveformGenerator: RestorationWaveformGeneratorSpy(),
             favoritesService: favoritesService,
             favoriteActionHandler: FavoriteTrackActionHandler(
                 favoritesService: favoritesService
@@ -1242,6 +1244,14 @@ private struct SavedPlayerStateWrite {
     let queueItemId: UUID?
     let duration: TimeInterval
     let source: PlaybackContextSource
+}
+
+/// Исключает файловый waveform pipeline в тестах восстановления состояния плеера.
+private actor RestorationWaveformGeneratorSpy: WaveformGenerating {
+    func generateSamples(
+        from fileURL: URL,
+        sampleCount: Int
+    ) async throws -> [Double] { [] }
 }
 
 /// Возвращает управляемый результат загрузки iTunes-контекста и может задержать первый ответ для проверки устаревшей асинхронной операции.

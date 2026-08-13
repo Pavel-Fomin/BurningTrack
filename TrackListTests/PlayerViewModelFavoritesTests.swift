@@ -396,12 +396,16 @@ final class PlayerViewModelFavoritesTests: XCTestCase {
             playbackContextStore: PlayerPlaybackContextStore(
                 playbackModePersistence: PlayerFavoritesPlaybackModePersistenceSpy()
             ),
+            runtimeSnapshotController: PlayerRuntimeSnapshotController(),
             eventObserver: PlayerFavoritesEventObserverSpy(),
             toastPresenter: PlayerFavoritesToastPresenterSpy(),
             statePersistence: statePersistence,
             playlistManager: resolvedPlaylistManager,
+            libraryContextLoader: PlayerFavoritesLibraryContextLoaderSpy(),
+            purchasedITunesContextLoader: PlayerFavoritesPurchasedITunesContextLoaderSpy(),
             fastLibraryTrackProvider: fastLibraryTrackProvider,
             isLibraryAccessRestored: isLibraryAccessRestored,
+            waveformGenerator: PlayerFavoritesWaveformGeneratorSpy(),
             favoritesService: favoritesService,
             favoriteActionHandler: FavoriteTrackActionHandler(
                 favoritesService: favoritesService
@@ -766,6 +770,36 @@ private final class PlayerFavoritesFastLibraryTrackProvider: FastLibraryTrackPro
 
         return track
     }
+}
+
+/// Не загружает production-фонотеку при тестах «Избранного».
+@MainActor
+private final class PlayerFavoritesLibraryContextLoaderSpy: LibraryPlaybackContextLoading {
+    func loadFolderContext(folderId: UUID) async throws -> [LibraryTrack] { [] }
+
+    func loadRootContext() async throws -> [LibraryTrack] { [] }
+
+    func loadCollectionContext(
+        category: LibraryCollectionCategory,
+        rawValue: String,
+        artistKey: String?
+    ) async throws -> [LibraryTrack] { [] }
+}
+
+/// Не обращается к MediaPlayer при тестах «Избранного».
+@MainActor
+private final class PlayerFavoritesPurchasedITunesContextLoaderSpy: PurchasedITunesPlaybackContextLoading {
+    func loadPlaybackContext() async -> PurchasedITunesPlaybackContextLoadResult {
+        .temporarilyUnavailable
+    }
+}
+
+/// Не строит waveform в тестах, которые проверяют только состояние «Избранного».
+private actor PlayerFavoritesWaveformGeneratorSpy: WaveformGenerating {
+    func generateSamples(
+        from fileURL: URL,
+        sampleCount: Int
+    ) async throws -> [Double] { [] }
 }
 
 /// Связывает ViewModel и её тестовую очередь для проверки очистки текущего трека.
