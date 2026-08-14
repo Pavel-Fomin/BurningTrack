@@ -11,6 +11,7 @@ import Foundation
 import SwiftUI
 
 struct SettingsScreen: View {
+    /// ViewModel создаётся factory один раз на identity вкладки и сохраняет presentation-состояние при пересчётах SwiftUI.
     @StateObject private var viewModel: SettingsScreenViewModel
 
     init(

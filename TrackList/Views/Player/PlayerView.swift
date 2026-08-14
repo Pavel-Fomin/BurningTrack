@@ -19,13 +19,13 @@ struct PlayerView: View {
     let onDeleteTrack: (UUID) -> Void
     let onShowInLibrary: (UUID) -> Void
     let onMoveToFolder: (UUID) -> Void
-    let onAddToTrackList: (UUID) -> Void  /// Добавление элемента очереди в треклист
-    let onToggleFavorite: (UUID) -> Void  /// Переключение избранного элемента очереди
-    let onGoToArtist: (UUID) -> Void      /// Переход к артисту элемента очереди
-    let onGoToAlbum: (UUID) -> Void       /// Переход к альбому элемента очереди
-    let onShareTrack: (UUID) -> Void      /// Отправка аудиофайла элемента очереди
-    let onCopyTrack: (UUID) -> Void       /// Копирование iTunes-трека из очереди
-    let onEditTags: (UUID) -> Void        /// Редактирование тегов элемента очереди
+    let onAddToTrackList: (UUID) -> Void
+    let onToggleFavorite: (UUID) -> Void
+    let onGoToArtist: (UUID) -> Void
+    let onGoToAlbum: (UUID) -> Void
+    let onShareTrack: (UUID) -> Void
+    let onCopyTrack: (UUID) -> Void
+    let onEditTags: (UUID) -> Void
     let onArtworkTap: (UUID) -> Void
     let onRequestSnapshot: (UUID) -> Void
     let onRenameTrack: (UUID, FileRenameStrategy) -> Void
@@ -98,13 +98,13 @@ struct PlayerView: View {
         let onDeleteTrack: (UUID) -> Void
         let onShowInLibrary: (UUID) -> Void
         let onMoveToFolder: (UUID) -> Void
-        let onAddToTrackList: (UUID) -> Void  /// Добавление элемента очереди в треклист
-        let onToggleFavorite: (UUID) -> Void  /// Переключение избранного элемента очереди
-        let onGoToArtist: (UUID) -> Void      /// Переход к артисту элемента очереди
-        let onGoToAlbum: (UUID) -> Void       /// Переход к альбому элемента очереди
-        let onShareTrack: (UUID) -> Void      /// Отправка аудиофайла элемента очереди
-        let onCopyTrack: (UUID) -> Void       /// Копирование iTunes-трека из очереди
-        let onEditTags: (UUID) -> Void        /// Редактирование тегов элемента очереди
+        let onAddToTrackList: (UUID) -> Void
+        let onToggleFavorite: (UUID) -> Void
+        let onGoToArtist: (UUID) -> Void
+        let onGoToAlbum: (UUID) -> Void
+        let onShareTrack: (UUID) -> Void
+        let onCopyTrack: (UUID) -> Void
+        let onEditTags: (UUID) -> Void
         let onArtworkTap: (UUID) -> Void
         let onRequestSnapshot: (UUID) -> Void
         let onRenameTrack: (UUID, FileRenameStrategy) -> Void

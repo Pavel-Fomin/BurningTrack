@@ -21,12 +21,12 @@ protocol LibraryCollectionRootItemsProvider {
 }
 
 final class DefaultLibraryCollectionValuesProvider: LibraryCollectionValuesProvider, LibraryCollectionRootItemsProvider {
-    // MARK: - Dependencies
+    // MARK: - Зависимости
 
     /// Фасад локального SQLite-индекса треков и сохранённых metadata.
     private let trackRegistry: TrackRegistry
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     init(trackRegistry: TrackRegistry) {
         self.trackRegistry = trackRegistry
@@ -63,7 +63,7 @@ final class DefaultLibraryCollectionValuesProvider: LibraryCollectionValuesProvi
         }
     }
 
-    // MARK: - Private
+    // MARK: - Приватное
 
     /// Собирает один снимок треков и metadata для всех запрошенных разделов.
     private func makeSnapshot(

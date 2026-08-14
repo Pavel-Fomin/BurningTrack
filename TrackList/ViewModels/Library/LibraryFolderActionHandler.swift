@@ -11,7 +11,7 @@ import Foundation
 
 @MainActor
 final class LibraryFolderActionHandler {
-    // MARK: - Dependencies
+    // MARK: - Зависимости
 
     private let navigationCoordinator: NavigationCoordinator
     private let clearSelectionActionBar: @MainActor () -> Void
@@ -20,7 +20,7 @@ final class LibraryFolderActionHandler {
     /// Семантическая дочерняя папка экспортируемого содержимого.
     private let exportFolder: ExportFolder
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     init(
         navigationCoordinator: NavigationCoordinator,
@@ -34,7 +34,7 @@ final class LibraryFolderActionHandler {
         self.clearSelectionActionBar = clearSelectionActionBar
     }
 
-    // MARK: - Handle
+    // MARK: - Обработка
 
     func handle(_ action: LibraryFolderAction) {
         switch action {
@@ -47,7 +47,7 @@ final class LibraryFolderActionHandler {
         }
     }
 
-    // MARK: - Export
+    // MARK: - Экспорт
 
     /// Запускает общий экспорт треков текущей папки без нумерации имён файлов.
     private func exportTracks(_ libraryTracks: [LibraryTrack]) {

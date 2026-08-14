@@ -37,8 +37,8 @@ struct ScreenToolbarModifier<Leading: View, Trailing: View>: ViewModifier {
     }
     
     
-    // MARK: - UI
-    
+    // MARK: - Интерфейс
+
     func body(content: Content) -> some View {
         content
             .toolbar {
@@ -95,7 +95,7 @@ struct ScreenToolbarModifier<Leading: View, Trailing: View>: ViewModifier {
 }
 
 
-// MARK: - View extension
+// MARK: - Расширение View
 
 extension View {
     

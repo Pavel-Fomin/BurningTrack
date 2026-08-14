@@ -2,6 +2,8 @@
 //  DefaultLibraryTracksProvider.swift
 //  TrackList
 //
+//  Загружает треки фонотеки, выбирая путь по источнику списка.
+//
 //  Created by Pavel Fomin on 13.12.2025.
 //
 
@@ -21,7 +23,7 @@ final class DefaultLibraryTracksProvider: LibraryTracksProvider {
         }
     }
 
-    /// Возвращает треки папки старым способом с восстановлением bookmark.
+    /// Восстанавливает треки папки через реестр и bookmark-путь.
     private func tracks(inFolder folderId: UUID) async -> [LibraryTrack] {
 
         let entries = await TrackRegistry.shared.tracks(inFolder: folderId)

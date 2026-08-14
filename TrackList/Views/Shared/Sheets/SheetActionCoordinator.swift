@@ -21,7 +21,7 @@ import Foundation
 @MainActor
 final class SheetActionCoordinator {
 
-    // MARK: - Singleton
+    // MARK: - Единый экземпляр
 
     static let shared = SheetActionCoordinator()
     private init() {}

@@ -12,7 +12,7 @@ import Foundation
 
 enum TrackChangedField: Equatable, Hashable {
 
-    // MARK: - File
+    // MARK: - Файл
 
     case fileName           /// Изменилось имя файла (rename)
     case isAvailable        /// Изменилась доступность файла
@@ -55,7 +55,7 @@ enum TrackChangedField: Equatable, Hashable {
     case encodedBy          /// Кем закодирован файл
     case isrc               /// Международный код записи
 
-    // MARK: - Runtime
+    // MARK: - Runtime-состояние
 
     case duration           /// Длительность трека
     case artworkData        /// Обложка (raw data)

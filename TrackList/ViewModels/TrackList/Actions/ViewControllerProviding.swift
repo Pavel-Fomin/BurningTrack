@@ -2,6 +2,8 @@
 //  ViewControllerProviding.swift
 //  TrackList
 //
+//  Объявляет платформенную capability получения верхнего UIKit-контроллера.
+//
 //  Created by Pavel Fomin on 18.06.2026.
 //
 

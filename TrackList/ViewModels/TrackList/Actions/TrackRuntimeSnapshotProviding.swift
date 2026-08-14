@@ -2,6 +2,8 @@
 //  TrackRuntimeSnapshotProviding.swift
 //  TrackList
 //
+//  Объявляет read-only доступ к уже подготовленным runtime-снимкам треков.
+//
 //  Created by Pavel Fomin on 18.06.2026.
 //
 

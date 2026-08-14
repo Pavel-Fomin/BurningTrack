@@ -12,22 +12,22 @@ import SwiftUI
 
 struct CreateTrackListSheet: View {
     
-    // MARK: - Input
+    // MARK: - Входные данные
     
-    @Binding var name: String   /// Название нового треклиста.
+    @Binding var name: String
     
-    let canSubmit: Bool  /// Можно ли выполнить действие с текущим названием.
-    let onCreateEmpty: () -> Void  /// Действие "Добавить треки позже".
-    let onAddTracks: () -> Void  /// Действие "Добавить треки".
-    let onCancel: () -> Void  /// Действие закрытия sheet.
+    let canSubmit: Bool
+    let onCreateEmpty: () -> Void
+    let onAddTracks: () -> Void
+    let onCancel: () -> Void
     
-    // MARK: - Focus
+    // MARK: - Фокус
     
     /// Состояние фокуса поля ввода.
     /// Управляется sheet-компонентом, чтобы снимать focus до закрытия или перехода к другому sheet.
     @FocusState private var isNameFocused: Bool
     
-    // MARK: - UI
+    // MARK: - Интерфейс
     
     var body: some View {
         NavigationBarHost(
@@ -47,7 +47,6 @@ struct CreateTrackListSheet: View {
     private var form: some View {
         VStack(spacing: 20) {
             
-            /// Поле ввода — оставляем как в SaveTrackListSheet
             Form {
                 Section {
                     TextField("Tracklist Name", text: $name)

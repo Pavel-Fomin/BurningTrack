@@ -9,7 +9,7 @@
 import Foundation
 
 struct LibraryScreenStateBuilder {
-    // MARK: - Build
+    // MARK: - Сборка
 
     @MainActor
     func build(
@@ -48,7 +48,7 @@ struct LibraryScreenStateBuilder {
         )
     }
 
-    // MARK: - Private
+    // MARK: - Приватное
 
     private func appendDestination(
         for folder: LibraryFolder,

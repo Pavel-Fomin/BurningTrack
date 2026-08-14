@@ -2,19 +2,7 @@
 //  MoveToFolderContainer.swift
 //  TrackList
 //
-//  UI-контейнер экрана выбора папки для файлового действия над треком.
-//
-//  Роль контейнера:
-//  - владеет состоянием выбора папки назначения
-//  - управляет подтверждением действия (✓) и закрытием sheet’а (×)
-//  - выполняет команду, соответствующую режиму sheet’а
-//  - конфигурирует NavigationBarHost
-//
-//  Архитектурные принципы:
-//  - контейнер не содержит визуальной разметки списка папок
-//  - контейнер не знает о навигации внутри дерева папок
-//  - MoveToFolderSheet — чистый UI-компонент
-//  - вся бизнес-логика и side-effects находятся здесь
+//  Контейнер UI-сеанса выбора папки и запуска существующей команды перемещения или копирования.
 //
 //  Created by Pavel Fomin on 21.01.2026.
 //
@@ -24,9 +12,9 @@ import Foundation
 
 struct MoveToFolderContainer: View {
 
-    // MARK: - Input
+    // MARK: - Входные данные
 
-    /// Данные sheet’а, переданные через SheetManager
+    /// Неизменяемый route payload, переданный SheetManager.
     let data: MoveToFolderSheetData
 
     /// Читает текущую папку локального трека через явную factory-зависимость.
@@ -44,12 +32,11 @@ struct MoveToFolderContainer: View {
     /// Обрабатывает typed-закрытие текущего AppSheet без доступа View к SheetManager.
     let actionHandler: any MoveToFolderActionHandling
 
-    // MARK: - State
+    // MARK: - Состояние
 
-    /// Выбранная папка назначения
     @State private var selectedFolderId: UUID?
 
-    /// Текущая папка трека (для валидации и бейджа "Текущая")
+    /// Текущая папка нужна для валидации папки назначения и отметки в списке.
     @State private var trackCurrentFolderId: UUID?
     /// Исключает повторный запуск файловой операции до завершения первой.
     @State private var isPerformingOperation = false
@@ -58,17 +45,14 @@ struct MoveToFolderContainer: View {
     /// Отличает completion последней операции от предыдущего route или нажатия.
     @State private var operationID: UUID?
 
-    // MARK: - UI
+    // MARK: - Интерфейс
 
     var body: some View {
         NavigationBarHost(
             title: navigationTitle,
-
-            /// Кнопка подтверждения (✓)
             rightButtonImage: "checkmark",
 
-            /// Активна только если папка выбрана и она отличается от текущей.
-            /// Для iTunes-copy текущей папки нет, поэтому достаточно выбора назначения.
+            // У iTunes-copy нет текущей папки фонотеки, поэтому достаточно выбрать папку назначения.
             isRightEnabled: Binding(
                 get: {
                     selectedFolderId != nil &&
@@ -77,14 +61,10 @@ struct MoveToFolderContainer: View {
                 },
                 set: { _ in }
             ),
-
-            /// Закрытие sheet’а без действий
             onClose: {
                 actionHandler.handle(.closeTapped)
             },
             closeAccessibilityLabel: String(localized: "Cancel"),
-
-            /// Подтверждение выбранной файловой операции
             onRightTap: {
                 Task { await performSelectedOperation() }
             },
@@ -102,6 +82,7 @@ struct MoveToFolderContainer: View {
             await loadCurrentTrackFolder()
         }
         .onDisappear {
+            // Закрытие UI делает completion неактуальным, но не отменяет уже начатую файловую команду.
             invalidateSession()
         }
     }
@@ -111,7 +92,7 @@ struct MoveToFolderContainer: View {
         MoveToFolderPresentationText.title(for: data.operation)
     }
 
-    // MARK: - Actions
+    // MARK: - Действия
 
     /// Загружает текущую папку трека для move-flow.
     /// У iTunes-трека нет папки в фонотеке, поэтому BookmarkResolver не используется.

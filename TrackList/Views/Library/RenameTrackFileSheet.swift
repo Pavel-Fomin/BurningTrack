@@ -12,7 +12,7 @@ import SwiftUI
 
 struct RenameTrackFileSheet: View {
 
-    // MARK: - Input
+    // MARK: - Входные данные
 
     /// Связанное состояние имени файла.
     /// Источник истины находится в ViewModel feature-flow.
@@ -22,7 +22,7 @@ struct RenameTrackFileSheet: View {
     /// Управляется контейнером, чтобы снимать focus до закрытия sheet.
     let isFileNameFocused: FocusState<Bool>.Binding
 
-    // MARK: - UI
+    // MARK: - Интерфейс
 
     var body: some View {
         Form {

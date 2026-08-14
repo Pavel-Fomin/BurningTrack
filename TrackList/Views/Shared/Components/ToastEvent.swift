@@ -15,7 +15,7 @@ import Foundation
 
 enum ToastEvent: Equatable {
 
-    // MARK: - Success
+    // MARK: - Успех
 
     // MARK: Плеер
 
@@ -125,7 +125,7 @@ enum ToastEvent: Equatable {
         artwork: ArtworkRequest?
     )
 
-    // MARK: - Warning
+    // MARK: - Предупреждение
 
     case trackUnavailable(title: String?)
 
@@ -143,7 +143,7 @@ enum ToastEvent: Equatable {
 
     case artworkCouldNotBeLoaded
 
-    // MARK: - Error
+    // MARK: - Ошибка
 
     case operationFailed(message: String)
 

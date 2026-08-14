@@ -62,7 +62,7 @@ protocol TrackDetailEventProviding {
     var trackDidUpdate: AnyPublisher<TrackUpdateEvent, Never> { get }
 }
 
-// MARK: - Production adapters
+// MARK: - Адаптеры production-слоя
 
 extension TrackRuntimeStore: TrackDetailSnapshotProviding {}
 

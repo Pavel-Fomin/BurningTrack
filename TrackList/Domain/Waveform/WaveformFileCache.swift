@@ -31,7 +31,7 @@ protocol WaveformCaching: Sendable {
 
 extension WaveformCaching {
 
-    /// Сохраняет прежний вызов для изолированных проверок и использует путь файла как локальный ключ.
+    /// Использует путь файла как локальный ключ, когда вызывающий код не передаёт отдельную идентичность трека.
     func samples(
         for fileURL: URL,
         sampleCount: Int
@@ -43,7 +43,7 @@ extension WaveformCaching {
         )
     }
 
-    /// Сохраняет прежнюю запись кэша для существующих клиентов без явного ключа трека.
+    /// Использует путь файла как локальный ключ при записи без отдельной идентичности трека.
     func store(
         _ samples: [Double],
         for fileURL: URL,
@@ -101,7 +101,7 @@ actor WaveformFileCache: WaveformCaching {
             let data = try Data(contentsOf: cacheFileURL)
             let record = try JSONDecoder().decode(CachedWaveform.self, from: data)
 
-            // Несовпадение sampleCount, включая старые 64 значения после перехода на 128, требует безопасной перестройки производного waveform.
+            // Запись с другим количеством амплитуд не соответствует запросу и пересоздаётся как производный кэш.
             guard record.version == Self.cacheVersion,
                   record.sampleCount == sampleCount,
                   isValid(samples: record.samples, expectedCount: sampleCount)
@@ -148,7 +148,7 @@ actor WaveformFileCache: WaveformCaching {
         try data.write(to: cacheFileURL, options: .atomic)
     }
 
-    // MARK: - Cache key
+    // MARK: - Ключ кэша
 
     /// Возвращает отдельный каталожный путь для производных данных приложения.
     private static var defaultDirectoryURL: URL {
@@ -203,7 +203,7 @@ actor WaveformFileCache: WaveformCaching {
         return directoryURL.appendingPathComponent(fileName, isDirectory: false)
     }
 
-    // MARK: - Validation
+    // MARK: - Валидация
 
     /// Проверяет размер, конечность и диапазон значений перед выдачей либо записью в кэш.
     private func isValid(samples: [Double], expectedCount: Int) -> Bool {

@@ -2,18 +2,8 @@
 //  NavigationBarHost.swift
 //  TrackList
 //
-//  UIKit-хост для sheet’ов с системным navigation bar.
-//
-//  Роль:
-//  - предоставляет НАСТОЯЩИЙ UIKit navigation bar внутри SwiftUI sheet
-//  - создаёт системные UIBarButtonItem (× / универсальная правая кнопка)
-//  - управляет состоянием enabled / disabled правой кнопки
-//
-//  ВАЖНО:
-//  - использует ТОЛЬКО контрактный API UIKit
-//  - НЕ содержит бизнес-логики
-//  - НЕ знает, что означает кнопка (edit / save / apply)
-//  - НЕ владеет состоянием формы
+//  UIKit-мост для sheet, которым требуется системный navigation bar.
+//  Адаптирует конфигурацию и обработчики, не владея маршрутом, состоянием формы или доменными операциями.
 //
 //  Created by Pavel Fomin on 21.01.2026.
 //
@@ -23,7 +13,7 @@ import UIKit
 
 struct NavigationBarHost<Content: View>: UIViewControllerRepresentable {
 
-    // MARK: - Configuration
+    // MARK: - Конфигурация
 
     let title: String?
 
@@ -31,32 +21,25 @@ struct NavigationBarHost<Content: View>: UIViewControllerRepresentable {
     /// Если nil — используется стандартный системный title без кастомного titleView.
     let subtitle: String?
 
-    /// System image name для правой кнопки (pencil / checkmark и т.д.)
-    /// Если nil — кнопка не отображается
     let rightButtonImage: String?
 
-    /// Управляет доступностью правой кнопки
     let isRightEnabled: Binding<Bool>
 
-    /// Кнопка закрытия (×)
     let onClose: (() -> Void)?
 
     /// Accessibility-подпись кнопки закрытия.
     let closeAccessibilityLabel: String?
 
-    /// Действие правой кнопки
     let onRightTap: (() -> Void)?
 
     /// Accessibility-подпись универсальной правой кнопки.
     let rightButtonAccessibilityLabel: String?
 
-    /// Показывать правую кнопку только на корневом экране NavigationStack
     let showsRightButtonOnlyOnRoot: Bool
 
-    /// Контент sheet’а (чистый SwiftUI View)
     let content: Content
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     init(
         title: String? = nil,
@@ -94,7 +77,6 @@ struct NavigationBarHost<Content: View>: UIViewControllerRepresentable {
         context.coordinator.hostingController = hosting
         configureTitle(for: hosting)
 
-        // Кнопка закрытия (×)
         if onClose != nil {
             let item = UIBarButtonItem(
                 image: UIImage(systemName: "xmark"),
@@ -106,7 +88,6 @@ struct NavigationBarHost<Content: View>: UIViewControllerRepresentable {
             hosting.navigationItem.leftBarButtonItem = item
         }
 
-        // Универсальная правая кнопка
         if let imageName = rightButtonImage {
 
             let style: UIBarButtonItem.Style =
@@ -152,7 +133,6 @@ struct NavigationBarHost<Content: View>: UIViewControllerRepresentable {
                 )
         }
 
-        // если правой кнопки быть не должно
         guard let imageName = rightButtonImage else {
             root.navigationItem.rightBarButtonItem = nil
             if top !== root {
@@ -167,7 +147,6 @@ struct NavigationBarHost<Content: View>: UIViewControllerRepresentable {
             top.navigationItem.rightBarButtonItem = nil
         }
 
-        // если кнопки ещё нет — создаём
         if root.navigationItem.rightBarButtonItem == nil {
 
             let style: UIBarButtonItem.Style =
@@ -212,7 +191,7 @@ struct NavigationBarHost<Content: View>: UIViewControllerRepresentable {
 
     func makeCoordinator() -> Coordinator {Coordinator()}
 
-    // MARK: - Accessibility
+    // MARK: - Доступность
 
     private var resolvedCloseAccessibilityLabel: String {
         closeAccessibilityLabel ?? String(localized: "Close")
@@ -222,7 +201,7 @@ struct NavigationBarHost<Content: View>: UIViewControllerRepresentable {
         rightButtonAccessibilityLabel ?? String(localized: "Done")
     }
 
-    // MARK: - Title
+    // MARK: - Заголовок
 
     /// Настраивает заголовок navigation bar.
     private func configureTitle(for viewController: UIViewController) {
@@ -270,7 +249,7 @@ struct NavigationBarHost<Content: View>: UIViewControllerRepresentable {
         return stack
     }
 
-    // MARK: - Coordinator
+    // MARK: - Координатор
 
     final class Coordinator: NSObject {
 

@@ -60,7 +60,7 @@ struct BatchFilenameRenamePresenter {
         }
     }
 
-    /// Сохраняет прежнее правило: ошибки metadata показывают исходное имя, остальные — target.
+    /// Ошибки metadata показывают исходное имя, а остальные ошибки — целевое.
     private func displayedFileName(for item: BatchFilenameRenameItem) -> String {
         switch item.status {
         case .ready,

@@ -35,7 +35,7 @@ final class MoveToFolderNavigationContext: ObservableObject {
     /// Стек родительских папок для кнопки "Назад".
     private var stack: [UUID?] = []
 
-    // MARK: - Публичные computed для UI
+    // MARK: - Публичные вычисляемые свойства для интерфейса
 
     var canGoBack: Bool { stack.isEmpty == false }
 
@@ -67,7 +67,7 @@ final class MoveToFolderNavigationContext: ObservableObject {
         }
     }
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     init(library: MusicLibraryManager) {
         self.library = library

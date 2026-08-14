@@ -10,10 +10,10 @@
 import Foundation
 
 struct BatchTagEditTrack: Identifiable, Equatable {
-    let trackId: UUID                        /// Идентификатор трека.
-    let fileName: String                     /// Имя файла трека.
-    let values: [EditableTrackField: String] /// Значения тегов, прочитанные для этого трека.
-    let hasArtwork: Bool                     /// Есть ли у трека обложка.
-    var id: UUID { trackId                   /// Идентификатор для SwiftUI-списков.
+    let trackId: UUID
+    let fileName: String
+    let values: [EditableTrackField: String]
+    let hasArtwork: Bool
+    var id: UUID { trackId
     }
 }

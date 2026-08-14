@@ -12,7 +12,7 @@ import AVKit
 
 struct MiniPlayerExpandedContent: View {
 
-    // MARK: - Input
+    // MARK: - Входные данные
 
     let showInLibraryAction: (() -> Void)?
     let shuffleAction: (() -> Void)?
@@ -23,7 +23,7 @@ struct MiniPlayerExpandedContent: View {
     let isRepeatAllEnabled: Bool
     let isRepeatOneEnabled: Bool
 
-    // MARK: - UI
+    // MARK: - Интерфейс
 
     var body: some View {
         HStack {
@@ -67,7 +67,7 @@ struct MiniPlayerExpandedContent: View {
         .padding(.vertical, 4)
     }
 
-    // MARK: - Optional actions
+    // MARK: - Необязательные действия
 
     /// Открывает системное меню выбора источника AirPlay.
     @ViewBuilder

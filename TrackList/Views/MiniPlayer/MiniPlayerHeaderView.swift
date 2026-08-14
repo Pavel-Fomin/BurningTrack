@@ -18,7 +18,7 @@ struct MiniPlayerHeaderView: View {
     /// Смещение даёт обратную связь о направлении свайпа, не меняя компоновку заголовка.
     @State private var contentDragOffset: CGFloat = 0
 
-    // MARK: - Input
+    // MARK: - Входные данные
 
     let artworkRequest: ArtworkRequest?
     let title: String
@@ -36,7 +36,7 @@ struct MiniPlayerHeaderView: View {
     let onContentSwipeNext: () -> Void
     let onFavorite: () -> Void
 
-    // MARK: - UI
+    // MARK: - Интерфейс
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
@@ -155,7 +155,7 @@ struct MiniPlayerHeaderView: View {
             }
     }
 
-    // MARK: - Artwork
+    // MARK: - Обложка
 
     /// Показывает вращающуюся обложку текущего трека или статичную круглую заглушку.
     @ViewBuilder

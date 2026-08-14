@@ -66,7 +66,7 @@ final class CloudTrackAvailabilityController {
     /// Запрашивает немедленный повторный проход, если набор треков изменился во время обновления.
     private var needsImmediateRefresh = false
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     init(
         manager: any CloudTrackAvailabilityManaging = CloudTrackAvailabilityManager.shared
@@ -303,7 +303,7 @@ final class LibraryCloudAvailabilityScreenController {
     /// Не принимает запоздалые события строк после ухода экрана.
     private var isScreenVisible = false
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     init() {
         availabilityController = CloudTrackAvailabilityController()

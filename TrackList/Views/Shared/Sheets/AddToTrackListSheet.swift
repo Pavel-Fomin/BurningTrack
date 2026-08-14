@@ -23,16 +23,16 @@ import Foundation
 
 struct AddToTrackListSheet: View {
     
-    // MARK: - Input
-    
+    // MARK: - Входные данные
+
     /// Готовое presentation-состояние экрана.
     let state: AddToTrackListState
     /// Typed-действия, передаваемые во ViewModel.
     let onAction: (AddToTrackListAction) -> Void
     
     
-    // MARK: - UI
-    
+    // MARK: - Интерфейс
+
     var body: some View {
         NavigationBarHost(
             title: "Add to Tracklist",

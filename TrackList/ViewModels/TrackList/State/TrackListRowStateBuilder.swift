@@ -2,6 +2,8 @@
 //  TrackListRowStateBuilder.swift
 //  TrackList
 //
+//  Подготавливает presentation-состояние строки detail-flow треклиста.
+//
 //  Created by Pavel Fomin on 17.06.2026.
 //
 

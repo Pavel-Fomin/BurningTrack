@@ -14,13 +14,15 @@ import CryptoKit
 
 /// Представляет папку с музыкой в фонотеке, включая вложенные папки и найденные аудиофайлы
 struct LibraryFolder: Identifiable, Hashable {
-    let id: UUID                     /// Уникальный ID папки (для SwiftUI и идентификации)
-    let name: String                 /// Название папки (отображается в UI)
-    let url: URL                     /// Путь к папке на устройстве
-    var subfolders: [LibraryFolder]  /// Вложенные подпапки (рекурсивная структура)
-    var audioFiles: [URL]            /// Список найденных аудиофайлов в этой папке (не включая подпапки)
+    /// Стабильно выводится из нормализованного URL, поэтому повторное сканирование той же папки сохраняет её идентичность в SwiftUI.
+    let id: UUID
+    let name: String
+    let url: URL
+    var subfolders: [LibraryFolder]
+    /// Содержит только файлы текущей папки; содержимое подпапок добавляет `flattenedTracks()`.
+    var audioFiles: [URL]
 
-    /// Инициализатор папки
+    /// Нормализует URL один раз, чтобы идентичность и обращения к папке не зависели от символьных ссылок.
     init(name: String, url: URL, subfolders: [LibraryFolder] = [], audioFiles: [URL] = []) {
         let resolved = url.resolvingSymlinksInPath()
         self.id = resolved.libraryFolderId
@@ -36,9 +38,7 @@ struct LibraryFolder: Identifiable, Hashable {
 // MARK: - Утилиты
 
 extension LibraryFolder {
-    
-    /// Рекурсивно возвращает все аудиофайлы, включая содержимое подпапок
-    /// Используется для построения общего списка треков без вложенности
+    /// Сворачивает дерево папок в список файлов для операций, которым не важна иерархия.
     func flattenedTracks() -> [URL] {
         var result = audioFiles
         for subfolder in subfolders {

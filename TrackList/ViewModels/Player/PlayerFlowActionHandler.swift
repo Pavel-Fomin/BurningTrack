@@ -17,7 +17,7 @@ import Foundation
 /// Не обращается к UI и infrastructure singleton-слоям.
 final class PlayerFlowActionHandler {
 
-    // MARK: - Dependencies
+    // MARK: - Зависимости
 
     /// Обработчик playback-действий.
     private let playbackActionHandler: PlayerPlaybackActionHandler
@@ -51,7 +51,7 @@ final class PlayerFlowActionHandler {
         self.renameActionHandler = renameActionHandler
     }
 
-    // MARK: - Actions
+    // MARK: - Действия
 
     @MainActor
     func handle(_ action: PlayerScreenAction) {

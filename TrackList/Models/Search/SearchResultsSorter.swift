@@ -115,7 +115,7 @@ private extension SearchResultsSorter {
         }
     }
 
-    /// Вторичный fallback сохраняет прежнее детерминированное упорядочивание.
+    /// Вторичный fallback делает порядок результатов детерминированным.
     static func compareFallback(
         _ lhs: SearchTrackResult,
         _ rhs: SearchTrackResult

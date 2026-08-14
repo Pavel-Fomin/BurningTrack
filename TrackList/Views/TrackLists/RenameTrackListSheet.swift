@@ -23,7 +23,7 @@ import SwiftUI
 
 struct RenameTrackListSheet: View {
 
-    // MARK: - Input
+    // MARK: - Входные данные
 
     /// Готовое presentation-состояние формы.
     let state: RenameTrackListState
@@ -34,7 +34,7 @@ struct RenameTrackListSheet: View {
     /// Управляется sheet-компонентом, чтобы снимать focus до закрытия sheet.
     @FocusState private var isNameFocused: Bool
 
-    // MARK: - UI
+    // MARK: - Интерфейс
 
     var body: some View {
         NavigationBarHost(

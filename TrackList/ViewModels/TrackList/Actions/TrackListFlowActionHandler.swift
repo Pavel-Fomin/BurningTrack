@@ -2,6 +2,8 @@
 //  TrackListFlowActionHandler.swift
 //  TrackList
 //
+//  Разделяет typed-действия detail-flow треклиста между presentation, playback, изменениями и экспортом.
+//
 //  Created by Pavel Fomin on 17.06.2026.
 //
 

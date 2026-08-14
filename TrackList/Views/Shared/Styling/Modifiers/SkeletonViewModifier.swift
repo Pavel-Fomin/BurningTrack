@@ -2,6 +2,8 @@
 //  SkeletonViewModifier.swift
 //  TrackList
 //
+//  Добавляет анимированное представление-заполнитель для загружаемого содержимого.
+//
 //  Created by Pavel Fomin on 23.11.2025.
 //
 

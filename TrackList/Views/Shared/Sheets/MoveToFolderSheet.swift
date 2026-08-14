@@ -2,18 +2,7 @@
 //  MoveToFolderSheet.swift
 //  TrackList
 //
-//  UI-форма выбора папки для файлового действия над треком.
-//
-//  Роль компонента:
-//  - отображает дерево папок
-//  - позволяет выбрать папку назначения
-//  - управляет локальной навигацией внутри дерева папок
-//
-//  Архитектурные принципы:
-//  - не содержит бизнес-логики
-//  - не выполняет файловых команд
-//  - не управляет закрытием sheet’а
-//  - подтверждение и отмена обрабатываются контейнером
+//  Отображает дерево папок и передаёт локальный выбор контейнеру.
 //
 //  Created by Pavel Fomin on 07.12.2025.
 //
@@ -23,30 +12,26 @@ import Foundation
 
 struct MoveToFolderSheet: View {
 
-    // MARK: - Input
+    // MARK: - Входные данные
 
-    /// Идентификатор трека, для которого выполняется файловое действие.
-    /// Используется ТОЛЬКО для определения текущей папки (бейдж "Текущая").
+    /// Идентификатор трека нужен только для отметки его текущей папки.
     let trackId: UUID
 
-    /// Локализованный заголовок корневого уровня выбора destination.
     let rootNavigationTitle: String
 
     /// Выбранная папка назначения.
     /// Источник истины находится в контейнере.
     @Binding var selectedFolderId: UUID?
 
-    /// Текущая папка трека.
-    /// Используется для бейджа "Текущая" и валидации.
+    /// Текущая папка трека нужна для отметки и исключается из доступных папок назначения.
     @Binding var trackCurrentFolderId: UUID?
 
     /// Явно переданное read-only дерево папок для navigation context и virtual current row.
     let library: MusicLibraryManager
 
-    // MARK: - State
+    // MARK: - Состояние
 
-    /// Контекст навигации по дереву папок.
-    /// Управляет переходами внутрь подпапок и возвратами назад.
+    /// Сохраняет путь внутри дерева при пересчётах родительского View.
     @StateObject private var nav: MoveToFolderNavigationContext
 
     init(
@@ -66,7 +51,7 @@ struct MoveToFolderSheet: View {
         )
     }
 
-    // MARK: - Rows
+    // MARK: - Строки
 
     /// Строки папок для отображения в списке.
     ///
@@ -109,13 +94,12 @@ struct MoveToFolderSheet: View {
         return [currentRow] + rows
     }
 
-    // MARK: - UI
+    // MARK: - Интерфейс
 
     var body: some View {
         List(orderedRows) { row in
             HStack(spacing: 12) {
 
-                // Левая зона — навигация (переход в подпапку)
                 Button {
                     nav.enter(row.id)
                 } label: {
@@ -133,8 +117,6 @@ struct MoveToFolderSheet: View {
                     : ""
                 )
 
-                // Правая зона — выбор папки назначения (radio)
-                // Показывается для любой папки, кроме текущей папки трека.
                 if row.id != trackCurrentFolderId {
                     Button {
                         selectedFolderId =
@@ -161,14 +143,12 @@ struct MoveToFolderSheet: View {
                         selectedFolderId == row.id ? String(localized: "Selected") : ""
                     )
                 } else {
-                    // Пустое место под radio, чтобы не ломать layout
                     Spacer()
                         .frame(width: 28)
                 }
             }
             .overlay(alignment: .trailing) {
 
-                // Бейдж "Текущая"
                 if row.id == trackCurrentFolderId {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.title3)
@@ -186,7 +166,6 @@ struct MoveToFolderSheet: View {
         )
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            // Кнопка "Назад" появляется только если мы реально углубились
             ToolbarItem(placement: .topBarLeading) {
                 if nav.canGoBack {
                     Button {

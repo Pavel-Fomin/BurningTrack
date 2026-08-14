@@ -30,5 +30,6 @@ final class ScenePhaseHandler: ObservableObject {
         case search
     }
 
+    /// Единственный источник выбора основной вкладки; `MainNavigationViewModel` только связывает его с конкретным SwiftUI-контейнером.
     @Published var activeTab: Tab = .library
 }

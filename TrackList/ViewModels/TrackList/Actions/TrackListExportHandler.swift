@@ -2,6 +2,8 @@
 //  TrackListExportHandler.swift
 //  TrackList
 //
+//  Направляет подготовленные данные треклиста в глобальный export-flow.
+//
 //  Created by Pavel Fomin on 17.06.2026.
 //
 

@@ -13,14 +13,14 @@ import Foundation
 @MainActor
 final class LibraryCollectionTracksActionHandler {
 
-    // MARK: - Dependencies
+    // MARK: - Зависимости
 
     /// Типизированный источник хранит отображаемое имя выбранного значения для экспорта.
     private let source: LibraryTrackListSource
     /// Типизированный вход в глобальный Export-feature.
     private let exportRequestHandler: any ExportRequestHandling
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     init(
         source: LibraryTrackListSource,
@@ -30,7 +30,7 @@ final class LibraryCollectionTracksActionHandler {
         self.exportRequestHandler = exportRequestHandler
     }
 
-    // MARK: - Handle
+    // MARK: - Обработка
 
     func handle(_ action: LibraryCollectionTracksAction) {
         switch action {
@@ -39,7 +39,7 @@ final class LibraryCollectionTracksActionHandler {
         }
     }
 
-    // MARK: - Export
+    // MARK: - Экспорт
 
     /// Запускает экспорт треков выбранного значения без изменения текущего порядка строк.
     private func exportTracks(_ libraryTracks: [LibraryTrack]) {

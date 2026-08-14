@@ -21,7 +21,7 @@ struct RenameTrackFileContainer: View {
         self._viewModel = StateObject(wrappedValue: viewModel)
     }
 
-    // MARK: - UI
+    // MARK: - Интерфейс
 
     var body: some View {
         NavigationBarHost(

@@ -92,7 +92,7 @@ final class TrackListsActionHandler {
         }
     }
 
-    // MARK: - Navigation
+    // MARK: - Навигация
 
     /// Открывает существующий треклист из актуального master-снимка.
     private func openTrackList(id: UUID) {
@@ -122,7 +122,7 @@ final class TrackListsActionHandler {
         return true
     }
 
-    // MARK: - Sort and reorder
+    // MARK: - Сортировка и изменение порядка
 
     /// Сохраняет выбранный режим и его физический порядок как одну пользовательскую команду.
     private func setSortMode(_ mode: TrackListsSortMode) {
@@ -188,7 +188,7 @@ final class TrackListsActionHandler {
         }
     }
 
-    // MARK: - Delete
+    // MARK: - Удаление
 
     /// Валидирует команду удаления до публикации presentation state подтверждения.
     private func requestDeleteTrackList(id: UUID) {

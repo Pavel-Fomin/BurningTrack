@@ -2,6 +2,8 @@
 //  TrackExporting.swift
 //  TrackList
 //
+//  Объявляет capability запуска и отмены глобального export-flow.
+//
 //  Created by Pavel Fomin on 18.06.2026.
 //
 

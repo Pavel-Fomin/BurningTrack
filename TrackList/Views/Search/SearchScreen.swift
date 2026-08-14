@@ -10,7 +10,7 @@ import SwiftUI
 
 struct SearchScreen: View {
 
-    // MARK: - Dependencies
+    // MARK: - Зависимости
 
     /// MainTabView использует состояние для синхронного скрытия MiniPlayer и резерва.
     @Binding private var isSearchActive: Bool
@@ -19,7 +19,7 @@ struct SearchScreen: View {
     /// Обработчик действий единственного экранного графа Search.
     private let actionHandler: SearchActionHandler
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     init(
         viewModel: SearchViewModel,
@@ -43,7 +43,7 @@ struct SearchScreen: View {
         )
     }
 
-    // MARK: - UI
+    // MARK: - Интерфейс
 
     var body: some View {
         NavigationStack {
@@ -75,7 +75,7 @@ struct SearchScreen: View {
         .searchPresentationToolbarBehavior(.avoidHidingContent)
     }
 
-    // MARK: - Toolbar
+    // MARK: - Панель инструментов
 
     /// Верхняя кнопка сортировки появляется только после ввода запроса или при видимой выдаче.
     @ToolbarContentBuilder

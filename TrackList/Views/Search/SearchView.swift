@@ -22,7 +22,7 @@ struct SearchView: View {
             )
     }
 
-    // MARK: - Content
+    // MARK: - Содержимое
 
     @ViewBuilder
     private var content: some View {
@@ -142,7 +142,7 @@ struct SearchView: View {
     }
 }
 
-// MARK: - Empty State
+// MARK: - Пустое состояние
 
 private struct SearchMessageView: View {
     let title: String
@@ -168,7 +168,7 @@ private struct SearchMessageView: View {
     }
 }
 
-// MARK: - Search Activity
+// MARK: - Активность поиска
 
 private struct SearchActivityObserver: View {
     @Environment(\.isSearching) private var isSearching
@@ -187,7 +187,7 @@ private struct SearchActivityObserver: View {
     }
 }
 
-// MARK: - Result Row
+// MARK: - Строка результата
 
 private struct SearchFolderRowView: View {
     let result: SearchFolderResult

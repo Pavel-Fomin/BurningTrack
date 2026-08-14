@@ -16,7 +16,7 @@ import Foundation
 
 final class DefaultTrackListBadgeProvider: TrackListBadgeProvider {
 
-    // MARK: - Public
+    // MARK: - Публичное
 
     func badges(for trackIds: [UUID]) -> [UUID: [TrackListMembership]] {
         TrackListBadgeIndex.shared.badges(for: trackIds)

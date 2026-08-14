@@ -18,7 +18,7 @@ struct BatchTagArtworkEditState: Equatable {
     private var groupReplacementPreviewID: UUID?
     /// Идентификаторы preview индивидуальных несохранённых замен.
     private var trackReplacementPreviewIDs: [UUID: UUID] = [:]
-    let summary: BatchTagArtworkSummary    /// Сводная информация о текущих обложках выбранных треков.
+    let summary: BatchTagArtworkSummary
     /// Сводная информация для первой карточки preview.
     var previewSummary: BatchTagArtworkPreviewSummary
     /// Первые элементы preview обложек.

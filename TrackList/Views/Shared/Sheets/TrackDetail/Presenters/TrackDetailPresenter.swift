@@ -177,7 +177,7 @@ struct TrackDetailPresenter {
         }
     }
 
-    /// Показывает прежнее сообщение для неизвестной ошибки сохранения.
+    /// Показывает сообщение для неизвестной ошибки сохранения.
     func presentUnknownSaveFailure() -> TrackDetailSavePresentation {
         toastPresenter.handle(
             .operationFailed(

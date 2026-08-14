@@ -11,14 +11,14 @@ import SwiftUI
 
 struct NewTrackListSelectionContainer: View {
 
-    // MARK: - State
+    // MARK: - Состояние
 
     /// ViewModel выбора уже собрана feature-factory и сохраняет выбор на время sheet-flow.
     @StateObject private var viewModel: NewTrackListSelectionViewModel
     /// Создаёт дочерние folder-экраны через существующую factory Library Tracks.
     let folderViewFactory: NewTrackListSelectionFolderViewFactory
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     init(
         viewModel: NewTrackListSelectionViewModel,
@@ -28,7 +28,7 @@ struct NewTrackListSelectionContainer: View {
         self.folderViewFactory = folderViewFactory
     }
 
-    // MARK: - UI
+    // MARK: - Интерфейс
 
     var body: some View {
         let state = viewModel.state

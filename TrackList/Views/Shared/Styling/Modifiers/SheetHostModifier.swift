@@ -2,13 +2,8 @@
 //  SheetHostModifier.swift
 //  TrackList
 //
-//  Унифицированный контейнер для всех sheet’ов приложения.
-//  Отвечает ТОЛЬКО за отображение sheet’ов по AppSheet.
-//  Не содержит логики, навигации и обработки действий.
-//
-//  Command-based UI Architecture:
-//  - SheetHost — тупой UI-контейнер
-//  - Sheet’ы сами инициируют команды или UI-действия
+//  Единственный SwiftUI-host, отображающий feature по типизированному AppSheet route.
+//  Не владеет feature-состоянием, domain-операциями и обработкой пользовательских действий.
 //
 //  Created by Pavel Fomin on 07.12.2025.
 //
@@ -45,44 +40,35 @@ struct SheetHostModifier: ViewModifier {
             .sheet(
                 item: $sheetManager.activeSheet,
                 onDismiss: {
+                    // Только подтверждение SwiftUI завершает lifecycle закрываемого route.
                     sheetManager.handleDismiss()
                 }
             ) { sheet in switch sheet {
-                
-                // MARK: - Действия над треком
-                
-                /// Сохранение треклиста
             case .saveTrackList(let data):
                 saveTrackListFeatureFactory.makeView(data: data)
                     .appSheet(detents: [.fraction(0.45), .medium])
-                
-                /// Переименование треклиста
+
             case .renameTrackList(let data):
                 renameTrackListFeatureFactory.makeView(data: data)
                     .appSheet(detents: [.fraction(0.45), .medium])
 
-                /// Ручное переименование файла трека
             case .renameTrackFile(let data):
                 renameTrackFileFeatureFactory.makeView(data: data)
                 .appSheet(detents: [.fraction(0.45), .medium])
-                
-                /// Перемещение трека
+
             case .moveToFolder(let data):
                 moveToFolderFeatureFactory.makeView(data: data)
                 .appSheet(detents: [.fraction(0.6), .medium])
-                
-                /// О треке
+
             case .trackDetail(let data):
                     trackDetailFeatureFactory.makeView(
                         data: data
                     )
                     .appSheet(detents: [.large])
 
-                
-                /// Добавить в треклист
             case .addToTrackList(let data):
                 addToTrackListFeatureFactory.makeView(data: data)
-                    .appSheet(detents: [.fraction(0.6), .medium])
+                .appSheet(detents: [.fraction(0.6), .medium])
 
                 /// Массовое добавление в треклист через тот же UI выбора треклиста.
             case .batchAddToTrackList(let data):
@@ -104,12 +90,10 @@ struct SheetHostModifier: ViewModifier {
                 batchFilenameRenameFeatureFactory.makeView(data: data)
                     .appSheet(detents: [.large])
 
-                /// Создание нового треклиста
             case .createTrackList(let data):
                 createTrackListFlowFactory.makeCreateTrackListView(data: data)
                     .appSheet(detents: [.fraction(0.55), .medium])
 
-                /// Подробности глобального экспорта.
             case .exportProgress(let route):
                 ExportProgressDetailsView(route: route)
                     .appSheet(detents: [.medium, .large])

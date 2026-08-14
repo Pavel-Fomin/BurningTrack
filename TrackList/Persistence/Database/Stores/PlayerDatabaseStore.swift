@@ -36,7 +36,7 @@ final class PlayerDatabaseStore: PlayerQueuePersisting {
         )
     }
 
-    // MARK: - Queue
+    // MARK: - Очередь
 
     /// Возвращает очередь плеера как бизнес-модели, без протаскивания SQLite-моделей выше Store.
     func fetchQueue() throws -> [PlayerTrack] {
@@ -73,7 +73,7 @@ final class PlayerDatabaseStore: PlayerQueuePersisting {
         try queueStore.replaceAll([])
     }
 
-    // MARK: - State
+    // MARK: - Состояние
 
     /// Возвращает сохранённое состояние плеера для будущего подключения восстановления playback-состояния.
     func fetchState() throws -> PlayerStateDatabaseModel? {
@@ -90,7 +90,7 @@ final class PlayerDatabaseStore: PlayerQueuePersisting {
         try stateStore.delete()
     }
 
-    // MARK: - Mapping
+    // MARK: - Сопоставление
 
     /// Создаёт SQLite-снимок элемента очереди из runtime-модели плеера.
     private static func makeQueueModel(

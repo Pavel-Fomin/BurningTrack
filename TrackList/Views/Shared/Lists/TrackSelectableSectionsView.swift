@@ -12,7 +12,7 @@ import SwiftUI
 
 struct TrackSelectableSectionsView: View {
 
-    // MARK: - Input
+    // MARK: - Входные данные
 
     /// Секции с готовым presentation-состоянием строк.
     let sections: [TrackSelectableSectionState]
@@ -25,7 +25,7 @@ struct TrackSelectableSectionsView: View {
     /// Запрашивает runtime snapshot через ViewModel фонотеки.
     let onRequestSnapshot: (UUID) -> Void
 
-    // MARK: - UI
+    // MARK: - Интерфейс
 
     var body: some View {
         ForEach(sections, id: \.id) { section in

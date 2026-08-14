@@ -14,6 +14,7 @@ import Combine
 final class TrackMetadataCacheManager: ObservableObject, @unchecked Sendable {
     static let shared = TrackMetadataCacheManager()
 
+    /// Публикуется на MainActor после инвалидации, чтобы presentation-потребители пересобрали производные данные.
     @Published private(set) var revision: Int = 0
 
     private let cache = NSCache<NSURL, CachedMetadata>()
@@ -114,9 +115,9 @@ final class TrackMetadataCacheManager: ObservableObject, @unchecked Sendable {
     
     final class CachedMetadata: NSObject, @unchecked Sendable {
         
-        let title: String?    /// Название
-        let artist: String?   /// Исполнитель
-        let duration: Double? /// Длительность
+        let title: String?
+        let artist: String?
+        let duration: Double?
         
         /// Сырые данные обложки (JPEG / PNG и т.п.)
         /// - технический raw-cache, а не главный источник истины для UI

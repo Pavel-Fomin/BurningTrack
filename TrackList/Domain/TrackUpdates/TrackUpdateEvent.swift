@@ -23,16 +23,16 @@ import Foundation
 /// - несёт новый каноничный runtime snapshot
 struct TrackUpdateEvent: Equatable {
 
-    // MARK: - Identity
+    // MARK: - Идентичность
 
-    let trackId: UUID                         /// Идентификатор трека
+    let trackId: UUID
 
-    // MARK: - Update info
+    // MARK: - Сведения об обновлении
 
-    let reason: TrackUpdateReason             /// Причина обновления трека
-    let changedFields: Set<TrackChangedField> /// Набор изменённых полей
+    let reason: TrackUpdateReason
+    let changedFields: Set<TrackChangedField>
 
-    // MARK: - Snapshot
+    // MARK: - Снимок
 
-    let snapshot: TrackRuntimeSnapshot        /// Новый каноничный runtime snapshot трека
+    let snapshot: TrackRuntimeSnapshot
 }

@@ -2,6 +2,8 @@
 //  SheetTrackListPresenter.swift
 //  TrackList
 //
+//  Адаптирует единый sheet-router и координатор к presentation-границе треклиста.
+//
 //  Created by Pavel Fomin on 18.06.2026.
 //
 

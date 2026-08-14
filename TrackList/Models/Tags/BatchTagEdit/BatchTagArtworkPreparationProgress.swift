@@ -11,7 +11,7 @@ import Foundation
 
 /// Прогресс подготовки обложек перед сохранением.
 struct BatchTagArtworkPreparationProgress: Equatable {
-    let current: Int   /// Количество подготовленных обложек.
-    let total: Int     /// Общее количество обложек для подготовки.
+    let current: Int
+    let total: Int
 
 }

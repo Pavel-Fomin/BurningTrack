@@ -16,7 +16,7 @@
 import SwiftUI
 
 struct LibraryFolderView: View {
-    // MARK: - State
+    // MARK: - Состояние
 
     let state: LibraryFolderScreenState
 
@@ -29,11 +29,11 @@ struct LibraryFolderView: View {
     @Binding var selectionActionBarConfig: SelectionActionBarConfig?
     @Binding var selectionActionSender: (any LibraryTracksActionSending)?
 
-    // MARK: - Actions
+    // MARK: - Действия
 
     let onAction: (LibraryFolderAction) -> Void
 
-    // MARK: - UI
+    // MARK: - Интерфейс
 
     var body: some View {
         Group {

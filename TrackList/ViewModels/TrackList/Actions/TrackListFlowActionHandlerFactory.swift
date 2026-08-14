@@ -2,6 +2,8 @@
 //  TrackListFlowActionHandlerFactory.swift
 //  TrackList
 //
+//  Собирает ActionHandler detail-flow треклиста из зависимостей Composition Root.
+//
 //  Created by Pavel Fomin on 18.06.2026.
 //
 

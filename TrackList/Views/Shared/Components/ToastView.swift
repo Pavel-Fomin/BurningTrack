@@ -17,7 +17,7 @@ struct ToastView: View {
     private let rightWidth: CGFloat = 120
     
     
-    // MARK: - UI
+    // MARK: - Интерфейс
     var body: some View {
         HStack(spacing: 12) {
             
@@ -83,8 +83,8 @@ struct ToastView: View {
         .padding(.horizontal, 16)
     }
     
-    // MARK: - Text mapping
-    
+    // MARK: - Сопоставление текста
+
     private var titleText: String {
         switch data.style {
         case let .track(title, _):

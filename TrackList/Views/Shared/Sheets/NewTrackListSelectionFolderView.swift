@@ -11,13 +11,13 @@ import SwiftUI
 
 struct NewTrackListSelectionFolderView: View {
 
-    // MARK: - Input
+    // MARK: - Входные данные
 
     let folder: LibraryFolder
     /// Собирает дочерние папки через feature-factory.
     let folderViewFactory: NewTrackListSelectionFolderViewFactory
 
-    // MARK: - State
+    // MARK: - Состояние
 
     @ObservedObject var selectionViewModel: NewTrackListSelectionViewModel
     /// Published-состояние «Избранного» используется только как вход state builder-а.
@@ -28,7 +28,7 @@ struct NewTrackListSelectionFolderView: View {
     /// Готовая ViewModel Library Tracks, собранная отдельным container через factory.
     @ObservedObject var tracksViewModel: LibraryTracksViewModel
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     init(
         folder: LibraryFolder,
@@ -60,7 +60,7 @@ struct NewTrackListSelectionFolderView: View {
         )
     }
 
-    // MARK: - UI
+    // MARK: - Интерфейс
 
     var body: some View {
         ZStack {

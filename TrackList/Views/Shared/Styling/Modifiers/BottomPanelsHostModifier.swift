@@ -17,7 +17,7 @@ import SwiftUI
 
 struct GlobalBottomPanelsHostModifier: ViewModifier {
 
-    // MARK: - Input
+    // MARK: - Входные данные
 
     /// Использует единый feature graph MiniPlayer, созданный в composition root приложения.
     let miniPlayerFeature: MiniPlayerFeature
@@ -28,7 +28,7 @@ struct GlobalBottomPanelsHostModifier: ViewModifier {
     /// Управляет только присутствием высокого MiniPlayer в общем контейнере.
     let showsMiniPlayer: Bool
 
-    // MARK: - Body
+    // MARK: - Содержимое
 
     func body(content: Content) -> some View {
         let exportProgress = exportProgressViewModel.progress
@@ -76,12 +76,12 @@ struct GlobalBottomPanelsHostModifier: ViewModifier {
 
 struct BottomPanelsHostModifier<TopPanel: View>: ViewModifier {
 
-    // MARK: - Input
+    // MARK: - Входные данные
 
     let showsTopPanel: Bool
     let topPanel: () -> TopPanel
 
-    // MARK: - Body
+    // MARK: - Содержимое
 
     @ViewBuilder
     func body(content: Content) -> some View {
@@ -98,7 +98,7 @@ struct BottomPanelsHostModifier<TopPanel: View>: ViewModifier {
     }
 }
 
-// MARK: - View extension
+// MARK: - Расширение View
 
 extension View {
 

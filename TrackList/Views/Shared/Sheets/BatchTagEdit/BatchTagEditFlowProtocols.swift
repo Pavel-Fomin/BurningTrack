@@ -55,7 +55,7 @@ protocol BatchTagArtworkCompressing {
 
 /// Production-адаптер существующего общего сервиса подготовки artwork.
 struct BatchTagArtworkPreparer: BatchTagArtworkPreparing {
-    /// Применяет прежние параметры нормализации replacement artwork.
+    /// Применяет заданные feature параметры нормализации замены обложки.
     func prepareReplacementArtwork(data: Data) async throws -> Data {
         try await ArtworkPreparationService.prepare(
             ArtworkPreparationRequest(
@@ -78,7 +78,7 @@ struct BatchTagArtworkCompressionService: BatchTagArtworkCompressing {
     }
 }
 
-// MARK: - Production adapters
+// MARK: - Адаптеры production-слоя
 
 extension BatchTagMetadataLoader: BatchTagEditMetadataLoading {}
 

@@ -19,14 +19,14 @@ final class TrackListBadgeIndex {
 
     static let shared = TrackListBadgeIndex()
 
-    // MARK: - State
+    // MARK: - Состояние
 
     private var badgesByTrackId: [UUID: [TrackListMembership]] = [:]
     private var observers: [NSObjectProtocol] = []
     private let trackListsManager: TrackListsManager
     private let trackListManager: TrackListManager
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     /// Создаёт индекс с явными зависимостями, чтобы поиск использовал тот же источник треклистов, что и фонотека.
     init(
@@ -48,7 +48,7 @@ final class TrackListBadgeIndex {
         }
     }
 
-    // MARK: - Public
+    // MARK: - Публичное
 
     func badges(for trackIds: [UUID]) -> [UUID: [TrackListMembership]] {
         var result: [UUID: [TrackListMembership]] = [:]
@@ -85,7 +85,7 @@ final class TrackListBadgeIndex {
         }
     }
 
-    // MARK: - Observing
+    // MARK: - Наблюдение
 
     private func observeTrackListChanges() {
         let trackListsObserver = NotificationCenter.default.addObserver(

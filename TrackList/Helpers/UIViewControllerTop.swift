@@ -2,6 +2,8 @@
 //  UIViewController+Top.swift
 //  TrackList
 //
+//  Находит верхний UIKit-контроллер только на платформенной границе системных презентаций.
+//
 //  Created by Pavel Fomin on 20.05.2025.
 //
 

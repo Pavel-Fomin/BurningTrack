@@ -29,15 +29,15 @@ struct TrackRowView<ActionMenuContent: View>: View {
     let title: String?
     let artist: String?
     let duration: Double?
-    let onRowTap: () -> Void          /// Тап по правой части строки (воспроизведение / пауза)
+    let onRowTap: () -> Void
     /// Передаёт feature-local намерение для недоступного содержимого без знания Toast во View.
     let onUnavailableTap: () -> Void
-    let showsSelection: Bool          /// Показывать radio или нет
-    let isSelected: Bool              /// Radio (пустой / выбранный)
+    let showsSelection: Bool
+    let isSelected: Bool
     let onToggleSelection: (() -> Void)?
     let selectionPlacement: TrackRowSelectionPlacement
-    let showsFileFormat: Bool         /// Показывать формат файла в правой колонке
-    let isContentAvailable: Bool      /// Доступно ли локальное содержимое файла для действий строки
+    let showsFileFormat: Bool
+    let isContentAvailable: Bool
     
     var trackListNames: [String]? = nil
     var useNativeSwipeActions: Bool = false
@@ -140,7 +140,7 @@ struct TrackRowView<ActionMenuContent: View>: View {
         self.trailingContent = trailingContent
         self.actionMenuContent = storedActionMenuContent
     }
-    // MARK: - UI
+    // MARK: - Интерфейс
 
     /// Есть ли отображаемый исполнитель
     private var hasArtist: Bool {
@@ -314,7 +314,7 @@ struct TrackRowView<ActionMenuContent: View>: View {
         VStack(alignment: .leading, spacing: hasArtist ? 2 : 0) {
             if hasArtist, let artistText = artist {
                 Text(artistText)
-                    // Верхняя строка сохраняет прежний основной стиль.
+                    // Верхняя строка использует основной стиль текста.
                     .font(.subheadline)
                     .foregroundColor(.primary)
                     .lineLimit(1)

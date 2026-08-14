@@ -181,7 +181,7 @@ final class BatchTagEditViewModel: ObservableObject {
                 return
             }
 
-            // Сохраняем прежнюю семантику: partial success перезагружает whole flow.
+            // Частичный успех требует повторной загрузки формы, чтобы показать фактические данные всех треков.
             self.startMetadataLoad(restoring: selectedTarget)
         }
     }

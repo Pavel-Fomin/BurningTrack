@@ -16,23 +16,23 @@ import SwiftUI
 
 struct TrackListRowView: View {
     
-    // MARK: - Input
+    // MARK: - Входные данные
     
-    let state: TrackListRowState /// Готовое состояние строки треклиста
-    let onTap: () -> Void        /// Тап по строке (воспроизведение / пауза)
-    let onUnavailableTap: () -> Void /// Нажатие на недоступную строку
-    let onDelete: () -> Void     /// Удаление строки (локальное действие)
-    let onShareTrack: () -> Void /// Отправка аудиофайла трека
-    let onCopyTrack: () -> Void  /// Копирование iTunes-трека
-    let onAddToPlayer: () -> Void /// Добавление iTunes-трека в плеер
-    let onToggleFavorite: () -> Void /// Переключение трека в «Избранном»
-    let onRenameTrack: (FileRenameStrategy) -> Void /// Переименование файла трека
-    let onEditTags: () -> Void    /// Редактирование тегов трека
-    let onArtworkTap: () -> Void /// Открытие карточки трека из меню
-    let onShowInLibrary: () -> Void /// Переход к треку в фонотеке
-    let onMoveToFolder: () -> Void  /// Перемещение файла трека в папку
-    let onGoToArtist: () -> Void /// Переход к артисту трека
-    let onGoToAlbum: () -> Void /// Переход к альбому трека
+    let state: TrackListRowState
+    let onTap: () -> Void
+    let onUnavailableTap: () -> Void
+    let onDelete: () -> Void
+    let onShareTrack: () -> Void
+    let onCopyTrack: () -> Void
+    let onAddToPlayer: () -> Void
+    let onToggleFavorite: () -> Void
+    let onRenameTrack: (FileRenameStrategy) -> Void
+    let onEditTags: () -> Void
+    let onArtworkTap: () -> Void
+    let onShowInLibrary: () -> Void
+    let onMoveToFolder: () -> Void
+    let onGoToArtist: () -> Void
+    let onGoToAlbum: () -> Void
 
     /// Использует подготовленную capability строки без policy-вызова из View.
     private func isMenuActionAvailable(
@@ -41,7 +41,7 @@ struct TrackListRowView: View {
         state.availableActions.contains(action)
     }
     
-    // MARK: - UI
+    // MARK: - Интерфейс
     
     var body: some View {
         TrackRowView(

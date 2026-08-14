@@ -2,9 +2,7 @@
 //  View+AppSheet.swift
 //  TrackList
 //
-//  Унифицированное расширение для отображения шитов
-//  Оборачивает любой sheet-контент в AppSheetContainer
-//  Экран просто вызывает .appSheet(...) и получает единый стиль из AppSheetContainer
+//  Применяет единый presentation-стиль sheet без хранения его route или lifecycle.
 //
 //  Created by Pavel Fomin on 07.12.2025.
 //

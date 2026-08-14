@@ -21,7 +21,7 @@ final class UnavailableProgressLiveActivityManager: ProgressLiveActivityManaging
         progress: OperationProgress
     ) {}
 
-    /// Пустое обновление сохраняет прежнее поведение операции.
+    /// Пустое обновление не влияет на ход операции, когда Live Activity недоступна.
     func update(
         operationID: UUID,
         progress: OperationProgress

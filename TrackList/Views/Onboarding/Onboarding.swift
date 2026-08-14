@@ -2,6 +2,8 @@
 //  Onboarding.swift
 //  TrackList
 //
+//  Показывает последовательные шаги первого знакомства с приложением.
+//
 //  Created by Pavel Fomin on 23.05.2025.
 //
 

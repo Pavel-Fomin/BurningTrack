@@ -13,7 +13,7 @@ import Foundation
 @MainActor
 final class PlayerExportActionHandler {
 
-    // MARK: - Dependencies
+    // MARK: - Зависимости
 
     /// Хранилище очереди плеера.
     private let playlistManager: PlaylistManager
@@ -31,7 +31,7 @@ final class PlayerExportActionHandler {
         self.exportRequestHandler = exportRequestHandler
     }
 
-    // MARK: - Actions
+    // MARK: - Действия
 
     /// Запускает экспорт текущего плейлиста плеера.
     func exportTrackList() {

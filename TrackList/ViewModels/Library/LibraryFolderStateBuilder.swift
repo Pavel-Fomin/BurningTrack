@@ -9,7 +9,7 @@
 import Foundation
 
 struct LibraryFolderStateBuilder {
-    // MARK: - Build
+    // MARK: - Сборка
 
     func build(
         folder: LibraryFolder,
@@ -24,7 +24,7 @@ struct LibraryFolderStateBuilder {
         )
     }
 
-    // MARK: - Private
+    // MARK: - Приватное
 
     private func displayMode(for folder: LibraryFolder) -> LibraryFolderScreenState.DisplayMode {
         // Треки фонотеки загружаются отдельно через LibraryTracksViewModel / TrackRegistry.

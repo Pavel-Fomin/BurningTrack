@@ -39,7 +39,7 @@ struct PurchasedITunesTrackCopyResult {
 /// BookmarkResolver для исходного iTunes-трека.
 actor PurchasedITunesTrackCopyManager {
 
-    // MARK: - Singleton
+    // MARK: - Единый экземпляр
 
     static let shared = PurchasedITunesTrackCopyManager()
 
@@ -48,7 +48,7 @@ actor PurchasedITunesTrackCopyManager {
 
     private init() {}
 
-    // MARK: - Public API
+    // MARK: - Публичный API
 
     /// Копирует iTunes-трек в выбранную папку фонотеки.
     func copy(
@@ -116,7 +116,7 @@ actor PurchasedITunesTrackCopyManager {
         }
     }
 
-    // MARK: - Destination
+    // MARK: - Назначение
 
     /// Контекст выбранной папки и её прикреплённого корня.
     private struct DestinationContext {
@@ -182,7 +182,7 @@ actor PurchasedITunesTrackCopyManager {
         return started
     }
 
-    // MARK: - Copy plan
+    // MARK: - План копирования
 
     /// Создаёт план копирования с безопасным уникальным именем файла.
     private func makeCopyPlan(
@@ -233,7 +233,7 @@ actor PurchasedITunesTrackCopyManager {
         }
     }
 
-    /// Сохраняет прежнее отображение ошибок одиночного копирования.
+    /// Преобразует ошибки одиночного копирования в семантический AppError.
     private func copyError(
         from error: PurchasedITunesAssetWriterError
     ) -> PurchasedITunesTrackCopyError {

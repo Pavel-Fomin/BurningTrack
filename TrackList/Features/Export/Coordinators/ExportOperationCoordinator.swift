@@ -13,7 +13,7 @@ import Foundation
 @MainActor
 final class ExportOperationCoordinator {
 
-    // MARK: - Events
+    // MARK: - События
 
     /// Сообщает, что ActionHandler принял непустой запрос на экспорт.
     var onExportAccepted: (@MainActor () -> Void)?
@@ -24,7 +24,7 @@ final class ExportOperationCoordinator {
     /// Сообщает, что координатор освободил ресурсы завершённой операции.
     var onOperationFinished: (@MainActor () -> Void)?
 
-    // MARK: - Dependencies
+    // MARK: - Зависимости
 
     /// Выполняет сценарий запуска и штатной отмены экспорта.
     private let actionHandler: ExportActionHandler
@@ -32,7 +32,7 @@ final class ExportOperationCoordinator {
     /// Универсальный слой внешнего прогресса, не знающий о моделях экспорта.
     private let liveActivityManager: any ProgressLiveActivityManaging
 
-    // MARK: - Operation lifecycle
+    // MARK: - Жизненный цикл операции
 
     /// Удерживает текущую операцию независимой от экранов приложения.
     private var exportTask: Task<Void, Never>?
@@ -58,7 +58,7 @@ final class ExportOperationCoordinator {
     /// Название папки, выбранное для текущей операции и показанное пользователю.
     private var liveActivitySubjectTitle = ""
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     /// Создаёт координатор с обработчиком сценария экспорта.
     init(actionHandler: ExportActionHandler) {
@@ -75,14 +75,14 @@ final class ExportOperationCoordinator {
         self.liveActivityManager = liveActivityManager
     }
 
-    // MARK: - State
+    // MARK: - Состояние
 
     /// Показывает, что текущая операция ещё не завершила свой жизненный цикл.
     var isExportActive: Bool {
         exportTask != nil
     }
 
-    // MARK: - Operation
+    // MARK: - Операция
 
     /// Запускает новую операцию, если предыдущая уже завершилась.
     @discardableResult
@@ -202,7 +202,7 @@ final class ExportOperationCoordinator {
         return true
     }
 
-    // MARK: - Progress delivery
+    // MARK: - Передача прогресса
 
     /// Передаёт ViewModel только обновления текущей операции.
     private func deliver(
@@ -248,7 +248,7 @@ final class ExportOperationCoordinator {
         onOperationFinished?()
     }
 
-    // MARK: - Live Activity progress
+    // MARK: - Прогресс Live Activity
 
     /// Преобразует экспортный снимок в абстрактную модель внешнего прогресса.
     /// Здесь заканчивается знание об ExportProgress и начинается универсальный слой.

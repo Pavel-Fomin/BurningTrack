@@ -2,6 +2,8 @@
 //  ScrollSpeedObserver.swift
 //  TrackList
 //
+//  Подключает SwiftUI-модель скорости прокрутки к ближайшему UIScrollView.
+//
 //  Created by Pavel Fomin on 09.08.2025.
 //
 
@@ -52,7 +54,7 @@ private struct _PlatformObserver: UIViewRepresentable {
             let now = CACurrentMediaTime()
             let dt = max(now - lastTime, 0.001)
             let dy = sv.contentOffset.y - lastOffsetY
-            let velocity = abs(dy) / CGFloat(dt) // pt/сек
+            let velocity = abs(dy) / CGFloat(dt) // пт/с
 
             // пробрасываем вверх через NotificationCenter (без retain циклов)
             NotificationCenter.default.post(name: ._scrollVelocityDidUpdate, object: nil, userInfo: ["v": velocity])
@@ -116,7 +118,7 @@ private struct _PlatformObserver: NSViewRepresentable {
             let now = CACurrentMediaTime()
             let dt = max(now - lastTime, 0.001)
             let dy = sv.contentView.bounds.origin.y - lastOffsetY
-            let velocity = abs(dy) / CGFloat(dt) // pt/сек
+            let velocity = abs(dy) / CGFloat(dt) // пт/с
             NotificationCenter.default.post(name: ._scrollVelocityDidUpdate, object: nil, userInfo: ["v": velocity])
 
             lastTime = now

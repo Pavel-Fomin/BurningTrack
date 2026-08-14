@@ -2,6 +2,8 @@
 //  TrackListMutationHandler.swift
 //  TrackList
 //
+//  Обрабатывает изменяющие данные typed-действия detail-flow одного треклиста.
+//
 //  Created by Pavel Fomin on 17.06.2026.
 //
 

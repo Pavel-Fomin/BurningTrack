@@ -17,14 +17,14 @@ import SwiftUI
 
 struct BottomPanelsHost<TopPanel: View, BottomPanel: View>: View {
 
-    // MARK: - Input
+    // MARK: - Входные данные
 
     let spacing: CGFloat
     let showsTopPanel: Bool
     let topPanel: TopPanel
     let bottomPanel: BottomPanel
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     init(
         spacing: CGFloat = 0,
@@ -38,7 +38,7 @@ struct BottomPanelsHost<TopPanel: View, BottomPanel: View>: View {
         self.bottomPanel = bottomPanel()
     }
 
-    // MARK: - UI
+    // MARK: - Интерфейс
 
     var body: some View {
         VStack(spacing: showsTopPanel ? spacing : 0) {

@@ -18,7 +18,7 @@ import SwiftUI
 
 struct SaveTrackListSheet: View {
 
-    // MARK: - Input
+    // MARK: - Входные данные
 
     /// Готовое presentation-состояние формы.
     let state: SaveTrackListState
@@ -29,7 +29,7 @@ struct SaveTrackListSheet: View {
     /// Управляется sheet-компонентом, чтобы снимать focus до закрытия sheet.
     @FocusState private var isNameFocused: Bool
 
-    // MARK: - UI
+    // MARK: - Интерфейс
 
     var body: some View {
         NavigationBarHost(

@@ -15,6 +15,7 @@ struct LibraryCollectionTracksContainer: View {
     let onAllTracksAction: ((LibraryAllTracksAction) -> Void)?
     let onCollectionTracksAction: ((LibraryCollectionTracksAction) -> Void)?
 
+    /// Store удерживает graph выбранного источника и не пересобирается при обновлении родительского View.
     @StateObject private var screenStore: LibraryCollectionTracksScreenStore
 
     init(

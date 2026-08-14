@@ -35,7 +35,7 @@ enum LibraryFileError: Error {
 ///
 actor LibraryFileManager {
 
-    // MARK: - Singleton
+    // MARK: - Единый экземпляр
 
     static let shared = LibraryFileManager()
 

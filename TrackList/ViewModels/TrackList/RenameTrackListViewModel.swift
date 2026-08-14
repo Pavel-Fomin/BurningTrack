@@ -13,12 +13,12 @@ import Foundation
 @MainActor
 final class RenameTrackListViewModel: ObservableObject {
 
-    // MARK: - State
+    // MARK: - Состояние
 
     /// Готовое presentation-состояние формы переименования.
     @Published private(set) var state: RenameTrackListState
 
-    // MARK: - Dependencies
+    // MARK: - Зависимости
 
     /// Идентификатор треклиста, переданный sheet route.
     private let trackListId: UUID
@@ -33,7 +33,7 @@ final class RenameTrackListViewModel: ObservableObject {
     /// Удерживает отложенную задачу формы до её завершения.
     private var submissionTask: Task<Void, Never>?
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     init(
         trackListId: UUID,
@@ -52,7 +52,7 @@ final class RenameTrackListViewModel: ObservableObject {
         )
     }
 
-    // MARK: - Actions
+    // MARK: - Действия
 
     /// Обновляет состояние ввода или передаёт подтверждённое действие обработчику.
     func handle(_ action: RenameTrackListAction) {

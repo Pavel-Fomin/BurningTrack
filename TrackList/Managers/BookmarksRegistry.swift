@@ -99,7 +99,7 @@ actor BookmarksRegistry {
         }
     }
 
-    // MARK: - Private
+    // MARK: - Приватное
 
     private func libraryStore() throws -> LibraryDatabaseStore {
         if let cachedLibraryStore {

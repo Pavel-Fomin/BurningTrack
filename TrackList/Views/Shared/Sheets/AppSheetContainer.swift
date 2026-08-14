@@ -2,7 +2,7 @@
 //  AppSheetContainer.swift
 //  TrackList
 //
-//  Унифицированный iOS 26-style sheet
+//  Применяет общие detents и оформление system sheet.
 //
 //  Created by Pavel Fomin
 //

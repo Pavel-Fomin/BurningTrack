@@ -2,6 +2,8 @@
 //  PlaybackContext.swift
 //  TrackList
 //
+//  Описывает источник контекста воспроизведения для переходов между треками.
+//
 //  Created by Pavel Fomin on 07.08.2025.
 //
 

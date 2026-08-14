@@ -8,19 +8,18 @@
 //
 import Foundation
 struct LibraryTrack: Identifiable, TrackDisplayable {
-    // MARK: - Identity
+    // MARK: - Идентичность
     /// Канонический идентификатор локального трека: первичный ключ строки tracks в SQLite.
     let id: UUID
     /// Псевдоним канонического идентификатора для общих моделей трека.
     var trackId: UUID { id }
     // MARK: - Файл
-    let fileURL: URL          // фактический URL
-    // MARK: - Metadata
+    let fileURL: URL
+    // MARK: - Метаданные
     let title: String?
     let artist: String?
     let duration: Double
     let addedDate: Date
-    /// UI флаг — доступность файла
     let isAvailable: Bool
 
     init(

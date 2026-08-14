@@ -2,6 +2,8 @@
 //  PlayerFlowActionHandlerFactory.swift
 //  TrackList
 //
+//  Собирает ActionHandler плеера из зависимостей, подготовленных Composition Root.
+//
 //  Created by Pavel Fomin on 19.06.2026.
 //
 

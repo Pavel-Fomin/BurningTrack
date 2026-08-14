@@ -14,7 +14,7 @@ struct TrackMenuActionAvailability {
 
     /// Возвращает доступные пункты меню для указанного источника и раздела.
     ///
-    /// Локальные треки сохраняют прежние наборы действий.
+    /// Локальные треки используют наборы действий, доступные файловому источнику.
     /// iTunes-треки получают только действия с runtime-данными без файловых операций приложения.
     static func availableActions(
         source: TrackSource,
@@ -67,7 +67,7 @@ struct TrackMenuActionAvailability {
         }
     }
 
-    /// Прежние наборы меню для локальных файлов приложения.
+    /// Наборы меню для локальных файлов приложения.
     private static func localActions(
         context: TrackMenuContext
     ) -> Set<TrackMenuAction> {

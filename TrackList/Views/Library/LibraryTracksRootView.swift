@@ -30,7 +30,7 @@ struct LibraryTracksRootView: View {
         GridItem(.flexible(), spacing: 8)
     ]
 
-    // MARK: - UI
+    // MARK: - Интерфейс
 
     var body: some View {
         // Исходный порядок rootItems задаёт Presenter и сохраняется при раскладке в две колонки.

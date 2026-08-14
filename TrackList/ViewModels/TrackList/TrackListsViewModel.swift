@@ -49,7 +49,7 @@ final class TrackListsViewModel: ObservableObject {
     private let stateBuilder = TrackListsScreenStateBuilder()
     private var cancellables = Set<AnyCancellable>()
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     init(
         loader: any TrackListsLoading,
@@ -108,7 +108,7 @@ final class TrackListsViewModel: ObservableObject {
         updateScreenState()
     }
 
-    // MARK: - Presentation state
+    // MARK: - Состояние представления
 
     /// Применяет уже атомарно сохранённый порядок до публикации invalidation-события.
     func applyPersistedOrdering(
@@ -137,7 +137,7 @@ final class TrackListsViewModel: ObservableObject {
         pendingDeleteTrackListId == id
     }
 
-    // MARK: - Navigation
+    // MARK: - Навигация
 
     /// Добавляет уже проверенный route пользовательского открытия в compact navigation stack.
     func appendNavigationPath(id: UUID) {
@@ -159,7 +159,7 @@ final class TrackListsViewModel: ObservableObject {
         trackList(for: id) != nil
     }
 
-    // MARK: - Private
+    // MARK: - Приватное
 
     /// Применяет выбранную сортировку после каждого reload, чтобы settings и отображение не расходились после create/rename.
     private func displayOrderedTrackLists(from trackLists: [TrackList]) -> [TrackList] {

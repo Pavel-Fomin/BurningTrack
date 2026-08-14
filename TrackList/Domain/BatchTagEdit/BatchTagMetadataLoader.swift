@@ -2,27 +2,27 @@
 //  BatchTagMetadataLoader.swift
 //  TrackList
 //
-//  Loader metadata для массового редактирования тегов.
+//  Загружает метаданные для массового редактирования тегов.
 //
 //  Created by Pavel Fomin on 27.05.2026.
 //
 
 import Foundation
 
-/// Loader metadata для массового редактирования тегов.
+/// Загружает метаданные для массового редактирования тегов.
 ///
 /// Роль:
-/// - получает runtime snapshots для выбранных треков;
+/// - получает runtime-снимки выбранных треков;
 /// - сначала проверяет TrackRuntimeStore;
 /// - если snapshot отсутствует, строит его через TrackRuntimeSnapshotBuilder;
 /// - собирает BatchTagEditFlow через BatchTagEditFlowBuilder;
 /// - не знает про UI, SheetManager и сохранение тегов.
 struct BatchTagMetadataLoader {
-    /// Хранилище runtime snapshots.
+    /// Хранилище runtime-снимков.
     private let runtimeStore: TrackRuntimeStore
-    /// Builder runtime snapshot.
+    /// Builder runtime-снимка.
     private let snapshotBuilder: TrackRuntimeSnapshotBuilder
-    /// Ограничение параллельной загрузки snapshot.
+    /// Ограничивает число параллельных загрузок снимков.
     private let limiter: BatchTagMetadataAsyncLimiter
 
     init(
@@ -46,7 +46,7 @@ struct BatchTagMetadataLoader {
         )
     }
 
-    /// Загружает snapshots для выбранных треков.
+    /// Загружает снимки для выбранных треков.
     private func loadSnapshots(trackIDs: [UUID]) async -> [TrackRuntimeSnapshot] {
         let runtimeStore = runtimeStore
         let snapshotBuilder = snapshotBuilder
@@ -57,6 +57,7 @@ struct BatchTagMetadataLoader {
                 group.addTask {
                     await limiter.acquire()
                     defer {
+                        // `defer` не поддерживает `await`, поэтому освобождение слота передаётся actor после завершения чтения.
                         Task {
                             await limiter.release()
                         }
@@ -79,7 +80,7 @@ struct BatchTagMetadataLoader {
         }
     }
 
-    /// Загружает snapshot одного трека.
+    /// Загружает снимок одного трека.
     private func loadSnapshot(
         trackID: UUID,
         runtimeStore: TrackRuntimeStore,
@@ -98,7 +99,7 @@ struct BatchTagMetadataLoader {
     }
 }
 
-/// Ограничитель параллельных async-операций.
+/// Ограничитель параллельных асинхронных операций.
 private actor BatchTagMetadataAsyncLimiter {
     /// Максимальное количество одновременных операций.
     private let limit: Int

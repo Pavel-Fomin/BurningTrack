@@ -2,8 +2,7 @@
 //  TrackListApp.swift
 //  TrackList
 //
-//  файл запуска SwiftUI-приложения
-//  PlayerViewModel — управляет воспроизведением
+//  Composition Root SwiftUI-приложения: собирает production-зависимости и корневые состояния.
 //
 //  Created by Pavel Fomin on 28.04.2025.
 //

@@ -18,7 +18,7 @@ import Foundation
 @MainActor
 final class PlayerQueueActionHandler {
 
-    // MARK: - Dependencies
+    // MARK: - Зависимости
 
     /// Хранилище очереди плеера.
     private let playlistManager: PlaylistManager
@@ -41,7 +41,7 @@ final class PlayerQueueActionHandler {
         self.toastManager = toastManager
     }
 
-    // MARK: - Actions
+    // MARK: - Действия
 
     /// Перемещает элементы очереди плеера
     /// с сохранением очереди и rollback при ошибке.

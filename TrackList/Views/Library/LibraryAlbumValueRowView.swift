@@ -21,7 +21,7 @@ struct LibraryAlbumValueRowView: View {
     /// Показывает, что текущий трек альбома сейчас воспроизводится.
     let isPlaying: Bool
 
-    // MARK: - UI
+    // MARK: - Интерфейс
 
     var body: some View {
         HStack(spacing: 12) {

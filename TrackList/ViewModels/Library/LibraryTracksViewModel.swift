@@ -477,7 +477,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding, Li
         applyBulkAction(action)
     }
 
-    // MARK: - Typed action output
+    // MARK: - Выход typed-действий
 
     /// Адаптирует существующие screen-flow методы к узкому output ActionHandler-а.
     func refreshTracks() async {

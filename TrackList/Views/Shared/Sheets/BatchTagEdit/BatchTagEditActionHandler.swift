@@ -66,7 +66,7 @@ final class BatchTagEditActionHandler {
         await metadataLoader.loadFlow(pendingAction: pendingAction)
     }
 
-    /// Строит план, выполняет запись и сохраняет прежнюю интерпретацию результата Toast.
+    /// Строит план, выполняет запись и передаёт семантический результат в Toast.
     func save(flow: BatchTagEditFlow) async -> BatchTagEditSaveResult? {
         do {
             let plan = try BatchTagEditSavePlanner.makePlan(from: flow)

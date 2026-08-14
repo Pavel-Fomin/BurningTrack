@@ -17,7 +17,7 @@ import Foundation
 @MainActor
 final class PlayerPlaybackActionHandler {
 
-    // MARK: - Dependencies
+    // MARK: - Зависимости
 
     /// ViewModel воспроизведения.
     private let playerViewModel: PlayerViewModel
@@ -35,7 +35,7 @@ final class PlayerPlaybackActionHandler {
         self.playlistManager = playlistManager
     }
 
-    // MARK: - Actions
+    // MARK: - Действия
 
     /// Запускает выбранный элемент очереди или переключает play/pause для текущего.
     func playPause(queueItemId: UUID) {

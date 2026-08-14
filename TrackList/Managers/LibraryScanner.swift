@@ -16,8 +16,10 @@ import Foundation
 struct ScannedFolder {
     let url: URL
     let name: String
-    let subfolders: [URL]        // Прямые подпапки
-    let audioFiles: [URL]        // Прямые аудиофайлы
+    /// Содержит только непосредственные подпапки; рекурсивный обход выполняет `scanRecursively(_:)`.
+    let subfolders: [URL]
+    /// Содержит только непосредственные аудиофайлы; рекурсивный обход выполняет `scanRecursively(_:)`.
+    let audioFiles: [URL]
 }
 
 struct ScannedAudioFile: Hashable {
@@ -26,7 +28,7 @@ struct ScannedAudioFile: Hashable {
     let folderURL: URL
 }
 
-// MARK: - Дельты (понадобятся позже)
+// MARK: - Изменения файлов
 
 enum FileChange {
     case added(URL)
@@ -126,8 +128,8 @@ final class LibraryScanner: LibraryScannerProtocol {
         return result
     }
     
-    // MARK: - Diff между списками файлов
-    
+    // MARK: - Разница между списками файлов
+
     func diff(old: [ScannedAudioFile], new: [ScannedAudioFile]) -> [FileChange] {
         var changes: [FileChange] = []
         
@@ -144,7 +146,7 @@ final class LibraryScanner: LibraryScannerProtocol {
             changes.append(.removed(file.url))
         }
         
-        // Мувы (упрощённая логика: совпадает fileName, отличается folderURL)
+        // Эвристика перемещения сопоставляет одинаковые имена файлов с разными URL папок.
         let oldByName = Dictionary(grouping: old, by: { $0.fileName })
         let newByName = Dictionary(grouping: new, by: { $0.fileName })
         

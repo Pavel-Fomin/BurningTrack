@@ -17,7 +17,7 @@ final class ImportManager {
 
     func importTracks(from urls: [URL], to folderId: UUID) async throws -> [UUID] {
 
-        // Параметр оставлен для старого контракта вызова; imported-треки больше не получают fake folderId.
+        // Импортированные треки не получают вымышленный идентификатор папки, потому что у них нет корневого пути фонотеки.
         _ = folderId
 
         var result: [UUID] = []

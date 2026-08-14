@@ -45,7 +45,7 @@ protocol NewTrackListSelectionRouting {
     func dismissNewTrackListSelection(_ routeID: UUID)
 }
 
-// MARK: - Production adapters
+// MARK: - Адаптеры production-слоя
 
 extension TrackListsManager: TrackListFlowManaging {}
 

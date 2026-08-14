@@ -13,14 +13,14 @@
 //
 import Foundation
 struct PlayerTrack: Identifiable, TrackDisplayable, Equatable {
-    // MARK: - Identity
+    // MARK: - Идентичность
     /// Идентифицирует конкретное вхождение трека в очереди, включая дубликаты.
     let queueItemId: UUID
     /// Идентифицирует сам музыкальный трек в TrackRegistry.
     let trackId: UUID
     /// UI-идентичность элемента очереди; переходы в очереди используют queueItemId.
     var id: UUID { queueItemId }
-    // MARK: - Metadata
+    // MARK: - Метаданные
     let title: String?
     let artist: String?
     let album: String?
@@ -31,9 +31,9 @@ struct PlayerTrack: Identifiable, TrackDisplayable, Equatable {
     let source: TrackSource
     /// URL iTunes-трека из MediaPlayer; для файлов фонотеки остаётся nil.
     let assetURL: URL?
-    // MARK: - Availability
+    // MARK: - Доступность
     let isAvailable: Bool
-    // MARK: - Init
+    // MARK: - Инициализация
     init(
         queueItemId: UUID = UUID(),
         trackId: UUID,
@@ -60,7 +60,7 @@ struct PlayerTrack: Identifiable, TrackDisplayable, Equatable {
         self.isAvailable = isAvailable
     }
 }
-// MARK: - Init from LibraryTrack
+// MARK: - Инициализация из LibraryTrack
 extension PlayerTrack {
     /// Синхронная обёртка
     static func make(from track: LibraryTrack) -> PlayerTrack {
@@ -74,7 +74,7 @@ extension PlayerTrack {
         )
     }
 }
-// MARK: - Init from PurchasedITunesPlayableTrack
+// MARK: - Инициализация из PurchasedITunesPlayableTrack
 extension PlayerTrack {
     /// Создаёт элемент очереди из iTunes-трека без копирования файла.
     static func make(from track: PurchasedITunesPlayableTrack) -> PlayerTrack {

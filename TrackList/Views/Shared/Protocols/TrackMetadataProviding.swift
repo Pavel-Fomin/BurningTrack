@@ -2,6 +2,8 @@
 //  TrackMetadataProviding.swift
 //  TrackList
 //
+//  Объявляет доступ к runtime-снимкам и подготовленным целям навигации трека.
+//
 //  Created by Pavel Fomin on 13.12.2025.
 //
 

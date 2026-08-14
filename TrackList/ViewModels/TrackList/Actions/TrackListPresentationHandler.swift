@@ -2,6 +2,8 @@
 //  TrackListPresentationHandler.swift
 //  TrackList
 //
+//  Направляет presentation-намерения detail-flow треклиста в typed-маршруты и capability.
+//
 //  Created by Pavel Fomin on 17.06.2026.
 //
 

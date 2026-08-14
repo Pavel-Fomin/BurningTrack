@@ -107,7 +107,7 @@ struct AppCommandToastPresenter {
         )
     }
 
-    /// Отображает создание треклиста тем же событием, что и прежний flow.
+    /// Отображает создание треклиста через семантическое событие успешного результата.
     func present(_ result: TrackListCreatedSuccess) {
         toastPresenter.handle(.trackListSaved(name: result.trackListName))
     }

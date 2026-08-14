@@ -13,16 +13,18 @@ import SwiftUI
 
 struct LibraryTrackRowContainer: View {
 
-    // MARK: - Input
+    // MARK: - Входные данные
 
-    let state: LibraryTrackRowState               /// Готовое состояние строки без iCloud runtime-состояния
-    let allTracks: [LibraryTrack]                 /// Контекст всех треков (для переключения)
+    /// Базовое состояние строки не содержит часто меняющуюся доступность iCloud.
+    let state: LibraryTrackRowState
+    let allTracks: [LibraryTrack]
     /// Текущая категория коллекции, явно переданная из источника списка.
     let currentCollectionCategory: LibraryCollectionCategory?
-    let commandHandler: LibraryTrackCommandHandler /// Обработчик намерений строки
-    @ObservedObject var cloudAvailabilityStateStore: CloudTrackAvailabilityRowStateStore /// Точечное runtime-состояние iCloud
+    let commandHandler: LibraryTrackCommandHandler
+    /// Наблюдается отдельно, чтобы изменение доступности не пересобирало состояние всего списка.
+    @ObservedObject var cloudAvailabilityStateStore: CloudTrackAvailabilityRowStateStore
 
-    // MARK: - State
+    // MARK: - Состояние
 
     /// Добавляет к готовому состоянию только обновление iCloud текущей строки.
     private var rowState: LibraryTrackRowState {
@@ -42,7 +44,7 @@ struct LibraryTrackRowContainer: View {
         )
     }
 
-    // MARK: - UI
+    // MARK: - Интерфейс
 
     var body: some View {
         TrackRowView(

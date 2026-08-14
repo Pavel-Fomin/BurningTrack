@@ -27,15 +27,15 @@ enum TrackUpdateCoordinatorError: Error {
 
 final class TrackUpdateCoordinator {
 
-    // MARK: - Singleton
+    // MARK: - Единый экземпляр
 
     static let shared = TrackUpdateCoordinator()  /// Общий экземпляр coordinator обновления трека
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     private init() {}
 
-    // MARK: - Handle update
+    // MARK: - Обработка обновления
 
     /// Выполняет полный post-update pipeline для одного трека.
     ///
@@ -153,7 +153,7 @@ final class TrackUpdateCoordinator {
         )
     }
 
-    // MARK: - Invalidate
+    // MARK: - Инвалидация
 
     /// Инвалидирует runtime-кэши, связанные с треком.
     ///
@@ -186,7 +186,7 @@ final class TrackUpdateCoordinator {
         // Старый snapshot намеренно не удаляем: готовый новый snapshot заменит его атомарно.
     }
 
-    // MARK: - Publish
+    // MARK: - Публикация
 
     /// Публикует единое событие обновления трека.
     ///

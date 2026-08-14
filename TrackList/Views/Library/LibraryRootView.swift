@@ -21,7 +21,7 @@ struct LibraryRootView: View {
     /// Передаёт выбор строки коллекции в контейнер фонотеки.
     let onCollectionRootItemSelected: (LibraryCollectionRootItem) -> Void
 
-    // MARK: - UI
+    // MARK: - Интерфейс
 
     var body: some View {
         List {

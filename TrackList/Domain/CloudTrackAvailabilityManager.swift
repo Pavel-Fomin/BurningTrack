@@ -25,12 +25,12 @@ protocol CloudTrackAvailabilityManaging: Sendable {
 /// Изолированно работает с URL resource values и системным API загрузки iCloud.
 actor CloudTrackAvailabilityManager: CloudTrackAvailabilityManaging {
 
-    // MARK: - Singleton
+    // MARK: - Единый экземпляр
 
-    /// Общий компонент для всех мест, которым понадобится runtime-состояние iCloud-файла.
+    /// Общий компонент для всех feature, отображающих runtime-состояние iCloud-файла.
     static let shared = CloudTrackAvailabilityManager()
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     private init() {}
 

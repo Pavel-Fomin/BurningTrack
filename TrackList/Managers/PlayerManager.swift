@@ -26,7 +26,7 @@ enum PlayerProgressObservationConfiguration {
 
 final class PlayerManager {
 
-    // MARK: - Private
+    // MARK: - Приватное
 
     private let player = AVPlayer()
     private var timeObserverToken: Any?
@@ -46,7 +46,7 @@ final class PlayerManager {
     /// Флаг, что плеер сейчас воспроизводит трек.
     private(set) var isPlaying: Bool = false
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     init() {
         print("🧠 PlayerManager инициализирован")
@@ -66,7 +66,7 @@ final class PlayerManager {
         removeFavoriteCommandHandler()
     }
 
-    // MARK: - Finish Notification
+    // MARK: - Уведомление о завершении
 
     @objc private func trackDidFinishPlaying() {
         // Трек доиграл до конца — считаем, что больше не играет
@@ -74,7 +74,7 @@ final class PlayerManager {
         NotificationCenter.default.post(name: .trackDidFinish, object: nil)
     }
 
-    // MARK: - Main Playback
+    // MARK: - Основное воспроизведение
 
     func play(
         track: any TrackDisplayable,
@@ -172,7 +172,7 @@ final class PlayerManager {
         return (resolvedURL, true)
     }
 
-    // MARK: - Security Access
+    // MARK: - Доступ безопасности
 
     func stopAccessingCurrentTrack() {
         if let url = currentAccessedURL {
@@ -180,7 +180,7 @@ final class PlayerManager {
             currentAccessedURL = nil
         }
 
-        // После освобождения scope прежний URL больше нельзя отдавать фоновым производным операциям.
+        // После освобождения scope URL закрытого доступа нельзя передавать фоновым производным операциям.
         currentPreparedURL = nil
     }
 
@@ -233,7 +233,7 @@ final class PlayerManager {
         return currentPreparedURL
     }
 
-    // MARK: - Controls
+    // MARK: - Элементы управления
 
     func pause() {
         player.pause()
@@ -274,7 +274,7 @@ final class PlayerManager {
         return currentTrackId == id && currentAccessedURL != nil
     }
 
-    // MARK: - Progress
+    // MARK: - Прогресс
 
     func observeProgress(update: @escaping (TimeInterval) -> Void) {
         removeTimeObserver()
@@ -355,7 +355,7 @@ final class PlayerManager {
         ]
     }
 
-    /// Настраивает системную команду «Избранное» и заменяет только собственный прежний target.
+    /// Настраивает системную команду «Избранное», не затрагивая targets других владельцев.
     func configureFavoriteCommand(
         handler: @escaping @MainActor (Bool) -> MPRemoteCommandHandlerStatus
     ) {
@@ -440,7 +440,7 @@ final class PlayerManager {
         center.previousTrackCommand.isEnabled = isPreviousEnabled
     }
 
-    // MARK: - Now Playing Info
+    // MARK: - Данные Now Playing
 
     /// Применяет полный snapshot в Control Center.
     /// PlayerManager НЕ решает, какие данные показывать — он только применяет.

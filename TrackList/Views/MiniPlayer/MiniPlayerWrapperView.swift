@@ -11,12 +11,12 @@ import SwiftUI
 
 struct MiniPlayerWrapperView: View {
 
-    // MARK: - Input
+    // MARK: - Входные данные
 
     /// Неизменяемый feature graph передаёт wrapper-у только готовую точку presentation-сборки.
     let feature: MiniPlayerFeature
 
-    // MARK: - Body
+    // MARK: - Содержимое
 
     var body: some View {
         MiniPlayerContainer(feature: feature)

@@ -270,7 +270,7 @@ final class SearchService: SearchServicing {
         }
     }
 
-    /// Сортирует треки так же стабильно, как прежний SQL-запрос поиска.
+    /// Сохраняет стабильный порядок, чтобы одинаковый запрос давал одинаковую выдачу.
     private static func sortTrackResults(
         _ lhs: SearchTrackResult,
         _ rhs: SearchTrackResult

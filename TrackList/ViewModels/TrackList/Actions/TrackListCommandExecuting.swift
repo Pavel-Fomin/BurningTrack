@@ -2,6 +2,8 @@
 //  TrackListCommandExecuting.swift
 //  TrackList
 //
+//  Объявляет capability изменения состава одного пользовательского треклиста.
+//
 //  Created by Pavel Fomin on 18.06.2026.
 //
 

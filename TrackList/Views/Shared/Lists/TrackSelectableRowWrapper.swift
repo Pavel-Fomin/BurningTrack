@@ -12,15 +12,15 @@ import SwiftUI
 
 struct TrackSelectableRowWrapper: View {
     
-    // MARK: - Input
-    
+    // MARK: - Входные данные
+
     let state: TrackSelectableRowState
     let onToggleSelection: () -> Void
     let onUnavailableTap: () -> Void
     let onRequestSnapshot: (UUID) -> Void
     
-    // MARK: - UI
-    
+    // MARK: - Интерфейс
+
     var body: some View {
         TrackRowView(
             track: state.track,

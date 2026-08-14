@@ -21,15 +21,15 @@ import Foundation
 
 final class TrackRuntimeSnapshotBuilder {
 
-    // MARK: - Singleton
+    // MARK: - Единый экземпляр
 
     static let shared = TrackRuntimeSnapshotBuilder() /// Общий экземпляр сборщика snapshot
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     private init() {}
 
-    // MARK: - Build
+    // MARK: - Сборка
 
     /// Собирает каноничный runtime snapshot трека по его идентификатору.
     /// Использует существующие слои проекта:

@@ -2,6 +2,8 @@
 //  TrackListRenameHandler.swift
 //  TrackList
 //
+//  Преобразует намерение строки треклиста в запрос общего файлового rename-flow.
+//
 //  Created by Pavel Fomin on 17.06.2026.
 //
 

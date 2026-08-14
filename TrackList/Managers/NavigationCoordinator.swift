@@ -52,7 +52,7 @@ struct TrackListOpenRequest: Equatable {
 @MainActor
 final class NavigationCoordinator: ObservableObject {
 
-    // MARK: - Singleton
+    // MARK: - Единый экземпляр
 
     static let shared = NavigationCoordinator()
 
@@ -72,7 +72,7 @@ final class NavigationCoordinator: ObservableObject {
 
     private init() {}
 
-    // MARK: - API для UI
+    // MARK: - API для интерфейса
 
     /// Находимся ли мы в корне фонотеки.
     var isAtRoot: Bool {

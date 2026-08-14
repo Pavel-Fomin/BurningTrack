@@ -23,11 +23,14 @@ final class MusicLibraryManager: ObservableObject {
 
     static let shared = MusicLibraryManager()
 
-    // MARK: - Published состояния
+    // MARK: - Состояния @Published
 
-    @Published private(set) var isAccessRestored = false       /// Флаг, что восстановление доступа к папкам завершено
-    @Published var attachedFolders: [LibraryFolder] = []       /// Прикреплённые корневые папки (дерево подпапок и файлов для UI)
-    @Published private(set) var attachingFolderIds: Set<UUID> = [] /// Папки, которые сейчас прикрепляются и сканируются
+    /// Становится истинным только после восстановления security-scoped доступа ко всем сохранённым папкам.
+    @Published private(set) var isAccessRestored = false
+    /// Корневые папки с уже собранным деревом для представления фонотеки без повторного чтения файловой системы из View.
+    @Published var attachedFolders: [LibraryFolder] = []
+    /// Позволяет показывать прогресс одновременно сканируемых корневых папок независимо друг от друга.
+    @Published private(set) var attachingFolderIds: Set<UUID> = []
    
     enum LibraryAccessState {
         case booting
@@ -43,12 +46,13 @@ final class MusicLibraryManager: ObservableObject {
     
     // MARK: - Security-scoped доступы (держим открытыми весь runtime)
 
-    private var activeRootFolderAccess: [UUID: URL] = [:]    /// Активные root-доступы: если папка прикреплена — доступ держим открытым.
+    /// Доступ к корневой папке остаётся открытым весь runtime, пока она прикреплена к фонотеке.
+    private var activeRootFolderAccess: [UUID: URL] = [:]
 
     // MARK: - Инициализация
 
     init() {
-        // Восстанавливаем доступ к папкам (быстро) и затем запускаем синк (в фоне)
+        // Восстановление принадлежит глобальному менеджеру приложения, а не экрану, поэтому не отменяется при смене вкладки.
         Task { [weak self] in
             await self?.restoreAccessAsync()
         }
@@ -416,7 +420,7 @@ final class MusicLibraryManager: ObservableObject {
         NotificationCenter.default.post(name: .libraryAccessRestored, object: nil)
     }
     
-    // MARK: - Sync фасад для ViewModel
+    // MARK: - Синхронный фасад для ViewModel
 
     /// Синхронизирует фонотеку для папки.
     /// Работает корректно даже для пустых папок.

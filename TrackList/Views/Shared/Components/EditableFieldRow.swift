@@ -22,17 +22,18 @@ import UIKit
 
 struct EditableFieldRow: View {
 
-    // MARK: - Input
+    // MARK: - Входные данные
 
-    let title: String                /// Текст лейбла
-    let isMultiline: Bool            /// Режим ввода
-    let keyboardType: UIKeyboardType /// Тип клавиатуры
-    let placeholder: String          /// Подсказка поля ввода
-    let emphasizesPlaceholder: Bool  /// Нужно ли выделять placeholder основным цветом
-    let showsClearButton: Bool       /// Показывать кнопку очистки значения
-    let onForceClear: (() -> Void)?  /// Принудительная очистка поля, когда value уже пустой, но визуально есть mixed-placeholder.
+    let title: String
+    let isMultiline: Bool
+    let keyboardType: UIKeyboardType
+    let placeholder: String
+    let emphasizesPlaceholder: Bool
+    let showsClearButton: Bool
+    /// Вызывается для очистки смешанной подсказки, когда связанное значение уже пусто.
+    let onForceClear: (() -> Void)?
     
-    @Binding var value: String /// Значение поля
+    @Binding var value: String
 
     /// Опциональный фокус для внешнего управления конкретным полем.
     var focusBinding: FocusState<Bool>.Binding?
@@ -59,12 +60,11 @@ struct EditableFieldRow: View {
         self.focusBinding = focusBinding
     }
 
-    // MARK: - UI
+    // MARK: - Интерфейс
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
 
-            // Лейбл внутри карточки
             Text(title.uppercased())
                 .font(.caption2)
                 .foregroundColor(.secondary)
@@ -108,7 +108,7 @@ struct EditableFieldRow: View {
         .accessibilityLabel(SharedPresentationText.clearAccessibilityLabel)
     }
 
-    // MARK: - Single line
+    // MARK: - Одна строка
 
     private var singleLineInput: some View {
         HStack(spacing: 8) {
@@ -145,7 +145,7 @@ struct EditableFieldRow: View {
         }
     }
 
-    // MARK: - Multiline
+    // MARK: - Многострочный ввод
 
     private var multilineInput: some View {
         ZStack(alignment: .topTrailing) {
@@ -162,7 +162,7 @@ struct EditableFieldRow: View {
         }
     }
 
-    // MARK: - Background
+    // MARK: - Фон
 
     private var background: some View {
         RoundedRectangle(cornerRadius: 26, style: .continuous)

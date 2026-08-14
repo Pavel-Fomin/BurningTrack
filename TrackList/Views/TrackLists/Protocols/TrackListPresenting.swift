@@ -2,6 +2,8 @@
 //  TrackListPresenting.swift
 //  TrackList
 //
+//  Объявляет presentation-границу detail-flow одного треклиста.
+//
 //  Created by Pavel Fomin on 18.06.2026.
 //
 

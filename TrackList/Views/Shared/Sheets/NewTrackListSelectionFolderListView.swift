@@ -11,17 +11,17 @@ import SwiftUI
 
 struct NewTrackListSelectionFolderListView: View {
 
-    // MARK: - Input
+    // MARK: - Входные данные
 
     let folders: [LibraryFolder]
     /// Собирает дочерний экран папки через feature-factory.
     let folderViewFactory: NewTrackListSelectionFolderViewFactory
 
-    // MARK: - State
+    // MARK: - Состояние
 
     @ObservedObject var selectionViewModel: NewTrackListSelectionViewModel
 
-    // MARK: - UI
+    // MARK: - Интерфейс
 
     var body: some View {
         List {

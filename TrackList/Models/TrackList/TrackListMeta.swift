@@ -2,7 +2,7 @@
 //  TrackListMeta.swift
 //  TrackList
 //
-//  Модель метаинформации о плейлисте.
+//  Метаданные пользовательского треклиста без состава его треков.
 //
 //  Используется для отображения списка плейлистов и хранения:
 //  - уникального ID,
@@ -18,11 +18,9 @@
 
 import Foundation
 
-// Метаданные одного треклиста без самих треков.
-// Используются для отображения списка и управления треклистами.
 struct TrackListMeta: Identifiable {
-    let id: UUID               // Уникальный идентификатор треклиста.
-    var name: String           // Отображаемое название треклиста.
-    let createdAt: Date        // Дата создания треклиста.
-    let kind: TrackListKind    // Назначение треклиста.
+    let id: UUID
+    var name: String
+    let createdAt: Date
+    let kind: TrackListKind
 }

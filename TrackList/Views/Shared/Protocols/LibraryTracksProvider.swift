@@ -2,6 +2,8 @@
 //  LibraryTracksProvider.swift
 //  TrackList
 //
+//  Объявляет асинхронное получение треков для источников фонотеки.
+//
 //  Created by Pavel Fomin on 13.12.2025.
 //
 

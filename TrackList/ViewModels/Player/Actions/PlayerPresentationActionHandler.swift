@@ -28,7 +28,7 @@ extension SheetActionCoordinator: PlayerSheetActionCoordinating {}
 @MainActor
 final class PlayerPresentationActionHandler {
 
-    // MARK: - Dependencies
+    // MARK: - Зависимости
 
     /// Хранилище очереди плеера.
     private let playlistManager: PlaylistManager
@@ -68,7 +68,7 @@ final class PlayerPresentationActionHandler {
         self.favoriteActionHandler = favoriteActionHandler
     }
 
-    // MARK: - Actions
+    // MARK: - Действия
 
     /// Открывает сценарий сохранения плейлиста как треклиста.
     func saveTrackList() {
@@ -164,7 +164,7 @@ final class PlayerPresentationActionHandler {
         sheetManager.presentCopyPurchasedITunesToFolder(for: purchasedTrack)
     }
 
-    // MARK: - Private
+    // MARK: - Приватное
 
     /// Возвращает элемент очереди плеера по его идентификатору.
     private func track(queueItemId: UUID) -> PlayerTrack? {

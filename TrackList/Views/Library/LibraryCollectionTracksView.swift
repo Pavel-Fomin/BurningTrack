@@ -38,16 +38,16 @@ struct LibraryCollectionTracksView: View {
     /// Локальный снимок сохраняет реактивность строк без наблюдения PlayerViewModel.
     @State private var favoriteTrackIds: Set<UUID>
 
-    // MARK: - Coordinators
+    // MARK: - Координаторы
 
     private let selectionActionBarCoordinator = LibrarySelectionActionBarCoordinator()
 
-    // MARK: - State
+    // MARK: - Состояние
 
     /// Отложенная команда прокрутки к текущему треку.
     @State private var scrollRequest: LibraryScrollRequest?
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     init(
         source: LibraryTrackListSource,
@@ -125,7 +125,7 @@ struct LibraryCollectionTracksView: View {
         LibraryPresentationText.sourceNavigationTitlePresentation(for: source)
     }
 
-    // MARK: - UI
+    // MARK: - Интерфейс
 
     var body: some View {
         contentView

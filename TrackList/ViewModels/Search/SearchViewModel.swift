@@ -12,12 +12,12 @@ import Foundation
 @MainActor
 final class SearchViewModel: ObservableObject {
 
-    // MARK: - State
+    // MARK: - Состояние
 
     /// Готовое состояние экрана поиска.
     @Published private(set) var state: SearchScreenState
 
-    // MARK: - Dependencies
+    // MARK: - Зависимости
 
     /// Доменный сервис поиска по SQLite.
     private let searchService: any SearchServicing
@@ -46,7 +46,7 @@ final class SearchViewModel: ObservableObject {
     /// Удерживает подписку на изменения presentation-настроек результатов поиска.
     private var cancellables = Set<AnyCancellable>()
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     init(
         searchService: any SearchServicing,
@@ -74,7 +74,7 @@ final class SearchViewModel: ObservableObject {
         searchTask?.cancel()
     }
 
-    // MARK: - Actions
+    // MARK: - Действия
 
     /// Повторно выполняет непустой запрос при возвращении на экран.
     func refreshIfNeeded() {
@@ -145,7 +145,7 @@ final class SearchViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Search
+    // MARK: - Поиск
 
     /// Выполняет поиск и защищает UI от результатов отменённых задач.
     private func search(query: String, resetsSelectedFilter: Bool) {

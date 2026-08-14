@@ -28,7 +28,7 @@ final class PlayerTrackRowStateBuilder {
         self.artworkBadgeStateFactory = artworkBadgeStateFactory
     }
 
-    // MARK: - Public API
+    // MARK: - Публичный API
 
     /// Собирает состояния строк плеера.
     func makeRows(
@@ -85,7 +85,7 @@ final class PlayerTrackRowStateBuilder {
         }
     }
 
-    // MARK: - Private
+    // MARK: - Приватное
 
     /// Формирует лёгкий запрос обложки строки плеера из runtime snapshot.
     private func makeArtworkRequest(

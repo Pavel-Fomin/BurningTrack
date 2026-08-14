@@ -2,6 +2,8 @@
 //  NotificationTrackListEventProvider.swift
 //  TrackList
 //
+//  Преобразует NotificationCenter в поток событий detail-flow треклиста.
+//
 //  Created by Pavel Fomin on 18.06.2026.
 //
 

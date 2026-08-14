@@ -18,7 +18,7 @@
 
 import Foundation
 
-// MARK: - MiniPlayerStaticState
+// MARK: - Статическое состояние MiniPlayer
 
 struct MiniPlayerStaticState: Equatable {
 
@@ -35,7 +35,7 @@ struct MiniPlayerStaticState: Equatable {
     let artworkRequest: ArtworkRequest?
 }
 
-// MARK: - MiniPlayerProgressState
+// MARK: - Состояние прогресса MiniPlayer
 
 struct MiniPlayerProgressState: Equatable {
 
@@ -49,7 +49,7 @@ struct MiniPlayerProgressState: Equatable {
     let duration: Double
 }
 
-// MARK: - MiniPlayerState
+// MARK: - Состояние MiniPlayer
 
 /// Явное состояние отображения мини-плеера.
 ///

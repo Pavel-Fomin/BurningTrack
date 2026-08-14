@@ -25,7 +25,7 @@ struct LibraryFolderContainer: View {
     @Binding var selectionActionBarConfig: SelectionActionBarConfig?
     @Binding var selectionActionSender: (any LibraryTracksActionSending)?
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     init(
         folder: LibraryFolder,
@@ -45,7 +45,7 @@ struct LibraryFolderContainer: View {
         self._selectionActionSender = selectionActionSender
     }
 
-    // MARK: - UI
+    // MARK: - Интерфейс
 
     var body: some View {
         LibraryFolderContent(
@@ -76,9 +76,10 @@ private struct LibraryFolderContent: View {
 
     // MARK: - ViewModel
 
+    /// ViewModel живёт ровно пока существует destination папки; смена `folder.id` создаёт новый graph через внешний `.id`.
     @StateObject private var viewModel: LibraryFolderViewModel
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     init(
         folder: LibraryFolder,
@@ -108,7 +109,7 @@ private struct LibraryFolderContent: View {
         )
     }
 
-    // MARK: - UI
+    // MARK: - Интерфейс
 
     var body: some View {
         LibraryFolderView(

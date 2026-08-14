@@ -11,12 +11,12 @@ import SwiftUI
 import UIKit
 
 struct RotatingArtworkView: UIViewRepresentable {
-    let image: UIImage          // обложка (любой размер)
-    let isActive: Bool          // эта ячейка/экран активны?
-    let isPlaying: Bool         // сейчас играет?
-    var size: CGFloat = 48      // диаметр кружка
-    var rpm: Double = 10        // оборотов/мин (обычное вращение)
-    var smoothReturnDuration: CFTimeInterval = 1.2 // докрут
+    let image: UIImage
+    let isActive: Bool
+    let isPlaying: Bool
+    var size: CGFloat = 48
+    var rpm: Double = 10
+    var smoothReturnDuration: CFTimeInterval = 1.2
 
 // MARK: -  Ключ анимации
     private static let spinKey = "rotating.spin"
@@ -169,7 +169,7 @@ struct RotatingArtworkView: UIViewRepresentable {
     }
 
     
-// MARK: -  MARK: Логика состояний
+// MARK: - Логика состояний
     
     /// Применяет новое состояние вращения в зависимости от активности, проигрывания и состояния приложения
     private func apply(to layer: CALayer,
@@ -189,8 +189,8 @@ struct RotatingArtworkView: UIViewRepresentable {
     }
 
     
-// MARK: -  Core Animation helpers
-    
+// MARK: -  Помощники Core Animation
+
     /// Гарантирует наличие бесконечной анимации вращения на слое
     private func ensureSpin(on layer: CALayer) {
         if layer.animation(forKey: Self.spinKey) == nil {

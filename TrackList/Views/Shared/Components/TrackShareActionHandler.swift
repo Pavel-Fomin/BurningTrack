@@ -13,12 +13,12 @@ import UIKit
 @MainActor
 final class TrackShareActionHandler {
 
-    // MARK: - Singleton
+    // MARK: - Единый экземпляр
 
     /// Общий handler не позволяет разным экранам дублировать подготовку и очистку файла.
     static let shared = TrackShareActionHandler()
 
-    // MARK: - Dependencies
+    // MARK: - Зависимости
 
     /// Сервис не зависит от UIKit и выполняет файловую подготовку вне View.
     private let preparationService: TrackSharePreparationService
@@ -30,7 +30,7 @@ final class TrackShareActionHandler {
     /// Новая операция запрещена, пока предыдущий UIActivityViewController владеет файлом.
     private var isShareOperationRunning = false
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     /// Создаёт production handler внутри MainActor, где доступны UIKit-зависимости приложения.
     private init() {
@@ -50,7 +50,7 @@ final class TrackShareActionHandler {
         self.toastPresenter = toastPresenter
     }
 
-    // MARK: - Actions
+    // MARK: - Действия
 
     /// Отправляет обычный локальный или imported-трек, доступный через существующую bookmark-модель.
     func shareLocalTrack(
@@ -84,7 +84,7 @@ final class TrackShareActionHandler {
         shareLocalTrack(trackID: track.trackId)
     }
 
-    // MARK: - Private
+    // MARK: - Приватное
 
     /// Источник выбирается handler-ом, поэтому View не ищет файл и не различает его тип.
     private enum ShareSource {

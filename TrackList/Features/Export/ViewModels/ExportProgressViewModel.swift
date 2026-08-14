@@ -17,7 +17,7 @@ import Foundation
 @MainActor
 final class ExportProgressViewModel: ObservableObject {
 
-    // MARK: - State
+    // MARK: - Состояние
 
     /// Последний полученный снимок состояния экспорта.
     @Published private(set) var progress: ExportProgress?
@@ -28,7 +28,7 @@ final class ExportProgressViewModel: ObservableObject {
     /// Показывает, что Coordinator ещё не завершил текущую экспортную операцию.
     @Published private(set) var isExportActive = false
 
-    // MARK: - Dependencies
+    // MARK: - Зависимости
 
     /// Владеет жизненным циклом одной экспортной операции.
     private let coordinator: ExportOperationCoordinator
@@ -42,7 +42,7 @@ final class ExportProgressViewModel: ObservableObject {
     /// Преобразует внутренние данные операции в единый снимок интерфейса.
     private let exportPresenter = ExportPresenter()
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     /// Создаёт ViewModel с координатором операции и сообщением повторного запуска.
     init(
@@ -63,7 +63,7 @@ final class ExportProgressViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Derived state
+    // MARK: - Производное состояние
 
     /// Показывает наличие результата или активного снимка экспорта.
     var isVisible: Bool {
@@ -85,7 +85,7 @@ final class ExportProgressViewModel: ObservableObject {
         )
     }
 
-    // MARK: - Export actions
+    // MARK: - Действия экспорта
 
     /// Запускает экспорт и оставляет его независимым от жизненного цикла экрана.
     func startExport(_ request: ExportRequest) {
@@ -137,7 +137,7 @@ final class ExportProgressViewModel: ObservableObject {
         return true
     }
 
-    // MARK: - Coordinator events
+    // MARK: - События координатора
 
     /// Очищает отображаемое состояние только после принятия сценария экспорта.
     private func exportWasAccepted() {

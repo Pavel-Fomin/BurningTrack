@@ -2,6 +2,8 @@
 //  Styles.swift
 //  TrackList
 //
+//  Объединяет общие палитры, типографику, отступы и системные иконки интерфейса.
+//
 //  Created by Pavel Fomin on 24.04.2025.
 //
 
@@ -21,7 +23,7 @@ enum Colors {
     static let customHeaderBackground = Color("HeaderBackground")
 }
 
-// MARK: - HEX Color Extension
+// MARK: - Расширение цветов из шестнадцатеричного значения
 extension Color {
     init(hex: String) {
         let scanner = Scanner(string: hex)
@@ -75,7 +77,7 @@ enum Icons {
     static let airplay = Image(systemName: "airplayaudio")
 }
 
-// MARK: - View Modifiers
+// MARK: - Модификаторы View
 
 // MARK: - Стиль для названия трека
 struct TrackTitleStyle: ViewModifier {
@@ -157,7 +159,7 @@ enum HeaderStyle {
 }
 
 
-// MARK: - View Extensions
+// MARK: - Расширения View
 
 extension View {
     func trackTitleStyle() -> some View {

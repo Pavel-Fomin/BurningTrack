@@ -13,11 +13,11 @@ import Combine
 
 @MainActor
 final class LibraryFolderViewModel: ObservableObject {
-    // MARK: - Output
+    // MARK: - Выходные данные
 
     @Published private(set) var screenState: LibraryFolderScreenState
 
-    // MARK: - Dependencies
+    // MARK: - Зависимости
 
     private let actionHandler: LibraryFolderActionHandler
     /// Собирает готовое состояние папки, не перенося логику отображения во View.
@@ -31,7 +31,7 @@ final class LibraryFolderViewModel: ObservableObject {
     /// Удерживает подписки на события в течение жизни ViewModel.
     private var cancellables = Set<AnyCancellable>()
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     init(
         folder: LibraryFolder,
@@ -55,13 +55,13 @@ final class LibraryFolderViewModel: ObservableObject {
         summaryTask?.cancel()
     }
 
-    // MARK: - Actions
+    // MARK: - Действия
 
     func handle(_ action: LibraryFolderAction) {
         actionHandler.handle(action)
     }
 
-    // MARK: - Summary
+    // MARK: - Сводка
 
     /// Подписывается на завершение синхронизации, перемещение и изменение сохранённой длительности трека.
     private func bindSummaryEvents() {

@@ -11,14 +11,14 @@ import Foundation
 
 @MainActor
 final class LibraryScreenActionHandler {
-    // MARK: - Dependencies
+    // MARK: - Зависимости
 
     private let navigationCoordinator: NavigationCoordinator
     private let musicLibraryManager: MusicLibraryManager
     private let trackRegistry: TrackRegistry
     private let toastPresenter: any ToastPresenting
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     init(
         navigationCoordinator: NavigationCoordinator,
@@ -32,7 +32,7 @@ final class LibraryScreenActionHandler {
         self.toastPresenter = toastPresenter
     }
 
-    // MARK: - Handle
+    // MARK: - Обработка
 
     func handle(_ action: LibraryScreenAction) {
         switch action {
@@ -55,7 +55,7 @@ final class LibraryScreenActionHandler {
         }
     }
 
-    // MARK: - Private
+    // MARK: - Приватное
 
     /// Открывает маршрут, соответствующий выбранной строке корня режима "Треки".
     private func handleCollectionRootItemSelected(_ item: LibraryCollectionRootItem) {

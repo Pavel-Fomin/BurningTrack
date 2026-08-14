@@ -17,38 +17,38 @@ struct TrackSheetMetadata: Equatable {
 
     // MARK: - Основное
 
-    var title: String?        /// Название трека
-    var artist: String?       /// Основной исполнитель
-    var album: String?        /// Название альбома
-    var albumArtist: String?  /// Исполнитель альбома
-    var genre: String?        /// Жанр
-    var comment: String?      /// Комментарий
+    var title: String?
+    var artist: String?
+    var album: String?
+    var albumArtist: String?
+    var genre: String?
+    var comment: String?
 
     // MARK: - Авторы
 
-    var composer: String?     /// Композитор
-    var conductor: String?    /// Дирижёр
-    var lyricist: String?     /// Автор текста
-    var remixer: String?      /// Автор ремикса
+    var composer: String?
+    var conductor: String?
+    var lyricist: String?
+    var remixer: String?
 
     // MARK: - Музыкальные атрибуты
 
-    var grouping: String?     /// Поле группировки
-    var bpm: Int?             /// Темп трека
-    var musicalKey: String?   /// Музыкальная тональность
+    var grouping: String?
+    var bpm: Int?
+    var musicalKey: String?
 
     // MARK: - Нумерация
-    var trackNumber: Int?     /// Номер трека
-    var totalTracks: Int?     /// Общее количество треков
-    var discNumber: Int?      /// Номер диска
-    var totalDiscs: Int?      /// Общее количество дисков
+    var trackNumber: Int?
+    var totalTracks: Int?
+    var discNumber: Int?
+    var totalDiscs: Int?
 
     // MARK: - Выпуск и идентификация
 
-    var year: Int?             /// Год выпуска
-    var date: String?          /// Полная дата, если она есть в файле
-    var publisherOrLabel: String?  /// Лейбл или издатель
-    var copyright: String?     /// Поле copyright
-    var encodedBy: String?     /// Кем был закодирован или обработан файл
-    var isrc: String?          /// Международный код записи
+    var year: Int?
+    var date: String?
+    var publisherOrLabel: String?
+    var copyright: String?
+    var encodedBy: String?
+    var isrc: String?
 }

@@ -75,6 +75,7 @@ final class TrackCollectionNavigationHandler {
         trackId: UUID,
         category: LibraryCollectionCategory
     ) {
+        // SQLite metadata читаются асинхронно; переход выполняется только если сохранённое значение ещё существует.
         Task { [trackRegistry, navigationCoordinator] in
             guard let metadata = await trackRegistry
                 .cachedMetadata(forTrackIds: [trackId])[trackId] else {

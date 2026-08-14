@@ -13,21 +13,20 @@ import SwiftUI
 @MainActor
 final class ToastManager: ObservableObject {
 
-    // MARK: - Singleton
+    // MARK: - Единый экземпляр
 
     static let shared = ToastManager()
 
-    // MARK: - Public state
+    // MARK: - Публичное состояние
 
-    @Published private(set) var data: ToastData?   /// Текущий тост (nil — ничего не отображается)
+    @Published private(set) var data: ToastData?
 
-    // MARK: - Private
+    // MARK: - Внутреннее состояние
 
     private var dismissTask: Task<Void, Never>?
 
-    // MARK: - Public API
+    // MARK: - Публичный API
 
-    /// Основной вход для показа тостов из ViewModel
     func handle(_ event: ToastEvent, duration: TimeInterval = 2.0) {
 
         let toastData = ToastPresentation.makeData(from: event)
@@ -35,17 +34,14 @@ final class ToastManager: ObservableObject {
         show(toastData, duration: duration)
     }
 
-    /// Показывает Toast на основе ошибки приложения.
-    /// Использует централизованный маппинг AppError -> ToastEvent.
     func handle(_ error: AppError) {
         handle(error.toastEvent)
     }
 
-    // MARK: - Internal logic
+    // MARK: - Внутренняя логика
 
     private func show(_ newToast: ToastData, duration: TimeInterval) {
 
-        // Защита от дублей
         if data == newToast {
             return
         }
@@ -64,6 +60,6 @@ final class ToastManager: ObservableObject {
 
 }
 
-// MARK: - ToastPresenting
+// MARK: - Подключение к ToastPresenting
 
 extension ToastManager: ToastPresenting {}

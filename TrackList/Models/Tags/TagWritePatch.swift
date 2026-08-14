@@ -3,8 +3,7 @@
 //  TrackList
 //
 //  Модель изменений тегов трека.
-//  Описывает ТОЛЬКО то, что нужно изменить.
-//  nil означает «не трогать поле».
+//  Неизменённые поля выражаются через .unchanged, а отсутствие патча обложки — через nil.
 //
 //  Created by PavelFomin on 16.01.2026.
 //
@@ -17,32 +16,33 @@ struct TagWritePatch: Sendable, Equatable {
 
     // MARK: - Основные текстовые теги
 
-    var artist: TagFieldChange<String> = .unchanged     /// Исполнитель
-    var title: TagFieldChange<String> = .unchanged      /// Название трека
-    var album: TagFieldChange<String> = .unchanged      /// Альбом
-    var publisher: TagFieldChange<String> = .unchanged  /// Издатель / лейбл
-    var genre: TagFieldChange<String> = .unchanged      /// Жанр
-    var comment: TagFieldChange<String> = .unchanged    /// Комментарий
+    var artist: TagFieldChange<String> = .unchanged
+    var title: TagFieldChange<String> = .unchanged
+    var album: TagFieldChange<String> = .unchanged
+    var publisher: TagFieldChange<String> = .unchanged
+    var genre: TagFieldChange<String> = .unchanged
+    var comment: TagFieldChange<String> = .unchanged
 
     // MARK: - Числовые теги
 
-    /// Год выпуска
-    var year: TagFieldChange<Int> = .unchanged                /// Год выпуска
-    var trackNumber: TagFieldChange<Int> = .unchanged         /// Номер трека
-    var bpm: TagFieldChange<Int> = .unchanged                 /// BPM (удары в минуту)
-    var duration: TagFieldChange<TimeInterval> = .unchanged   /// Длительность. По умолчанию вычесляемое, но предусмотрено для форматов, где тег поддерживается.
+    var year: TagFieldChange<Int> = .unchanged
+    var trackNumber: TagFieldChange<Int> = .unchanged
+    var bpm: TagFieldChange<Int> = .unchanged
+    /// Длительность обычно вычисляется из файла, но отдельные форматы поддерживают её как тег.
+    var duration: TagFieldChange<TimeInterval> = .unchanged
 
     // MARK: - Обложка
 
-    var artwork: ArtworkPatch? = nil  /// Патч для обложки: nil → не трогаем, remove → удалить, set → заменить
+    /// nil сохраняет обложку; remove удаляет её, а set заменяет исходными данными.
+    var artwork: ArtworkPatch? = nil
 
 }
 
-// Операции над обложкой трека
+// Операции над обложкой трека.
 enum ArtworkPatch: Sendable, Equatable {
 
-    case remove           /// Удалить существующую обложку
-    case set(             /// Установить новую обложку без преобразований
+    case remove
+    case set(
         data: Data,
         mime: String?
     )

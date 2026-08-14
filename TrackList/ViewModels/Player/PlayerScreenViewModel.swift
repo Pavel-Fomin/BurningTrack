@@ -22,12 +22,12 @@ import Combine
 @MainActor
 final class PlayerScreenViewModel: ObservableObject {
 
-    // MARK: - State
+    // MARK: - Состояние
 
     /// Готовое состояние экрана плеера.
     @Published private(set) var state: PlayerScreenState
 
-    // MARK: - Dependencies
+    // MARK: - Зависимости
 
     /// ViewModel воспроизведения.
     private let playerViewModel: PlayerViewModel
@@ -95,7 +95,7 @@ final class PlayerScreenViewModel: ObservableObject {
         observeHighlightedRow()
     }
 
-    // MARK: - Actions
+    // MARK: - Действия
 
     /// Передаёт пользовательское действие в обработчик Player Flow.
     func handle(_ action: PlayerScreenAction) {

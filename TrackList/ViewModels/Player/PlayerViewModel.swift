@@ -28,7 +28,7 @@ final class PlayerViewModel: ObservableObject {
     
     // MARK: - Публичные состояния
     
-    @Published var currentTrackDisplayable: (any TrackDisplayable)? { /// Текущий воспроизводимый трек
+    @Published var currentTrackDisplayable: (any TrackDisplayable)? {
         didSet {
             guard oldValue?.trackId != currentTrackDisplayable?.trackId else {
                 return
@@ -37,17 +37,18 @@ final class PlayerViewModel: ObservableObject {
             refreshCurrentTrackFavoriteState()
         }
     }
-    @Published var isPlaying: Bool = false                           /// Воспроизводится ли сейчас аудио
-    @Published var currentTime: TimeInterval = 0.0                   /// Текущее время воспроизведения
-    @Published var trackDuration: TimeInterval = 0.0                 /// Длительность текущего трека
-    @Published var currentContext: PlaybackContext?                  /// Контекст воспроизведения
+    @Published var isPlaying: Bool = false
+    @Published var currentTime: TimeInterval = 0.0
+    @Published var trackDuration: TimeInterval = 0.0
+    @Published var currentContext: PlaybackContext?
     /// Показывает, что для текущего трека получен достоверный playback-массив, а не только ранняя display-модель.
     @Published private(set) var isPlaybackContextReady = false
     /// Разрешает переход к предыдущему треку только после проверки готового playback-контекста.
     @Published private(set) var canPlayPreviousTrack = false
     /// Разрешает переход к следующему треку только после проверки готового playback-контекста.
     @Published private(set) var canPlayNextTrack = false
-    @Published private(set) var snapshotsByTrackId: [UUID: TrackRuntimeSnapshot] = [:] /// Runtime snapshot треков по id
+    /// Публикуемое зеркало controller-а для представления; источником загрузки и обновления snapshot остаётся `PlayerRuntimeSnapshotController`.
+    @Published private(set) var snapshotsByTrackId: [UUID: TrackRuntimeSnapshot] = [:]
     /// Подтверждённые идентификаторы «Избранного» для presentation-состояния строк.
     @Published private(set) var favoriteTrackIds: Set<UUID> = []
     /// Показывает состояние «Избранного» только для текущего трека плеера.
@@ -62,8 +63,8 @@ final class PlayerViewModel: ObservableObject {
         playbackContextStore.playbackMode
     }
     
-    // MARK: - MiniPlayer State
-    
+    // MARK: - Состояние MiniPlayer
+
     /// Единое явное состояние отображения мини-плеера.
     /// До чтения player_state отсутствие трека ещё не подтверждено, поэтому UI начинает с loading.
     @Published private(set) var miniPlayerState: MiniPlayerState = .loading(staticState: nil)
@@ -76,7 +77,7 @@ final class PlayerViewModel: ObservableObject {
     /// Задача существует только для текущего трека и отменяется до запуска следующей генерации.
     private var waveformTask: Task<Void, Never>?
     
-    // MARK: - Throttling
+    // MARK: - Ограничение частоты
 
     private var lastNowPlayingTick: CFTimeInterval = 0
     
@@ -140,7 +141,7 @@ final class PlayerViewModel: ObservableObject {
         let identifier: UUID
         /// Стабильный id сохранённого трека для быстрой и полной проверок.
         let trackId: UUID
-        /// Исходный контекст нужен позднему восстановлению порядка Next/Previous и уточняется только для распознанного старого iTunes-состояния.
+        /// Исходный контекст нужен позднему восстановлению порядка Next/Previous и уточняется только для распознанного сохранённого iTunes-состояния.
         var source: PlaybackContextSource
         /// Queue item сохраняет точную позицию среди повторных вхождений одного trackId.
         let queueItemId: UUID?
@@ -162,8 +163,8 @@ final class PlayerViewModel: ObservableObject {
     /// Ненулевое значение означает, что отображение, предварительный или окончательный контекст стартового трека ещё восстанавливаются.
     private var pendingLastTrackRestoration: PendingLastTrackRestoration?
 
-    // MARK: - Now Playing Snapshot
-    
+    // MARK: - Снимок Now Playing
+
     /// Собирает snapshot для Control Center из текущего состояния.
     /// Источник метаданных — TrackRuntimeSnapshot или runtime-данные iTunes-адаптера.
     /// Artwork используется отдельного размера (~512 px).
@@ -751,7 +752,7 @@ final class PlayerViewModel: ObservableObject {
             )
         }
 
-        // Legacy-состояния без queueItemId сохраняют прежнее восстановление одиночного трека.
+        // Сохранённое состояние без queueItemId восстанавливает только один трек.
         restoreFallbackTrack(restorationIdentifier: restorationIdentifier)
     }
 
@@ -1448,8 +1449,8 @@ final class PlayerViewModel: ObservableObject {
         }
     }
     
-    // MARK: - Snapshot
-    
+    // MARK: - Снимок
+
     // Реализация чтения runtime snapshot
     /// Возвращает runtime snapshot трека по его идентификатору.
     ///
@@ -1586,8 +1587,8 @@ final class PlayerViewModel: ObservableObject {
         }
     }
     
-    // MARK: - MiniPlayer State Updates
-    
+    // MARK: - Обновления состояния MiniPlayer
+
     /// Пересобирает статическое состояние мини-плеера из текущего трека и runtime snapshot.
     private func updateMiniPlayerStaticState(for track: any TrackDisplayable) {
         let snapshot = runtimeSnapshotController.snapshot(for: track.trackId)

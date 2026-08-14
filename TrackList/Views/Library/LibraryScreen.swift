@@ -50,7 +50,7 @@ struct LibraryScreen: View {
     /// ViewModel корневого экрана фонотеки.
     @StateObject private var masterViewModel: LibraryMasterViewModel
 
-    // MARK: - State
+    // MARK: - Состояние
 
     @State private var isShowingFolderPicker = false
     /// Конфигурация верхней нижней панели для текущего экрана фонотеки.
@@ -58,7 +58,7 @@ struct LibraryScreen: View {
     /// Маршрут подтверждения принадлежит дочернему экрану, а host хранит только ссылку для возврата действия.
     @State private var selectionActionSender: (any LibraryTracksActionSending)?
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     init(
         favoriteTrackActionHandler: FavoriteTrackActionHandler,
@@ -108,7 +108,7 @@ struct LibraryScreen: View {
         )
     }
 
-    // MARK: - UI
+    // MARK: - Интерфейс
 
     var body: some View {
         NavigationStack(path: libraryPathBinding) {
@@ -173,7 +173,7 @@ struct LibraryScreen: View {
         }
     }
 
-    // MARK: - Root контент
+    // MARK: - Корневое содержимое
 
     @ViewBuilder
     private var rootContent: some View {
@@ -196,7 +196,7 @@ struct LibraryScreen: View {
         }
     }
 
-    // MARK: - Navigation destinations
+    // MARK: - Навигационные назначения
 
     @ViewBuilder
     private func destination(for destination: LibraryScreenDestinationState) -> some View {

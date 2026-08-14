@@ -41,7 +41,7 @@ protocol BatchFilenameRenameCommandExecuting {
     ) async -> BatchFilenameRenameResult
 }
 
-// MARK: - Production adapters
+// MARK: - Адаптеры production-слоя
 
 extension BatchFilenameRenameMetadataLoader: BatchFilenameRenameMetadataLoading {}
 

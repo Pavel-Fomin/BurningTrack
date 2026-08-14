@@ -12,18 +12,18 @@ import Foundation
 
 struct CreateTrackListContainer: View {
 
-    // MARK: - State
+    // MARK: - Состояние
 
     /// ViewModel формы уже собрана feature-factory и удерживается на время sheet-flow.
     @StateObject private var viewModel: CreateTrackListViewModel
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     init(viewModel: CreateTrackListViewModel) {
         _viewModel = StateObject(wrappedValue: viewModel)
     }
 
-    // MARK: - UI
+    // MARK: - Интерфейс
 
     var body: some View {
         CreateTrackListSheet(

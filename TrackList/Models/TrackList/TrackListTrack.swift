@@ -10,13 +10,13 @@ import Foundation
 // MARK: - Основная модель трека
 struct Track: Identifiable, TrackDisplayable {
     
-    // MARK: - Identity
+    // MARK: - Идентичность
     let listItemId: UUID
     let trackId: UUID
     
     var id: UUID { listItemId }
     
-    // MARK: - Metadata
+    // MARK: - Метаданные
     let title: String?
     let artist: String?
     let album: String?
@@ -28,10 +28,10 @@ struct Track: Identifiable, TrackDisplayable {
     /// URL iTunes-трека из MediaPlayer; для обычных файлов остаётся nil.
     let assetURL: URL?
     
-    // MARK: - Availability
+    // MARK: - Доступность
     let isAvailable: Bool
     
-    // MARK: - Init
+    // MARK: - Инициализация
     init(
         listItemId: UUID = UUID(),
         trackId: UUID,

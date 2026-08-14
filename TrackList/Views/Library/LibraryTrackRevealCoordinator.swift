@@ -54,7 +54,7 @@ enum LibraryTrackRevealDecision: Equatable {
 @MainActor
 final class LibraryTrackRevealCoordinator: ObservableObject {
 
-    // MARK: - State
+    // MARK: - Состояние
 
     /// Текущий ожидающий reveal-запрос.
     @Published private var pendingRevealRequest: LibraryRevealRequest?
@@ -79,13 +79,13 @@ final class LibraryTrackRevealCoordinator: ObservableObject {
         return completedRequestId != revealedRequestId
     }
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     init(initialRequest: LibraryRevealRequest?) {
         pendingRevealRequest = initialRequest
     }
 
-    // MARK: - Reveal lifecycle
+    // MARK: - Жизненный цикл раскрытия
 
     /// Принимает новый внешний reveal-запрос и возвращает решение для View.
     func receiveRevealRequest(
@@ -177,7 +177,7 @@ final class LibraryTrackRevealCoordinator: ObservableObject {
         revealedRequestId = nil
     }
 
-    // MARK: - Active track scroll
+    // MARK: - Прокрутка к активному треку
 
     /// Возвращает запрос прокрутки к текущему треку, если reveal не имеет приоритета.
     func activeTrackScrollRequestIfNeeded(
@@ -196,7 +196,7 @@ final class LibraryTrackRevealCoordinator: ObservableObject {
         return .activeTrack(currentDisplayableId)
     }
 
-    // MARK: - Track lookup
+    // MARK: - Поиск трека
 
     /// Проверяет, присутствует ли строка трека в текущих секциях экрана.
     func hasTrack(id: UUID, in trackSections: [TrackSection]) -> Bool {

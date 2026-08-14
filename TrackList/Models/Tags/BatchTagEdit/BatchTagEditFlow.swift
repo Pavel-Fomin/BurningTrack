@@ -10,12 +10,13 @@
 import Foundation
 
 struct BatchTagEditFlow {
-    var pendingAction: PendingBulkTrackAction?  /// Массовое действие, из которого была открыта форма.
-    var phase: BatchTagEditPhase                /// Текущий этап формы.
-    var tracks: [BatchTagEditTrack]             /// Треки, выбранные для массового редактирования.
-    var fields: [BatchTagFieldEditState]        /// Состояния редактируемых текстовых полей.
-    var trackFieldOverrides: [UUID: BatchTagTrackFieldOverride] /// Per-track изменения полей тегов.
-    var artwork: BatchTagArtworkEditState       /// Состояние редактирования обложек.
+    var pendingAction: PendingBulkTrackAction?
+    var phase: BatchTagEditPhase
+    var tracks: [BatchTagEditTrack]
+    var fields: [BatchTagFieldEditState]
+    /// Переопределения полей, относящиеся к конкретным трекам, а не ко всей выборке.
+    var trackFieldOverrides: [UUID: BatchTagTrackFieldOverride]
+    var artwork: BatchTagArtworkEditState
 
     /// Активен ли flow массового редактирования тегов.
     var isActive: Bool {

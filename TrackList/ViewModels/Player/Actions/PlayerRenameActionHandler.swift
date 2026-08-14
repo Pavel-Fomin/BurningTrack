@@ -19,7 +19,7 @@ import Foundation
 @MainActor
 final class PlayerRenameActionHandler {
 
-    // MARK: - Dependencies
+    // MARK: - Зависимости
 
     /// Хранилище очереди плеера.
     private let playlistManager: PlaylistManager
@@ -47,7 +47,7 @@ final class PlayerRenameActionHandler {
         self.toastPresenter = toastPresenter
     }
 
-    // MARK: - Actions
+    // MARK: - Действия
 
     /// Запускает сценарий переименования элемента очереди плеера.
     func renameTrack(

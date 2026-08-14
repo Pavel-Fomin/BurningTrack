@@ -75,7 +75,7 @@ struct ExportJob: Sendable {
         /// Для обычного файла содержит полное имя, а для iTunes — основу без расширения.
         let exportFileName: String
 
-        /// Сохраняет прежний доступ к идентификатору независимо от типа источника.
+        /// Предоставляет идентификатор единообразно для любого типа источника.
         var trackID: UUID {
             switch source {
             case .bookmark(let trackID):

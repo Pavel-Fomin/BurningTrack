@@ -16,7 +16,7 @@ struct ActiveArtworkOverlayView: View {
     /// Определяет, должна ли иконка показывать анимацию воспроизведения.
     let isPlaying: Bool
 
-    // MARK: - UI
+    // MARK: - Интерфейс
 
     var body: some View {
         ZStack {

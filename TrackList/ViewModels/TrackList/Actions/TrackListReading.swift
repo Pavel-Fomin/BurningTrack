@@ -2,6 +2,8 @@
 //  TrackListReading.swift
 //  TrackList
 //
+//  Объявляет согласованный read-only снимок detail-flow одного треклиста.
+//
 //  Created by Pavel Fomin on 18.06.2026.
 //
 

@@ -12,8 +12,8 @@ import Foundation
 
 extension Notification.Name {
     
-    // MARK: - Settings
-    
+    // MARK: - Настройки
+
     static let appSettingsDidChange = Notification.Name("appSettingsDidChange")     /// Изменились настройки чтения metadata треков
     
     // MARK: - TrackList
@@ -24,18 +24,18 @@ extension Notification.Name {
     static let trackDidUpdate = Notification.Name("trackDidUpdate")                 /// Единое событие обновления трека с payload TrackUpdateEvent
     static let trackBatchDidUpdate = Notification.Name("trackBatchDidUpdate")       /// Пакетное событие обновления треков с payload [TrackUpdateEvent]
     
-    // MARK: - Library
-    
+    // MARK: - Фонотека
+
     static let trackDidMove = Notification.Name("trackDidMove")                   /// Перемещение трека
     static let libraryDataDidChange = Notification.Name("libraryDataDidChange")   /// Завершено изменение состава фонотеки в SQLite
     static let libraryAccessRestored = Notification.Name("libraryAccessRestored") /// Доступ к прикреплённым папкам восстановлен (root-scope открыт)
 
-    // MARK: - Purchased iTunes
+    // MARK: - Куплено в iTunes
 
     static let purchasedITunesMediaLibraryAccessDidChange = Notification.Name("purchasedITunesMediaLibraryAccessDidChange") /// Системный запрос MediaPlayer завершился и можно повторить отложенное восстановление
 
-    // MARK: - Player
-    
+    // MARK: - Плеер
+
     static let trackDidFinish = Notification.Name("trackDidFinish")              /// Трек доиграл до конца (AVPlayerItem → PlayerManager → PlayerViewModel)
     static let trackDurationUpdated = Notification.Name("trackDurationUpdated")  /// Обновилась длительность текущего трека
 }

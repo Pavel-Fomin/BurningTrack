@@ -13,14 +13,14 @@ import Foundation
 @MainActor
 final class PurchasedITunesMusicActionHandler {
 
-    // MARK: - Dependencies
+    // MARK: - Зависимости
 
     /// ViewModel владеет загрузкой и сортировкой, а handler принимает typed-намерения View.
     private let viewModel: PurchasedITunesMusicViewModel
     /// Типизированный вход в глобальный Export-feature.
     private let exportRequestHandler: any ExportRequestHandling
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     /// Создаёт обработчик с production- или тестовыми зависимостями.
     init(
@@ -31,7 +31,7 @@ final class PurchasedITunesMusicActionHandler {
         self.exportRequestHandler = exportRequestHandler
     }
 
-    // MARK: - Handle
+    // MARK: - Обработка
 
     /// Выполняет действие экрана за пределами SwiftUI View.
     func handle(
@@ -56,7 +56,7 @@ final class PurchasedITunesMusicActionHandler {
         }
     }
 
-    // MARK: - Export
+    // MARK: - Экспорт
 
     /// Запускает обычный экспорт всех доступных iTunes-треков без нумерации.
     private func exportTracks(

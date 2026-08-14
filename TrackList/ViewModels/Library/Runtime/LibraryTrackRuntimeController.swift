@@ -23,20 +23,21 @@ import Foundation
 @MainActor
 final class LibraryTrackRuntimeController: ObservableObject {
 
-    // MARK: - State
+    // MARK: - Состояние
 
+    /// Локальная проекция snapshot-ов для фонотеки; общий `TrackRuntimeStore` остаётся источником уже подготовленных данных между feature.
     @Published private(set) var snapshotsByTrackId: [UUID: TrackRuntimeSnapshot] = [:]
     /// Идентификаторы snapshot, которые уже читаются из runtime pipeline.
     private var loadingTrackIds = Set<UUID>()
     /// Ожидающие получают результат единственной уже запущенной загрузки того же трека.
     private var snapshotWaitersByTrackId: [UUID: [CheckedContinuation<TrackRuntimeSnapshot?, Never>]] = [:]
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     /// Позволяет создавать controller как зависимость по умолчанию.
     nonisolated init() {}
 
-    // MARK: - Public
+    // MARK: - Публичное
 
     /// Возвращает runtime snapshot трека по его идентификатору.
     ///
@@ -62,7 +63,7 @@ final class LibraryTrackRuntimeController: ObservableObject {
         }
     }
 
-    // MARK: - Internal
+    // MARK: - Внутреннее
 
     /// Загружает runtime snapshot и возвращает результат сценариям, которым нужно дождаться metadata.
     ///

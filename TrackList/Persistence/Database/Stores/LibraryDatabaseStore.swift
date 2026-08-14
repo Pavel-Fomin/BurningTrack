@@ -32,7 +32,7 @@ final class LibraryDatabaseStore {
         try self.init(executor: database.databaseExecutor())
     }
 
-    // MARK: - Folders
+    // MARK: - Папки
 
     /// Возвращает прикреплённые корневые папки фонотеки.
     func fetchRootFolders() throws -> [FolderDatabaseModel] {
@@ -211,7 +211,7 @@ final class LibraryDatabaseStore {
         }
     }
 
-    // MARK: - Tracks
+    // MARK: - Треки
 
     /// Возвращает один активный трек фонотеки.
     func fetchLibraryTrack(id: UUID) throws -> TrackDatabaseModel? {
@@ -378,7 +378,7 @@ final class LibraryDatabaseStore {
         )
     }
 
-    // MARK: - Metadata
+    // MARK: - Метаданные
 
     /// Возвращает сохранённые metadata трека.
     func fetchTrackMetadata(trackId: UUID) throws -> TrackMetadataDatabaseModel? {
@@ -408,7 +408,7 @@ final class LibraryDatabaseStore {
         try metadataStore.upsert(model)
     }
 
-    // MARK: - Helpers
+    // MARK: - Помощники
 
     /// Создаёт минимальную root-строку, если синхронизация пришла раньше полного attach-flow.
     private func ensureRootFolder(id: UUID) throws {

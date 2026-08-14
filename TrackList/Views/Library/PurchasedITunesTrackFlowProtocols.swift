@@ -30,7 +30,7 @@ protocol PurchasedITunesTrackSharing: AnyObject {
     func sharePurchasedITunesTrack(_ track: PurchasedITunesPlayableTrack)
 }
 
-// MARK: - Production adapters
+// MARK: - Адаптеры production-слоя
 
 extension SheetManager: PurchasedITunesTrackRouting {}
 extension AppCommandExecutor: PurchasedITunesTrackPlayerAdding {}

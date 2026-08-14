@@ -2,6 +2,8 @@
 //  TrackListScreenStateBuilder.swift
 //  TrackList
 //
+//  Преобразует данные detail-flow треклиста в готовый ScreenState без SwiftUI-зависимостей.
+//
 //  Created by Pavel Fomin on 17.06.2026.
 //
 

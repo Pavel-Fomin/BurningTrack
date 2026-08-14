@@ -17,7 +17,7 @@ struct LibraryCollectionCategoriesView: View {
     /// Передаёт выбранный раздел наружу, не выполняя навигацию внутри view.
     let onCategorySelected: (LibraryCollectionCategory) -> Void
 
-    // MARK: - UI
+    // MARK: - Интерфейс
 
     var body: some View {
         List(categories) { category in

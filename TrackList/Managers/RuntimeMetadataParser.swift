@@ -15,13 +15,13 @@ import AVFoundation
 // MARK: - Модель для хранения распарсенных метаданных трека
 
 struct TrackMetadata {
-    let artist: String?          /// Исполнитель
-    let title: String?           /// Название
-    let album: String?           /// Альбом
-    let artworkData: Data?       /// Обложка в виде raw-данных
-    let artworkSourceIdentifier: ArtworkSourceIdentifier? /// Стабильная идентичность raw-обложки
-    let duration: TimeInterval?  /// Длительность трека в секундах
-    let isCustomFormat: Bool     /// True, если использовалась кастомная библиотека (например, TagLib)
+    let artist: String?
+    let title: String?
+    let album: String?
+    let artworkData: Data?
+    let artworkSourceIdentifier: ArtworkSourceIdentifier?
+    let duration: TimeInterval?
+    let isCustomFormat: Bool
 }
 
 
@@ -31,17 +31,12 @@ struct TrackMetadata {
 /// Получает длительность через AVAsset и передаёт URL в TLTagLibFile для разбора тегов
 final class RuntimeMetadataParser {
      
-    /// Извлекает длительность (через AVFoundation) и метаданные (через TagLib)
-    /// - Parameter url: Путь к аудиофайлу
-    /// - Returns: TrackMetadata со всеми доступными полями
     static func parseMetadata(from url: URL) async throws -> TrackMetadata {
         let asset = AVURLAsset(url: url)
         
-        // Получаем длительность файла асинхронно через AVAsset
         let duration = try await asset.load(.duration)
         let durationSeconds = CMTimeGetSeconds(duration)
         
-        // Парсим остальные теги через обёртку TLTagLibFile (TagLib)
         let metadata = TLTagLibFile(fileURL: url).readMetadata(duration: durationSeconds)
 
         // Хеш вычисляется в metadata-подготовке один раз и не попадает в SwiftUI View.

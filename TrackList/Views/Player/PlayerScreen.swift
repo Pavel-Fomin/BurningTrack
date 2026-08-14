@@ -17,6 +17,7 @@ struct PlayerScreen: View {
     /// Готовая factory экранного flow с явными production-зависимостями.
     let viewModelFactory: PlayerScreenViewModelFactory
 
+    /// Удерживает экранный flow на время жизни вкладки и не запускает factory при каждом пересчёте `body`.
     @StateObject private var screenViewModel: PlayerScreenViewModel
 
     init(

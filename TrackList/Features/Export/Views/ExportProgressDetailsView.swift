@@ -12,7 +12,7 @@ import SwiftUI
 /// Показывает подробности операции без собственного состояния прогресса.
 struct ExportProgressDetailsView: View {
 
-    // MARK: - Dependencies
+    // MARK: - Зависимости
 
     /// Неизменяемый route конкретного показа подробностей.
     let route: ExportDetailsSheetRoute
@@ -22,7 +22,7 @@ struct ExportProgressDetailsView: View {
     /// Все пользовательские и lifecycle-события направляются в feature ActionHandler.
     @EnvironmentObject private var exportActionHandler: ExportFeatureActionHandler
 
-    // MARK: - Presentation
+    // MARK: - Представление
 
     /// Безопасно форматирует количество байтов для короткого пользовательского текста.
     private func byteCountText(_ value: Int64) -> String {
@@ -36,7 +36,7 @@ struct ExportProgressDetailsView: View {
         return name.isEmpty ? destination.displayName : name
     }
 
-    // MARK: - UI
+    // MARK: - Интерфейс
 
     var body: some View {
         Group {

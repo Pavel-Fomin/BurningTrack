@@ -2,6 +2,8 @@
 //  TrackRuntimeSnapshotBuilding.swift
 //  TrackList
 //
+//  Объявляет асинхронное построение runtime-снимка по физическому идентификатору трека.
+//
 //  Created by Pavel Fomin on 18.06.2026.
 //
 

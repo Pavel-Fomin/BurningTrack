@@ -42,7 +42,7 @@ struct LibraryTrackPlaybackHandler {
                 source: source
             )
         } else {
-            // Защищаем старый вызов для экранов, которые ещё не передали источник списка.
+            // При отсутствии источника очередь плеера остаётся единственным нейтральным контекстом воспроизведения.
             playbackController.play(
                 track: track,
                 context: context.map { $0 as any TrackDisplayable },

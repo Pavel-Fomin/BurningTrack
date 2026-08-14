@@ -10,7 +10,7 @@
 
 import Foundation
 
-// MARK: - Grouping mode
+// MARK: - Режим группировки
 
 enum TrackGroupingMode {
     case date
@@ -19,7 +19,7 @@ enum TrackGroupingMode {
     case title
 }
 
-// MARK: - Builder
+// MARK: - Построитель
 
 struct TrackSectionBuilder {
 
@@ -41,7 +41,7 @@ struct TrackSectionBuilder {
     }
 }
 
-// MARK: - Date grouping
+// MARK: - Группировка по дате
 
 private extension TrackSectionBuilder {
 
@@ -89,7 +89,7 @@ private extension TrackSectionBuilder {
     }
 }
 
-// MARK: - Artist grouping
+// MARK: - Группировка по исполнителю
 
 private extension TrackSectionBuilder {
 
@@ -118,7 +118,7 @@ private extension TrackSectionBuilder {
     }
 }
 
-// MARK: - Title grouping
+// MARK: - Группировка по заголовку
 
 private extension TrackSectionBuilder {
 
@@ -148,7 +148,7 @@ private extension TrackSectionBuilder {
     }
 }
 
-// MARK: - Normalization helpers
+// MARK: - Помощники нормализации
 
 private extension TrackSectionBuilder {
 
@@ -186,7 +186,7 @@ private extension TrackSectionBuilder {
     }
 }
 
-// MARK: - Date helper
+// MARK: - Помощник дат
 
 private extension Date {
 

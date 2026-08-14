@@ -12,11 +12,11 @@ import Foundation
 
 final class TagLibTagsWriter: TagsWriter {
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     init() {}
     
-    // MARK: - Mapping
+    // MARK: - Сопоставление
 
     /// Возвращает действие для строкового тега.
     private func stringAction(
@@ -107,7 +107,7 @@ final class TagLibTagsWriter: TagsWriter {
             artworkMime = mime
 
         case .setCompressed(let data, let mime, _, _):
-            // Сжатие будет добавлено позже
+            // Данные уже подготовлены вышестоящим слоем до передачи в writer.
             artworkAction = .set
             artworkData = data
             artworkMime = mime

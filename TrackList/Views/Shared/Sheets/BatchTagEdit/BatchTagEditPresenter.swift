@@ -29,7 +29,7 @@ struct BatchTagEditPresenter {
         )
     }
 
-    /// Показывает прежний итог массового сохранения без переноса ToastManager во ViewModel.
+    /// Показывает итог массового сохранения без переноса ToastManager во ViewModel.
     func present(_ result: BatchTagEditSaveResult) {
         if result.failedCount == 0 {
             toastPresenter.handle(.batchTagsUpdated(count: result.succeededCount))

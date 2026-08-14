@@ -23,6 +23,7 @@ struct LibraryTracksContainer: View {
     @Binding var selectionActionBarConfig: SelectionActionBarConfig?
     @Binding var selectionActionSender: (any LibraryTracksActionSending)?
 
+    /// Store владеет graph одного destination, поэтому повторный `body` не пересоздаёт ViewModel и ActionHandler.
     @StateObject private var screenStore: LibraryTracksScreenStore
 
     init(

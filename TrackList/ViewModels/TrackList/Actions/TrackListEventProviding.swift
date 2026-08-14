@@ -2,6 +2,8 @@
 //  TrackListEventProviding.swift
 //  TrackList
 //
+//  Объявляет события, влияющие на presentation-состояние detail-flow треклиста.
+//
 //  Created by Pavel Fomin on 18.06.2026.
 //
 

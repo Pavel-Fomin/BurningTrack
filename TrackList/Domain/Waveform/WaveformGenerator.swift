@@ -68,7 +68,7 @@ actor WaveformGenerator: WaveformGenerating {
         }
     }
 
-    // MARK: - Input validation
+    // MARK: - Валидация входных данных
 
     /// Проверяет, что генератор получает доступный обычный файл, а не каталог или media-library URL.
     private func validateReadableLocalFile(at fileURL: URL) throws {
@@ -88,7 +88,7 @@ actor WaveformGenerator: WaveformGenerating {
         }
     }
 
-    // MARK: - Sampled reading
+    // MARK: - Выборочное чтение
 
     /// Выбирает центральное короткое окно каждого равного временного участка, чтобы форма была повторяемой.
     private func generateSamplesUsingWindows(
@@ -212,7 +212,7 @@ actor WaveformGenerator: WaveformGenerating {
         return contribution
     }
 
-    // MARK: - Sequential fallback
+    // MARK: - Последовательный fallback
 
     /// Последовательный путь используется только если формат не позволяет запустить выборочное чтение.
     private func generateSamplesSequentially(
@@ -285,7 +285,7 @@ actor WaveformGenerator: WaveformGenerating {
         )
     }
 
-    // MARK: - PCM reading
+    // MARK: - Чтение PCM
 
     /// Запрашивает единый interleaved PCM-формат, чтобы одинаково вычислять амплитуды для поддерживаемых контейнеров.
     private func makePCMOutput(for audioTrack: AVAssetTrack) -> AVAssetReaderTrackOutput {
@@ -372,7 +372,7 @@ actor WaveformGenerator: WaveformGenerating {
         )
     }
 
-    /// Возвращает квадрат наибольшей амплитуды кадра так же, как прежняя RMS-нормализация.
+    /// Возвращает вклад кадра в RMS по наибольшей амплитуде среди его каналов.
     private func squaredAmplitude(
         for frameIndex: Int,
         in pcmBuffer: DecodedPCMBuffer
@@ -403,7 +403,7 @@ actor WaveformGenerator: WaveformGenerating {
         return min(normalized, 1)
     }
 
-    // MARK: - Normalization
+    // MARK: - Нормализация
 
     /// Нормализует RMS каждого окна по наибольшему значению, сохраняя контракт кэша от 0 до 1.
     private func normalizedSamples(_ rootMeanSquares: [Double]) -> [Double] {
@@ -416,7 +416,7 @@ actor WaveformGenerator: WaveformGenerating {
         }
     }
 
-    /// Сохраняет прежнюю нормализацию для редкого последовательного fallback.
+    /// Сводит суммы амплитуд последовательного пути к общему контракту нормализации.
     private func normalizedSamples(
         squaredAmplitudeSums: [Double],
         frameCounts: [Int]

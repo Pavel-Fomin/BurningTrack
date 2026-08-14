@@ -24,7 +24,7 @@ struct ExportProgressCompactView: View {
     /// Размер интерактивной области кнопки закрытия.
     private let dismissButtonSize: CGFloat = 36
 
-    // MARK: - Input
+    // MARK: - Входные данные
 
     /// Снимок состояния, полученный напрямую от ExportProgressViewModel.
     let progress: ExportProgress
@@ -32,7 +32,7 @@ struct ExportProgressCompactView: View {
     /// Направляет все намерения компактной панели в Export-feature.
     let actionHandler: any ExportActionHandling
 
-    // MARK: - Presentation
+    // MARK: - Представление
 
     /// Успешное завершение получает отдельный текст и кнопку закрытия.
     private var isCompleted: Bool {
@@ -109,7 +109,7 @@ struct ExportProgressCompactView: View {
         "\(Int((progressFraction * 100).rounded()))%"
     }
 
-    // MARK: - UI
+    // MARK: - Интерфейс
 
     var body: some View {
         ZStack(alignment: .topTrailing) {

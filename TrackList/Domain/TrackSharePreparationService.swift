@@ -37,7 +37,7 @@ struct PreparedTrackShareFile: Sendable {
 /// потому что служебный ipod-library URL нельзя безопасно передавать стороннему приложению.
 actor TrackSharePreparationService {
 
-    // MARK: - Dependencies
+    // MARK: - Зависимости
 
     /// Общий writer уже умеет копировать file URL и экспортировать MediaPlayer URL без перекодирования.
     private let purchasedITunesAssetWriter = PurchasedITunesAssetWriter()
@@ -45,7 +45,7 @@ actor TrackSharePreparationService {
     /// Активные security-scoped URL удерживаются до завершения UIActivityViewController.
     private var activeSecurityScopedURLs: [UUID: URL] = [:]
 
-    // MARK: - Local file
+    // MARK: - Локальный файл
 
     /// Возвращает исходный локальный аудиофайл для системного меню.
     func prepareLocalTrack(
@@ -82,7 +82,7 @@ actor TrackSharePreparationService {
         )
     }
 
-    // MARK: - Purchased iTunes file
+    // MARK: - Файл «Куплено в iTunes»
 
     /// Создаёт временную копию iTunes-трека с тем же правилом имени, что и обычное копирование.
     func preparePurchasedITunesTrack(
@@ -131,7 +131,7 @@ actor TrackSharePreparationService {
         }
     }
 
-    // MARK: - Cleanup
+    // MARK: - Очистка
 
     /// Освобождает доступ и удаляет временную копию только после завершения системного меню.
     func finishSharing(
@@ -149,7 +149,7 @@ actor TrackSharePreparationService {
         }
     }
 
-    // MARK: - Private
+    // MARK: - Приватное
 
     /// Проверяет, что URL указывает на читаемый обычный файл, а не на папку или недоступный placeholder.
     private func validateReadableRegularFile(

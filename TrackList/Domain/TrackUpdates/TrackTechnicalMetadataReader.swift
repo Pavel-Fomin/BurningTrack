@@ -14,16 +14,16 @@ import Foundation
 /// Читает технические данные вне MainActor и возвращает только достоверно доступные значения.
 actor TrackTechnicalMetadataReader {
 
-    // MARK: - Singleton
+    // MARK: - Единый экземпляр
 
     /// Общий считыватель предотвращает чтение синхронных файловых свойств на главном потоке.
     static let shared = TrackTechnicalMetadataReader()
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     private init() {}
 
-    // MARK: - Read
+    // MARK: - Чтение
 
     /// Получает размер, формат и битрейт из фактического URL аудиоисточника.
     /// - Parameter url: Локальный либо media-library URL доступного аудиоисточника.
@@ -40,7 +40,7 @@ actor TrackTechnicalMetadataReader {
         )
     }
 
-    // MARK: - File properties
+    // MARK: - Свойства файла
 
     /// Читает фактический размер только у URL, который система подтверждает как обычный файл.
     private func fileSizeBytes(from url: URL) -> Int64? {
@@ -69,7 +69,7 @@ actor TrackTechnicalMetadataReader {
         return fileExtension.uppercased()
     }
 
-    // MARK: - Audio track
+    // MARK: - Аудиотрек
 
     /// Сначала читает битрейт файла через Audio Toolbox, затем использует AVFoundation как резервный источник.
     private func bitrateBitsPerSecond(from url: URL) async -> Int? {

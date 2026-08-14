@@ -27,7 +27,7 @@ import Foundation
 
 struct ArtworkEditState: Equatable {
 
-    // MARK: - Stored state
+    // MARK: - Сохранённое состояние
 
     /// Была ли обложка у трека в момент открытия экрана.
     let hadOriginalArtwork: Bool
@@ -41,7 +41,7 @@ struct ArtworkEditState: Equatable {
     /// Флаг локального удаления обложки в форме.
     private(set) var isMarkedForRemoval: Bool
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     init(hadOriginalArtwork: Bool) {
         self.hadOriginalArtwork = hadOriginalArtwork
@@ -50,7 +50,7 @@ struct ArtworkEditState: Equatable {
         self.isMarkedForRemoval = false
     }
 
-    // MARK: - Derived state
+    // MARK: - Производное состояние
 
     /// Нужно ли сейчас показывать обложку в превью формы.
     var hasArtworkForPreview: Bool {
@@ -74,7 +74,7 @@ struct ArtworkEditState: Equatable {
         makeWriteAction() != .none
     }
 
-    // MARK: - Mutating
+    // MARK: - Изменение
 
     /// Пользователь выбрал новую обложку.
     /// С этого момента она становится текущим локальным превью.
@@ -100,7 +100,7 @@ struct ArtworkEditState: Equatable {
         isMarkedForRemoval = false
     }
 
-    // MARK: - Mapping
+    // MARK: - Сопоставление
 
     /// Переводит состояние формы в итоговую команду записи.
     func makeWriteAction() -> ArtworkWriteAction {

@@ -17,21 +17,21 @@ import Foundation
 @MainActor
 final class TrackRuntimeStore {
 
-    // MARK: - Singleton
+    // MARK: - Единый экземпляр
 
     static let shared = TrackRuntimeStore()  /// Общий экземпляр runtime-хранилища snapshot
 
-    // MARK: - Storage
+    // MARK: - Хранилище
 
     /// Словарь актуальных snapshot по идентификатору трека.
     /// Доступ изолирован MainActor, чтобы фоновые TaskGroup-задачи не писали в Dictionary параллельно.
     private var snapshotsByTrackId: [UUID: TrackRuntimeSnapshot] = [:]
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     private init() {}
 
-    // MARK: - Read
+    // MARK: - Чтение
 
     /// Возвращает сохранённый snapshot трека по его идентификатору.
     ///
@@ -41,7 +41,7 @@ final class TrackRuntimeStore {
         snapshotsByTrackId[trackId]
     }
 
-    // MARK: - Write
+    // MARK: - Запись
 
     /// Сохраняет или обновляет snapshot трека в runtime-хранилище.
     ///
@@ -50,7 +50,7 @@ final class TrackRuntimeStore {
         snapshotsByTrackId[snapshot.trackId] = snapshot
     }
 
-    // MARK: - Remove
+    // MARK: - Удаление
 
     /// Удаляет snapshot одного трека из runtime-хранилища.
     ///

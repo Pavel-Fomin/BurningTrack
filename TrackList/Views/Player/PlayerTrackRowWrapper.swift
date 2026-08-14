@@ -2,6 +2,8 @@
 //  PlayerTrackRowWrapper.swift
 //  TrackList
 //
+//  Адаптирует подготовленную строку очереди плеера к общему представлению трека.
+//
 //  Created by Pavel Fomin on 03.08.2025.
 //
 
@@ -9,26 +11,25 @@ import SwiftUI
 
 struct PlayerTrackRowWrapper: View {
     
-    // MARK: - Input
+    // MARK: - Входные данные
     
-    let row: PlayerTrackRowState                         /// Готовое состояние строки плеера
-    let onTap: () -> Void                                /// Обработчик тапа по строке
-    let onUnavailableTap: (UUID) -> Void                  /// Обработчик недоступной строки очереди
-    let onDeleteTrack: (UUID) -> Void                    /// Обработчик удаления элемента очереди
-    let onShowInLibrary: (UUID) -> Void                  /// Обработчик показа элемента очереди в фонотеке
-    let onMoveToFolder: (UUID) -> Void                   /// Обработчик перемещения элемента очереди в папку
-    let onAddToTrackList: (UUID) -> Void                 /// Обработчик добавления элемента очереди в треклист
-    let onToggleFavorite: (UUID) -> Void                 /// Обработчик переключения избранного элемента очереди
-    let onGoToArtist: (UUID) -> Void                     /// Обработчик перехода к артисту элемента очереди
-    let onGoToAlbum: (UUID) -> Void                      /// Обработчик перехода к альбому элемента очереди
-    let onShareTrack: (UUID) -> Void                     /// Обработчик отправки аудиофайла
-    let onCopyTrack: (UUID) -> Void                      /// Обработчик копирования iTunes-трека
-    let onEditTags: (UUID) -> Void                       /// Обработчик редактирования тегов элемента очереди
-    let onArtworkTap: (UUID) -> Void                     /// Обработчик пункта меню "О треке"
-    let onRequestSnapshot: (UUID) -> Void                /// Обработчик запроса runtime snapshot трека
-    let onRenameTrack: (UUID, FileRenameStrategy) -> Void /// Обработчик переименования элемента очереди
+    let row: PlayerTrackRowState
+    let onTap: () -> Void
+    let onUnavailableTap: (UUID) -> Void
+    let onDeleteTrack: (UUID) -> Void
+    let onShowInLibrary: (UUID) -> Void
+    let onMoveToFolder: (UUID) -> Void
+    let onAddToTrackList: (UUID) -> Void
+    let onToggleFavorite: (UUID) -> Void
+    let onGoToArtist: (UUID) -> Void
+    let onGoToAlbum: (UUID) -> Void
+    let onShareTrack: (UUID) -> Void
+    let onCopyTrack: (UUID) -> Void
+    let onEditTags: (UUID) -> Void
+    let onArtworkTap: (UUID) -> Void
+    let onRequestSnapshot: (UUID) -> Void
+    let onRenameTrack: (UUID, FileRenameStrategy) -> Void
 
-    /// Проверяет доступность пункта меню для строки плеера.
     private func isMenuActionAvailable(
         _ action: TrackMenuAction
     ) -> Bool {
@@ -39,7 +40,7 @@ struct PlayerTrackRowWrapper: View {
         )
     }
     
-    // MARK: - UI
+    // MARK: - Интерфейс
     
     var body: some View {
         TrackRowView(

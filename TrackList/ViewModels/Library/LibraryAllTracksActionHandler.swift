@@ -13,12 +13,12 @@ import Foundation
 @MainActor
 final class LibraryAllTracksActionHandler {
 
-    // MARK: - Dependencies
+    // MARK: - Зависимости
 
     /// Типизированный вход в глобальный Export-feature.
     private let exportRequestHandler: any ExportRequestHandling
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     init(
         exportRequestHandler: any ExportRequestHandling
@@ -26,7 +26,7 @@ final class LibraryAllTracksActionHandler {
         self.exportRequestHandler = exportRequestHandler
     }
 
-    // MARK: - Handle
+    // MARK: - Обработка
 
     func handle(_ action: LibraryAllTracksAction) {
         switch action {
@@ -35,7 +35,7 @@ final class LibraryAllTracksActionHandler {
         }
     }
 
-    // MARK: - Export
+    // MARK: - Экспорт
 
     /// Запускает экспорт общего списка треков без нумерации имён файлов.
     private func exportTracks(_ libraryTracks: [LibraryTrack]) {

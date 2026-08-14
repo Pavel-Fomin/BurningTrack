@@ -34,7 +34,7 @@ final class TrackListDatabaseStore {
         try self.init(executor: database.databaseExecutor())
     }
 
-    // MARK: - Read
+    // MARK: - Чтение
 
     /// Возвращает метаданные активных треклистов как бизнес-модели.
     func fetchMetas() throws -> [TrackListMeta] {
@@ -103,7 +103,7 @@ final class TrackListDatabaseStore {
         try activeMetaModel(id: id) != nil
     }
 
-    // MARK: - Write
+    // MARK: - Запись
 
     /// Создаёт треклист с заданным назначением и все его строки в одной транзакции.
     @discardableResult
@@ -277,7 +277,7 @@ final class TrackListDatabaseStore {
         )
     }
 
-    // MARK: - Internal Mapping
+    // MARK: - Внутреннее сопоставление
 
     /// Возвращает активные SQLite-модели метаданных.
     private func fetchActiveMetaModels() throws -> [TrackListDatabaseModel] {

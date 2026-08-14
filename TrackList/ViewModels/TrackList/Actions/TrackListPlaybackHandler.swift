@@ -2,6 +2,8 @@
 //  TrackListPlaybackHandler.swift
 //  TrackList
 //
+//  Обрабатывает playback-намерения detail-flow одного треклиста через узкие capability плеера.
+//
 //  Created by Pavel Fomin on 17.06.2026.
 //
 

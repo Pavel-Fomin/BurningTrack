@@ -41,7 +41,7 @@ struct TrackFileRenameRequest {
 @MainActor
 final class TrackFileRenameActionHandler {
 
-    // MARK: - Dependencies
+    // MARK: - Зависимости
 
     /// Capability проверки занятости файла не раскрывает handler-у PlayerManager.
     private let fileBusyChecker: any TrackFileBusyChecking
@@ -66,7 +66,7 @@ final class TrackFileRenameActionHandler {
         self.proposalBuilder = proposalBuilder
     }
 
-    // MARK: - Public API
+    // MARK: - Публичный API
 
     /// Обрабатывает запрос на переименование файла трека.
     func handle(_ request: TrackFileRenameRequest) {
@@ -108,6 +108,7 @@ final class TrackFileRenameActionHandler {
             return
         }
 
+        // Автоматическое переименование завершается независимо от исходной View и сообщает результат через общий flow пользовательских сообщений.
         Task {
             do {
                 let result = try await commandExecutor.saveTrackEdits(

@@ -72,7 +72,7 @@ struct LibraryTrackRowStateBuilder {
                 ? TrackListPresentationText.membershipTitles(for: trackListMemberships)
                 : nil,
             cloudAvailabilityState: cloudAvailabilityState,
-            // Неопределённое iCloud-состояние сохраняет прежнюю доступность модели трека.
+            // Неопределённое iCloud-состояние использует доступность из модели трека.
             isContentAvailable: cloudAvailabilityState?.isContentAvailable ?? track.isAvailable
         )
     }

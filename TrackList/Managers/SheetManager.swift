@@ -2,6 +2,8 @@
 //  SheetManager.swift
 //  TrackList
 //
+//  Управляет единым presentation-состоянием и глобальным lifecycle sheet-сценариев.
+//
 //  Created by Pavel Fomin on 29.07.2025.
 //
 
@@ -129,7 +131,8 @@ struct AddToTrackListSheetData: Identifiable, Equatable {
     let id = UUID()
     let tracks: [any TrackDisplayable]
     let libraryBatchTracks: [LibraryTrack]?
-    let sourceTrackListId: UUID?   // ← ВАЖНО
+    /// Исключает исходный треклист из доступных назначений при добавлении его трека.
+    let sourceTrackListId: UUID?
 
     /// Создаёт payload одиночного добавления без изменения существующего swipe-flow.
     init(
@@ -332,8 +335,9 @@ final class SheetManager: ObservableObject {
         self.activeSheet = nil
     }
 
-    // MARK: - ВЫЗЫВАЕТСЯ ИЗ ContentView.onDismiss
-  
+    // MARK: - Подтверждение закрытия SwiftUI
+
+    /// Вызывается только `SheetHostModifier.onDismiss`, когда SwiftUI завершил закрытие конкретного route.
     func handleDismiss() {
         guard let dismissedSheet = dismissingSheet else {
             return
@@ -467,7 +471,7 @@ final class SheetManager: ObservableObject {
         present(.createTrackList(CreateTrackListSheetData()))
     }
 
-    // MARK: - Route-specific dismiss
+    // MARK: - Закрытие конкретного маршрута
 
     /// Закрывает только совпадающий route выбора папки.
     func dismissMoveToFolder(_ routeID: UUID) {

@@ -14,7 +14,7 @@ struct SelectionActionBar: View {
     /// Форма glass-панели, общая для эффекта, обрезки и hit-test зоны.
     private let actionBarShape = RoundedRectangle(cornerRadius: 28, style: .continuous)
 
-    // MARK: - Input
+    // MARK: - Входные данные
 
     let title: String
     let subtitle: String?
@@ -24,7 +24,7 @@ struct SelectionActionBar: View {
     let isPrimaryEnabled: Bool
     let onPrimaryTap: () -> Void
 
-    // MARK: - UI
+    // MARK: - Интерфейс
 
     var body: some View {
         HStack(spacing: 12) {

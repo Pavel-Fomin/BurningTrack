@@ -59,7 +59,7 @@ final class TrackListViewModel: ObservableObject {
     /// Несколько синхронных invalidation-сигналов объединяются в один detail reload.
     private var isDetailReloadScheduled = false
 
-    // MARK: - Реактивные presentation snapshots
+    // MARK: - Реактивные presentation-снимки
 
     /// Семантическая статистика заголовка, не зависящая от runtime snapshot строк.
     private var summary: TrackCollectionSummary?
@@ -86,7 +86,7 @@ final class TrackListViewModel: ObservableObject {
     /// Незавершённая batch-загрузка metadata отменяется при изменении состава треклиста.
     private var collectionNavigationTargetLoadTask: Task<Void, Never>?
 
-    // MARK: - Runtime snapshot lifecycle
+    // MARK: - Жизненный цикл runtime-снимка
 
     /// Последние подтверждённые runtime snapshots ключуются physical trackId и используются всеми повторными строками.
     private var snapshotsByTrackId: [UUID: TrackRuntimeSnapshot] = [:]
@@ -214,7 +214,7 @@ final class TrackListViewModel: ObservableObject {
         reloadCollectionNavigationTargets()
     }
 
-    // MARK: - Reactive subscriptions
+    // MARK: - Реактивные подписки
 
     /// Подписывает ViewModel на presentation invalidations; пользовательские команды остаются в handlers.
     private func observePresentationDependencies() {
@@ -312,7 +312,7 @@ final class TrackListViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Screen state
+    // MARK: - ScreenState
 
     /// Применяет immutable playback snapshot без перечитывания provider во время deferred rebuild.
     private func applyPlaybackState(_ playbackState: PlaybackStateSnapshot) {
@@ -348,7 +348,7 @@ final class TrackListViewModel: ObservableObject {
         )
     }
 
-    // MARK: - Prepared collection navigation
+    // MARK: - Подготовленная навигация по коллекции
 
     /// Загружает metadata обычных локальных строк единым запросом, не читая их файлы.
     private func reloadCollectionNavigationTargets() {
@@ -382,7 +382,7 @@ final class TrackListViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Runtime snapshots
+    // MARK: - Runtime-снимки
 
     /// Запрашивает runtime snapshot только для присутствующего обычного трека и не дублирует active build.
     func requestSnapshotIfNeeded(for trackId: UUID) {
@@ -456,7 +456,7 @@ final class TrackListViewModel: ObservableObject {
         }
     }
 
-    /// Делает прежний task неактуальным даже в случае позднего завершения после cancellation.
+    /// Делает task неактуальным даже при позднем завершении после отмены.
     private func invalidateSnapshotRequest(for trackId: UUID) {
         snapshotGenerationByTrackId[trackId, default: 0] &+= 1
         snapshotTasksByTrackId[trackId]?.cancel()
@@ -474,7 +474,7 @@ final class TrackListViewModel: ObservableObject {
         })
     }
 
-    // MARK: - Settings and track events
+    // MARK: - События настроек и треков
 
     /// Metadata-сигнал приходит после очистки общих cache, поэтому только он инвалидирует file snapshots.
     private func handleMetadataSettingsDidChange() {
@@ -521,7 +521,7 @@ final class TrackListViewModel: ObservableObject {
         reloadSummary()
     }
 
-    // MARK: - Summary
+    // MARK: - Сводка
 
     /// Перечитывает агрегаты независимо от строк, отменяя только предыдущий запрос этого detail ID.
     private func reloadSummary() {

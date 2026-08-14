@@ -10,12 +10,12 @@
 import Foundation
 
 struct LibraryScreenState {
-    // MARK: - Navigation
+    // MARK: - Навигация
 
     let libraryPath: [NavigationCoordinator.LibraryRoute]
     let destinations: [NavigationCoordinator.LibraryRoute: LibraryScreenDestinationState]
 
-    // MARK: - Destination
+    // MARK: - Назначение
 
     func destination(for route: NavigationCoordinator.LibraryRoute) -> LibraryScreenDestinationState {
         if case .collectionValue(let category, let value, let artistKey) = route {

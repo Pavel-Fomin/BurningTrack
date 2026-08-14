@@ -12,7 +12,7 @@ import Foundation
 @MainActor
 final class NewTrackListSelectionViewModel: ObservableObject {
 
-    // MARK: - State
+    // MARK: - Состояние
 
     /// Готовое presentation-состояние корневого экрана выбора.
     @Published private(set) var state: NewTrackListSelectionState
@@ -21,7 +21,7 @@ final class NewTrackListSelectionViewModel: ObservableObject {
     /// Храним сами LibraryTrack, чтобы после выбора сразу создать треклист.
     @Published private(set) var selectedTracksById: [UUID: LibraryTrack] = [:]
 
-    // MARK: - Dependencies
+    // MARK: - Зависимости
 
     /// Получает прикреплённые папки через явную feature-зависимость.
     private let foldersProvider: any LibraryFoldersProviding
@@ -34,7 +34,7 @@ final class NewTrackListSelectionViewModel: ObservableObject {
     /// Удерживает одну текущую submission-задачу для защиты от повторного нажатия.
     private var submissionTask: Task<Void, Never>?
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     init(
         foldersProvider: any LibraryFoldersProviding,
@@ -66,7 +66,7 @@ final class NewTrackListSelectionViewModel: ObservableObject {
         Set(selectedTracksById.keys)
     }
 
-    // MARK: - Actions
+    // MARK: - Действия
 
     /// Обрабатывает пользовательские действия выбора и передаёт подтверждение ActionHandler-у.
     func handle(_ action: NewTrackListSelectionAction) {
@@ -100,7 +100,7 @@ final class NewTrackListSelectionViewModel: ObservableObject {
         updateState()
     }
 
-    // MARK: - Selection
+    // MARK: - Выбор
 
     /// Проверяет, выбран ли трек.
     func isSelected(_ track: LibraryTrack) -> Bool {

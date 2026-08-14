@@ -31,7 +31,7 @@ protocol RenameTrackFileRouting: AnyObject {
     func dismissRenameTrackFile(_ routeID: UUID)
 }
 
-// MARK: - Production adapters
+// MARK: - Адаптеры production-слоя
 
 extension AppCommandExecutor: RenameTrackFileCommandExecuting {}
 

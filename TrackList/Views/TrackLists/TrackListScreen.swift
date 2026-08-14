@@ -17,6 +17,7 @@ struct TrackListScreen: View {
     let favoriteTrackActionHandler: FavoriteTrackActionHandler
     /// Готовые фабрики detail-flow, подготовленные Composition Root.
     let dependencies: TrackListFeatureDependencies
+    /// ViewModel принадлежит одному detail-маршруту и загружает актуальное состояние по стабильному `trackListId`, а не по снимку master-списка.
     @StateObject private var viewModel: TrackListViewModel
 
     /// Обработчик действий detail-flow одного треклиста.
@@ -75,6 +76,7 @@ struct TrackListScreen: View {
                 }
             }
         }
+        // View только инициирует чтение; защита от повторного старта и владение загрузкой остаются в ViewModel.
         .task {
             viewModel.loadIfNeeded()
         }

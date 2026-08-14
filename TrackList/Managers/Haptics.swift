@@ -2,6 +2,8 @@
 //  Haptics.swift
 //  TrackList
 //
+//  Инкапсулирует подготовку и воспроизведение тактильной обратной связи устройства.
+//
 //  Created by Pavel Fomin on 10.08.2025.
 //
 
@@ -24,14 +26,12 @@ final class Haptics {
         #endif
     }()
 
-    /// вызывать только с main
     func lightTap() {
         DispatchQueue.main.async {
             self.lightGen?.impactOccurred()
         }
     }
 
-    /// звать, когда экран стал активным (например, в onAppear корневого вью)
     func warmup() {
         DispatchQueue.main.async {
             self.lightGen?.prepare()

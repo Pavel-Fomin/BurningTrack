@@ -25,25 +25,25 @@ struct LibraryCollectionValuesScreenState {
 
 @MainActor
 final class LibraryCollectionValuesViewModel: ObservableObject {
-    // MARK: - Output
+    // MARK: - Выходные данные
 
     /// Готовое состояние экрана для SwiftUI.
     @Published private(set) var state: LibraryCollectionValuesScreenState
     /// Текущий режим сортировки значений в рамках жизненного цикла экрана.
     @Published private(set) var sortMode: LibraryCollectionValueSortMode
 
-    // MARK: - Dependencies
+    // MARK: - Зависимости
 
     private let category: LibraryCollectionCategory
     private let provider: LibraryCollectionValuesProvider
 
-    // MARK: - Private
+    // MARK: - Приватное
 
     private var didLoad = false
     /// Исходные значения после чтения provider, чтобы менять порядок без повторного чтения SQLite.
     private var loadedValues: [LibraryCollectionValue] = []
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     init(
         category: LibraryCollectionCategory,
@@ -59,7 +59,7 @@ final class LibraryCollectionValuesViewModel: ObservableObject {
         self.sortMode = category.defaultValueSortMode
     }
 
-    // MARK: - Actions
+    // MARK: - Действия
 
     /// Загружает значения выбранного раздела один раз за жизненный цикл экрана.
     func load() async {
@@ -96,7 +96,7 @@ final class LibraryCollectionValuesViewModel: ObservableObject {
         )
     }
 
-    // MARK: - Private
+    // MARK: - Приватное
 
     /// Сортирует только сохранённый в памяти результат provider.
     private func sortedValues() -> [LibraryCollectionValue] {

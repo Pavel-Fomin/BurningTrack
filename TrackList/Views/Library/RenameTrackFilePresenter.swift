@@ -70,7 +70,7 @@ struct RenameTrackFilePresenter {
         }
     }
 
-    /// Показывает прежнее сообщение, когда предложение нельзя подготовить.
+    /// Показывает сообщение, когда предложение нельзя подготовить.
     func presentPreparationFailure() -> RenameTrackFilePresentation {
         toastPresenter.handle(
             .operationFailed(
@@ -80,7 +80,7 @@ struct RenameTrackFilePresenter {
         return .keepOpen(alert: nil)
     }
 
-    /// Показывает прежнее сообщение для ошибки, не относящейся к AppError.
+    /// Показывает сообщение для ошибки, не относящейся к AppError.
     func presentUnknownFailure() -> RenameTrackFilePresentation {
         toastPresenter.handle(
             .operationFailed(

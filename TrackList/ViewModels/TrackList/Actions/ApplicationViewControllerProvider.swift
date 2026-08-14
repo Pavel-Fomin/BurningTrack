@@ -2,6 +2,8 @@
 //  ApplicationViewControllerProvider.swift
 //  TrackList
 //
+//  Адаптирует UIKit-поиск верхнего контроллера к capability системной презентации.
+//
 //  Created by Pavel Fomin on 18.06.2026.
 //
 

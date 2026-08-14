@@ -13,19 +13,19 @@ import Foundation
 @MainActor
 final class CreateTrackListViewModel: ObservableObject {
 
-    // MARK: - State
+    // MARK: - Состояние
 
     /// Готовое presentation-состояние формы.
     @Published private(set) var state: CreateTrackListState
 
-    // MARK: - Dependencies
+    // MARK: - Зависимости
 
     /// Собирает состояние формы из текущего имени.
     private let stateBuilder: CreateTrackListStateBuilder
     /// Выполняет доменные команды и маршрутизацию flow.
     private let actionHandler: CreateTrackListActionHandler
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     init(
         initialName: String = generateDefaultTrackListName(),
@@ -37,7 +37,7 @@ final class CreateTrackListViewModel: ObservableObject {
         self.state = stateBuilder.build(name: initialName)
     }
 
-    // MARK: - Actions
+    // MARK: - Действия
 
     /// Обновляет состояние формы или передаёт подтверждённое действие обработчику.
     func handle(_ action: CreateTrackListAction) {

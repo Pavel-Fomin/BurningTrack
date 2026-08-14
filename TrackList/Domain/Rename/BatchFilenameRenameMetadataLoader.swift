@@ -15,7 +15,7 @@ struct BatchFilenameRenameMetadataLoader {
     private let runtimeStore: TrackRuntimeStore
     /// Builder отсутствующего snapshot из существующего runtime pipeline.
     private let snapshotBuilder: TrackRuntimeSnapshotBuilder
-    /// Ограничитель сохраняет прежний предел одновременных чтений metadata.
+    /// Ограничитель удерживает число одновременных чтений metadata в заданной границе.
     private let limiter: BatchFilenameRenameAsyncLimiter
 
     init(

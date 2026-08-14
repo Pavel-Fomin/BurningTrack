@@ -26,7 +26,7 @@ struct LibraryCollectionValuesView: View {
     /// Предоставляет playback-состояние только для подсветки album-строки.
     let playbackStateProvider: any PlaybackStateProviding
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     init(
         viewModel: LibraryCollectionValuesViewModel,
@@ -44,7 +44,7 @@ struct LibraryCollectionValuesView: View {
         self.onValueSelected = onValueSelected
     }
 
-    // MARK: - UI
+    // MARK: - Интерфейс
 
     var body: some View {
         content

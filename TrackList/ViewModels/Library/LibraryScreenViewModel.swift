@@ -12,13 +12,13 @@ import Foundation
 
 @MainActor
 final class LibraryScreenViewModel: ObservableObject {
-    // MARK: - Output
+    // MARK: - Выходные данные
 
     @Published private(set) var screenState: LibraryScreenState
     /// Готовые строки корня режима "Треки"; nil-счётчик означает продолжающуюся загрузку.
     @Published private(set) var collectionRootItems: [LibraryCollectionRootItemState]
 
-    // MARK: - Dependencies
+    // MARK: - Зависимости
 
     private let navigationCoordinator: NavigationCoordinator
     private let musicLibraryManager: MusicLibraryManager
@@ -29,7 +29,7 @@ final class LibraryScreenViewModel: ObservableObject {
     /// Источник существующих событий изменения треков и metadata.
     private let trackEventProvider: any LibraryTrackEventProvider
 
-    // MARK: - Private
+    // MARK: - Приватное
 
     private var cancellables = Set<AnyCancellable>()
     /// Текущая загрузка корневого снимка; одновременно выполняется только одна задача.
@@ -41,7 +41,7 @@ final class LibraryScreenViewModel: ObservableObject {
     /// Корневой список режима "Треки" сейчас виден пользователю.
     private var isCollectionRootVisible = false
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     init(
         navigationCoordinator: NavigationCoordinator,
@@ -66,7 +66,7 @@ final class LibraryScreenViewModel: ObservableObject {
         observeDependencies()
     }
 
-    // MARK: - Actions
+    // MARK: - Действия
 
     func handle(_ action: LibraryScreenAction) {
         actionHandler.handle(action)
@@ -125,7 +125,7 @@ final class LibraryScreenViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Private
+    // MARK: - Приватное
 
     /// Строит шесть строк корня без ложных нулей до завершения первого чтения SQLite.
     private static let loadingCollectionRootItems = LibraryCollectionRootItem.rootItems.map {

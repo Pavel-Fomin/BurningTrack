@@ -74,8 +74,8 @@ struct LibraryTracksView: View {
         )
     }
     
-    // MARK: - Init
-    
+    // MARK: - Инициализация
+
     init(
         folder: LibraryFolder,
         summary: TrackCollectionSummary? = nil,
@@ -117,7 +117,7 @@ struct LibraryTracksView: View {
         )
     }
 
-    // MARK: - Ui
+    // MARK: - Интерфейс
 
     var body: some View {
         contentView
@@ -457,7 +457,7 @@ struct LibraryTracksToolbarMenuButton: UIViewRepresentable {
     /// Accessibility label для кнопки действий текущего списка.
     let accessibilityLabel: String
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     /// Создаёт меню действий списка с необязательным пунктом экспорта.
     init(

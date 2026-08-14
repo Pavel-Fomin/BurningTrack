@@ -33,7 +33,7 @@ protocol SaveTrackListRouting {
     func dismissSaveTrackList(_ routeID: UUID)
 }
 
-// MARK: - Production adapters
+// MARK: - Адаптеры production-слоя
 
 extension PlaylistManager: SaveTrackListQueueProviding {
     /// Возвращает актуальную очередь на момент подтверждения без изменения её порядка.

@@ -17,14 +17,14 @@ import SwiftUI
 
 struct TrackFileRenameMenuModifier: ViewModifier {
 
-    // MARK: - Input
+    // MARK: - Входные данные
 
     let artist: String?
     let title: String?
     let isEnabled: Bool
     let onRename: (FileRenameStrategy) -> Void
 
-    // MARK: - Derived rename data
+    // MARK: - Производные данные переименования
 
     /// Исполнитель без лишних пробелов для генерации имени файла.
     private var normalizedArtist: String {
@@ -51,7 +51,7 @@ struct TrackFileRenameMenuModifier: ViewModifier {
         "\(normalizedTitle) - \(normalizedArtist)"
     }
 
-    // MARK: - UI
+    // MARK: - Интерфейс
 
     @ViewBuilder
     func body(content: Content) -> some View {

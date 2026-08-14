@@ -28,7 +28,7 @@ final class LibraryTrackPlaybackStateController: ObservableObject {
     /// Хранит узкие подписки и намеренно не наблюдает прогресс воспроизведения.
     private var cancellables = Set<AnyCancellable>()
 
-    // MARK: - Init
+    // MARK: - Инициализация
 
     init(
         playbackStateProvider: any PlaybackStateProviding

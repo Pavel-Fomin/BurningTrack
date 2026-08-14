@@ -18,11 +18,11 @@ import Foundation
 
 struct TrackRuntimeSnapshot: Equatable {
 
-    // MARK: - Identity
+    // MARK: - Идентичность
 
     let trackId: UUID
 
-    // MARK: - File
+    // MARK: - Файл
 
     let fileName: String
     let isAvailable: Bool
@@ -30,48 +30,48 @@ struct TrackRuntimeSnapshot: Equatable {
 
     // MARK: - Основное
 
-    let title: String?        /// Название трека
-    let artist: String?       /// Основной исполнитель
-    let album: String?        /// Название альбома
-    let albumArtist: String?  /// Исполнитель альбома
-    let genre: String?        /// Жанр
-    let comment: String?      /// Комментарий
+    let title: String?
+    let artist: String?
+    let album: String?
+    let albumArtist: String?
+    let genre: String?
+    let comment: String?
 
     // MARK: - Авторы
 
-    let composer: String?     /// Композитор
-    let conductor: String?    /// Дирижёр
-    let lyricist: String?     /// Автор текста
-    let remixer: String?      /// Автор ремикса
+    let composer: String?
+    let conductor: String?
+    let lyricist: String?
+    let remixer: String?
 
     // MARK: - Музыкальные атрибуты
 
-    let grouping: String?     /// Поле группировки
-    let bpm: Int?             /// Темп трека
-    let musicalKey: String?   /// Музыкальная тональность
+    let grouping: String?
+    let bpm: Int?
+    let musicalKey: String?
 
     // MARK: - Нумерация
 
-    let trackNumber: Int?     /// Номер трека
-    let totalTracks: Int?     /// Общее количество треков
-    let discNumber: Int?      /// Номер диска
-    let totalDiscs: Int?      /// Общее количество дисков
+    let trackNumber: Int?
+    let totalTracks: Int?
+    let discNumber: Int?
+    let totalDiscs: Int?
 
     // MARK: - Выпуск и идентификация
 
-    let year: Int?                 /// Год выпуска
-    let date: String?              /// Полная дата, если она есть в файле
-    let publisherOrLabel: String?  /// Лейбл или издатель
-    let copyright: String?         /// Поле copyright
-    let encodedBy: String?         /// Кем был закодирован или обработан файл
-    let isrc: String?              /// Международный код записи
+    let year: Int?
+    let date: String?
+    let publisherOrLabel: String?
+    let copyright: String?
+    let encodedBy: String?
+    let isrc: String?
 
-    // MARK: - Runtime
+    // MARK: - Runtime-состояние
 
-    let duration: Double?  /// Длительность трека в секундах
-    let artworkData: Data? /// Обложка в сыром виде, как прочитано из файла
-    let artworkSourceIdentifier: ArtworkSourceIdentifier? /// Стабильная идентичность исходных байтов обложки
-    let updatedAt: Date    /// Время последней сборки snapshot
+    let duration: Double?
+    let artworkData: Data?
+    let artworkSourceIdentifier: ArtworkSourceIdentifier?
+    let updatedAt: Date
 
 }
 

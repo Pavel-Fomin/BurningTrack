@@ -2,6 +2,8 @@
 //  TrackRowPlayground.swift
 //  TrackList
 //
+//  Локальная площадка для ручной проверки вариантов отображения строки трека.
+//
 //  Created by Pavel Fomin on 25.04.2025.
 //
 
@@ -12,14 +14,11 @@ struct TrackRowPlayground: View {
         List {
             Section("Обычные треки") {
                 ForEach(0..<3) { _ in
-                    // TrackRowView(track: .mock, isPlaying: false, isCurrent: false)
                 }
             }
             Section("Текущий трек") {
-                // TrackRowView(track: .mock, isPlaying: true, isCurrent: true)
             }
             Section("Экспортируется") {
-                // TrackRowView(track: .mockExporting, isPlaying: false, isCurrent: false)
             }
         }
         .listStyle(.plain)

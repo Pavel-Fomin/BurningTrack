@@ -54,7 +54,7 @@ enum TrackSorter {
     }
 }
 
-// MARK: - Stable sorting
+// MARK: - Стабильная сортировка
 
 private extension TrackSorter {
     /// Сохраняет исходный порядок элементов при равных или отсутствующих значениях.
@@ -82,7 +82,7 @@ private extension TrackSorter {
     }
 }
 
-// MARK: - Sort keys
+// MARK: - Ключи сортировки
 
 private extension TrackSorter {
     /// Собирает ключ сортировки из общего контракта TrackDisplayable.
@@ -124,7 +124,7 @@ private extension TrackSorter {
     }
 }
 
-// MARK: - Comparison
+// MARK: - Сравнение
 
 private extension TrackSorter {
     /// Сравнивает ключи, оставляя отсутствующие значения в конце при любом направлении сортировки.
@@ -147,7 +147,7 @@ private extension TrackSorter {
     }
 }
 
-// MARK: - Shared comparison
+// MARK: - Общее сравнение
 
 extension TrackSorter {
     /// Сравнивает optional-строки локализованно и оставляет пустые значения в конце.
