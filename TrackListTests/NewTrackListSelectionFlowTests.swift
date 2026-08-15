@@ -32,7 +32,7 @@ final class NewTrackListSelectionFlowTests: XCTestCase {
 
         viewModel.handle(.toggleTrack(track))
 
-        XCTAssertEqual(viewModel.selectedTrackIds, [track.id])
+        XCTAssertEqual(viewModel.state.selectedTrackIDs, [track.id])
         XCTAssertEqual(viewModel.state.selectedCount, 1)
         XCTAssertTrue(viewModel.state.canSubmit)
     }
@@ -44,7 +44,7 @@ final class NewTrackListSelectionFlowTests: XCTestCase {
         viewModel.handle(.toggleTrack(track))
         viewModel.handle(.toggleTrack(track))
 
-        XCTAssertTrue(viewModel.selectedTrackIds.isEmpty)
+        XCTAssertTrue(viewModel.state.selectedTrackIDs.isEmpty)
         XCTAssertEqual(viewModel.state.selectedCount, 0)
         XCTAssertFalse(viewModel.state.canSubmit)
     }
@@ -63,7 +63,7 @@ final class NewTrackListSelectionFlowTests: XCTestCase {
         viewModel.handle(.unavailableTrackTapped(track))
 
         XCTAssertEqual(toast.events, [.trackUnavailable(title: track.title)])
-        XCTAssertTrue(viewModel.selectedTrackIds.isEmpty)
+        XCTAssertTrue(viewModel.state.selectedTrackIDs.isEmpty)
     }
 
     /// Повторное подтверждение не запускает вторую доменную операцию до completion первой.
@@ -83,6 +83,189 @@ final class NewTrackListSelectionFlowTests: XCTestCase {
         await settleTaskQueue()
 
         XCTAssertEqual(manager.createdRequests.count, 1)
+    }
+
+    func testScreenAppearedRefreshesFoldersFromExplicitProvider() {
+        let oldFolder = makeFolder(name: "Старая папка")
+        let newFolder = makeFolder(name: "Новая папка")
+        let provider = NewTrackListSelectionFoldersSpy(folders: [oldFolder])
+        let viewModel = makeViewModel(foldersProvider: provider)
+
+        provider.attachedFolders = [newFolder]
+        viewModel.handle(.screenAppeared)
+
+        XCTAssertEqual(viewModel.state.folders, [newFolder])
+    }
+
+    func testSingleSelectionsKeepUserOrderForCreate() async {
+        let manager = NewTrackListSelectionManagerSpy()
+        let viewModel = makeViewModel(
+            foldersProvider: NewTrackListSelectionFoldersSpy(folders: []),
+            manager: manager,
+            toast: NewTrackListSelectionToastSpy(),
+            router: NewTrackListSelectionRouterSpy()
+        )
+        let tracks = [
+            makeLibraryTrack(name: "A.mp3"),
+            makeLibraryTrack(name: "B.mp3"),
+            makeLibraryTrack(name: "C.mp3")
+        ]
+
+        tracks.forEach { viewModel.handle(.toggleTrack($0)) }
+        viewModel.handle(.submit)
+        await settleTaskQueue()
+
+        XCTAssertEqual(manager.createdRequests.first?.trackIDs, tracks.map(\.id))
+    }
+
+    func testDeselectAndReselectMovesTrackToEndOfSubmitOrder() async {
+        let manager = NewTrackListSelectionManagerSpy()
+        let viewModel = makeViewModel(
+            foldersProvider: NewTrackListSelectionFoldersSpy(folders: []),
+            manager: manager,
+            toast: NewTrackListSelectionToastSpy(),
+            router: NewTrackListSelectionRouterSpy()
+        )
+        let trackA = makeLibraryTrack(name: "A.mp3")
+        let trackB = makeLibraryTrack(name: "B.mp3")
+
+        viewModel.handle(.toggleTrack(trackA))
+        viewModel.handle(.toggleTrack(trackB))
+        viewModel.handle(.toggleTrack(trackA))
+        viewModel.handle(.toggleTrack(trackA))
+        viewModel.handle(.submit)
+        await settleTaskQueue()
+
+        XCTAssertEqual(manager.createdRequests.first?.trackIDs, [trackB.id, trackA.id])
+    }
+
+    func testSelectAllAppendsOnlyMissingTracksInVisibleOrder() async {
+        let manager = NewTrackListSelectionManagerSpy()
+        let viewModel = makeViewModel(
+            foldersProvider: NewTrackListSelectionFoldersSpy(folders: []),
+            manager: manager,
+            toast: NewTrackListSelectionToastSpy(),
+            router: NewTrackListSelectionRouterSpy()
+        )
+        let trackX = makeLibraryTrack(name: "X.mp3")
+        let trackA = makeLibraryTrack(name: "A.mp3")
+        let trackB = makeLibraryTrack(name: "B.mp3")
+        let trackC = makeLibraryTrack(name: "C.mp3")
+        let trackD = makeLibraryTrack(name: "D.mp3")
+
+        viewModel.handle(.toggleTrack(trackX))
+        viewModel.handle(.toggleTrack(trackB))
+        viewModel.handle(.selectAll([trackA, trackB, trackC, trackD]))
+        viewModel.handle(.submit)
+        await settleTaskQueue()
+
+        XCTAssertEqual(
+            manager.createdRequests.first?.trackIDs,
+            [trackX.id, trackB.id, trackA.id, trackC.id, trackD.id]
+        )
+    }
+
+    func testDeselectAllPreservesOrderOfTracksOutsideFolder() async {
+        let manager = NewTrackListSelectionManagerSpy()
+        let viewModel = makeViewModel(
+            foldersProvider: NewTrackListSelectionFoldersSpy(folders: []),
+            manager: manager,
+            toast: NewTrackListSelectionToastSpy(),
+            router: NewTrackListSelectionRouterSpy()
+        )
+        let trackX = makeLibraryTrack(name: "X.mp3")
+        let trackA = makeLibraryTrack(name: "A.mp3")
+        let trackB = makeLibraryTrack(name: "B.mp3")
+        let trackC = makeLibraryTrack(name: "C.mp3")
+        let trackY = makeLibraryTrack(name: "Y.mp3")
+
+        [trackX, trackA, trackB, trackC, trackY].forEach {
+            viewModel.handle(.toggleTrack($0))
+        }
+        viewModel.handle(.deselectAll([trackA, trackB, trackC]))
+        viewModel.handle(.submit)
+        await settleTaskQueue()
+
+        XCTAssertEqual(manager.createdRequests.first?.trackIDs, [trackX.id, trackY.id])
+    }
+
+    func testCrossFolderSelectionsKeepOneGlobalOrder() async {
+        let manager = NewTrackListSelectionManagerSpy()
+        let viewModel = makeViewModel(
+            foldersProvider: NewTrackListSelectionFoldersSpy(folders: []),
+            manager: manager,
+            toast: NewTrackListSelectionToastSpy(),
+            router: NewTrackListSelectionRouterSpy()
+        )
+        let trackA = makeLibraryTrack(name: "Folder1-A.mp3")
+        let trackB = makeLibraryTrack(name: "Folder1-B.mp3")
+        let trackC = makeLibraryTrack(name: "Folder2-C.mp3")
+        let trackD = makeLibraryTrack(name: "Folder1-D.mp3")
+
+        [trackA, trackB, trackC, trackD].forEach {
+            viewModel.handle(.toggleTrack($0))
+        }
+        viewModel.handle(.submit)
+        await settleTaskQueue()
+
+        XCTAssertEqual(
+            manager.createdRequests.first?.trackIDs,
+            [trackA.id, trackB.id, trackC.id, trackD.id]
+        )
+    }
+
+    func testDuplicateSelectAllKeepsExistingOrderWithoutDuplicates() async {
+        let manager = NewTrackListSelectionManagerSpy()
+        let viewModel = makeViewModel(
+            foldersProvider: NewTrackListSelectionFoldersSpy(folders: []),
+            manager: manager,
+            toast: NewTrackListSelectionToastSpy(),
+            router: NewTrackListSelectionRouterSpy()
+        )
+        let trackA = makeLibraryTrack(name: "A.mp3")
+        let trackB = makeLibraryTrack(name: "B.mp3")
+
+        viewModel.handle(.selectAll([trackA, trackB]))
+        viewModel.handle(.selectAll([trackB, trackA]))
+        viewModel.handle(.submit)
+        await settleTaskQueue()
+
+        XCTAssertEqual(manager.createdRequests.first?.trackIDs, [trackA.id, trackB.id])
+    }
+
+    func testOrderedSelectionIsPassedToAppendDomainCommand() async {
+        let trackListID = UUID()
+        let manager = NewTrackListSelectionManagerSpy()
+        manager.metas = [
+            TrackListMeta(
+                id: trackListID,
+                name: "Existing",
+                createdAt: Date(),
+                kind: .regular
+            )
+        ]
+        let router = NewTrackListSelectionRouterSpy()
+        let viewModel = NewTrackListSelectionViewModel(
+            foldersProvider: NewTrackListSelectionFoldersSpy(folders: []),
+            stateBuilder: NewTrackListSelectionStateBuilder(),
+            actionHandler: makeActionHandler(
+                mode: .append(trackListId: trackListID),
+                manager: manager,
+                toast: NewTrackListSelectionToastSpy(),
+                router: router
+            )
+        )
+        let tracks = [
+            makeLibraryTrack(name: "A.mp3"),
+            makeLibraryTrack(name: "B.mp3"),
+            makeLibraryTrack(name: "C.mp3")
+        ]
+
+        tracks.forEach { viewModel.handle(.toggleTrack($0)) }
+        viewModel.handle(.submit)
+        await settleTaskQueue()
+
+        XCTAssertEqual(manager.appendedRequests.first?.trackIDs, tracks.map(\.id))
     }
 
     /// Поздний completion закрытого route не показывает feedback и не закрывает новый sheet.
@@ -109,6 +292,52 @@ final class NewTrackListSelectionFlowTests: XCTestCase {
         XCTAssertEqual(router.closeCount, 0)
     }
 
+    /// Session может закрыться после domain completion, пока строится track-style Toast одного добавленного трека.
+    func testSingleTrackAppendAfterSheetDisappearedDuringFeedbackPreparationDoesNotPresent() async {
+        let trackListID = UUID()
+        let manager = NewTrackListSelectionManagerSpy()
+        manager.metas = [
+            TrackListMeta(
+                id: trackListID,
+                name: "Existing",
+                createdAt: Date(),
+                kind: .regular
+            )
+        ]
+        let toast = NewTrackListSelectionToastSpy()
+        let router = NewTrackListSelectionRouterSpy()
+        let feedbackPreparer = NewTrackListSelectionControlledFeedbackPreparer()
+        let viewModel = NewTrackListSelectionViewModel(
+            foldersProvider: NewTrackListSelectionFoldersSpy(folders: []),
+            stateBuilder: NewTrackListSelectionStateBuilder(),
+            actionHandler: makeActionHandler(
+                mode: .append(trackListId: trackListID),
+                manager: manager,
+                toast: toast,
+                router: router,
+                feedbackPreparer: feedbackPreparer
+            )
+        )
+        let track = makeLibraryTrack(name: "one.mp3")
+
+        viewModel.handle(.toggleTrack(track))
+        viewModel.handle(.submit)
+        await feedbackPreparer.waitUntilPreparationStarted()
+
+        viewModel.handle(.sheetDisappeared)
+        feedbackPreparer.resume(
+            with: .tracksAddedToTrackList(count: 1, name: "Existing")
+        )
+        await settleTaskQueue()
+
+        XCTAssertEqual(manager.appendedRequests.count, 1)
+        XCTAssertEqual(manager.appendedRequests.first?.trackIDs, [track.id])
+        XCTAssertEqual(feedbackPreparer.requestedTrackIDs, [track.id])
+        XCTAssertTrue(toast.events.isEmpty)
+        XCTAssertTrue(toast.errors.isEmpty)
+        XCTAssertEqual(router.closeCount, 0)
+    }
+
     func testSubmitCreateInvokesDomainCommandAndClosesFlow() async {
         let manager = NewTrackListSelectionManagerSpy()
         let toast = NewTrackListSelectionToastSpy()
@@ -122,7 +351,8 @@ final class NewTrackListSelectionFlowTests: XCTestCase {
         let track = makeLibraryTrack(name: "one.mp3")
 
         let result = await handler.submit(selectedTracks: [track])
-        await handler.present(result)
+        let presentation = await handler.preparePresentation(result)
+        handler.present(presentation)
 
         XCTAssertEqual(manager.createdRequests.count, 1)
         XCTAssertEqual(manager.createdRequests.first?.name, "Set")
@@ -156,7 +386,8 @@ final class NewTrackListSelectionFlowTests: XCTestCase {
         ]
 
         let result = await handler.submit(selectedTracks: tracks)
-        await handler.present(result)
+        let presentation = await handler.preparePresentation(result)
+        handler.present(presentation)
 
         XCTAssertEqual(manager.appendedRequests.count, 1)
         XCTAssertEqual(manager.appendedRequests.first?.trackListID, trackListID)
@@ -209,7 +440,8 @@ final class NewTrackListSelectionFlowTests: XCTestCase {
         )
 
         let result = await handler.submit(selectedTracks: [makeLibraryTrack(name: "one.mp3")])
-        await handler.present(result)
+        let presentation = await handler.preparePresentation(result)
+        handler.present(presentation)
 
         XCTAssertEqual(router.closeCount, 0)
         XCTAssertEqual(toast.errors.count, 1)
@@ -260,13 +492,15 @@ final class NewTrackListSelectionFlowTests: XCTestCase {
         mode: NewTrackListSelectionMode,
         manager: NewTrackListSelectionManagerSpy,
         toast: NewTrackListSelectionToastSpy,
-        router: NewTrackListSelectionRouterSpy
+        router: NewTrackListSelectionRouterSpy,
+        feedbackPreparer: (any NewTrackListSelectionFeedbackPreparing)? = nil
     ) -> NewTrackListSelectionActionHandler {
         NewTrackListSelectionActionHandler(
             mode: mode,
             trackListsManager: manager,
             toastPresenter: toast,
-            router: router
+            router: router,
+            feedbackPreparer: feedbackPreparer
         )
     }
 
@@ -278,6 +512,13 @@ final class NewTrackListSelectionFlowTests: XCTestCase {
             artist: "Artist",
             duration: 180,
             addedDate: Date()
+        )
+    }
+
+    private func makeFolder(name: String) -> LibraryFolder {
+        LibraryFolder(
+            name: name,
+            url: URL(fileURLWithPath: "/tmp/\(name)")
         )
     }
 
@@ -363,7 +604,7 @@ private final class NewTrackListSelectionManagerSpy: TrackListFlowManaging {
 /// Предоставляет фиксированный снимок папок для проверки ViewModel без MusicLibraryManager.
 @MainActor
 private final class NewTrackListSelectionFoldersSpy: LibraryFoldersProviding {
-    let attachedFolders: [LibraryFolder]
+    var attachedFolders: [LibraryFolder]
 
     init(folders: [LibraryFolder]) {
         attachedFolders = folders
@@ -394,5 +635,44 @@ private final class NewTrackListSelectionRouterSpy: NewTrackListSelectionRouting
     func dismissNewTrackListSelection(_ routeID: UUID) {
         closeCount += 1
         dismissedRouteIDs.append(routeID)
+    }
+}
+
+/// Детерминированно удерживает async-подготовку одного track-style Toast до явного resume тестом.
+@MainActor
+private final class NewTrackListSelectionControlledFeedbackPreparer: NewTrackListSelectionFeedbackPreparing {
+    private var preparationStarted = false
+    private var startContinuation: CheckedContinuation<Void, Never>?
+    private var resultContinuation: CheckedContinuation<ToastEvent, Never>?
+    private(set) var requestedTrackIDs: [UUID] = []
+
+    /// Фиксирует реальный single-track путь и приостанавливает его перед presentation side effect.
+    func trackAddedToTrackList(
+        track: LibraryTrack,
+        trackListName: String
+    ) async -> ToastEvent {
+        requestedTrackIDs.append(track.id)
+        preparationStarted = true
+        startContinuation?.resume()
+        startContinuation = nil
+
+        return await withCheckedContinuation { continuation in
+            resultContinuation = continuation
+        }
+    }
+
+    /// Возвращается только после того, как ViewModel дошла до suspend point подготовки feedback.
+    func waitUntilPreparationStarted() async {
+        guard preparationStarted == false else { return }
+
+        await withCheckedContinuation { continuation in
+            startContinuation = continuation
+        }
+    }
+
+    /// Завершает подготовку после управляемого lifecycle-события sheet.
+    func resume(with event: ToastEvent) {
+        resultContinuation?.resume(returning: event)
+        resultContinuation = nil
     }
 }

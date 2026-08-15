@@ -14,6 +14,8 @@ struct NewTrackListSelectionState {
     let folders: [LibraryFolder]
     /// Количество выбранных треков для presentation-элементов экрана.
     let selectedCount: Int
+    /// Идентификаторы выбранных треков для готового presentation-state дочерних папок.
+    let selectedTrackIDs: Set<UUID>
     /// Можно ли применить текущий выбор треков.
     let canSubmit: Bool
     /// Выполняется ли создание или добавление выбранных треков.

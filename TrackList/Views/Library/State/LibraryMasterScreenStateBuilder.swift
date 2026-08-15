@@ -16,7 +16,8 @@ struct LibraryMasterScreenStateBuilder {
     func build(
         manager: MusicLibraryManager,
         settings: AppSettings,
-        detachFolderConfirmation: LibraryMasterDetachFolderConfirmation
+        detachFolderConfirmation: LibraryMasterDetachFolderConfirmation,
+        folderPickerRequestID: UUID?
     ) -> LibraryMasterScreenState {
 
         let folders = manager.attachedFolders.map { folder in
@@ -33,7 +34,8 @@ struct LibraryMasterScreenStateBuilder {
             folders: folders,
             showsPurchasedITunesSource: settings.visible.library.isPurchasedITunesSourceVisible,
             isEmpty: folders.isEmpty,
-            detachFolderConfirmation: detachFolderConfirmation
+            detachFolderConfirmation: detachFolderConfirmation,
+            folderPickerRequestID: folderPickerRequestID
         )
     }
 }

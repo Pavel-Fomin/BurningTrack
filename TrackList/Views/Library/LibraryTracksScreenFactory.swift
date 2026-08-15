@@ -29,6 +29,10 @@ struct LibraryTracksScreenFactory {
     private let trackShareActionHandler: TrackShareActionHandler
     private let commandExecutor: AppCommandExecutor
     private let toastManager: ToastManager
+    /// Создаёт handler экспорта общего раздела внутри graph его destination.
+    private let allTracksActionHandlerFactory: LibraryAllTracksActionHandlerFactory
+    /// Создаёт handler экспорта выбранного значения коллекции внутри graph destination.
+    private let collectionTracksActionHandlerFactory: LibraryCollectionTracksActionHandlerFactory
 
     init(
         tracksProvider: LibraryTracksProvider,
@@ -47,7 +51,9 @@ struct LibraryTracksScreenFactory {
         collectionNavigationHandler: TrackCollectionNavigationHandler,
         trackShareActionHandler: TrackShareActionHandler,
         commandExecutor: AppCommandExecutor,
-        toastManager: ToastManager
+        toastManager: ToastManager,
+        allTracksActionHandlerFactory: LibraryAllTracksActionHandlerFactory,
+        collectionTracksActionHandlerFactory: LibraryCollectionTracksActionHandlerFactory
     ) {
         self.tracksProvider = tracksProvider
         self.badgeProvider = badgeProvider
@@ -66,6 +72,8 @@ struct LibraryTracksScreenFactory {
         self.trackShareActionHandler = trackShareActionHandler
         self.commandExecutor = commandExecutor
         self.toastManager = toastManager
+        self.allTracksActionHandlerFactory = allTracksActionHandlerFactory
+        self.collectionTracksActionHandlerFactory = collectionTracksActionHandlerFactory
     }
 
     /// Возвращает контейнер, который откладывает production composition до инициализации StateObject.
@@ -99,17 +107,13 @@ struct LibraryTracksScreenFactory {
     func makeLibraryCollectionTracksContainer(
         source: LibraryTrackListSource,
         selectionActionBarConfig: Binding<SelectionActionBarConfig?>,
-        selectionActionSender: Binding<(any LibraryTracksActionSending)?>,
-        onAllTracksAction: ((LibraryAllTracksAction) -> Void)? = nil,
-        onCollectionTracksAction: ((LibraryCollectionTracksAction) -> Void)? = nil
+        selectionActionSender: Binding<(any LibraryTracksActionSending)?>
     ) -> LibraryCollectionTracksContainer {
         LibraryCollectionTracksContainer(
             factory: self,
             source: source,
             selectionActionBarConfig: selectionActionBarConfig,
-            selectionActionSender: selectionActionSender,
-            onAllTracksAction: onAllTracksAction,
-            onCollectionTracksAction: onCollectionTracksAction
+            selectionActionSender: selectionActionSender
         )
     }
 
@@ -117,10 +121,17 @@ struct LibraryTracksScreenFactory {
     func makeSelectionTracksViewModel(
         folder: LibraryFolder
     ) -> LibraryTracksViewModel {
-        makeTracksViewModel(
+        let viewModel = makeTracksViewModel(
             source: .folder(folderId: folder.id),
             usesLibrarySortSettings: false
         )
+        let presenter = LibraryTracksPresenter(
+            output: viewModel,
+            selectionActionBarCoordinator: LibrarySelectionActionBarCoordinator()
+        )
+        let actionHandler = LibraryTracksActionHandler(output: viewModel)
+        viewModel.configure(actionHandler: actionHandler, presenter: presenter)
+        return viewModel
     }
 
     /// Собирает тонкий маршрутизатор Batch Tag Edit без глобальных singleton в Library ViewModel.
@@ -154,6 +165,9 @@ struct LibraryTracksScreenFactory {
                 manager: cloudAvailabilityManager
             )
         )
+        let cloudAvailabilityActionHandler = LibraryCloudAvailabilityActionHandler(
+            controller: cloudController
+        )
         let presentationHandler = LibraryTrackPresentationHandler(metadataProvider: viewModel)
         let commandHandler = LibraryTrackCommandHandler(
             sheetManager: sheetManager,
@@ -163,9 +177,7 @@ struct LibraryTracksScreenFactory {
                 source: .libraryFolder(id: folder.id)
             ),
             presentationHandler: presentationHandler,
-            cloudAvailabilityActionHandler: LibraryCloudAvailabilityActionHandler(
-                controller: cloudController
-            ),
+            cloudAvailabilityActionHandler: cloudAvailabilityActionHandler,
             collectionNavigationHandler: collectionNavigationHandler,
             trackShareActionHandler: trackShareActionHandler,
             commandExecutor: commandExecutor,
@@ -180,6 +192,7 @@ struct LibraryTracksScreenFactory {
         return LibraryTracksScreenStore(
             tracksViewModel: viewModel,
             cloudAvailabilityController: cloudController,
+            cloudAvailabilityActionHandler: cloudAvailabilityActionHandler,
             settingsManager: settingsManager,
             playbackStateController: LibraryTrackPlaybackStateController(
                 playbackStateProvider: playbackStateProvider
@@ -235,6 +248,13 @@ struct LibraryTracksScreenFactory {
             }
         )
 
+        let allTracksActionHandler = source.isAllLibraryTracks
+            ? allTracksActionHandlerFactory.make()
+            : nil
+        let collectionTracksActionHandler = source.isCollectionValue
+            ? collectionTracksActionHandlerFactory.make(source: source)
+            : nil
+
         return LibraryCollectionTracksScreenStore(
             source: source,
             tracksViewModel: viewModel,
@@ -247,7 +267,9 @@ struct LibraryTracksScreenFactory {
             presentationHandler: presentationHandler,
             commandHandler: commandHandler,
             favoriteTrackIdsProvider: favoriteTrackIdsProvider,
-            sheetManager: sheetManager
+            sheetManager: sheetManager,
+            allTracksActionHandler: allTracksActionHandler,
+            collectionTracksActionHandler: collectionTracksActionHandler
         )
     }
 

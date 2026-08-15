@@ -13,6 +13,12 @@ import Foundation
 /// View отправляет эти действия наверх, но не выполняет бизнес-логику сама.
 enum TrackListAction {
 
+    /// Detail destination появился и должен запросить initial snapshot у владельца lifecycle.
+    case screenAppeared
+
+    /// Пользователь повторяет initial read после отображённой ошибки загрузки.
+    case retryInitialLoad
+
     /// Строка появилась на экране и запросила подготовку runtime snapshot.
     case requestRuntimeSnapshot(trackId: UUID)
 

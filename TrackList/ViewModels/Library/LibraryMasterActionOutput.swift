@@ -17,6 +17,9 @@ protocol LibraryMasterActionOutput: AnyObject {
     /// Пересобирает состояние корневого экрана.
     func refreshState()
 
+    /// Передаёт View presentation intent системного picker-а без доступа Handler к SwiftUI-state.
+    func requestFolderPicker()
+
     /// Запоминает папку и показывает обязательное подтверждение её открепления.
     func requestDetachFolderConfirmation(_ folder: LibraryFolder)
 

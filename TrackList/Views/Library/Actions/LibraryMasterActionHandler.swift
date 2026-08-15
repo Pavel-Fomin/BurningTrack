@@ -24,8 +24,6 @@ final class LibraryMasterActionHandler {
     private let playbackController: any TrackPlaybackControlling
     /// Output корневого flow для изменения экранного состояния.
     private let output: any LibraryMasterActionOutput
-    /// Запрашивает показ системного picker'а папки на уровне экрана.
-    private let requestFolderPicker: @MainActor () -> Void
 
     init(
         manager: MusicLibraryManager,
@@ -33,8 +31,7 @@ final class LibraryMasterActionHandler {
         toastPresenter: any ToastPresenting,
         playbackState: any PlaybackStateProviding,
         playbackController: any TrackPlaybackControlling,
-        output: any LibraryMasterActionOutput,
-        requestFolderPicker: @escaping @MainActor () -> Void
+        output: any LibraryMasterActionOutput
     ) {
         self.manager = manager
         self.navigationCoordinator = navigationCoordinator
@@ -42,7 +39,6 @@ final class LibraryMasterActionHandler {
         self.playbackState = playbackState
         self.playbackController = playbackController
         self.output = output
-        self.requestFolderPicker = requestFolderPicker
     }
 
     /// Обрабатывает действие корневого экрана фонотеки.
@@ -55,7 +51,7 @@ final class LibraryMasterActionHandler {
             output.refreshState()
 
         case .addFolderTapped:
-            requestFolderPicker()
+            output.requestFolderPicker()
 
         case .moveFolder(let source, let destination):
             output.moveFolder(from: source, to: destination)

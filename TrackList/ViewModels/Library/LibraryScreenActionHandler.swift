@@ -17,6 +17,8 @@ final class LibraryScreenActionHandler {
     private let musicLibraryManager: MusicLibraryManager
     private let trackRegistry: TrackRegistry
     private let toastPresenter: any ToastPresenting
+    /// Слабый output исключает цикл между ViewModel и её action handler-ом.
+    private weak var output: (any LibraryScreenActionHandlingOutput)?
 
     // MARK: - Инициализация
 
@@ -32,12 +34,21 @@ final class LibraryScreenActionHandler {
         self.toastPresenter = toastPresenter
     }
 
+    /// Подключает владельца screen-state после завершения его инициализации.
+    func configure(output: any LibraryScreenActionHandlingOutput) {
+        self.output = output
+    }
+
     // MARK: - Обработка
 
     func handle(_ action: LibraryScreenAction) {
         switch action {
         case .appeared:
             handlePendingShowInLibraryRequest()
+        case .collectionRootAppeared:
+            output?.setCollectionRootVisibility(true)
+        case .collectionRootDisappeared:
+            output?.setCollectionRootVisibility(false)
         case .collectionRootItemSelected(let item):
             handleCollectionRootItemSelected(item)
         case .collectionValueSelected(let value):
@@ -111,4 +122,10 @@ final class LibraryScreenActionHandler {
             navigationCoordinator.openFolder(folderId)
         }
     }
+}
+
+/// Узкий output сохраняет ViewModel владельцем lifecycle collection root.
+@MainActor
+protocol LibraryScreenActionHandlingOutput: AnyObject {
+    func setCollectionRootVisibility(_ isVisible: Bool)
 }

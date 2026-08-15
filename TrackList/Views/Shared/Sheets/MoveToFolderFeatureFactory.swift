@@ -41,19 +41,35 @@ struct MoveToFolderFeatureFactory {
         self.router = router
     }
 
-    /// Создаёт стабильный контейнер для неизменяемого payload конкретного route.
+    /// Собирает полный feature graph для одного неизменяемого route payload.
     func makeView(data: MoveToFolderSheetData) -> MoveToFolderContainer {
-        MoveToFolderContainer(
+        // Снимок дерева фиксирует UI-semantics route и не открывает manager leaf View.
+        let folderSnapshot = MoveToFolderFolderSnapshot(
+            folders: library.attachedFolders
+        )
+        let presenter = MoveToFolderPresenter()
+        let initialState = presenter.makeState(
+            navigationTitle: MoveToFolderPresentationText.title(for: data.operation),
+            folderSnapshot: folderSnapshot,
+            selectedFolderID: nil,
+            currentFolderID: nil,
+            isPerformingOperation: false
+        )
+        let viewModel = MoveToFolderViewModel(initialState: initialState)
+        presenter.configure(output: viewModel)
+
+        let actionHandler = MoveToFolderActionHandler(
             data: data,
+            folderSnapshot: folderSnapshot,
             trackRegistry: trackRegistry,
-            library: library,
             fileBusyChecker: fileBusyChecker,
             commandExecutor: commandExecutor,
             toastPresenter: toastPresenter,
-            actionHandler: MoveToFolderActionHandler(
-                router: router,
-                routeID: data.id
-            )
+            router: router,
+            presenter: presenter
         )
+        viewModel.configure(actionHandler: actionHandler)
+
+        return MoveToFolderContainer(viewModel: viewModel)
     }
 }

@@ -19,6 +19,12 @@ import UIKit
 /// Функция подготовки позволяет проверять кэширование без реального обращения к ImageIO.
 typealias ArtworkImagePreparation = @Sendable (Data, ArtworkSizeClass) async -> UIImage?
 
+/// Узкая capability асинхронной подготовки обложки для presentation-компонентов.
+/// Реализация не раскрывает View внутреннее кэширование или работу ImageIO.
+protocol ArtworkImageProviding: Sendable {
+    func image(for request: ArtworkRequest) async -> UIImage?
+}
+
 /// Единственный владелец жизненного цикла подготовки обложек.
 actor ArtworkProvider {
     static let shared = ArtworkProvider()
@@ -196,6 +202,9 @@ actor ArtworkProvider {
     }
 
 }
+
+/// Production-provider реализует capability, которую получает SwiftUI presentation-слой.
+extension ArtworkProvider: ArtworkImageProviding {}
 
 /// Описание общей выполняющейся задачи одного исходного изображения.
 private struct InFlightPreparation {

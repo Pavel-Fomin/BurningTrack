@@ -40,8 +40,8 @@ struct MainTabView: View {
     let searchFeatureFactory: SearchFeatureFactory
     /// Готовая factory feature настроек.
     let settingsFeatureFactory: SettingsFeatureFactory
-    /// Готовые фабрики detail-flow одного треклиста.
-    let trackListFeatureDependencies: TrackListFeatureDependencies
+    /// Готовая factory detail-flow одного треклиста.
+    let trackListFeatureFactory: TrackListFeatureFactory
     /// Единый ActionHandler master-flow треклистов.
     let trackListsActionHandler: TrackListsActionHandler
     /// Единый координатор межэкранной навигации.
@@ -92,7 +92,7 @@ struct MainTabView: View {
                 systemImage: "play.square.stack",
                 value: ScenePhaseHandler.Tab.library
             ) {
-            LibraryScreen(
+            LibraryScreenContainer(
                 favoriteTrackActionHandler: favoriteTrackActionHandler,
                     dependencies: libraryFeatureDependencies
                 )
@@ -112,10 +112,9 @@ struct MainTabView: View {
             ) {
                 TrackListsScreen(
                     trackListsViewModel: trackListsViewModel,
-                    favoriteTrackActionHandler: favoriteTrackActionHandler,
                     actionHandler: trackListsActionHandler,
                     navigationCoordinator: navigationCoordinator,
-                    trackListFeatureDependencies: trackListFeatureDependencies
+                    trackListFeatureFactory: trackListFeatureFactory
                 )
                 .globalBottomPanelsHost(
                     miniPlayerFeature: miniPlayerFeature,

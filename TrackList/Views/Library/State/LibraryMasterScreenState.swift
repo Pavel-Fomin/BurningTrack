@@ -31,6 +31,8 @@ struct LibraryMasterScreenState {
     let isEmpty: Bool
     /// Текущая фаза подтверждения открепления папки.
     let detachFolderConfirmation: LibraryMasterDetachFolderConfirmation
+    /// Одноразовый presentation intent для системного picker-а папки.
+    let folderPickerRequestID: UUID?
 
     /// Нужно ли показать обязательное подтверждение обычного открепления папки.
     var showsDetachFolderConfirmation: Bool {

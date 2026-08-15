@@ -23,6 +23,8 @@ struct TrackListApp: App {
     let appSettingsManager: AppSettingsManager
     /// Единый менеджер фонотеки приложения.
     let musicLibraryManager: MusicLibraryManager
+    /// Рабочая capability подготовки обложек для общего presentation-слоя.
+    let artworkImageProvider: any ArtworkImageProviding
     let playerViewModel: PlayerViewModel
     /// Capability проверки занятости файла для глобальных файловых sheet-сценариев.
     let fileBusyChecker: any TrackFileBusyChecking
@@ -40,8 +42,8 @@ struct TrackListApp: App {
     let searchFeatureFactory: SearchFeatureFactory
     /// Готовая factory feature настроек с application-wide SettingsManaging.
     let settingsFeatureFactory: SettingsFeatureFactory
-    /// Готовые фабрики detail-flow одного треклиста с явными production-зависимостями.
-    let trackListFeatureDependencies: TrackListFeatureDependencies
+    /// Готовая factory detail-flow одного треклиста с явными production-зависимостями.
+    let trackListFeatureFactory: TrackListFeatureFactory
     /// Единый ActionHandler master-flow треклистов для tab- и sidebar-компоновок.
     let trackListsActionHandler: TrackListsActionHandler
     /// Готовая factory связанного flow создания и выбора треклиста.
@@ -98,6 +100,8 @@ struct TrackListApp: App {
         let sheetActionCoordinator = SheetActionCoordinator.shared
         let runtimeSnapshotStore = TrackRuntimeStore.shared
         let runtimeSnapshotBuilder = TrackRuntimeSnapshotBuilder.shared
+        // Узкая capability обложек разрешается только в Composition Root.
+        let artworkImageProvider: any ArtworkImageProviding = ArtworkProvider.shared
         let viewControllerProvider = ApplicationViewControllerProvider()
         // Export собирается в Composition Root: source features не знают picker и UIKit.
         let exportDestinationResolver = ExportDestinationResolver(
@@ -254,11 +258,18 @@ struct TrackListApp: App {
             playbackStateProvider: playbackStateProvider,
             playbackController: playbackController
         )
-        let trackListFeatureDependencies = TrackListFeatureDependencies(
+        let trackListFeatureFactory = TrackListFeatureFactory(
             viewModelFactory: trackListViewModelFactory,
-            actionHandlerFactory: trackListActionHandlerFactory
+            actionHandlerFactory: trackListActionHandlerFactory,
+            favoriteTrackActionHandler: favoriteTrackActionHandler
         )
 
+        let libraryAllTracksActionHandlerFactory = LibraryAllTracksActionHandlerFactory(
+            exportRequestHandler: exportRequestHandler
+        )
+        let libraryCollectionTracksActionHandlerFactory = LibraryCollectionTracksActionHandlerFactory(
+            exportRequestHandler: exportRequestHandler
+        )
         let libraryTracksScreenFactory = LibraryTracksScreenFactory(
             tracksProvider: FastLibraryTracksProvider(),
             badgeProvider: DefaultTrackListBadgeProvider(),
@@ -276,7 +287,9 @@ struct TrackListApp: App {
             collectionNavigationHandler: trackCollectionNavigationHandler,
             trackShareActionHandler: trackShareActionHandler,
             commandExecutor: commandExecutor,
-            toastManager: toastManager
+            toastManager: toastManager,
+            allTracksActionHandlerFactory: libraryAllTracksActionHandlerFactory,
+            collectionTracksActionHandlerFactory: libraryCollectionTracksActionHandlerFactory
         )
         let purchasedITunesFeatureFactory = PurchasedITunesFeatureFactory(
             musicProvider: PurchasedITunesMusicProvider(),
@@ -294,32 +307,35 @@ struct TrackListApp: App {
             toastPresenter: toastManager,
             exportRequestHandler: exportRequestHandler
         )
+        let libraryScreenViewModelFactory = LibraryScreenViewModelFactory(
+            navigationCoordinator: navigationCoordinator,
+            musicLibraryManager: musicLibraryManager,
+            trackRegistry: trackRegistry,
+            toastPresenter: toastManager,
+            trackEventProvider: NotificationLibraryTrackEventProvider()
+        )
+        let libraryMasterViewModelFactory = LibraryMasterViewModelFactory(
+            manager: musicLibraryManager,
+            settingsManager: appSettingsManager,
+            toastPresenter: toastManager,
+            stateBuilder: LibraryMasterScreenStateBuilder()
+        )
+        let libraryMasterActionHandlerFactory = LibraryMasterActionHandlerFactory(
+            manager: musicLibraryManager,
+            navigationCoordinator: navigationCoordinator,
+            toastPresenter: toastManager,
+            playbackState: playbackStateProvider,
+            playbackController: playbackController
+        )
         let libraryFeatureDependencies = LibraryFeatureDependencies(
-            screenViewModelFactory: LibraryScreenViewModelFactory(
-                navigationCoordinator: navigationCoordinator,
-                musicLibraryManager: musicLibraryManager,
+            screenStoreFactory: LibraryScreenStoreFactory(
+                screenViewModelFactory: libraryScreenViewModelFactory,
+                masterViewModelFactory: libraryMasterViewModelFactory,
+                masterActionHandlerFactory: libraryMasterActionHandlerFactory
+            ),
+            collectionValuesFeatureFactory: LibraryCollectionValuesFeatureFactory(
                 trackRegistry: trackRegistry,
-                toastPresenter: toastManager,
-                trackEventProvider: NotificationLibraryTrackEventProvider()
-            ),
-            masterViewModelFactory: LibraryMasterViewModelFactory(
-                manager: musicLibraryManager,
-                settingsManager: appSettingsManager,
-                toastPresenter: toastManager,
-                stateBuilder: LibraryMasterScreenStateBuilder()
-            ),
-            masterActionHandlerFactory: LibraryMasterActionHandlerFactory(
-                manager: musicLibraryManager,
-                navigationCoordinator: navigationCoordinator,
-                toastPresenter: toastManager,
-                playbackState: playbackStateProvider,
-                playbackController: playbackController
-            ),
-            allTracksActionHandlerFactory: LibraryAllTracksActionHandlerFactory(
-                exportRequestHandler: exportRequestHandler
-            ),
-            collectionTracksActionHandlerFactory: LibraryCollectionTracksActionHandlerFactory(
-                exportRequestHandler: exportRequestHandler
+                playbackStateProvider: playbackStateProvider
             ),
             purchasedITunesFeatureFactory: purchasedITunesFeatureFactory,
             folderViewModelFactory: LibraryFolderViewModelFactory(
@@ -328,11 +344,7 @@ struct TrackListApp: App {
                 summaryProvider: summaryProvider,
                 eventProvider: NotificationLibraryTrackEventProvider()
             ),
-            tracksScreenFactory: libraryTracksScreenFactory,
-            playbackStateProvider: playbackStateProvider,
-            playbackController: playbackController,
-            favoriteTrackIdsProvider: favoriteTrackIdsProvider,
-            trackFileRenameActionHandler: renameActionHandler
+            tracksScreenFactory: libraryTracksScreenFactory
         )
 
         let searchFeatureFactory = SearchFeatureFactory(
@@ -471,6 +483,7 @@ struct TrackListApp: App {
         self.navigationCoordinator = navigationCoordinator
         self.appSettingsManager = appSettingsManager
         self.musicLibraryManager = musicLibraryManager
+        self.artworkImageProvider = artworkImageProvider
         self.playerViewModel = playerVM
         self.fileBusyChecker = fileBusyChecker
         self.playbackFileReleaser = playbackFileReleaser
@@ -480,7 +493,7 @@ struct TrackListApp: App {
         self.libraryFeatureDependencies = libraryFeatureDependencies
         self.searchFeatureFactory = searchFeatureFactory
         self.settingsFeatureFactory = settingsFeatureFactory
-        self.trackListFeatureDependencies = trackListFeatureDependencies
+        self.trackListFeatureFactory = trackListFeatureFactory
         self.trackListsActionHandler = trackListsActionHandler
         self.createTrackListFlowFactory = createTrackListFlowFactory
         self.renameTrackListFeatureFactory = renameTrackListFeatureFactory
@@ -520,7 +533,7 @@ struct TrackListApp: App {
                 libraryFeatureDependencies: libraryFeatureDependencies,
                 searchFeatureFactory: searchFeatureFactory,
                 settingsFeatureFactory: settingsFeatureFactory,
-                trackListFeatureDependencies: trackListFeatureDependencies,
+                trackListFeatureFactory: trackListFeatureFactory,
                 trackListsActionHandler: trackListsActionHandler,
                 createTrackListFlowFactory: createTrackListFlowFactory,
                 renameTrackListFeatureFactory: renameTrackListFeatureFactory,
@@ -532,6 +545,7 @@ struct TrackListApp: App {
                 batchTagEditFeatureFactory: batchTagEditFeatureFactory,
                 batchFilenameRenameFeatureFactory: batchFilenameRenameFeatureFactory
             )
+            .environment(\.artworkImageProvider, artworkImageProvider)
             .environmentObject(sheetManager)
             .environmentObject(exportProgressViewModel)
             .environmentObject(exportActionHandler)

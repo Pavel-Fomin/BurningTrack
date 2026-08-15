@@ -43,12 +43,14 @@ struct LibraryScreen: View {
     /// Готовые фабрики feature фонотеки, подготовленные Composition Root.
     let dependencies: LibraryFeatureDependencies
 
-    // MARK: - ViewModels
+    // MARK: - Screen state
 
+    /// Store удерживает root graph, созданный контейнером вне SwiftUI View.
+    private let screenStore: LibraryScreenStore
     /// ViewModel контейнера фонотеки.
-    @StateObject private var viewModel: LibraryScreenViewModel
+    @ObservedObject private var viewModel: LibraryScreenViewModel
     /// ViewModel корневого экрана фонотеки.
-    @StateObject private var masterViewModel: LibraryMasterViewModel
+    @ObservedObject private var masterViewModel: LibraryMasterViewModel
 
     // MARK: - Состояние
 
@@ -62,40 +64,14 @@ struct LibraryScreen: View {
 
     init(
         favoriteTrackActionHandler: FavoriteTrackActionHandler,
-        dependencies: LibraryFeatureDependencies
+        dependencies: LibraryFeatureDependencies,
+        screenStore: LibraryScreenStore
     ) {
         self.favoriteTrackActionHandler = favoriteTrackActionHandler
         self.dependencies = dependencies
-        self._viewModel = StateObject(
-            wrappedValue: dependencies.screenViewModelFactory.make()
-        )
-        self._masterViewModel = StateObject(
-            wrappedValue: dependencies.masterViewModelFactory.make()
-        )
-    }
-
-    /// Обработчик действий корневого flow фонотеки.
-    private var actionHandler: LibraryMasterActionHandler {
-        dependencies.masterActionHandlerFactory.make(
-            output: masterViewModel,
-            requestFolderPicker: {
-                isShowingFolderPicker = true
-            }
-        )
-    }
-
-    /// Обработчик действий экрана всех треков фонотеки.
-    private var allTracksActionHandler: LibraryAllTracksActionHandler {
-        dependencies.allTracksActionHandlerFactory.make()
-    }
-
-    /// Собирает обработчик экспорта текущего выбранного значения коллекции.
-    private func collectionTracksActionHandler(
-        for source: LibraryTrackListSource
-    ) -> LibraryCollectionTracksActionHandler {
-        dependencies.collectionTracksActionHandlerFactory.make(
-            source: source
-        )
+        self.screenStore = screenStore
+        self._viewModel = ObservedObject(wrappedValue: screenStore.viewModel)
+        self._masterViewModel = ObservedObject(wrappedValue: screenStore.masterViewModel)
     }
 
     /// Binding пути навигации, который отправляет изменения через action.
@@ -125,7 +101,7 @@ struct LibraryScreen: View {
                     ToolbarItem(placement: .topBarTrailing) {
                         LibraryToolbarMenuButton(
                             onAction: { action in
-                                actionHandler.handle(action)
+                                screenStore.masterActionHandler.handle(action)
                             }
                         )
                     }
@@ -154,6 +130,10 @@ struct LibraryScreen: View {
         .onAppear {
             viewModel.handle(.appeared)
         }
+        .onChange(of: masterViewModel.screenState.folderPickerRequestID) { _, requestID in
+            guard requestID != nil else { return }
+            isShowingFolderPicker = true
+        }
         // Выбор папки
         .fileImporter(
             isPresented: $isShowingFolderPicker,
@@ -163,12 +143,12 @@ struct LibraryScreen: View {
             switch result {
             case .success(let urls):
                 if let folderURL = urls.first {
-                    actionHandler.handle(.folderPicked(folderURL))
+                    screenStore.masterActionHandler.handle(.folderPicked(folderURL))
                 } else {
-                    actionHandler.handle(.folderPickFailed)
+                    screenStore.masterActionHandler.handle(.folderPickFailed)
                 }
             case .failure:
-                actionHandler.handle(.folderPickFailed)
+                screenStore.masterActionHandler.handle(.folderPickFailed)
             }
         }
     }
@@ -181,7 +161,7 @@ struct LibraryScreen: View {
             folderState: masterViewModel.screenState,
             collectionRootItems: viewModel.collectionRootItems,
             onFolderAction: { action in
-                actionHandler.handle(action)
+                screenStore.masterActionHandler.handle(action)
             },
             onCollectionRootItemSelected: { item in
                 viewModel.handle(.collectionRootItemSelected(item))
@@ -189,10 +169,10 @@ struct LibraryScreen: View {
         )
         .onAppear {
             // Коллекция всегда видна в едином корне, поэтому её счётчики загружаются при появлении.
-            viewModel.setCollectionRootVisibility(true)
+            viewModel.handle(.collectionRootAppeared)
         }
         .onDisappear {
-            viewModel.setCollectionRootVisibility(false)
+            viewModel.handle(.collectionRootDisappeared)
         }
     }
 
@@ -218,18 +198,13 @@ struct LibraryScreen: View {
             dependencies.tracksScreenFactory.makeLibraryCollectionTracksContainer(
                 source: .allLibraryTracks,
                 selectionActionBarConfig: $selectionActionBarConfig,
-                selectionActionSender: $selectionActionSender,
-                onAllTracksAction: { action in
-                    allTracksActionHandler.handle(action)
-                }
+                selectionActionSender: $selectionActionSender
             )
             .id(LibraryTrackListSource.allLibraryTracks.id)
 
         case .collectionCategory(let category):
-            LibraryCollectionValuesView(
-                viewModel: dependencies.screenViewModelFactory
-                    .makeCollectionValuesViewModel(category: category),
-                playbackStateProvider: dependencies.playbackStateProvider,
+            dependencies.collectionValuesFeatureFactory.makeContainer(
+                category: category,
                 onValueSelected: { value in
                     viewModel.handle(.collectionValueSelected(value))
                 }
@@ -274,10 +249,7 @@ struct LibraryScreen: View {
         dependencies.tracksScreenFactory.makeLibraryCollectionTracksContainer(
             source: source,
             selectionActionBarConfig: $selectionActionBarConfig,
-            selectionActionSender: $selectionActionSender,
-            onCollectionTracksAction: { action in
-                collectionTracksActionHandler(for: source).handle(action)
-            }
+            selectionActionSender: $selectionActionSender
         )
         .id(source.id)
     }

@@ -89,7 +89,7 @@ final class LibraryTrackCommandHandlerTests: XCTestCase {
 
 /// Фиксирует действия selection-flow без обращения к production ViewModel.
 @MainActor
-private final class LibraryUnavailableTracksActionOutputSpy: LibraryTracksActionHandlingOutput {
+final class LibraryUnavailableTracksActionOutputSpy: LibraryTracksActionHandlingOutput {
     private(set) var toggledTrackIds: [UUID] = []
 
     func loadTracksIfNeeded() async {}
@@ -109,7 +109,7 @@ private final class LibraryUnavailableTracksActionOutputSpy: LibraryTracksAction
 
 /// Фиксирует presentation-события без глобального ToastManager.
 @MainActor
-private final class LibraryUnavailableToastPresenterSpy: ToastPresenting {
+final class LibraryUnavailableToastPresenterSpy: ToastPresenting {
     private(set) var errors: [AppError] = []
     private(set) var events: [ToastEvent] = []
 
@@ -124,7 +124,7 @@ private final class LibraryUnavailableToastPresenterSpy: ToastPresenting {
 
 /// Фиксирует playback-команды, которые недоступная строка не должна отправлять.
 @MainActor
-private final class LibraryUnavailablePlaybackControllerSpy: TrackPlaybackControlling {
+final class LibraryUnavailablePlaybackControllerSpy: TrackPlaybackControlling {
     private(set) var togglePlayPauseCount = 0
     private(set) var playedTrackIds: [UUID] = []
 
@@ -143,7 +143,7 @@ private final class LibraryUnavailablePlaybackControllerSpy: TrackPlaybackContro
 
 /// Предоставляет неизменяемое playback-состояние для неиспользуемой ветви handler-а.
 @MainActor
-private final class LibraryUnavailablePlaybackStateProviderSpy: PlaybackStateProviding {
+final class LibraryUnavailablePlaybackStateProviderSpy: PlaybackStateProviding {
     private let subject = CurrentValueSubject<PlaybackStateSnapshot, Never>(
         PlaybackStateSnapshot(
             currentDisplayableId: nil,
@@ -167,7 +167,7 @@ private final class LibraryUnavailablePlaybackStateProviderSpy: PlaybackStatePro
 
 /// Возвращает пустые metadata, поскольку unavailable-route их не читает.
 @MainActor
-private final class LibraryUnavailableMetadataProviderSpy: TrackMetadataProviding {
+final class LibraryUnavailableMetadataProviderSpy: TrackMetadataProviding {
     func snapshot(for trackId: UUID) -> TrackRuntimeSnapshot? { nil }
     func collectionNavigationTarget(for trackId: UUID) -> TrackCollectionNavigationTarget? { nil }
     func requestSnapshotIfNeeded(for trackId: UUID) {}
@@ -175,20 +175,20 @@ private final class LibraryUnavailableMetadataProviderSpy: TrackMetadataProvidin
 
 /// Не открывает экран коллекции в проверке недоступной строки.
 @MainActor
-private final class LibraryUnavailableCollectionNavigatorSpy: TrackCollectionIdentifierNavigating {
+final class LibraryUnavailableCollectionNavigatorSpy: TrackCollectionIdentifierNavigating {
     func openArtist(trackId: UUID) {}
     func openAlbum(trackId: UUID) {}
 }
 
 /// Не выполняет добавление в очередь в проверке presentation-намерения.
-private actor LibraryUnavailablePlayerAddingSpy: LibraryTrackPlayerAdding {
+actor LibraryUnavailablePlayerAddingSpy: LibraryTrackPlayerAdding {
     func addTrackToPlayer(trackId: UUID) async throws -> TrackAddedToPlayerSuccess {
         throw LibraryUnavailableTestError.unexpectedCall
     }
 }
 
 /// Не выполняет iCloud-операции в изолированной проверке presentation-route.
-private actor LibraryUnavailableCloudManagerSpy: CloudTrackAvailabilityManaging {
+actor LibraryUnavailableCloudManagerSpy: CloudTrackAvailabilityManaging {
     func availabilityStates(
         for trackIds: [UUID]
     ) async -> [UUID: CloudTrackAvailabilityState] { [:] }
@@ -198,13 +198,13 @@ private actor LibraryUnavailableCloudManagerSpy: CloudTrackAvailabilityManaging 
 
 /// Не предоставляет UIKit presenter, потому что share-flow в тесте не запускается.
 @MainActor
-private final class LibraryUnavailableViewControllerProviderSpy: ViewControllerProviding {
+final class LibraryUnavailableViewControllerProviderSpy: ViewControllerProviding {
     func topViewController() -> UIViewController? { nil }
 }
 
 /// Реализует неиспользуемые Favorites-команды без persistent storage.
 @MainActor
-private final class LibraryUnavailableFavoritesServiceSpy: FavoritesServicing {
+final class LibraryUnavailableFavoritesServiceSpy: FavoritesServicing {
     func loadFavoriteTrackIds() throws -> Set<UUID> { [] }
     func isFavorite(trackId: UUID) throws -> Bool { false }
     func add(_ track: FavoriteTrackInput) throws -> FavoritesMutationResult { .added }
@@ -215,6 +215,6 @@ private final class LibraryUnavailableFavoritesServiceSpy: FavoritesServicing {
 }
 
 /// Обозначает неожиданное попадание в не относящуюся к тесту доменную ветвь.
-private enum LibraryUnavailableTestError: Error {
+enum LibraryUnavailableTestError: Error {
     case unexpectedCall
 }

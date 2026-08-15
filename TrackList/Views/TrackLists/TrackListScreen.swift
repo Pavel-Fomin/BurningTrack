@@ -11,36 +11,17 @@ import Foundation
 import SwiftUI
 
 struct TrackListScreen: View {
-    /// Неизменяемый идентификатор detail-маршрута без snapshot из master-flow.
-    let trackListId: UUID
-    /// Единый обработчик «Избранного» передаётся в фабрику detail-flow.
-    let favoriteTrackActionHandler: FavoriteTrackActionHandler
-    /// Готовые фабрики detail-flow, подготовленные Composition Root.
-    let dependencies: TrackListFeatureDependencies
     /// ViewModel принадлежит одному detail-маршруту и загружает актуальное состояние по стабильному `trackListId`, а не по снимку master-списка.
-    @StateObject private var viewModel: TrackListViewModel
-
-    /// Обработчик действий detail-flow одного треклиста.
-    private var actionHandler: TrackListFlowActionHandler {
-        dependencies.actionHandlerFactory.make(
-            reader: viewModel,
-            favoriteTrackActionHandler: favoriteTrackActionHandler
-        )
-    }
+    @ObservedObject private var viewModel: TrackListViewModel
+    /// Stable handler создан вместе с ViewModel для конкретного detail destination.
+    private let actionHandler: TrackListFlowActionHandler
 
     init(
-        trackListId: UUID,
-        favoriteTrackActionHandler: FavoriteTrackActionHandler,
-        dependencies: TrackListFeatureDependencies
+        viewModel: TrackListViewModel,
+        actionHandler: TrackListFlowActionHandler
     ) {
-        self.trackListId = trackListId
-        self.favoriteTrackActionHandler = favoriteTrackActionHandler
-        self.dependencies = dependencies
-        _viewModel = StateObject(
-            wrappedValue: dependencies.viewModelFactory.make(
-                trackListId: trackListId
-            )
-        )
+        self.viewModel = viewModel
+        self.actionHandler = actionHandler
     }
 
     var body: some View {
@@ -71,14 +52,14 @@ struct TrackListScreen: View {
                     Text("Try loading this tracklist again.")
                 } actions: {
                     Button("Retry") {
-                        viewModel.retryInitialLoad()
+                        actionHandler.handle(.retryInitialLoad)
                     }
                 }
             }
         }
-        // View только инициирует чтение; защита от повторного старта и владение загрузкой остаются в ViewModel.
+        // View отправляет typed lifecycle action; защита от повторного старта и владение загрузкой остаются в ViewModel.
         .task {
-            viewModel.loadIfNeeded()
+            actionHandler.handle(.screenAppeared)
         }
         .navigationTitle(loadedScreenState?.title ?? "Tracklist")
         .navigationBarTitleDisplayMode(.inline)

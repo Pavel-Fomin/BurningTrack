@@ -15,14 +15,12 @@ import UIKit
 struct TrackListsScreen: View {
 
     @ObservedObject var trackListsViewModel: TrackListsViewModel
-    /// Единый обработчик «Избранного» передаётся в detail-flow треклистов.
-    let favoriteTrackActionHandler: FavoriteTrackActionHandler
     /// Единый ActionHandler master-flow, подготовленный Composition Root.
     let actionHandler: TrackListsActionHandler
     /// Единый координатор навигации, подготовленный Composition Root.
     @ObservedObject var navigationCoordinator: NavigationCoordinator
-    /// Готовые фабрики detail-flow одного треклиста.
-    let trackListFeatureDependencies: TrackListFeatureDependencies
+    /// Готовая factory detail-flow одного треклиста.
+    let trackListFeatureFactory: TrackListFeatureFactory
 
     var body: some View {
         NavigationStack(path: $trackListsViewModel.navigationPath) {
@@ -37,11 +35,7 @@ struct TrackListsScreen: View {
             .navigationDestination(for: UUID.self) { id in
                 // Detail-экран строится по route id, чтобы строка списка оставалась обычной Button-строкой без шеврона.
                 if trackListsViewModel.trackList(for: id) != nil {
-                    TrackListScreen(
-                        trackListId: id,
-                        favoriteTrackActionHandler: favoriteTrackActionHandler,
-                        dependencies: trackListFeatureDependencies
-                    )
+                    trackListFeatureFactory.makeContainer(trackListId: id)
                 }
             }
             .toolbar {
@@ -56,10 +50,10 @@ struct TrackListsScreen: View {
             }
         }
         .onAppear {
-            actionHandler.handlePendingExternalOpenRequest()
+            actionHandler.handle(.onAppear)
         }
         .onChange(of: navigationCoordinator.pendingTrackListOpenRequest) { _, _ in
-            actionHandler.handlePendingExternalOpenRequest()
+            actionHandler.handle(.externalOpenRequestChanged)
         }
     }
 }

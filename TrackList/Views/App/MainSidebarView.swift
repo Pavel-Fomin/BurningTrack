@@ -30,8 +30,8 @@ struct MainSidebarView: View {
     let searchFeatureFactory: SearchFeatureFactory
     /// Готовая factory feature настроек.
     let settingsFeatureFactory: SettingsFeatureFactory
-    /// Готовые фабрики detail-flow одного треклиста.
-    let trackListFeatureDependencies: TrackListFeatureDependencies
+    /// Готовая factory detail-flow одного треклиста.
+    let trackListFeatureFactory: TrackListFeatureFactory
     /// Единый ActionHandler master-flow треклистов.
     let trackListsActionHandler: TrackListsActionHandler
     /// Единый координатор межэкранной навигации.
@@ -128,7 +128,7 @@ struct MainSidebarView: View {
                 viewModelFactory: playerScreenViewModelFactory
             )
         case .library:
-            LibraryScreen(
+            LibraryScreenContainer(
                 favoriteTrackActionHandler: favoriteTrackActionHandler,
                 dependencies: libraryFeatureDependencies
             )
@@ -142,18 +142,13 @@ struct MainSidebarView: View {
         case .allTrackLists:
             TrackListsScreen(
                 trackListsViewModel: trackListsViewModel,
-                favoriteTrackActionHandler: favoriteTrackActionHandler,
                 actionHandler: trackListsActionHandler,
                 navigationCoordinator: navigationCoordinator,
-                trackListFeatureDependencies: trackListFeatureDependencies
+                trackListFeatureFactory: trackListFeatureFactory
             )
         case .trackList(let id):
             if trackListsViewModel.trackList(for: id) != nil {
-                TrackListScreen(
-                    trackListId: id,
-                    favoriteTrackActionHandler: favoriteTrackActionHandler,
-                    dependencies: trackListFeatureDependencies
-                )
+                trackListFeatureFactory.makeContainer(trackListId: id)
             } else {
                 ContentUnavailableView(
                     "Tracklist Not Found",

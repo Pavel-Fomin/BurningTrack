@@ -40,8 +40,7 @@ struct LibraryMasterActionHandlerFactory {
 
     /// Создаёт production action handler из явно переданных зависимостей feature.
     func make(
-        output: any LibraryMasterActionOutput,
-        requestFolderPicker: @escaping @MainActor () -> Void
+        output: any LibraryMasterActionOutput
     ) -> LibraryMasterActionHandler {
         LibraryMasterActionHandler(
             manager: manager,
@@ -49,8 +48,7 @@ struct LibraryMasterActionHandlerFactory {
             toastPresenter: toastPresenter,
             playbackState: playbackState,
             playbackController: playbackController,
-            output: output,
-            requestFolderPicker: requestFolderPicker
+            output: output
         )
     }
 }

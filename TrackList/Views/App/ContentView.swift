@@ -45,8 +45,8 @@ struct ContentView: View {
     let searchFeatureFactory: SearchFeatureFactory
     /// Готовая factory feature настроек.
     let settingsFeatureFactory: SettingsFeatureFactory
-    /// Готовые фабрики detail-flow одного треклиста.
-    let trackListFeatureDependencies: TrackListFeatureDependencies
+    /// Готовая factory detail-flow одного треклиста.
+    let trackListFeatureFactory: TrackListFeatureFactory
     /// Единый ActionHandler master-flow треклистов.
     let trackListsActionHandler: TrackListsActionHandler
     /// Готовая factory связанного flow создания и выбора треклиста.
@@ -93,7 +93,7 @@ struct ContentView: View {
                     libraryFeatureDependencies: libraryFeatureDependencies,
                     searchFeatureFactory: searchFeatureFactory,
                     settingsFeatureFactory: settingsFeatureFactory,
-                    trackListFeatureDependencies: trackListFeatureDependencies,
+                    trackListFeatureFactory: trackListFeatureFactory,
                     trackListsActionHandler: trackListsActionHandler,
                     navigationCoordinator: navigationCoordinator,
                     isSearchActive: $isSearchActive
@@ -110,7 +110,7 @@ struct ContentView: View {
                     libraryFeatureDependencies: libraryFeatureDependencies,
                     searchFeatureFactory: searchFeatureFactory,
                     settingsFeatureFactory: settingsFeatureFactory,
-                    trackListFeatureDependencies: trackListFeatureDependencies,
+                    trackListFeatureFactory: trackListFeatureFactory,
                     trackListsActionHandler: trackListsActionHandler,
                     navigationCoordinator: navigationCoordinator,
                     isSearchActive: $isSearchActive

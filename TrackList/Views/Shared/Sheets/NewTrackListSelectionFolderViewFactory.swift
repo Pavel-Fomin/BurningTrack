@@ -33,9 +33,27 @@ struct NewTrackListSelectionFolderViewFactory {
         NewTrackListSelectionFolderContainer(
             folder: folder,
             selectionViewModel: selectionViewModel,
-            libraryTracksScreenFactory: libraryTracksScreenFactory,
-            favoriteTrackIdsProvider: favoriteTrackIdsProvider,
             folderViewFactory: self
+        )
+    }
+
+    /// Собирает screen-local graph папки выбора один раз до создания StateObject-контейнера.
+    func makeScreenStore(
+        folder: LibraryFolder,
+        selectionViewModel: NewTrackListSelectionViewModel
+    ) -> NewTrackListSelectionFolderScreenStore {
+        let tracksViewModel = libraryTracksScreenFactory.makeSelectionTracksViewModel(
+            folder: folder
+        )
+
+        return NewTrackListSelectionFolderScreenStore(
+            tracksViewModel: tracksViewModel,
+            selectionViewModel: selectionViewModel,
+            favoriteTrackIDsProvider: favoriteTrackIdsProvider,
+            actionHandler: NewTrackListSelectionFolderActionHandler(
+                libraryTracks: tracksViewModel
+            ),
+            presenter: NewTrackListSelectionFolderPresenter()
         )
     }
 }

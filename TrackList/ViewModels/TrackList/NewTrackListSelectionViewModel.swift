@@ -17,9 +17,10 @@ final class NewTrackListSelectionViewModel: ObservableObject {
     /// Готовое presentation-состояние корневого экрана выбора.
     @Published private(set) var state: NewTrackListSelectionState
 
-    /// Выбранные треки по id.
-    /// Храним сами LibraryTrack, чтобы после выбора сразу создать треклист.
-    @Published private(set) var selectedTracksById: [UUID: LibraryTrack] = [:]
+    /// Фиксирует порядок, в котором пользователь выбрал треки.
+    private var selectedTrackIDs = OrderedSelection<UUID>()
+    /// Хранит треки для domain submit, не участвуя в определении их порядка.
+    private var selectedTracksByID: [UUID: LibraryTrack] = [:]
 
     // MARK: - Зависимости
 
@@ -27,7 +28,7 @@ final class NewTrackListSelectionViewModel: ObservableObject {
     private let foldersProvider: any LibraryFoldersProviding
     /// Собирает готовое presentation-состояние экрана.
     private let stateBuilder: NewTrackListSelectionStateBuilder
-    /// Выполняет подтверждение выбора и закрытие flow.
+    /// Выполняет доменную операцию и подготовку feedback до финальной проверки session.
     private let actionHandler: NewTrackListSelectionActionHandler
     /// Не даёт late completion менять presentation-state уже закрытого route.
     private var isSessionActive = true
@@ -46,24 +47,9 @@ final class NewTrackListSelectionViewModel: ObservableObject {
         self.actionHandler = actionHandler
         self.state = stateBuilder.build(
             folders: foldersProvider.attachedFolders,
-            selectedCount: 0,
+            selectedTrackIDs: [],
             isSubmitting: false
         )
-    }
-
-    /// Количество выбранных треков.
-    var selectedCount: Int {
-        selectedTracksById.count
-    }
-
-    /// Массив выбранных треков.
-    var selectedTracks: [LibraryTrack] {
-        Array(selectedTracksById.values)
-    }
-
-    /// Идентификаторы текущего выбора для готового presentation-состояния строк.
-    var selectedTrackIds: Set<UUID> {
-        Set(selectedTracksById.keys)
     }
 
     // MARK: - Действия
@@ -71,6 +57,9 @@ final class NewTrackListSelectionViewModel: ObservableObject {
     /// Обрабатывает пользовательские действия выбора и передаёт подтверждение ActionHandler-у.
     func handle(_ action: NewTrackListSelectionAction) {
         switch action {
+        case .screenAppeared:
+            updateState()
+
         case let .toggleTrack(track):
             toggle(track)
 
@@ -95,58 +84,52 @@ final class NewTrackListSelectionViewModel: ObservableObject {
         }
     }
 
-    /// Обновляет снимок папок через явную зависимость перед показом корневого списка.
-    func reloadFolders() {
-        updateState()
-    }
-
     // MARK: - Выбор
 
-    /// Проверяет, выбран ли трек.
-    func isSelected(_ track: LibraryTrack) -> Bool {
-        selectedTracksById[track.id] != nil
-    }
-
     /// Переключает выбор одного трека.
-    func toggle(_ track: LibraryTrack) {
-        if isSelected(track) {
-            selectedTracksById.removeValue(forKey: track.id)
+    private func toggle(_ track: LibraryTrack) {
+        if selectedTrackIDs.contains(track.id) {
+            selectedTrackIDs.toggle(track.id)
+            selectedTracksByID.removeValue(forKey: track.id)
         } else {
-            selectedTracksById[track.id] = track
+            selectedTrackIDs.toggle(track.id)
+            selectedTracksByID[track.id] = track
         }
 
         updateState()
     }
 
     /// Выбирает все переданные треки.
-    func selectAll(_ tracks: [LibraryTrack]) {
+    private func selectAll(_ tracks: [LibraryTrack]) {
         for track in tracks {
-            selectedTracksById[track.id] = track
+            if selectedTrackIDs.contains(track.id) {
+                selectedTracksByID[track.id] = track
+                continue
+            }
+
+            selectedTrackIDs.toggle(track.id)
+            selectedTracksByID[track.id] = track
         }
 
         updateState()
     }
 
     /// Снимает выбор со всех переданных треков.
-    func deselectAll(_ tracks: [LibraryTrack]) {
+    private func deselectAll(_ tracks: [LibraryTrack]) {
         for track in tracks {
-            selectedTracksById.removeValue(forKey: track.id)
+            guard selectedTrackIDs.contains(track.id) else { continue }
+            selectedTrackIDs.toggle(track.id)
+            selectedTracksByID.removeValue(forKey: track.id)
         }
 
         updateState()
-    }
-
-    /// Проверяет, выбраны ли все переданные треки.
-    func areAllSelected(_ tracks: [LibraryTrack]) -> Bool {
-        guard !tracks.isEmpty else { return false }
-        return tracks.allSatisfy { selectedTracksById[$0.id] != nil }
     }
 
     /// Пересобирает единственное presentation-состояние из выбора и актуального снимка папок.
     private func updateState() {
         state = stateBuilder.build(
             folders: foldersProvider.attachedFolders,
-            selectedCount: selectedCount,
+            selectedTrackIDs: Set(selectedTrackIDs.ids),
             isSubmitting: state.isSubmitting
         )
     }
@@ -158,7 +141,7 @@ final class NewTrackListSelectionViewModel: ObservableObject {
         let tracks = selectedTracks
         state = stateBuilder.build(
             folders: foldersProvider.attachedFolders,
-            selectedCount: selectedCount,
+            selectedTrackIDs: Set(selectedTrackIDs.ids),
             isSubmitting: true
         )
 
@@ -168,12 +151,16 @@ final class NewTrackListSelectionViewModel: ObservableObject {
             let result = await actionHandler.submit(selectedTracks: tracks)
             guard isSessionActive else { return }
 
-            await actionHandler.present(result)
+            // Подготовка одного track-style Toast может ожидать runtime snapshot, поэтому session проверяется после неё.
+            let presentation = await actionHandler.preparePresentation(result)
             guard isSessionActive else { return }
+
+            // Presentation синхронен: после этой проверки stale Toast и dismiss невозможны.
+            actionHandler.present(presentation)
 
             state = stateBuilder.build(
                 folders: foldersProvider.attachedFolders,
-                selectedCount: selectedCount,
+                selectedTrackIDs: Set(selectedTrackIDs.ids),
                 isSubmitting: false
             )
         }
@@ -182,5 +169,10 @@ final class NewTrackListSelectionViewModel: ObservableObject {
     /// Закрывает только UI-сеанс и не отменяет уже начатую доменную операцию.
     private func invalidateSession() {
         isSessionActive = false
+    }
+
+    /// Собирает domain request строго в порядке пользовательского выбора.
+    private var selectedTracks: [LibraryTrack] {
+        selectedTrackIDs.ids.compactMap { selectedTracksByID[$0] }
     }
 }

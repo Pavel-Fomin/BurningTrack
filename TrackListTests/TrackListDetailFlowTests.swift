@@ -35,6 +35,62 @@ final class TrackListDetailFlowTests: XCTestCase {
         XCTAssertEqual(fixture.loader.loadCallCount, 1)
     }
 
+    /// Typed screen lifecycle запускает initial read только один раз для detail destination.
+    func testScreenAppearedActionStartsInitialDetailReadOnlyOnce() async {
+        let trackListId = UUID()
+        let fixture = makeFixture(
+            trackListId: trackListId,
+            outcomes: [.success(makeTrackList(id: trackListId, tracks: []))]
+        )
+        let actionHandler = makeFlowActionHandler(for: fixture.viewModel)
+
+        actionHandler.handle(.screenAppeared)
+        actionHandler.handle(.screenAppeared)
+        await yieldToDetailTasks()
+
+        XCTAssertEqual(fixture.loader.loadCallCount, 1)
+        XCTAssertEqual(tryLoadedState(from: fixture.viewModel)?.id, trackListId)
+    }
+
+    /// Typed retry повторяет initial read после failure, но не перезагружает уже согласованный detail.
+    func testRetryInitialLoadActionRetriesFailureButNotSuccessfulDetail() async {
+        let trackListId = UUID()
+        let fixture = makeFixture(
+            trackListId: trackListId,
+            outcomes: [
+                .failure(AppError.trackListLoadFailed),
+                .success(makeTrackList(id: trackListId, tracks: []))
+            ]
+        )
+        let actionHandler = makeFlowActionHandler(for: fixture.viewModel)
+
+        actionHandler.handle(.screenAppeared)
+        actionHandler.handle(.retryInitialLoad)
+        await yieldToDetailTasks()
+
+        XCTAssertEqual(fixture.loader.loadCallCount, 2)
+        XCTAssertEqual(tryLoadedState(from: fixture.viewModel)?.id, trackListId)
+
+        actionHandler.handle(.retryInitialLoad)
+        await yieldToDetailTasks()
+
+        XCTAssertEqual(fixture.loader.loadCallCount, 2)
+    }
+
+    /// Typed initial lifecycle сохраняет самостоятельное not-found presentation state detail route.
+    func testScreenAppearedActionPreservesNotFoundState() async {
+        let fixture = makeFixture(outcomes: [.failure(AppError.trackListNotFound)])
+        let actionHandler = makeFlowActionHandler(for: fixture.viewModel)
+
+        actionHandler.handle(.screenAppeared)
+        await yieldToDetailTasks()
+
+        guard case .notFound = fixture.viewModel.content else {
+            return XCTFail("Ожидалось состояние notFound")
+        }
+        XCTAssertEqual(fixture.loader.loadCallCount, 1)
+    }
+
     /// Корректно пустой треклист остаётся loaded, а не маскируется под loading или failure.
     func testInitialLoadEmptyTrackListPublishesLoadedEmptyState() async {
         let trackListId = UUID()
@@ -678,6 +734,36 @@ final class TrackListDetailFlowTests: XCTestCase {
         )
     }
 
+    /// Собирает полный detail ActionHandler с inert doubles, чтобы проверить только typed lifecycle ingress.
+    private func makeFlowActionHandler(
+        for viewModel: TrackListViewModel
+    ) -> TrackListFlowActionHandler {
+        let toastPresenter = DetailToastPresenter()
+
+        return TrackListFlowActionHandler(
+            reader: viewModel,
+            lifecycle: viewModel,
+            playbackStateProvider: DetailPlaybackProvider(),
+            playbackController: DetailPlaybackControllerSpy(),
+            trackListManager: DetailTrackListManagerSpy(),
+            commandExecutor: DetailTrackListCommandSpy(result: .failure(DetailTestError.failed)),
+            fileRenamer: DetailFileRenamerSpy(),
+            presenter: DetailTrackListPresenterSpy(),
+            exportRequestHandler: DetailExportRequestHandlerSpy(),
+            toastPresenter: toastPresenter,
+            appCommandExecutor: DetailPurchasedITunesPlayerAddingSpy(),
+            collectionNavigationHandler: DetailCollectionNavigatorSpy(),
+            trackShareActionHandler: TrackShareActionHandler(
+                preparationService: TrackSharePreparationService(),
+                viewControllerProvider: DetailViewControllerProvider(),
+                toastPresenter: toastPresenter
+            ),
+            favoriteTrackActionHandler: FavoriteTrackActionHandler(
+                favoritesService: DetailFavoritesServiceSpy()
+            )
+        )
+    }
+
     /// Возвращает loaded state или фиксирует ошибку проверяемого контракта.
     private func tryLoadedState(
         from viewModel: TrackListViewModel,
@@ -881,6 +967,18 @@ private final class DetailPlaybackProvider: PlaybackStateProviding {
     func emit(_ state: PlaybackStateSnapshot) {
         subject.send(state)
     }
+}
+
+/// Не выполняет playback-команды, потому что lifecycle-тесты проверяют только initial loading.
+@MainActor
+private final class DetailPlaybackControllerSpy: TrackPlaybackControlling {
+    func togglePlayPause() {}
+
+    func play(
+        track: any TrackDisplayable,
+        context: [any TrackDisplayable],
+        source: PlaybackContextSource
+    ) {}
 }
 
 /// Воспроизводит регрессию: publisher уже содержит новое значение, property намеренно остаётся старым.
@@ -1149,6 +1247,12 @@ private final class DetailFavoritesServiceSpy: FavoritesServicing {
     func add(_ track: FavoriteTrackInput) throws -> FavoritesMutationResult { .added }
     func remove(trackId: UUID) throws -> FavoritesMutationResult { .removed }
     func toggle(_ track: FavoriteTrackInput) throws -> FavoritesMutationResult { .unchanged(isFavorite: false) }
+}
+
+/// Игнорирует export request, потому что lifecycle-тесты не должны запускать глобальный Export-feature.
+@MainActor
+private final class DetailExportRequestHandlerSpy: ExportRequestHandling {
+    func startExport(_ request: ExportRequest) {}
 }
 
 /// Локальная управляемая ошибка test doubles.

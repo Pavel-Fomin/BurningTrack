@@ -54,12 +54,13 @@ final class TrackListsActionHandler {
         case .onAppear:
             // Оба корневых контейнера используют один master-flow без повторной начальной загрузки.
             viewModel.loadTrackListsIfNeeded()
+            consumePendingExternalOpenRequest()
+
+        case .externalOpenRequestChanged:
+            consumePendingExternalOpenRequest()
 
         case .openTrackList(let id):
             openTrackList(id: id)
-
-        case .openTrackListFromApp(let id):
-            openTrackListFromApp(id: id)
 
         case .createTrackList:
             presenter.presentCreateTrackList()
@@ -82,7 +83,7 @@ final class TrackListsActionHandler {
     }
 
     /// Потребляет один внешний route; requestId не позволит старому запросу очистить более новый.
-    func handlePendingExternalOpenRequest() {
+    private func consumePendingExternalOpenRequest() {
         guard let request = externalOpenRequests.pendingTrackListOpenRequest else {
             return
         }

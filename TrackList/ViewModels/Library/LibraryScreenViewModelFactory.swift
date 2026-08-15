@@ -60,16 +60,6 @@ struct LibraryScreenViewModelFactory {
         )
     }
 
-    /// Собирает ViewModel значений коллекции с тем же явно переданным SQLite-реестром.
-    func makeCollectionValuesViewModel(
-        category: LibraryCollectionCategory
-    ) -> LibraryCollectionValuesViewModel {
-        LibraryCollectionValuesViewModel(
-            category: category,
-            provider: makeCollectionValuesProvider()
-        )
-    }
-
     /// Создаёт provider только из зависимости, уже подготовленной Composition Root.
     private func makeCollectionValuesProvider() -> DefaultLibraryCollectionValuesProvider {
         DefaultLibraryCollectionValuesProvider(trackRegistry: trackRegistry)

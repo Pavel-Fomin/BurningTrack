@@ -69,7 +69,7 @@ struct NewTrackListSelectionContainer: View {
                 SelectionActionBar(
                     title: String(localized: "Selected"),
                     subtitle: TrackListPresentationText.selectedTracksCount(
-                        viewModel.selectedCount
+                        state.selectedCount
                     ),
                     primaryTitle: String(localized: "Add"),
                     iconName: "music.note",
@@ -81,7 +81,7 @@ struct NewTrackListSelectionContainer: View {
             }
         }
         .task {
-            viewModel.reloadFolders()
+            viewModel.handle(.screenAppeared)
         }
         .onDisappear {
             viewModel.handle(.sheetDisappeared)

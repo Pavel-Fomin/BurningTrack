@@ -235,7 +235,7 @@ final class TrackListsMasterFlowTests: XCTestCase {
         XCTAssertEqual(navigation.validTrackListIDSets.last, Set([favorites.id]))
     }
 
-    func testExternalOpenReloadsMissingSnapshotAndClearsOnlyHandledRequest() {
+    func testOnAppearLoadsAndConsumesExternalRequestThatNeedsReload() {
         let favorites = makeTrackList(name: "Favorites", kind: .favorites, createdAt: 100)
         let regular = makeTrackList(name: "Regular", kind: .regular, createdAt: 200)
         let request = TrackListOpenRequest(trackListId: regular.id, requestId: UUID())
@@ -251,9 +251,9 @@ final class TrackListsMasterFlowTests: XCTestCase {
         )
 
         handler.handle(.onAppear)
-        handler.handlePendingExternalOpenRequest()
 
         XCTAssertEqual(viewModel.navigationPath, [regular.id])
+        XCTAssertEqual(loader.loadCallCount, 2)
         XCTAssertEqual(externalRequests.clearedRequestIDs, [request.requestId])
         XCTAssertNil(externalRequests.pendingTrackListOpenRequest)
     }
@@ -269,11 +269,94 @@ final class TrackListsMasterFlowTests: XCTestCase {
             externalOpenRequests: externalRequests
         )
 
-        handler.handlePendingExternalOpenRequest()
+        handler.handle(.externalOpenRequestChanged)
 
         XCTAssertEqual(externalRequests.pendingTrackListOpenRequest, request)
         XCTAssertTrue(externalRequests.clearedRequestIDs.isEmpty)
         XCTAssertTrue(viewModel.navigationPath.isEmpty)
+    }
+
+    func testExternalOpenChangeDoesNothingWithoutPendingRequest() {
+        let loader = MasterLoader(results: [.success([])])
+        let externalRequests = MasterExternalOpenRequests()
+        let viewModel = makeViewModel(loader: loader)
+        let handler = makeHandler(
+            viewModel: viewModel,
+            externalOpenRequests: externalRequests
+        )
+
+        handler.handle(.externalOpenRequestChanged)
+
+        XCTAssertEqual(loader.loadCallCount, 0)
+        XCTAssertTrue(viewModel.navigationPath.isEmpty)
+        XCTAssertTrue(externalRequests.clearedRequestIDs.isEmpty)
+    }
+
+    func testExternalOpenChangeUsesLoadedSnapshotWithoutReload() {
+        let favorites = makeTrackList(name: "Favorites", kind: .favorites, createdAt: 100)
+        let regular = makeTrackList(name: "Regular", kind: .regular, createdAt: 200)
+        let request = TrackListOpenRequest(trackListId: regular.id, requestId: UUID())
+        let loader = MasterLoader(results: [.success([favorites, regular])])
+        let externalRequests = MasterExternalOpenRequests()
+        let viewModel = makeViewModel(loader: loader)
+        let handler = makeHandler(
+            viewModel: viewModel,
+            externalOpenRequests: externalRequests
+        )
+
+        handler.handle(.onAppear)
+        externalRequests.pendingTrackListOpenRequest = request
+        handler.handle(.externalOpenRequestChanged)
+
+        XCTAssertEqual(loader.loadCallCount, 1)
+        XCTAssertEqual(viewModel.navigationPath, [regular.id])
+        XCTAssertEqual(externalRequests.clearedRequestIDs, [request.requestId])
+    }
+
+    func testExternalOpenMissingAfterSuccessfulReloadShowsNotFoundAndClearsRequest() {
+        let requestedID = UUID()
+        let request = TrackListOpenRequest(trackListId: requestedID, requestId: UUID())
+        let loader = MasterLoader(results: [.success([])])
+        let toastPresenter = MasterToastPresenter()
+        let externalRequests = MasterExternalOpenRequests(request: request)
+        let viewModel = makeViewModel(loader: loader)
+        let handler = makeHandler(
+            viewModel: viewModel,
+            toastPresenter: toastPresenter,
+            externalOpenRequests: externalRequests
+        )
+
+        handler.handle(.externalOpenRequestChanged)
+
+        XCTAssertEqual(loader.loadCallCount, 1)
+        XCTAssertTrue(viewModel.navigationPath.isEmpty)
+        XCTAssertEqual(externalRequests.clearedRequestIDs, [request.requestId])
+        XCTAssertNil(externalRequests.pendingTrackListOpenRequest)
+        assertToast(toastPresenter.errors.first, equals: .trackListNotFound)
+    }
+
+    func testExternalOpenClearsOnlyExactRequestIDWhenNewRequestAppearsDuringClearing() {
+        let favorites = makeTrackList(name: "Favorites", kind: .favorites, createdAt: 100)
+        let regular = makeTrackList(name: "Regular", kind: .regular, createdAt: 200)
+        let firstRequest = TrackListOpenRequest(trackListId: regular.id, requestId: UUID())
+        let newerRequest = TrackListOpenRequest(trackListId: favorites.id, requestId: UUID())
+        let loader = MasterLoader(results: [.success([favorites, regular])])
+        let externalRequests = MasterExternalOpenRequests(
+            request: firstRequest,
+            replacementRequestOnClear: newerRequest
+        )
+        let viewModel = makeViewModel(loader: loader)
+        let handler = makeHandler(
+            viewModel: viewModel,
+            externalOpenRequests: externalRequests
+        )
+
+        XCTAssertTrue(viewModel.loadTrackListsIfNeeded())
+        handler.handle(.externalOpenRequestChanged)
+
+        XCTAssertEqual(viewModel.navigationPath, [regular.id])
+        XCTAssertEqual(externalRequests.clearedRequestIDs, [firstRequest.requestId])
+        XCTAssertEqual(externalRequests.pendingTrackListOpenRequest, newerRequest)
     }
 
     private func makeViewModel(
@@ -339,8 +422,10 @@ final class TrackListsMasterFlowTests: XCTestCase {
         switch (actual, expected) {
         case (.trackListSaveFailed?, .trackListSaveFailed):
             break
+        case (.trackListNotFound?, .trackListNotFound):
+            break
         default:
-            XCTFail("Ожидалась ошибка сохранения треклистов")
+            XCTFail("Ожидалась семантическая ошибка master-flow")
         }
     }
 
@@ -508,13 +593,24 @@ private final class MasterPresenter: TrackListsPresenting {
 private final class MasterExternalOpenRequests: TrackListsExternalOpenRequestManaging {
     var pendingTrackListOpenRequest: TrackListOpenRequest?
     private(set) var clearedRequestIDs: [UUID] = []
+    private var replacementRequestOnClear: TrackListOpenRequest?
 
-    init(request: TrackListOpenRequest? = nil) {
+    init(
+        request: TrackListOpenRequest? = nil,
+        replacementRequestOnClear: TrackListOpenRequest? = nil
+    ) {
         pendingTrackListOpenRequest = request
+        self.replacementRequestOnClear = replacementRequestOnClear
     }
 
     func clearTrackListOpenRequest(requestId: UUID) {
         clearedRequestIDs.append(requestId)
+
+        // Имитирует появление более нового request непосредственно перед exact-ID clearing.
+        if let replacementRequestOnClear {
+            pendingTrackListOpenRequest = replacementRequestOnClear
+            self.replacementRequestOnClear = nil
+        }
 
         guard pendingTrackListOpenRequest?.requestId == requestId else {
             return

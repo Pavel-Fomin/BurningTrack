@@ -16,6 +16,8 @@ final class TrackListFlowActionHandler {
 
     /// Читает detail snapshot для технических lifecycle-действий строки.
     private let reader: any TrackListReading
+    /// Владелец initial load и retry detail destination.
+    private let lifecycle: any TrackListDetailLifecycleHandling
 
     /// Обработчик presentation-действий одного треклиста.
     private let presentationHandler: TrackListPresentationHandler
@@ -35,6 +37,7 @@ final class TrackListFlowActionHandler {
     /// Создаёт обработчик действий detail-flow одного треклиста.
     init(
         reader: any TrackListReading,
+        lifecycle: any TrackListDetailLifecycleHandling,
         playbackStateProvider: any PlaybackStateProviding,
         playbackController: any TrackPlaybackControlling,
         trackListManager: any TrackListManaging,
@@ -49,6 +52,7 @@ final class TrackListFlowActionHandler {
         favoriteTrackActionHandler: FavoriteTrackActionHandler
     ) {
         self.reader = reader
+        self.lifecycle = lifecycle
         self.presentationHandler = TrackListPresentationHandler(
             reader: reader,
             presenter: presenter,
@@ -83,6 +87,12 @@ final class TrackListFlowActionHandler {
     /// Выполняет действие detail-flow одного треклиста.
     func handle(_ action: TrackListAction) {
         switch action {
+
+        case .screenAppeared:
+            lifecycle.loadIfNeeded()
+
+        case .retryInitialLoad:
+            lifecycle.retryInitialLoad()
 
         case .requestRuntimeSnapshot(let trackId):
             reader.requestSnapshotIfNeeded(for: trackId)

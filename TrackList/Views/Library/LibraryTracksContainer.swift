@@ -67,6 +67,7 @@ struct LibraryTracksContainer: View {
             favoriteTrackIdsProvider: screenStore.favoriteTrackIdsProvider,
             tracksViewModel: screenStore.tracksViewModel,
             cloudAvailabilityController: screenStore.cloudAvailabilityController,
+            cloudAvailabilityActionHandler: screenStore.cloudAvailabilityActionHandler,
             settingsManager: screenStore.settingsManager,
             playbackStateController: screenStore.playbackStateController,
             revealCoordinator: screenStore.revealCoordinator,

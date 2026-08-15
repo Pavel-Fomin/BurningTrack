@@ -2,7 +2,7 @@
 //  MoveToFolderSheet.swift
 //  TrackList
 //
-//  Отображает дерево папок и передаёт локальный выбор контейнеру.
+//  Отображает готовое дерево папок и передаёт typed выбор feature-flow.
 //
 //  Created by Pavel Fomin on 07.12.2025.
 //
@@ -14,20 +14,16 @@ struct MoveToFolderSheet: View {
 
     // MARK: - Входные данные
 
-    /// Идентификатор трека нужен только для отметки его текущей папки.
-    let trackId: UUID
-
+    /// Заголовок верхнего уровня готового screen state.
     let rootNavigationTitle: String
-
     /// Выбранная папка назначения.
-    /// Источник истины находится в контейнере.
-    @Binding var selectedFolderId: UUID?
-
+    let selectedFolderID: UUID?
     /// Текущая папка трека нужна для отметки и исключается из доступных папок назначения.
-    @Binding var trackCurrentFolderId: UUID?
-
-    /// Явно переданное read-only дерево папок для navigation context и virtual current row.
-    let library: MusicLibraryManager
+    let currentFolderID: UUID?
+    /// Lightweight snapshot исключает production-зависимости из leaf View и navigation context.
+    let folderSnapshot: MoveToFolderFolderSnapshot
+    /// Направляет изменение выбора в typed feature action.
+    let onFolderSelectionChanged: (UUID?) -> Void
 
     // MARK: - Состояние
 
@@ -35,69 +31,26 @@ struct MoveToFolderSheet: View {
     @StateObject private var nav: MoveToFolderNavigationContext
 
     init(
-        trackId: UUID,
         rootNavigationTitle: String,
-        selectedFolderId: Binding<UUID?>,
-        trackCurrentFolderId: Binding<UUID?>,
-        library: MusicLibraryManager
+        folderSnapshot: MoveToFolderFolderSnapshot,
+        selectedFolderID: UUID?,
+        currentFolderID: UUID?,
+        onFolderSelectionChanged: @escaping (UUID?) -> Void
     ) {
-        self.trackId = trackId
         self.rootNavigationTitle = rootNavigationTitle
-        _selectedFolderId = selectedFolderId
-        _trackCurrentFolderId = trackCurrentFolderId
-        self.library = library
+        self.folderSnapshot = folderSnapshot
+        self.selectedFolderID = selectedFolderID
+        self.currentFolderID = currentFolderID
+        self.onFolderSelectionChanged = onFolderSelectionChanged
         _nav = StateObject(
-            wrappedValue: MoveToFolderNavigationContext(library: library)
+            wrappedValue: MoveToFolderNavigationContext(snapshot: folderSnapshot)
         )
-    }
-
-    // MARK: - Строки
-
-    /// Строки папок для отображения в списке.
-    ///
-    /// Правила:
-    /// - текущая папка трека показывается виртуально ТОЛЬКО на корневом уровне
-    /// - внутри дерева отображается только естественным образом
-    private var orderedRows: [MoveToFolderNavigationContext.FolderRow] {
-
-        let rows = nav.rows
-
-        // Пока текущая папка ещё не загружена — показываем список как есть
-        guard let currentId = trackCurrentFolderId else {
-            return rows
-        }
-
-        // Если текущая папка уже есть в списке — просто поднимаем её наверх
-        if rows.contains(where: { $0.id == currentId }) {
-            return rows.sorted { lhs, rhs in
-                if lhs.id == currentId { return true }
-                if rhs.id == currentId { return false }
-                return false
-            }
-        }
-
-        // Виртуально добавляем текущую папку ТОЛЬКО на корневом уровне
-        guard nav.currentFolderId == nil else {
-            return rows
-        }
-
-        guard let currentFolder = library.folder(for: currentId) else {
-            return rows
-        }
-
-        let currentRow = MoveToFolderNavigationContext.FolderRow(
-            id: currentId,
-            name: currentFolder.name,
-            hasSubfolders: currentFolder.subfolders.isEmpty == false
-        )
-
-        return [currentRow] + rows
     }
 
     // MARK: - Интерфейс
 
     var body: some View {
-        List(orderedRows) { row in
+        List(nav.rows(currentFolderID: currentFolderID)) { row in
             HStack(spacing: 12) {
 
                 Button {
@@ -112,19 +65,20 @@ struct MoveToFolderSheet: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityValue(
-                    row.id == trackCurrentFolderId
+                    row.id == currentFolderID
                     ? MoveToFolderPresentationText.currentFolderAccessibilityValue
                     : ""
                 )
 
-                if row.id != trackCurrentFolderId {
+                if row.id != currentFolderID {
                     Button {
-                        selectedFolderId =
-                            (selectedFolderId == row.id) ? nil : row.id
+                        onFolderSelectionChanged(
+                            selectedFolderID == row.id ? nil : row.id
+                        )
                     } label: {
                         Image(
                             systemName:
-                                selectedFolderId == row.id
+                                selectedFolderID == row.id
                                 ? "largecircle.fill.circle"
                                 : "circle"
                         )
@@ -140,7 +94,7 @@ struct MoveToFolderSheet: View {
                         )
                     )
                     .accessibilityValue(
-                        selectedFolderId == row.id ? String(localized: "Selected") : ""
+                        selectedFolderID == row.id ? String(localized: "Selected") : ""
                     )
                 } else {
                     Spacer()
@@ -149,7 +103,7 @@ struct MoveToFolderSheet: View {
             }
             .overlay(alignment: .trailing) {
 
-                if row.id == trackCurrentFolderId {
+                if row.id == currentFolderID {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.title3)
                         .foregroundStyle(.green)

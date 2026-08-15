@@ -14,13 +14,14 @@ struct NewTrackListSelectionStateBuilder {
     /// Собирает состояние выбора треков.
     func build(
         folders: [LibraryFolder],
-        selectedCount: Int,
+        selectedTrackIDs: Set<UUID>,
         isSubmitting: Bool
     ) -> NewTrackListSelectionState {
-        return NewTrackListSelectionState(
+        NewTrackListSelectionState(
             folders: folders,
-            selectedCount: selectedCount,
-            canSubmit: selectedCount > 0 && !isSubmitting,
+            selectedCount: selectedTrackIDs.count,
+            selectedTrackIDs: selectedTrackIDs,
+            canSubmit: selectedTrackIDs.isEmpty == false && !isSubmitting,
             isSubmitting: isSubmitting
         )
     }

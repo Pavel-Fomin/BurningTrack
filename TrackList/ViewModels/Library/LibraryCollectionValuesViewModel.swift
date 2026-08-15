@@ -9,13 +9,15 @@
 
 import Foundation
 
-struct LibraryCollectionValuesScreenState {
+struct LibraryCollectionValuesScreenState: Equatable {
     /// Раздел коллекции, значения которого отображаются.
     let category: LibraryCollectionCategory
     /// Показывает, что значения сейчас загружаются из SQLite metadata.
     let isLoading: Bool
     /// Загруженные значения раздела.
     let values: [LibraryCollectionValue]
+    /// Текущий режим сортировки уже загруженного снимка значений.
+    let sortMode: LibraryCollectionValueSortMode
 
     /// Пустое состояние после завершения загрузки.
     var isEmpty: Bool {
@@ -24,18 +26,17 @@ struct LibraryCollectionValuesScreenState {
 }
 
 @MainActor
-final class LibraryCollectionValuesViewModel: ObservableObject {
+final class LibraryCollectionValuesViewModel: ObservableObject, LibraryCollectionValuesActionOutput {
     // MARK: - Выходные данные
 
     /// Готовое состояние экрана для SwiftUI.
     @Published private(set) var state: LibraryCollectionValuesScreenState
-    /// Текущий режим сортировки значений в рамках жизненного цикла экрана.
-    @Published private(set) var sortMode: LibraryCollectionValueSortMode
-
     // MARK: - Зависимости
 
     private let category: LibraryCollectionCategory
     private let provider: LibraryCollectionValuesProvider
+    /// Handler сохраняет typed flow пользовательских действий вне SwiftUI View.
+    private var actionHandler: LibraryCollectionValuesActionHandler?
 
     // MARK: - Приватное
 
@@ -54,22 +55,33 @@ final class LibraryCollectionValuesViewModel: ObservableObject {
         self.state = LibraryCollectionValuesScreenState(
             category: category,
             isLoading: true,
-            values: []
+            values: [],
+            sortMode: category.defaultValueSortMode
         )
-        self.sortMode = category.defaultValueSortMode
     }
 
     // MARK: - Действия
 
+    /// Подключает handler после того, как ViewModel стала его слабым output.
+    func configure(actionHandler: LibraryCollectionValuesActionHandler) {
+        self.actionHandler = actionHandler
+    }
+
+    /// Принимает typed intent View и не раскрывает ей загрузку или сортировку напрямую.
+    func send(_ action: LibraryCollectionValuesAction) {
+        actionHandler?.handle(action)
+    }
+
     /// Загружает значения выбранного раздела один раз за жизненный цикл экрана.
-    func load() async {
+    func loadValuesIfNeeded() async {
         guard didLoad == false else { return }
         didLoad = true
 
         state = LibraryCollectionValuesScreenState(
             category: category,
             isLoading: true,
-            values: []
+            values: [],
+            sortMode: state.sortMode
         )
 
         let values = await provider.values(for: category)
@@ -79,27 +91,33 @@ final class LibraryCollectionValuesViewModel: ObservableObject {
         state = LibraryCollectionValuesScreenState(
             category: category,
             isLoading: false,
-            values: sortedValues()
+            values: sortedValues(),
+            sortMode: state.sortMode
         )
     }
 
     /// Меняет сортировку уже загруженных значений без повторного обращения к provider.
-    func setSortMode(_ mode: LibraryCollectionValueSortMode) {
+    func selectSortMode(_ mode: LibraryCollectionValueSortMode) {
         guard category.availableValueSortModes.contains(mode) else { return }
-        guard sortMode != mode else { return }
+        guard state.sortMode != mode else { return }
 
-        sortMode = mode
         state = LibraryCollectionValuesScreenState(
             category: category,
             isLoading: state.isLoading,
-            values: sortedValues()
+            values: sortedValues(mode: mode),
+            sortMode: mode
         )
     }
 
     // MARK: - Приватное
 
     /// Сортирует только сохранённый в памяти результат provider.
-    private func sortedValues() -> [LibraryCollectionValue] {
-        LibraryCollectionValueSorter.sort(loadedValues, mode: sortMode)
+    private func sortedValues(
+        mode: LibraryCollectionValueSortMode? = nil
+    ) -> [LibraryCollectionValue] {
+        LibraryCollectionValueSorter.sort(
+            loadedValues,
+            mode: mode ?? state.sortMode
+        )
     }
 }

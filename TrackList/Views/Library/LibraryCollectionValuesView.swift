@@ -13,9 +13,9 @@ struct LibraryCollectionValuesView: View {
     // MARK: - ViewModel
 
     /// ViewModel владеет загрузкой значений из provider и не знает о NavigationStack.
-    @StateObject private var viewModel: LibraryCollectionValuesViewModel
+    @ObservedObject private var viewModel: LibraryCollectionValuesViewModel
     /// Контроллер runtime snapshot-ов сохраняет точечную загрузку обложки вне PlayerViewModel.
-    @StateObject private var runtimeController: LibraryTrackRuntimeController
+    @ObservedObject private var runtimeController: LibraryTrackRuntimeController
     /// Единый снимок сохраняет реактивность album-строк без наблюдения PlayerViewModel.
     @State private var playbackState: PlaybackStateSnapshot
 
@@ -30,13 +30,12 @@ struct LibraryCollectionValuesView: View {
 
     init(
         viewModel: LibraryCollectionValuesViewModel,
+        runtimeController: LibraryTrackRuntimeController,
         playbackStateProvider: any PlaybackStateProviding,
         onValueSelected: @escaping (LibraryCollectionValue) -> Void
     ) {
-        self._viewModel = StateObject(wrappedValue: viewModel)
-        self._runtimeController = StateObject(
-            wrappedValue: LibraryTrackRuntimeController()
-        )
+        self._viewModel = ObservedObject(wrappedValue: viewModel)
+        self._runtimeController = ObservedObject(wrappedValue: runtimeController)
         self._playbackState = State(
             initialValue: playbackStateProvider.playbackState
         )
@@ -60,7 +59,7 @@ struct LibraryCollectionValuesView: View {
                 }
             }
             .task {
-                await viewModel.load()
+                viewModel.send(.screenAppeared)
             }
             .onReceive(playbackStateProvider.playbackStatePublisher) { playbackState in
                 self.playbackState = playbackState
@@ -109,12 +108,12 @@ struct LibraryCollectionValuesView: View {
         _ mode: LibraryCollectionValueSortMode
     ) -> some View {
         Button {
-            viewModel.setSortMode(mode)
+            viewModel.send(.sortModeSelected(mode))
         } label: {
             Label {
                 Text(LibraryPresentationText.collectionValueSortModeTitle(for: mode))
             } icon: {
-                if viewModel.sortMode == mode {
+                if viewModel.state.sortMode == mode {
                     Image(systemName: "checkmark")
                 }
             }

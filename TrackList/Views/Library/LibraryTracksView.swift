@@ -34,6 +34,8 @@ struct LibraryTracksView: View {
     @ObservedObject private var tracksViewModel: LibraryTracksViewModel
     /// Контроллер iCloud принадлежит времени жизни destination, а не пересчёту родительского View.
     @State private var cloudAvailabilityController: LibraryCloudAvailabilityScreenController
+    /// Стабильный handler передаётся Container вместе с graph destination и не создаётся во View.
+    private let cloudAvailabilityActionHandler: LibraryCloudAvailabilityActionHandler
     @ObservedObject var settingsManager: AppSettingsManager
     /// Playback-состояние сохраняется на всё время жизни открытой папки.
     @StateObject private var playbackStateController: LibraryTrackPlaybackStateController
@@ -67,13 +69,6 @@ struct LibraryTracksView: View {
             && visibleIDs.isSubset(of: Set(tracksViewModel.state.selectedTrackIDs.ids))
     }
 
-    /// Обрабатывает iCloud-действия на уровне экрана, а не жизненного цикла каждой строки.
-    private var cloudAvailabilityActionHandler: LibraryCloudAvailabilityActionHandler {
-        LibraryCloudAvailabilityActionHandler(
-            controller: cloudAvailabilityController
-        )
-    }
-    
     // MARK: - Инициализация
 
     init(
@@ -87,6 +82,7 @@ struct LibraryTracksView: View {
         favoriteTrackIdsProvider: any FavoriteTrackIdsProviding,
         tracksViewModel: LibraryTracksViewModel,
         cloudAvailabilityController: LibraryCloudAvailabilityScreenController,
+        cloudAvailabilityActionHandler: LibraryCloudAvailabilityActionHandler,
         settingsManager: AppSettingsManager,
         playbackStateController: LibraryTrackPlaybackStateController,
         revealCoordinator: LibraryTrackRevealCoordinator,
@@ -105,6 +101,7 @@ struct LibraryTracksView: View {
         self.favoriteTrackIdsProvider = favoriteTrackIdsProvider
         self.tracksViewModel = tracksViewModel
         self._cloudAvailabilityController = State(initialValue: cloudAvailabilityController)
+        self.cloudAvailabilityActionHandler = cloudAvailabilityActionHandler
         self.settingsManager = settingsManager
         self._playbackStateController = StateObject(wrappedValue: playbackStateController)
         self._revealCoordinator = StateObject(wrappedValue: revealCoordinator)

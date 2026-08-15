@@ -21,6 +21,10 @@ final class LibraryCollectionTracksScreenStore: ObservableObject {
     let commandHandler: LibraryTrackCommandHandler
     let favoriteTrackIdsProvider: any FavoriteTrackIdsProviding
     let sheetManager: SheetManager
+    /// Stable handler экспортного сценария общего раздела, если source его поддерживает.
+    let allTracksActionHandler: LibraryAllTracksActionHandler?
+    /// Stable handler экспортного сценария выбранного значения, если source его поддерживает.
+    let collectionTracksActionHandler: LibraryCollectionTracksActionHandler?
 
     init(
         source: LibraryTrackListSource,
@@ -32,7 +36,9 @@ final class LibraryCollectionTracksScreenStore: ObservableObject {
         presentationHandler: LibraryTrackPresentationHandler,
         commandHandler: LibraryTrackCommandHandler,
         favoriteTrackIdsProvider: any FavoriteTrackIdsProviding,
-        sheetManager: SheetManager
+        sheetManager: SheetManager,
+        allTracksActionHandler: LibraryAllTracksActionHandler?,
+        collectionTracksActionHandler: LibraryCollectionTracksActionHandler?
     ) {
         self.source = source
         self.tracksViewModel = tracksViewModel
@@ -44,5 +50,7 @@ final class LibraryCollectionTracksScreenStore: ObservableObject {
         self.commandHandler = commandHandler
         self.favoriteTrackIdsProvider = favoriteTrackIdsProvider
         self.sheetManager = sheetManager
+        self.allTracksActionHandler = allTracksActionHandler
+        self.collectionTracksActionHandler = collectionTracksActionHandler
     }
 }

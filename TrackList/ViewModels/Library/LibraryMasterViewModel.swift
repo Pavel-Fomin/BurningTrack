@@ -21,13 +21,16 @@ final class LibraryMasterViewModel: ObservableObject, LibraryMasterActionOutput 
         folders: [],
         showsPurchasedITunesSource: AppSettings.defaultValue.visible.library.isPurchasedITunesSourceVisible,
         isEmpty: true,
-        detachFolderConfirmation: .none
+        detachFolderConfirmation: .none,
+        folderPickerRequestID: nil
     )
 
     /// Папка, ожидающая подтверждения открепления.
     private(set) var pendingDetachFolder: LibraryFolder?
     /// Фаза подтверждения открепления ожидающей папки.
     private var detachFolderConfirmation: LibraryMasterDetachFolderConfirmation = .none
+    /// Последний presentation intent системного picker-а; UUID позволяет отличить повторный запрос.
+    private var folderPickerRequestID: UUID?
 
     /// Менеджер фонотеки, из которого собирается состояние.
     private let manager: MusicLibraryManager
@@ -61,12 +64,19 @@ final class LibraryMasterViewModel: ObservableObject, LibraryMasterActionOutput 
         refreshState(using: settingsManager.settings)
     }
 
+    /// Публикует intent открытия системного picker-а, сохраняя SwiftUI presentation state у View.
+    func requestFolderPicker() {
+        folderPickerRequestID = UUID()
+        refreshState()
+    }
+
     /// Использует полученный снимок настроек, чтобы состояние не зависело от порядка публикации @Published.
     private func refreshState(using settings: AppSettings) {
         screenState = stateBuilder.build(
             manager: manager,
             settings: settings,
-            detachFolderConfirmation: detachFolderConfirmation
+            detachFolderConfirmation: detachFolderConfirmation,
+            folderPickerRequestID: folderPickerRequestID
         )
     }
 

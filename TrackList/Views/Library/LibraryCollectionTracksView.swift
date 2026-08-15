@@ -76,20 +76,19 @@ struct LibraryCollectionTracksView: View {
 
     /// Показывает, активен ли локальный режим выбора фонотеки.
     private var isSelecting: Bool {
-        tracksViewModel.bulkSelection.isActive
-    }
-
-    /// Пробрасывает selection в список без переноса логики выбора в строки.
-    private var selectionBinding: Binding<OrderedSelection<UUID>> {
-        Binding(
-            get: { tracksViewModel.bulkSelection.selection },
-            set: { tracksViewModel.bulkSelection.selection = $0 }
-        )
+        tracksViewModel.state.isSelecting
     }
 
     /// Все видимые треки текущих секций для передачи в строки списком контекста.
     private var allVisibleTracks: [LibraryTrack] {
-        tracksViewModel.trackSections.flatMap(\.tracks)
+        tracksViewModel.state.sections.flatMap(\.tracks)
+    }
+
+    /// Вычисление относится к представлению toolbar и использует готовый screen state без мутации selection.
+    private var areAllVisibleTracksSelected: Bool {
+        let visibleIDs = Set(allVisibleTracks.map(\.id))
+        return visibleIDs.isEmpty == false
+            && visibleIDs.isSubset(of: Set(tracksViewModel.state.selectedTrackIDs.ids))
     }
 
     /// Показывает экспорт внутри общего меню только для общего списка фонотеки.
@@ -141,14 +140,14 @@ struct LibraryCollectionTracksView: View {
                 navigationToolbarContent
             }
             .refreshable {
-                await tracksViewModel.refresh()
+                tracksViewModel.send(.refreshRequested)
             }
             .task {
                 selectionActionSender = tracksViewModel
-                await tracksViewModel.loadTracksIfNeeded()
+                tracksViewModel.send(.screenAppeared)
             }
-            .onChange(of: tracksViewModel.bulkSelection.selectedCount) { _, _ in
-                updateSelectionActionBarConfig()
+            .onChange(of: tracksViewModel.state.selectionActionBarState) { _, newValue in
+                updateSelectionActionBarConfig(from: newValue)
             }
             .onReceive(screenStore.favoriteTrackIdsProvider.favoriteTrackIdsPublisher) { favoriteTrackIds in
                 self.favoriteTrackIds = favoriteTrackIds
@@ -181,7 +180,7 @@ struct LibraryCollectionTracksView: View {
     private var navigationToolbarContent: some ToolbarContent {
         if isSelecting {
             LibraryBulkSelectionToolbar(
-                areAllVisibleTracksSelected: tracksViewModel.areAllVisibleTracksSelected,
+                areAllVisibleTracksSelected: areAllVisibleTracksSelected,
                 onToggleSelectAll: handleToggleSelectAll,
                 onBatchActionSelection: handleBatchActionSelection,
                 onCancel: handleTapCancel
@@ -190,7 +189,7 @@ struct LibraryCollectionTracksView: View {
             /// Меню обычного режима.
             ToolbarItem(placement: .topBarTrailing) {
                 LibraryTracksToolbarMenuButton(
-                    selectedSortMode: tracksViewModel.sortMode,
+                    selectedSortMode: tracksViewModel.state.sortMode,
                     availableSortModes: source.availableTrackSortModes,
                     onSelect: handleTapSelect,
                     onSortModeSelection: handleSortModeSelection,
@@ -216,11 +215,11 @@ struct LibraryCollectionTracksView: View {
         return ScrollViewReader { proxy in
             List {
                 LibraryTrackSectionsListView(
-                    sections: tracksViewModel.trackSections,
+                    sections: tracksViewModel.state.sections,
                     allTracks: allVisibleTracks,
                     playbackSource: playbackSource,
                     currentCollectionCategory: source.collectionCategory,
-                    trackListMembershipsById: tracksViewModel.trackListMembershipsById,
+                    trackListMembershipsById: tracksViewModel.state.trackListMembershipsById,
                     presentationHandler: screenStore.presentationHandler,
                     cloudAvailabilityStateStore: screenStore.cloudAvailabilityController.stateStore(for:),
                     cloudAvailabilityActionHandler: screenStore.cloudAvailabilityActionHandler,
@@ -233,10 +232,10 @@ struct LibraryCollectionTracksView: View {
                     shouldShowTrackListMembership: settingsManager.settings.visible.library.isTrackListMembershipVisible,
                     shouldShowFileFormat: settingsManager.settings.visible.library.isFileFormatVisible,
                     isSelecting: isSelecting,
-                    selectedTrackIDs: tracksViewModel.bulkSelection.selection
+                    selectedTrackIDs: tracksViewModel.state.selectedTrackIDs
                 )
 
-                if tracksViewModel.isLoading == false && tracksViewModel.trackSections.isEmpty {
+                if tracksViewModel.state.isLoading == false && tracksViewModel.state.sections.isEmpty {
                     Section {
                         Text("No Tracks")
                             .foregroundStyle(.secondary)
@@ -252,7 +251,7 @@ struct LibraryCollectionTracksView: View {
             .onChange(of: scrollRequest) { _, request in
                 handleScrollRequest(request, proxy: proxy)
             }
-            .onChange(of: tracksViewModel.trackSections) { _, _ in
+            .onChange(of: tracksViewModel.state.sections) { _, _ in
                 requestActiveTrackScrollIfNeeded()
             }
             .onChange(of: playbackStateController.currentDisplayableId) { _, _ in
@@ -270,7 +269,7 @@ struct LibraryCollectionTracksView: View {
     /// Скелетон / лоадер поверх пустого списка во время загрузки.
     @ViewBuilder
     private var loadingOverlayView: some View {
-        if tracksViewModel.isLoading && tracksViewModel.trackSections.isEmpty {
+        if tracksViewModel.state.isLoading && tracksViewModel.state.sections.isEmpty {
             VStack {
                 Spacer()
                 ProgressView("Loading Tracks")
@@ -290,13 +289,13 @@ struct LibraryCollectionTracksView: View {
     private func handleTracksListAppear() {
         screenStore.cloudAvailabilityActionHandler.handle(.screenDidAppear)
         requestActiveTrackScrollIfNeeded()
-        updateSelectionActionBarConfig()
+        restoreSelectionActionBarIfNeeded()
     }
 
     /// Обрабатывает нажатие выбора в toolbar.
     private func handleTapSelect() {
-        tracksViewModel.activateBulkSelection()
-        updateSelectionActionBarConfig()
+        // Вход в выбор без заранее выбранного batch-действия.
+        tracksViewModel.send(.selectionStarted)
     }
 
     /// Передаёт треки в текущем отображаемом порядке обработчику общего списка.
@@ -313,15 +312,13 @@ struct LibraryCollectionTracksView: View {
 
     /// Обрабатывает массовое переключение выбора в toolbar.
     private func handleToggleSelectAll() {
-        tracksViewModel.toggleSelectAllVisibleTracks()
-        updateSelectionActionBarConfig()
+        // Массовое переключение выбора остаётся во ViewModel.
+        tracksViewModel.send(.selectAllToggled)
     }
 
     /// Обрабатывает выбор режима сортировки из toolbar menu.
     private func handleSortModeSelection(_ mode: LibraryTrackSortMode) {
-        Task {
-            await tracksViewModel.setSortMode(mode)
-        }
+        tracksViewModel.send(.sortModeSelected(mode))
     }
 
     /// Обрабатывает отмену режима выбора.
@@ -349,15 +346,21 @@ struct LibraryCollectionTracksView: View {
         requestActiveTrackScrollIfNeeded()
     }
 
-    /// Синхронизирует конфигурацию нижней панели подтверждения для родительского host.
-    private func updateSelectionActionBarConfig() {
-        guard let state = selectionActionBarCoordinator.makeState(
-            isSelecting: tracksViewModel.bulkSelection.isActive,
-            pendingAction: tracksViewModel.bulkSelection.pendingAction,
-            selectedCount: tracksViewModel.bulkSelection.selectedCount,
-            hasSelection: tracksViewModel.bulkSelection.hasSelection
-        ) else {
+    /// Синхронизирует готовое presentation-состояние нижней панели с общим host.
+    private func updateSelectionActionBarConfig(
+        from state: LibrarySelectionActionBarState?
+    ) {
+        guard let state else {
             selectionActionBarConfig = nil
+            return
+        }
+
+        selectionActionBarConfig = selectionActionBarCoordinator.makeConfig(from: state)
+    }
+
+    /// Восстанавливает config только из уже активного selection, не записывая nil при remount списка.
+    private func restoreSelectionActionBarIfNeeded() {
+        guard let state = tracksViewModel.state.selectionActionBarState else {
             return
         }
 
@@ -366,20 +369,12 @@ struct LibraryCollectionTracksView: View {
 
     /// Сбрасывает режим мультиселекта и очищает нижнюю панель.
     private func resetMultiselect() {
-        tracksViewModel.resetBulkSelection()
-        updateSelectionActionBarConfig()
+        tracksViewModel.send(.selectionCancelled)
     }
 
     /// Обрабатывает выбор batch-действия с учётом текущего режима и выбора.
     private func handleBatchActionSelection(_ action: BulkTrackAction) {
         tracksViewModel.send(.batchActionSelected(action))
-        updateSelectionActionBarConfig()
-    }
-
-    /// Применяет заранее выбранное batch-действие из нижней панели.
-    private func applySelectedBatchAction() {
-        tracksViewModel.applyPendingBulkAction()
-        updateSelectionActionBarConfig()
     }
 
     /// Запрашивает прокрутку к активному треку, если он есть в текущем списке.

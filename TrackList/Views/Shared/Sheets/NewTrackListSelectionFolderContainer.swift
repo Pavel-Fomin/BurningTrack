@@ -9,34 +9,30 @@
 
 import SwiftUI
 
-/// Создаёт ViewModel Library Tracks один раз через существующую factory, а не во View папки.
+/// Создаёт selection-folder graph один раз через существующую Library Tracks factory.
 struct NewTrackListSelectionFolderContainer: View {
     /// Открытая папка фонотеки.
     let folder: LibraryFolder
     /// Единая ViewModel выбора треков всего sheet-flow.
     @ObservedObject var selectionViewModel: NewTrackListSelectionViewModel
-    /// Published-снимок «Избранного» для presentation-состояния строк.
-    let favoriteTrackIdsProvider: any FavoriteTrackIdsProviding
     /// Factory вложенных папок сохраняет тот же composition root.
     let folderViewFactory: NewTrackListSelectionFolderViewFactory
 
-    /// Готовая ViewModel папки, созданная только в initializer destination-контейнера.
-    @StateObject private var tracksViewModel: LibraryTracksViewModel
+    /// Store удерживает Library Tracks, presentation-state и action ingress одного destination.
+    @StateObject private var screenStore: NewTrackListSelectionFolderScreenStore
 
     init(
         folder: LibraryFolder,
         selectionViewModel: NewTrackListSelectionViewModel,
-        libraryTracksScreenFactory: LibraryTracksScreenFactory,
-        favoriteTrackIdsProvider: any FavoriteTrackIdsProviding,
         folderViewFactory: NewTrackListSelectionFolderViewFactory
     ) {
         self.folder = folder
         self.selectionViewModel = selectionViewModel
-        self.favoriteTrackIdsProvider = favoriteTrackIdsProvider
         self.folderViewFactory = folderViewFactory
-        _tracksViewModel = StateObject(
-            wrappedValue: libraryTracksScreenFactory.makeSelectionTracksViewModel(
-                folder: folder
+        _screenStore = StateObject(
+            wrappedValue: folderViewFactory.makeScreenStore(
+                folder: folder,
+                selectionViewModel: selectionViewModel
             )
         )
     }
@@ -46,8 +42,7 @@ struct NewTrackListSelectionFolderContainer: View {
             folder: folder,
             folderViewFactory: folderViewFactory,
             selectionViewModel: selectionViewModel,
-            favoriteTrackIdsProvider: favoriteTrackIdsProvider,
-            tracksViewModel: tracksViewModel
+            screenStore: screenStore
         )
     }
 }

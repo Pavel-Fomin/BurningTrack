@@ -11,7 +11,7 @@ import Combine
 import Foundation
 
 @MainActor
-final class LibraryScreenViewModel: ObservableObject {
+final class LibraryScreenViewModel: ObservableObject, LibraryScreenActionHandlingOutput {
     // MARK: - Выходные данные
 
     @Published private(set) var screenState: LibraryScreenState
@@ -63,6 +63,7 @@ final class LibraryScreenViewModel: ObservableObject {
         )
         self.collectionRootItems = Self.loadingCollectionRootItems
 
+        actionHandler.configure(output: self)
         observeDependencies()
     }
 
@@ -73,7 +74,7 @@ final class LibraryScreenViewModel: ObservableObject {
         refreshState()
     }
 
-    /// Сообщает ViewModel, виден ли корневой список режима "Треки".
+    /// Обновляет lifecycle collection root только по typed action от ActionHandler.
     func setCollectionRootVisibility(_ isVisible: Bool) {
         isCollectionRootVisible = isVisible
 

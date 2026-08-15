@@ -3,8 +3,8 @@
 //  TrackList
 //
 //  Тонкий навигационный контекст для MoveToFolderSheet.
-//  НЕ содержит бизнес-логики, НЕ сканирует ФС, НЕ мутирует дерево.
-//  Использует только read-only дерево папок из MusicLibraryManager.
+//  НЕ содержит бизнес-логики, НЕ сканирует ФС, НЕ мутирует snapshot.
+//  Использует только immutable presentation-модель папок.
 //
 //  Created by Pavel Fomin on 25.12.2025.
 //
@@ -25,12 +25,13 @@ final class MoveToFolderNavigationContext: ObservableObject {
 
     // MARK: - Зависимости
 
-    private let library: MusicLibraryManager
+    /// Снимок папок конкретного route, подготовленный feature factory.
+    private let snapshot: MoveToFolderFolderSnapshot
 
     // MARK: - Навигационное состояние (лёгкое)
 
     /// Текущая папка навигации. nil = корневой уровень.
-    private(set) var currentFolderId: UUID? = nil
+    private(set) var currentFolderID: UUID? = nil
 
     /// Стек родительских папок для кнопки "Назад".
     private var stack: [UUID?] = []
@@ -41,106 +42,102 @@ final class MoveToFolderNavigationContext: ObservableObject {
 
     /// Имя открытой папки; nil означает корневой уровень выбора назначения.
     var currentFolderName: String? {
-        guard let currentFolderId else { return nil }
-        return library.folder(for: currentFolderId)?.name
+        guard let currentFolderID else { return nil }
+        return node(for: currentFolderID)?.name
     }
 
-    var rows: [FolderRow] {
-        if let id = currentFolderId {
-            guard let folder = library.folder(for: id) else { return [] }
-            return folder.subfolders.map {
-                FolderRow(
-                    id: $0.url.libraryFolderId,
-                    name: $0.name,
-                    hasSubfolders: $0.subfolders.isEmpty == false
-                )
+    /// Строит UI-строки из snapshot, сохраняя virtual current-folder semantics корневого уровня.
+    func rows(currentFolderID trackCurrentFolderID: UUID?) -> [FolderRow] {
+        let baseRows = rowsForCurrentNavigationLevel()
+
+        guard let trackCurrentFolderID else { return baseRows }
+
+        if let currentIndex = baseRows.firstIndex(where: { $0.id == trackCurrentFolderID }) {
+            let currentRow = baseRows[currentIndex]
+            return [currentRow] + baseRows.enumerated().compactMap { index, row in
+                index == currentIndex ? nil : row
             }
         }
 
-        // Корневой уровень
-        return library.attachedFolders.map {
-            FolderRow(
-                id: $0.url.libraryFolderId,
-                name: $0.name,
-                hasSubfolders: $0.subfolders.isEmpty == false
-            )
+        // Виртуальная текущая папка показывается только на root; внутри дерева строка естественная.
+        guard currentFolderID == nil,
+              let currentRow = row(for: trackCurrentFolderID) else {
+            return baseRows
         }
+
+        return [currentRow] + baseRows
     }
 
     // MARK: - Инициализация
 
-    init(library: MusicLibraryManager) {
-        self.library = library
-    }
-
-    // MARK: - Инициализация навигации по текущему треку
-
-    /// Устанавливает навигационный путь так, чтобы пользователь
-    /// видел расположение папки трека, не смешивая навигацию и destination.
-    func initializeNavigation(to folderId: UUID?) {
-        guard let folderId else { return }
-        guard let path = findPath(to: folderId) else { return }
-
-        // path: [root, ..., target]
-        // target — папка, в которой лежит трек
-        // Если target — leaf (без подпапок), навигационно
-        // остаёмся на родителе, а не "входим" в неё
-        if path.count >= 2 {
-            let parentId = path[path.count - 2]
-            stack = Array(path.dropLast(2))
-            currentFolderId = parentId
-        } else {
-            // Корневая папка без подпапок — навигации нет
-            stack = []
-            currentFolderId = nil
-        }
-
-        objectWillChange.send()
+    init(snapshot: MoveToFolderFolderSnapshot) {
+        self.snapshot = snapshot
     }
     
     // MARK: - Навигация
 
     func enter(_ folderId: UUID) {
-        guard let folder = library.folder(for: folderId) else { return }
-        guard folder.subfolders.isEmpty == false else { return }
+        guard let folder = node(for: folderId),
+              folder.children.isEmpty == false else { return }
 
-        stack.append(currentFolderId)
-        currentFolderId = folderId
+        stack.append(currentFolderID)
+        currentFolderID = folderId
         objectWillChange.send()
     }
 
     func goBack() {
         guard let prev = stack.popLast() else { return }
-        currentFolderId = prev
+        currentFolderID = prev
         objectWillChange.send()
     }
 
-    // MARK: - Поиск пути в дереве
+    /// Возвращает строки текущего navigation level в порядке зафиксированного snapshot.
+    private func rowsForCurrentNavigationLevel() -> [FolderRow] {
+        let nodes: [MoveToFolderFolderNode]
 
-    /// Ищет путь от корня до папки с указанным id.
-    /// Возвращает массив folderId, начиная с root.
-    private func findPath(to targetId: UUID) -> [UUID]? {
-        for root in library.attachedFolders {
-            if let path = findPath(in: root, targetId: targetId) {
-                return path
+        if let currentFolderID {
+            nodes = node(for: currentFolderID)?.children ?? []
+        } else {
+            nodes = snapshot.rootNodes
+        }
+
+        return nodes.map(FolderRow.init(node:))
+    }
+
+    /// Находит узел в immutable tree без обращения к внешнему источнику папок.
+    private func node(for id: UUID) -> MoveToFolderFolderNode? {
+        Self.node(for: id, in: snapshot.rootNodes)
+    }
+
+    /// Рекурсивно ищет presentation-узел в уже подготовленном snapshot.
+    private static func node(
+        for id: UUID,
+        in nodes: [MoveToFolderFolderNode]
+    ) -> MoveToFolderFolderNode? {
+        for node in nodes {
+            if node.id == id {
+                return node
+            }
+
+            if let nestedNode = Self.node(for: id, in: node.children) {
+                return nestedNode
             }
         }
+
         return nil
     }
 
-    private func findPath(in folder: LibraryFolder, targetId: UUID) -> [UUID]? {
-        let currentId = folder.url.libraryFolderId
+    /// Строит UI-строку без раскрытия model detail в Sheet.
+    private func row(for id: UUID) -> FolderRow? {
+        node(for: id).map(FolderRow.init(node:))
+    }
+}
 
-        if currentId == targetId {
-            return [currentId]
-        }
-
-        for sub in folder.subfolders {
-            if let subPath = findPath(in: sub, targetId: targetId) {
-                return [currentId] + subPath
-            }
-        }
-
-        return nil
+private extension MoveToFolderNavigationContext.FolderRow {
+    /// Преобразует immutable node в компактную строку навигации.
+    init(node: MoveToFolderFolderNode) {
+        id = node.id
+        name = node.name
+        hasSubfolders = node.children.isEmpty == false
     }
 }

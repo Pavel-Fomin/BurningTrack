@@ -22,19 +22,24 @@ final class NewTrackListSelectionActionHandler {
     private let router: any NewTrackListSelectionRouting
     /// Неизменяемая идентичность конкретного route выбора треков.
     private let routeID: UUID
+    /// Готовит асинхронные feedback-данные без глобальных presentation side effect.
+    private let feedbackPreparer: any NewTrackListSelectionFeedbackPreparing
 
     init(
         mode: NewTrackListSelectionMode,
         trackListsManager: any TrackListFlowManaging,
         toastPresenter: any ToastPresenting,
         router: any NewTrackListSelectionRouting,
-        routeID: UUID = UUID()
+        routeID: UUID = UUID(),
+        feedbackPreparer: (any NewTrackListSelectionFeedbackPreparing)? = nil
     ) {
         self.mode = mode
         self.trackListsManager = trackListsManager
         self.toastPresenter = toastPresenter
         self.router = router
         self.routeID = routeID
+        self.feedbackPreparer = feedbackPreparer
+            ?? NewTrackListSelectionFeedbackPreparer()
     }
 
     /// Закрывает только текущий route выбора без выполнения доменной операции.
@@ -64,17 +69,32 @@ final class NewTrackListSelectionActionHandler {
         }
     }
 
-    /// Показывает feedback и закрывает route только пока его completion ещё актуален.
-    func present(
+    /// Готовит feedback без Toast и dismiss, чтобы ViewModel проверила session после последнего await.
+    func preparePresentation(
         _ result: NewTrackListSelectionSubmissionResult
-    ) async {
+    ) async -> NewTrackListSelectionPresentation {
         switch result {
         case .created(let name):
-            toastPresenter.handle(.trackListCreated(name: name))
-            router.dismissNewTrackListSelection(routeID)
+            return .success(.trackListCreated(name: name))
 
         case let .appended(tracks, trackListName):
-            await showAddedTracksToast(tracks, trackListName: trackListName)
+            return .success(
+                await makeAddedTracksToast(
+                    tracks,
+                    trackListName: trackListName
+                )
+            )
+
+        case .failure(let error):
+            return .failure(error)
+        }
+    }
+
+    /// Синхронно показывает уже подготовленный feedback после проверки актуальности session.
+    func present(_ presentation: NewTrackListSelectionPresentation) {
+        switch presentation {
+        case .success(let event):
+            toastPresenter.handle(event)
             router.dismissNewTrackListSelection(routeID)
 
         case .failure(let error):
@@ -135,25 +155,21 @@ final class NewTrackListSelectionActionHandler {
         }
     }
 
-    /// Показывает один Toast по результату добавления треков.
-    private func showAddedTracksToast(
+    /// Создаёт Toast по результату добавления, не выполняя presentation side effect до session-проверки.
+    private func makeAddedTracksToast(
         _ addedTracks: [LibraryTrack],
         trackListName: String
-    ) async {
+    ) async -> ToastEvent {
         if addedTracks.count == 1, let track = addedTracks.first {
-            let event = await TrackToastEventBuilder.trackAddedToTrackList(
+            return await feedbackPreparer.trackAddedToTrackList(
                 track: track,
                 trackListName: trackListName
             )
-            toastPresenter.handle(event)
-            return
         }
 
-        toastPresenter.handle(
-            .tracksAddedToTrackList(
-                count: addedTracks.count,
-                name: trackListName
-            )
+        return .tracksAddedToTrackList(
+            count: addedTracks.count,
+            name: trackListName
         )
     }
 }
@@ -166,4 +182,37 @@ enum NewTrackListSelectionSubmissionResult {
     case appended([LibraryTrack], trackListName: String)
     /// Операция не выполнена и должна показать существующее сообщение AppError.
     case failure(AppError)
+}
+
+/// Описывает подготовленный feedback, который можно синхронно показать после проверки session.
+enum NewTrackListSelectionPresentation {
+    /// Успешная операция показывает событие и закрывает только совпадающий route.
+    case success(ToastEvent)
+    /// Ошибка показывает существующий AppError и оставляет активный route открытым.
+    case failure(AppError)
+}
+
+/// Подготавливает данные track-style Toast без знания о ViewModel и состоянии sheet-session.
+@MainActor
+protocol NewTrackListSelectionFeedbackPreparing {
+    /// Формирует событие добавления одного трека, при необходимости ожидая runtime snapshot.
+    func trackAddedToTrackList(
+        track: LibraryTrack,
+        trackListName: String
+    ) async -> ToastEvent
+}
+
+/// Адаптирует существующий builder к узкой feature-зависимости, доступной для controlled XCTest.
+@MainActor
+struct NewTrackListSelectionFeedbackPreparer: NewTrackListSelectionFeedbackPreparing {
+    /// Сохраняет каноничное построение track-style Toast через runtime snapshot.
+    func trackAddedToTrackList(
+        track: LibraryTrack,
+        trackListName: String
+    ) async -> ToastEvent {
+        await TrackToastEventBuilder.trackAddedToTrackList(
+            track: track,
+            trackListName: trackListName
+        )
+    }
 }

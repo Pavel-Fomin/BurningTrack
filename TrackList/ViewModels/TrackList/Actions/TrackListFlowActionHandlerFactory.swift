@@ -66,10 +66,12 @@ struct TrackListFlowActionHandlerFactory {
     /// Создаёт production action handler для detail-flow одного треклиста.
     func make(
         reader: any TrackListReading,
+        lifecycle: any TrackListDetailLifecycleHandling,
         favoriteTrackActionHandler: FavoriteTrackActionHandler
     ) -> TrackListFlowActionHandler {
         TrackListFlowActionHandler(
             reader: reader,
+            lifecycle: lifecycle,
             playbackStateProvider: playbackStateProvider,
             playbackController: playbackController,
             trackListManager: trackListManager,

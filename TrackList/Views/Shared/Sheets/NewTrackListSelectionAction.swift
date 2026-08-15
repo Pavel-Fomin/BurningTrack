@@ -10,6 +10,8 @@
 import Foundation
 
 enum NewTrackListSelectionAction {
+    /// Корневой экран выбора стал видимым и должен получить актуальный снимок папок.
+    case screenAppeared
     /// Пользователь изменил выбор одного трека.
     case toggleTrack(LibraryTrack)
     /// Пользователь нажал недоступную строку без изменения selection.

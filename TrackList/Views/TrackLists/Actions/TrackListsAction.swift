@@ -12,10 +12,10 @@ import Foundation
 enum TrackListsAction {
     /// Экран появился.
     case onAppear
+    /// Изменился одноразовый внешний запрос открытия треклиста.
+    case externalOpenRequestChanged
     /// Пользователь открыл треклист.
     case openTrackList(UUID)
-    /// Приложение запросило открытие треклиста из другого раздела.
-    case openTrackListFromApp(UUID)
     /// Пользователь запросил создание нового треклиста.
     case createTrackList
     /// Пользователь выбрал сортировку треклистов.

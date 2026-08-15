@@ -20,13 +20,8 @@ struct NewTrackListSelectionFolderView: View {
     // MARK: - Состояние
 
     @ObservedObject var selectionViewModel: NewTrackListSelectionViewModel
-    /// Published-состояние «Избранного» используется только как вход state builder-а.
-    let favoriteTrackIdsProvider: any FavoriteTrackIdsProviding
-    /// Локально опубликованный снимок сохраняет реактивное обновление готовых строк без PlayerViewModel.
-    @State private var favoriteTrackIds: Set<UUID>
-
-    /// Готовая ViewModel Library Tracks, собранная отдельным container через factory.
-    @ObservedObject var tracksViewModel: LibraryTracksViewModel
+    /// Store передаёт готовые selectable-строки и typed action ingress folder destination.
+    @ObservedObject var screenStore: NewTrackListSelectionFolderScreenStore
 
     // MARK: - Инициализация
 
@@ -34,35 +29,19 @@ struct NewTrackListSelectionFolderView: View {
         folder: LibraryFolder,
         folderViewFactory: NewTrackListSelectionFolderViewFactory,
         selectionViewModel: NewTrackListSelectionViewModel,
-        favoriteTrackIdsProvider: any FavoriteTrackIdsProviding,
-        tracksViewModel: LibraryTracksViewModel
+        screenStore: NewTrackListSelectionFolderScreenStore
     ) {
         self.folder = folder
         self.folderViewFactory = folderViewFactory
         self.selectionViewModel = selectionViewModel
-        self.favoriteTrackIdsProvider = favoriteTrackIdsProvider
-        self.tracksViewModel = tracksViewModel
-        _favoriteTrackIds = State(
-            initialValue: favoriteTrackIdsProvider.favoriteTrackIds
-        )
-    }
-
-    /// Все треки текущей папки
-    private var currentTracks: [LibraryTrack] {
-        tracksViewModel.trackSections.flatMap(\.tracks)
-    }
-
-    /// Готовые секции не оставляют View вычислять источник или принадлежность к «Избранному».
-    private var selectableTrackSections: [TrackSelectableSectionState] {
-        tracksViewModel.makeSelectableTrackSections(
-            favoriteTrackIds: favoriteTrackIds,
-            selectedTrackIds: selectionViewModel.selectedTrackIds
-        )
+        self.screenStore = screenStore
     }
 
     // MARK: - Интерфейс
 
     var body: some View {
+        let state = screenStore.state
+
         ZStack {
             List {
                 if !folder.subfolders.isEmpty {
@@ -88,9 +67,9 @@ struct NewTrackListSelectionFolderView: View {
                     }
                 }
 
-                if !tracksViewModel.trackSections.isEmpty {
+                if state.hasVisibleTracks {
                     TrackSelectableSectionsView(
-                        sections: selectableTrackSections,
+                        sections: state.sections,
                         onToggleSelection: { track in
                             selectionViewModel.handle(.toggleTrack(track))
                         },
@@ -98,13 +77,13 @@ struct NewTrackListSelectionFolderView: View {
                             selectionViewModel.handle(.unavailableTrackTapped(track))
                         },
                         onRequestSnapshot: { trackId in
-                            tracksViewModel.requestSnapshotIfNeeded(for: trackId)
+                            screenStore.send(.snapshotRequested(trackId))
                         }
                     )
                 }
 
-                if !tracksViewModel.isLoading
-                    && tracksViewModel.trackSections.isEmpty
+                if !state.isLoading
+                    && !state.hasVisibleTracks
                     && folder.subfolders.isEmpty {
                     Section {
                         Text("No Tracks in This Folder")
@@ -113,7 +92,7 @@ struct NewTrackListSelectionFolderView: View {
                 }
             }
 
-            if tracksViewModel.isLoading && tracksViewModel.trackSections.isEmpty {
+            if state.isLoading && !state.hasVisibleTracks {
                 VStack {
                     Spacer()
 
@@ -131,16 +110,16 @@ struct NewTrackListSelectionFolderView: View {
         .navigationTitle(folder.name)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                if !currentTracks.isEmpty {
+                if state.hasVisibleTracks {
                     Button(
-                        selectionViewModel.areAllSelected(currentTracks)
+                        state.areAllVisibleTracksSelected
                             ? String(localized: "Deselect All")
                             : String(localized: "Select All")
                     ) {
-                        if selectionViewModel.areAllSelected(currentTracks) {
-                            selectionViewModel.handle(.deselectAll(currentTracks))
+                        if state.areAllVisibleTracksSelected {
+                            selectionViewModel.handle(.deselectAll(state.visibleTracks))
                         } else {
-                            selectionViewModel.handle(.selectAll(currentTracks))
+                            selectionViewModel.handle(.selectAll(state.visibleTracks))
                         }
                     }
                 }
@@ -148,10 +127,7 @@ struct NewTrackListSelectionFolderView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .task {
-            await tracksViewModel.refresh()
-        }
-        .onReceive(favoriteTrackIdsProvider.favoriteTrackIdsPublisher) { favoriteTrackIds in
-            self.favoriteTrackIds = favoriteTrackIds
+            screenStore.send(.screenAppeared)
         }
     }
 }

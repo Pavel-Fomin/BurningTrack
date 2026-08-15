@@ -14,28 +14,14 @@ import Foundation
 @MainActor
 struct LibraryFeatureDependencies {
 
-    /// Собирает ViewModel навигационного контейнера фонотеки.
-    let screenViewModelFactory: LibraryScreenViewModelFactory
-    /// Собирает ViewModel корня фонотеки.
-    let masterViewModelFactory: LibraryMasterViewModelFactory
-    /// Собирает ActionHandler корневых действий фонотеки.
-    let masterActionHandlerFactory: LibraryMasterActionHandlerFactory
-    /// Собирает ActionHandler экспорта общего списка треков.
-    let allTracksActionHandlerFactory: LibraryAllTracksActionHandlerFactory
-    /// Собирает ActionHandler экспорта значения коллекции.
-    let collectionTracksActionHandlerFactory: LibraryCollectionTracksActionHandlerFactory
+    /// Собирает устойчивый корневой graph фонотеки.
+    let screenStoreFactory: LibraryScreenStoreFactory
+    /// Собирает изолированный graph значений музыкальной коллекции.
+    let collectionValuesFeatureFactory: LibraryCollectionValuesFeatureFactory
     /// Собирает изолированный graph раздела купленных iTunes-треков.
     let purchasedITunesFeatureFactory: PurchasedITunesFeatureFactory
     /// Собирает ViewModel экрана папки фонотеки.
     let folderViewModelFactory: LibraryFolderViewModelFactory
     /// Собирает screen-local объекты и View экрана треков папки.
     let tracksScreenFactory: LibraryTracksScreenFactory
-    /// Предоставляет реактивное playback-состояние экранам фонотеки.
-    let playbackStateProvider: any PlaybackStateProviding
-    /// Выполняет playback-команды строк и подтверждённого открепления папки.
-    let playbackController: any TrackPlaybackControlling
-    /// Предоставляет подтверждённое состояние «Избранного» строкам фонотеки.
-    let favoriteTrackIdsProvider: any FavoriteTrackIdsProviding
-    /// Выполняет общий flow переименования файлов без создания handler-а во View.
-    let trackFileRenameActionHandler: TrackFileRenameActionHandler
 }

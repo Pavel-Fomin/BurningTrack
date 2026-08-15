@@ -16,6 +16,8 @@ import Combine
 final class LibraryTracksScreenStore: ObservableObject {
     let tracksViewModel: LibraryTracksViewModel
     let cloudAvailabilityController: LibraryCloudAvailabilityScreenController
+    /// Один handler обслуживает lifecycle экрана и действия всех строк destination.
+    let cloudAvailabilityActionHandler: LibraryCloudAvailabilityActionHandler
     let settingsManager: AppSettingsManager
     let playbackStateController: LibraryTrackPlaybackStateController
     let revealCoordinator: LibraryTrackRevealCoordinator
@@ -26,6 +28,7 @@ final class LibraryTracksScreenStore: ObservableObject {
     init(
         tracksViewModel: LibraryTracksViewModel,
         cloudAvailabilityController: LibraryCloudAvailabilityScreenController,
+        cloudAvailabilityActionHandler: LibraryCloudAvailabilityActionHandler,
         settingsManager: AppSettingsManager,
         playbackStateController: LibraryTrackPlaybackStateController,
         revealCoordinator: LibraryTrackRevealCoordinator,
@@ -35,6 +38,7 @@ final class LibraryTracksScreenStore: ObservableObject {
     ) {
         self.tracksViewModel = tracksViewModel
         self.cloudAvailabilityController = cloudAvailabilityController
+        self.cloudAvailabilityActionHandler = cloudAvailabilityActionHandler
         self.settingsManager = settingsManager
         self.playbackStateController = playbackStateController
         self.revealCoordinator = revealCoordinator
