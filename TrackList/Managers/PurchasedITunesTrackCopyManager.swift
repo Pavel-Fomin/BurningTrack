@@ -39,6 +39,9 @@ protocol PurchasedITunesTrackCopying: Sendable {
         _ track: PurchasedITunesPlayableTrack,
         toFolder destinationFolderId: UUID
     ) async throws -> PurchasedITunesTrackCopyResult
+
+    /// Удаляет только файл, созданный этой copy-операцией, если sync не смог подтвердить его регистрацию.
+    func rollbackCopiedFile(at url: URL) async throws
 }
 
 /// Выполняет физическое копирование runtime iTunes-ассета в папку фонотеки.
@@ -122,6 +125,16 @@ actor PurchasedITunesTrackCopyManager {
             try? removeTemporaryFile(at: temporaryURL)
             throw PurchasedITunesTrackCopyError.copyFailed(underlying: error)
         }
+    }
+
+    /// Копия принадлежит приложению только после успешной записи в destination folder.
+    /// Поэтому при неудачном sync её можно удалить, не затрагивая исходный iTunes-ассет.
+    func rollbackCopiedFile(at url: URL) async throws {
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            return
+        }
+
+        try FileManager.default.removeItem(at: url)
     }
 
     // MARK: - Назначение

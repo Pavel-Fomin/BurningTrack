@@ -75,6 +75,7 @@ actor LibraryFileManager {
         guard let sourceURL = await BookmarkResolver.url(forTrack: trackId) else {
             throw LibraryFileError.sourceURLUnavailable
         }
+        let originalBookmarkBase64 = await BookmarksRegistry.shared.trackBookmark(for: trackId)
 
         // 4. Получаем модель целевой папки из структуры фонотеки
         guard let destinationFolder = await MusicLibraryManager.shared.folder(for: destinationFolderId) else {
@@ -192,17 +193,33 @@ actor LibraryFileManager {
             try await BookmarksRegistry.shared.throwPendingPersistenceError()
             try await TrackRegistry.shared.throwPendingPersistenceError()
             return .confirmed
-        } catch let error as LibraryFileError {
-            throw MutationFailure(
-                stage: .persist,
-                appError: appError(forPersistFailure: error, fallback: .fileMoveFailed),
-                recovery: .physicalChangeCompleted
-            )
         } catch {
+            let operationError = error
+            do {
+                // SQLite не участвует в файловой transaction. Возвращаем файл и его реестры,
+                // пока новое расположение ещё не стало видимым через success-событие.
+                try await rollbackFileMutation(
+                    trackId: trackId,
+                    sourceURL: sourceURL,
+                    destinationURL: destinationURL,
+                    originalEntry: entry,
+                    originalBookmarkBase64: originalBookmarkBase64
+                )
+            } catch {
+                throw MutationFailure(
+                    stage: .persist,
+                    appError: appError(forPersistFailure: operationError, fallback: .fileMoveFailed),
+                    recovery: .rollbackFailed,
+                    operationErrorDescription: String(describing: operationError),
+                    recoveryErrorDescription: String(describing: error)
+                )
+            }
+
             throw MutationFailure(
                 stage: .persist,
-                appError: .fileMoveFailed,
-                recovery: .physicalChangeCompleted
+                appError: appError(forPersistFailure: operationError, fallback: .fileMoveFailed),
+                recovery: .restored,
+                operationErrorDescription: String(describing: operationError)
             )
         }
     }
@@ -233,6 +250,7 @@ actor LibraryFileManager {
         guard let sourceURL = await BookmarkResolver.url(forTrack: trackId) else {
             throw LibraryFileError.sourceURLUnavailable
         }
+        let originalBookmarkBase64 = await BookmarksRegistry.shared.trackBookmark(for: trackId)
         
         let folderURL = sourceURL.deletingLastPathComponent()
         let destinationURL = folderURL.appendingPathComponent(newFileName)
@@ -335,17 +353,33 @@ actor LibraryFileManager {
             try await BookmarksRegistry.shared.throwPendingPersistenceError()
             try await TrackRegistry.shared.throwPendingPersistenceError()
             return .confirmed
-        } catch let error as LibraryFileError {
-            throw MutationFailure(
-                stage: .persist,
-                appError: appError(forPersistFailure: error, fallback: .fileRenameFailed),
-                recovery: .physicalChangeCompleted
-            )
         } catch {
+            let operationError = error
+            do {
+                // Переименование и registry нельзя зафиксировать общей transaction,
+                // поэтому при сбое persistence возвращаем оба источника к исходному пути.
+                try await rollbackFileMutation(
+                    trackId: trackId,
+                    sourceURL: sourceURL,
+                    destinationURL: destinationURL,
+                    originalEntry: entry,
+                    originalBookmarkBase64: originalBookmarkBase64
+                )
+            } catch {
+                throw MutationFailure(
+                    stage: .persist,
+                    appError: appError(forPersistFailure: operationError, fallback: .fileRenameFailed),
+                    recovery: .rollbackFailed,
+                    operationErrorDescription: String(describing: operationError),
+                    recoveryErrorDescription: String(describing: error)
+                )
+            }
+
             throw MutationFailure(
                 stage: .persist,
-                appError: .fileRenameFailed,
-                recovery: .physicalChangeCompleted
+                appError: appError(forPersistFailure: operationError, fallback: .fileRenameFailed),
+                recovery: .restored,
+                operationErrorDescription: String(describing: operationError)
             )
         }
     }
@@ -378,12 +412,70 @@ actor LibraryFileManager {
         return String(filePath.dropFirst(rootPath.count))
     }
 
+    /// Возвращает файл и связанные SQLite-реестры к снимку, который был подтверждён до mutation.
+    private func rollbackFileMutation(
+        trackId: UUID,
+        sourceURL: URL,
+        destinationURL: URL,
+        originalEntry: TrackRegistry.TrackEntry,
+        originalBookmarkBase64: String?
+    ) async throws {
+        try FileManager.default.moveItem(at: destinationURL, to: sourceURL)
+
+        switch originalEntry.source {
+        case .library:
+            guard let relativePath = originalEntry.relativePath,
+                  let folderId = originalEntry.folderId,
+                  let rootFolderId = originalEntry.rootFolderId
+            else {
+                throw LibraryFileError.destinationFolderUnavailable
+            }
+            await TrackRegistry.shared.upsertTrack(
+                id: trackId,
+                fileName: originalEntry.fileName,
+                relativePath: relativePath,
+                folderId: folderId,
+                rootFolderId: rootFolderId,
+                fileDate: originalEntry.fileDate
+            )
+        case .imported:
+            await TrackRegistry.shared.upsertImportedTrack(
+                id: trackId,
+                fileName: originalEntry.fileName,
+                fileURL: sourceURL,
+                fileDate: originalEntry.fileDate
+            )
+            try await TrackIdentityResolver.shared.replaceImportedTrackIdentity(
+                id: trackId,
+                url: sourceURL
+            )
+        case .purchasedITunes:
+            throw LibraryFileError.trackNotFound
+        }
+
+        if let originalBookmarkBase64 {
+            await BookmarksRegistry.shared.upsertTrackBookmark(
+                id: trackId,
+                base64: originalBookmarkBase64
+            )
+        } else {
+            await BookmarksRegistry.shared.removeTrackBookmark(id: trackId)
+        }
+
+        try await TrackRegistry.shared.throwPendingPersistenceError()
+        try await BookmarksRegistry.shared.throwPendingPersistenceError()
+    }
+
     /// Переводит техническую persist-ошибку в безопасную пользовательскую причину.
     private func appError(
-        forPersistFailure error: LibraryFileError,
+        forPersistFailure error: Error,
         fallback: AppError
     ) -> AppError {
-        switch error {
+        guard let libraryError = error as? LibraryFileError else {
+            return fallback
+        }
+
+        switch libraryError {
         case .bookmarkCreationFailed:
             return .bookmarkCreateFailed
         case .destinationFolderUnavailable:

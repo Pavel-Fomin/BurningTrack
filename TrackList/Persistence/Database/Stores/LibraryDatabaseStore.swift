@@ -14,6 +14,18 @@ enum LibraryDatabaseStoreError: Error {
     case rootFolderNotFound(UUID)
 }
 
+/// Подготовленная запись scan-снимка, которая применяется к SQLite только вместе со всем root-проходом.
+struct LibrarySyncTrackRecord: Sendable {
+    let id: UUID
+    let fileName: String
+    let relativePath: String
+    let folderId: UUID
+    let rootFolderId: UUID
+    let fileDate: Date
+    let fileSize: Int64?
+    let bookmarkBase64: String
+}
+
 // Единый фасад фонотеки поверх типобезопасных SQLite Store.
 final class LibraryDatabaseStore {
     private let executor: DatabaseExecutor
@@ -362,8 +374,39 @@ final class LibraryDatabaseStore {
 
     /// Скрывает локальный трек приложения из активного индекса и удаляет его сохранённые metadata.
     func removeTrack(id: UUID) throws {
-        try metadataStore.delete(trackId: id)
-        try trackStore.markDeleted(id: id, updatedAt: Date())
+        try executor.transaction { _ in
+            try removeTrackDirect(id: id)
+        }
+    }
+
+    /// Применяет один scan-снимок целиком: частичный набор track и bookmark записей не переживает ошибку SQLite.
+    func applyLibrarySync(
+        records: [LibrarySyncTrackRecord],
+        removingTrackIDs: [UUID]
+    ) throws {
+        try executor.transaction { _ in
+            for record in records {
+                try upsertLibraryTrack(
+                    id: record.id,
+                    fileName: record.fileName,
+                    relativePath: record.relativePath,
+                    folderId: record.folderId,
+                    rootFolderId: record.rootFolderId,
+                    fileDate: record.fileDate,
+                    fileSize: record.fileSize,
+                    shouldUpdateFileSize: true
+                )
+                try upsertTrackBookmark(
+                    id: record.id,
+                    bookmarkBase64: record.bookmarkBase64
+                )
+            }
+
+            for trackID in removingTrackIDs {
+                try removeTrackBookmark(id: trackID)
+                try removeTrackDirect(id: trackID)
+            }
+        }
     }
 
     /// Сохраняет актуальное состояние доступности трека.
@@ -433,6 +476,12 @@ final class LibraryDatabaseStore {
 
         try shiftRootFoldersDown(updatedAt: now)
         try folderStore.upsert(model)
+    }
+
+    /// Удаление metadata и логическое удаление строки должны быть частью общей transaction sync-прохода.
+    private func removeTrackDirect(id: UUID) throws {
+        try metadataStore.delete(trackId: id)
+        try trackStore.markDeleted(id: id, updatedAt: Date())
     }
 
     /// Создаёт строку подпапки, чтобы tracks.folder_id всегда ссылался на SQLite.

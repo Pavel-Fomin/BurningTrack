@@ -133,27 +133,53 @@ final class AppCommandExecutor {
                 toFolder: folderId
             )
 
-            // После физического копирования используем общий sync-путь фонотеки,
-            // чтобы новый файл попал в TrackRegistry и BookmarksRegistry.
-            let syncOutcome = try await libraryRootSyncer.syncRootFolder(
-                rootFolderId: result.rootFolderId,
-                rootURL: result.rootFolderURL,
-                mode: .safe,
-                logsDatabaseDiagnostics: true
-            )
+            let importedTrackId: UUID
+            do {
+                // После физического копирования используем общий sync-путь фонотеки,
+                // чтобы новый файл попал в TrackRegistry и BookmarksRegistry.
+                let syncOutcome = try await libraryRootSyncer.syncRootFolder(
+                    rootFolderId: result.rootFolderId,
+                    rootURL: result.rootFolderURL,
+                    mode: .safe,
+                    logsDatabaseDiagnostics: true
+                )
 
-            guard case let .confirmed(syncReceipt) = syncOutcome,
-                  let relativePath = relativePath(
-                    for: result.fileURL,
-                    rootURL: result.rootFolderURL
-                  ),
-                  let importedTrackId = syncReceipt.trackId(forRelativePath: relativePath)
-            else {
-                // Копия файла без подтверждённой записи в реестрах не является успешным импортом.
+                guard case let .confirmed(syncReceipt) = syncOutcome,
+                      let relativePath = relativePath(
+                        for: result.fileURL,
+                        rootURL: result.rootFolderURL
+                      ),
+                      let confirmedTrackId = syncReceipt.trackId(forRelativePath: relativePath)
+                else {
+                    // Копия файла без подтверждённой записи в реестрах не является успешным импортом.
+                    throw MutationFailure(
+                        stage: .confirm,
+                        appError: .purchasedITunesCopyFailed,
+                        recovery: .confirmationMissing
+                    )
+                }
+                importedTrackId = confirmedTrackId
+            } catch {
+                let operationError = error
+                do {
+                    // Файл создан именно этой операцией. Если SQLite commit sync не состоялся,
+                    // удаляем копию, но не исходный iTunes-ассет пользователя.
+                    try await purchasedITunesTrackCopier.rollbackCopiedFile(at: result.fileURL)
+                } catch {
+                    throw MutationFailure(
+                        stage: .confirm,
+                        appError: .purchasedITunesCopyFailed,
+                        recovery: .rollbackFailed,
+                        operationErrorDescription: String(describing: operationError),
+                        recoveryErrorDescription: String(describing: error)
+                    )
+                }
+
                 throw MutationFailure(
                     stage: .confirm,
                     appError: .purchasedITunesCopyFailed,
-                    recovery: .confirmationMissing
+                    recovery: .restored,
+                    operationErrorDescription: String(describing: operationError)
                 )
             }
 
@@ -635,6 +661,8 @@ final class AppCommandExecutor {
         try await trackFileOperationCoordinator.run(trackId: trackId) {
             // Старый bookmark читается после ownership и остаётся согласованным с rename внутри этой команды.
             let previousURL = await self.trackFileURLResolver.url(forTrackId: trackId)
+            let originalFileName = previousURL?.lastPathComponent
+            var didRenameFile = false
 
             if fileChanged {
                 do {
@@ -650,6 +678,7 @@ final class AppCommandExecutor {
                             recovery: .untouched
                         )
                     }
+                    didRenameFile = true
                 } catch let libraryError as LibraryFileError {
                     throw appError(from: libraryError, fallback: .fileRenameFailed)
                 }
@@ -674,7 +703,61 @@ final class AppCommandExecutor {
                         mime: artworkMimeType(for: data)
                     )
                 }
-                try await self.tagsWriter.writeTags(to: url, patch: finalPatch)
+                do {
+                    try await self.tagsWriter.writeTags(to: url, patch: finalPatch)
+                } catch {
+                    let operationError = error
+
+                    if didRenameFile {
+                        guard let originalFileName else {
+                            throw MutationFailure(
+                                stage: .perform,
+                                appError: .tagWriteFailed,
+                                recovery: .rollbackFailed,
+                                operationErrorDescription: String(describing: operationError),
+                                recoveryErrorDescription: "Не удалось определить исходное имя файла для rollback."
+                            )
+                        }
+
+                        do {
+                            // Ошибка записи тегов не должна оставлять успешное rename отдельной mutation.
+                            // Используем тот же file boundary, чтобы вернуть файл и registry к исходному имени.
+                            let rollbackOutcome = try await self.trackFileManager.renameTrack(
+                                id: trackId,
+                                to: originalFileName,
+                                using: fileBusyChecker
+                            )
+                            guard case .confirmed = rollbackOutcome else {
+                                throw MutationFailure(
+                                    stage: .perform,
+                                    appError: .fileRenameFailed,
+                                    recovery: .rollbackFailed,
+                                    operationErrorDescription: String(describing: operationError),
+                                    recoveryErrorDescription: "Rollback rename не изменил путь файла."
+                                )
+                            }
+                        } catch let failure as MutationFailure {
+                            throw failure
+                        } catch {
+                            throw MutationFailure(
+                                stage: .perform,
+                                appError: .tagWriteFailed,
+                                recovery: .rollbackFailed,
+                                operationErrorDescription: String(describing: operationError),
+                                recoveryErrorDescription: String(describing: error)
+                            )
+                        }
+
+                        throw MutationFailure(
+                            stage: .perform,
+                            appError: .tagWriteFailed,
+                            recovery: .restored,
+                            operationErrorDescription: String(describing: operationError)
+                        )
+                    }
+
+                    throw operationError
+                }
             }
 
             var changedFields: Set<TrackChangedField> = []

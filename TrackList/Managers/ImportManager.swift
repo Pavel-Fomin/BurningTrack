@@ -27,35 +27,21 @@ final class ImportManager {
             // 1. Метаданные (опционально)
             let metadata = try? await RuntimeMetadataParser.parseMetadata(from: url)
 
-            // 2. Постоянный trackId через слой идентичности
-            // Для одиночного импорта используем отдельный путь identity,
-            // потому что здесь нет rootFolderId + relativePath.
-            let trackId = try await TrackIdentityResolver.shared.trackId(forImportedURL: url)
-
-            // 3. Bookmark сохраняем в BookmarksRegistry
-            if let bookmarkBase64 = BookmarkResolver.makeBookmarkBase64(for: url) {
-                await BookmarksRegistry.shared.upsertTrackBookmark(
-                    id: trackId,
-                    base64: bookmarkBase64
-                )
-            } else {
-                print("❌ Не удалось создать bookmark для файла: \(url.lastPathComponent)")
+            // 2. Сначала готовим bookmark: без него imported identity не должна попадать в SQLite.
+            guard let bookmarkBase64 = BookmarkResolver.makeBookmarkBase64(for: url) else {
+                throw AppError.bookmarkCreateFailed
             }
 
-            // 4. TrackRegistry сохраняет imported-трек в SQLite без фиктивной папки фонотеки.
-            await TrackRegistry.shared.upsertImportedTrack(
-                id: trackId,
-                fileName: url.lastPathComponent,
-                fileURL: url
+            // 3. Строка трека, identity и bookmark фиксируются одним commit.
+            // Внешний исходный файл не удаляется при ошибке, потому что приложению не принадлежит.
+            let trackId = try await TrackIdentityResolver.shared.registerImportedTrack(
+                forURL: url,
+                bookmarkBase64: bookmarkBase64
             )
 
             print("📥 Импортирован: \(metadata?.title ?? url.lastPathComponent)")
             result.append(trackId)
         }
-
-        // Финально пробрасываем возможные ошибки SQLite, накопленные во время non-throwing upsert-вызовов.
-        try await TrackRegistry.shared.throwPendingPersistenceError()
-        try await BookmarksRegistry.shared.throwPendingPersistenceError()
 
         return result
     }

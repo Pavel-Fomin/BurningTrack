@@ -178,6 +178,7 @@ actor LibrarySyncModule {
 
     private let scanner = LibraryScanner()
     private let rootSyncCoordinator = LibraryRootSyncCoordinator()
+    private var cachedLibraryStore: LibraryDatabaseStore?
 
     private init() {}
 
@@ -282,6 +283,7 @@ actor LibrarySyncModule {
         // 4) Применяем найденные файлы: upsert + bookmark
         var aliveIds = Set<UUID>()
         var confirmedTracks: [LibrarySyncTrackReceipt] = []
+        var recordsToCommit: [LibrarySyncTrackRecord] = []
         var insertedTrackCount = 0
         var updatedTrackCount = 0
         for file in scanned {
@@ -340,23 +342,23 @@ actor LibrarySyncModule {
                 )
             )
 
-            await TrackRegistry.shared.upsertTrack(
-                id: trackId,
-                fileName: fileName,
-                relativePath: relativePath,
-                folderId: folderId,
-                rootFolderId: rootFolderId,
-                fileDate: fileDate,
-                fileSize: fileSize,
-                shouldUpdateFileSize: true
-            )
-
-            // Bookmark файла (может обновляться, это не идентичность)
-            if let base64 = BookmarkResolver.makeBookmarkBase64(for: fileURL) {
-                await BookmarksRegistry.shared.upsertTrackBookmark(id: trackId, base64: base64)
-            } else {
-                print("⚠️ syncRootFolder: не удалось создать bookmark файла:", fileURL.path)
+            // Bookmark входит в тот же SQLite commit, что и запись трека.
+            // Иначе новый track мог бы стать недоступен до следующего sync-прохода.
+            guard let bookmarkBase64 = BookmarkResolver.makeBookmarkBase64(for: fileURL) else {
+                throw AppError.bookmarkCreateFailed
             }
+            recordsToCommit.append(
+                LibrarySyncTrackRecord(
+                    id: trackId,
+                    fileName: fileName,
+                    relativePath: relativePath,
+                    folderId: folderId,
+                    rootFolderId: rootFolderId,
+                    fileDate: fileDate,
+                    fileSize: fileSize,
+                    bookmarkBase64: bookmarkBase64
+                )
+            )
         }
 
         // 5) Удаляем только в full-режиме
@@ -365,25 +367,15 @@ actor LibrarySyncModule {
             aliveIDs: aliveIds,
             mode: mode
         )
-        for entry in entriesToDelete {
-            await TrackRegistry.shared.removeTrack(id: entry.id)
-            await BookmarksRegistry.shared.removeTrackBookmark(id: entry.id)
+        // 6) Все SQLite-изменения одного scan-снимка фиксируются одной transaction.
+        // До commit текущее состояние фонотеки остаётся единственным видимым снимком.
+        try libraryStore().applyLibrarySync(
+            records: recordsToCommit,
+            removingTrackIDs: entriesToDelete.map(\.id)
+        )
 
-            // Трек реально исчез из библиотеки.
-            // Значит его library identity тоже нужно забыть.
-            if let rootFolderId = entry.rootFolderId,
-               let relativePath = entry.relativePath {
-                try await TrackIdentityResolver.shared.unbindLibraryTrack(
-                    rootFolderId: rootFolderId,
-                    relativePath: relativePath
-                )
-            }
-
-            // И дополнительно очищаем все привязки к этому trackId,
-            // чтобы потом другой файл по старому пути не воскресил старый id.
-            try await TrackIdentityResolver.shared.forgetTrack(id: entry.id)
-        }
-        // 6) Финальная проверка ошибок выполняется только после валидной синхронизации.
+        // Финальная проверка больше не читает side-channel ошибки отдельных registry-вызовов:
+        // они исключены из commit-пути и не могут оставить частично применённый scan.
         // До этого места код доходит только если:
         // - библиотека находится в состоянии ready
         // - доступ к rootURL успешно открыт
@@ -418,6 +410,17 @@ actor LibrarySyncModule {
                 tracks: confirmedTracks
             )
         )
+    }
+
+    /// Создаёт data-store лениво, чтобы sync не открывал SQLite до первого подтверждённого scan-прохода.
+    private func libraryStore() throws -> LibraryDatabaseStore {
+        if let cachedLibraryStore {
+            return cachedLibraryStore
+        }
+
+        let store = try LibraryDatabaseStore()
+        cachedLibraryStore = store
+        return store
     }
 }
 

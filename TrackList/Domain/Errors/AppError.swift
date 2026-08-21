@@ -75,6 +75,10 @@ enum MutationRecoveryState: Sendable, Equatable {
     case confirmationMissing
     /// Security-scoped доступ уже закрыт, хотя удаление связанных записей не подтверждено.
     case accessReleased
+    /// Все изменения, выполненные до ошибки, возвращены к подтверждённому исходному состоянию.
+    case restored
+    /// Обратное действие не завершилось, поэтому состояние требует явного восстановления.
+    case rollbackFailed
 }
 
 /// Семантическая ошибка изменяющей операции без передачи небезопасного произвольного Error через async-границу.
@@ -82,4 +86,22 @@ struct MutationFailure: Error, Sendable {
     let stage: MutationStage
     let appError: AppError
     let recovery: MutationRecoveryState
+    /// Диагностика исходной ошибки сохраняется как значение, безопасное для async-границ.
+    let operationErrorDescription: String?
+    /// Диагностика ошибки обратного действия не должна маскироваться исходной ошибкой.
+    let recoveryErrorDescription: String?
+
+    init(
+        stage: MutationStage,
+        appError: AppError,
+        recovery: MutationRecoveryState,
+        operationErrorDescription: String? = nil,
+        recoveryErrorDescription: String? = nil
+    ) {
+        self.stage = stage
+        self.appError = appError
+        self.recovery = recovery
+        self.operationErrorDescription = operationErrorDescription
+        self.recoveryErrorDescription = recoveryErrorDescription
+    }
 }

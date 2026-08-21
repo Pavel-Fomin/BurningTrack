@@ -191,37 +191,22 @@ final class MusicLibraryManager: ObservableObject {
         // Получаем id корневой папки из её URL
         let rootFolderId = url.libraryFolderId
 
-        // Закрываем активный доступ к папке (security-scoped resource),
-        // если он был открыт ранее при restoreAccess
-        let didReleaseAccess: Bool
-        if let activeURL = activeRootFolderAccess[rootFolderId] {
-            activeURL.stopAccessingSecurityScopedResource()
-            activeRootFolderAccess.removeValue(forKey: rootFolderId)
-            didReleaseAccess = true
-        } else {
-            didReleaseAccess = false
-        }
-
         // Получаем все треки, принадлежащие этой корневой папке
         let tracksInFolder = await TrackRegistry.shared.tracks(inRootFolder: rootFolderId)
 
         do {
-            // Удаляем bookmarks для каждого трека из этой папки
-            for track in tracksInFolder {
-                await BookmarksRegistry.shared.removeTrackBookmark(id: track.id)
-            }
-
-            // Удаляем bookmark самой папки
-            await BookmarksRegistry.shared.removeFolderBookmark(id: rootFolderId)
-
-            // Удаляем папку и связанные с ней треки из TrackRegistry
+            // Удаление root-строки SQLite каскадно удаляет folders, tracks, их bookmarks и metadata.
+            // Это одна SQLite-операция, поэтому отдельные удаления bookmark не создают частичный detach.
             await TrackRegistry.shared.removeFolder(id: rootFolderId)
 
-            // Финально проверяем записи в SQLite после обновления реестров.
-            // Если запись не прошла, ошибка должна дойти до UI,
-            // чтобы success-toast не был показан ложно.
-            try await BookmarksRegistry.shared.throwPendingPersistenceError()
+            // До этой проверки access и published UI остаются прежними.
+            // При ошибке пользователь продолжает работать с последним подтверждённым состоянием папки.
             try await TrackRegistry.shared.throwPendingPersistenceError()
+
+            // Security-scoped access относится к состоянию памяти и освобождается только после SQLite commit.
+            if let activeURL = activeRootFolderAccess.removeValue(forKey: rootFolderId) {
+                activeURL.stopAccessingSecurityScopedResource()
+            }
 
             // Сигнал отправляется после полного удаления папки и её треков из SQLite.
             NotificationCenter.default.post(name: .libraryDataDidChange, object: nil)
@@ -239,14 +224,7 @@ final class MusicLibraryManager: ObservableObject {
                 removedTrackCount: tracksInFolder.count
             )
         } catch {
-            guard didReleaseAccess else { throw error }
-
-            // Автоматически повторно открывать доступ небезопасно: UI получает failure без ложного success.
-            throw MutationFailure(
-                stage: .persist,
-                appError: .librarySyncFailed,
-                recovery: .accessReleased
-            )
+            throw error
         }
     }
     

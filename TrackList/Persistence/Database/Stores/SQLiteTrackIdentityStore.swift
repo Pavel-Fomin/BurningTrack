@@ -112,11 +112,30 @@ final class TrackIdentityDatabaseStore {
         return trackId
     }
 
+    /// Создаёт imported identity, строку трека и bookmark одной transaction.
+    /// Внешний файл не принадлежит приложению, поэтому при ошибке не трогаем его,
+    /// а SQLite не получает identity без способа вновь разрешить этот URL.
+    func registerImportedTrack(
+        identityKey: String,
+        fileURL: URL,
+        bookmarkBase64: String
+    ) throws -> UUID {
+        let trackId = try identityStore.fetch(identityKey: identityKey)?.trackId ?? UUID()
+        try bindImportedTrack(
+            id: trackId,
+            identityKey: identityKey,
+            fileURL: fileURL,
+            bookmarkBase64: bookmarkBase64
+        )
+        return trackId
+    }
+
     /// Привязывает imported identity к trackId и создаёт строку tracks, если её ещё нет.
     func bindImportedTrack(
         id trackId: UUID,
         identityKey: String,
-        fileURL: URL
+        fileURL: URL,
+        bookmarkBase64: String? = nil
     ) throws {
         let now = Date()
 
@@ -134,7 +153,7 @@ final class TrackIdentityDatabaseStore {
                 fileDate: fileDate(for: fileURL) ?? existingTrack?.fileDate ?? now,
                 importedAt: existingTrack?.importedAt ?? now,
                 updatedAt: now,
-                bookmarkBase64: existingTrack?.bookmarkBase64,
+                bookmarkBase64: bookmarkBase64 ?? existingTrack?.bookmarkBase64,
                 assetURLString: fileURL.standardizedFileURL.absoluteString,
                 isAvailable: FileManager.default.fileExists(atPath: fileURL.path),
                 isDeleted: false

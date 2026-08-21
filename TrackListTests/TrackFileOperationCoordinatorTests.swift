@@ -514,6 +514,7 @@ final class TrackFileOperationCoordinatorTests: XCTestCase {
     func testPurchasedITunesCopyDoesNotReturnSuccessWhenSyncIsSkipped() async {
         let copiedFileURL = URL(fileURLWithPath: "/tmp/library/Imported.m4a")
         let rootURL = URL(fileURLWithPath: "/tmp/library")
+        let rollbackRecorder = PurchasedITunesCopyRollbackRecorder()
         let executor = AppCommandExecutor(
             purchasedITunesTrackCopier: PurchasedITunesTrackCopyStub(
                 result: PurchasedITunesTrackCopyResult(
@@ -522,7 +523,8 @@ final class TrackFileOperationCoordinatorTests: XCTestCase {
                     folderName: "Library",
                     rootFolderId: UUID(),
                     rootFolderURL: rootURL
-                )
+                ),
+                rollbackRecorder: rollbackRecorder
             ),
             libraryRootSyncer: LibraryRootSyncStub(
                 outcome: .skipped(.emptyScanProtected)
@@ -538,10 +540,52 @@ final class TrackFileOperationCoordinatorTests: XCTestCase {
         } catch let failure as MutationFailure {
             XCTAssertEqual(failure.stage, .confirm)
             XCTAssertEqual(failure.appError, .purchasedITunesCopyFailed)
-            XCTAssertEqual(failure.recovery, .confirmationMissing)
+            XCTAssertEqual(failure.recovery, .restored)
         } catch {
             XCTFail("Ожидалась MutationFailure, получено: \(error)")
         }
+
+        let rollbackCount = await rollbackRecorder.count()
+        XCTAssertEqual(rollbackCount, 1)
+    }
+
+    func testPurchasedITunesCopySurfacesRecoveryFailureWhenRemovingUnconfirmedCopyFails() async {
+        let rollbackRecorder = PurchasedITunesCopyRollbackRecorder()
+        let executor = AppCommandExecutor(
+            purchasedITunesTrackCopier: PurchasedITunesTrackCopyStub(
+                result: PurchasedITunesTrackCopyResult(
+                    fileURL: URL(fileURLWithPath: "/tmp/library/Imported.m4a"),
+                    folderId: UUID(),
+                    folderName: "Library",
+                    rootFolderId: UUID(),
+                    rootFolderURL: URL(fileURLWithPath: "/tmp/library")
+                ),
+                rollbackRecorder: rollbackRecorder,
+                shouldFailRollback: true
+            ),
+            libraryRootSyncer: LibraryRootSyncStub(
+                outcome: .skipped(.emptyScanProtected)
+            )
+        )
+
+        do {
+            _ = try await executor.copyPurchasedITunesTrack(
+                makePurchasedITunesTrack(),
+                toFolder: UUID()
+            )
+            XCTFail("Неудачный rollback должен вернуть recovery failure")
+        } catch let failure as MutationFailure {
+            XCTAssertEqual(failure.stage, .confirm)
+            XCTAssertEqual(failure.appError, .purchasedITunesCopyFailed)
+            XCTAssertEqual(failure.recovery, .rollbackFailed)
+            XCTAssertNotNil(failure.operationErrorDescription)
+            XCTAssertNotNil(failure.recoveryErrorDescription)
+        } catch {
+            XCTFail("Ожидалась MutationFailure, получено: \(error)")
+        }
+
+        let rollbackCount = await rollbackRecorder.count()
+        XCTAssertEqual(rollbackCount, 1)
     }
 
     /// Даёт созданным задачам дойти до actor-owned continuation без busy-wait в production-коде.
@@ -772,12 +816,45 @@ private actor TrackPostUpdateFailureSpy: TrackPostUpdateHandling {
 /// Возвращает заранее подготовленный результат физического копирования без MediaPlayer и файловой системы.
 private struct PurchasedITunesTrackCopyStub: PurchasedITunesTrackCopying {
     let result: PurchasedITunesTrackCopyResult
+    let rollbackRecorder: PurchasedITunesCopyRollbackRecorder?
+    let shouldFailRollback: Bool
+
+    init(
+        result: PurchasedITunesTrackCopyResult,
+        rollbackRecorder: PurchasedITunesCopyRollbackRecorder? = nil,
+        shouldFailRollback: Bool = false
+    ) {
+        self.result = result
+        self.rollbackRecorder = rollbackRecorder
+        self.shouldFailRollback = shouldFailRollback
+    }
 
     func copy(
         _ track: PurchasedITunesPlayableTrack,
         toFolder destinationFolderId: UUID
     ) async throws -> PurchasedITunesTrackCopyResult {
         result
+    }
+
+    func rollbackCopiedFile(at url: URL) async throws {
+        _ = url
+        await rollbackRecorder?.record()
+        if shouldFailRollback {
+            throw TrackFileOperationTestError.failed
+        }
+    }
+}
+
+/// Фиксирует обратное удаление без обращения к файловой системе устройства.
+private actor PurchasedITunesCopyRollbackRecorder {
+    private var calls = 0
+
+    func record() {
+        calls += 1
+    }
+
+    func count() -> Int {
+        calls
     }
 }
 

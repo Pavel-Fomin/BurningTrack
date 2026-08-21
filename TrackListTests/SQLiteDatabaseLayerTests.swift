@@ -83,6 +83,36 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
         XCTAssertNil(try store.fetch(id: track.id))
     }
 
+    func testLibrarySyncCommitRollsBackWholeSnapshotWhenLaterTransactionStepFails() throws {
+        let database = try makeDatabase()
+        let executor = try database.databaseExecutor()
+        let store = LibraryDatabaseStore(executor: executor)
+        let rootFolderId = UUID()
+        let trackId = UUID()
+        let record = LibrarySyncTrackRecord(
+            id: trackId,
+            fileName: "sync.mp3",
+            relativePath: "sync.mp3",
+            folderId: rootFolderId,
+            rootFolderId: rootFolderId,
+            fileDate: Date(timeIntervalSince1970: 100),
+            fileSize: 128,
+            bookmarkBase64: "sync-bookmark"
+        )
+
+        XCTAssertThrowsError(
+            try executor.transaction { _ in
+                try store.applyLibrarySync(records: [record], removingTrackIDs: [])
+                // Искусственная ошибка после записи track и bookmark проверяет именно границу общего commit.
+                throw ExpectedRollbackError.rollback
+            }
+        )
+
+        XCTAssertNil(try store.fetchLibraryTrack(id: trackId))
+        XCTAssertNil(try store.trackBookmark(id: trackId))
+        XCTAssertTrue(try store.fetchRootFolders().isEmpty)
+    }
+
     func testPlayerQueueReplaceAll() throws {
         let database = try makeDatabase()
         let executor = try database.databaseExecutor()

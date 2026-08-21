@@ -62,6 +62,18 @@ actor TrackIdentityResolver {
         )
     }
 
+    /// Регистрирует внешний imported-файл только после успешного создания его bookmark.
+    func registerImportedTrack(
+        forURL url: URL,
+        bookmarkBase64: String
+    ) async throws -> UUID {
+        try identityStore().registerImportedTrack(
+            identityKey: importedFileKey(for: url),
+            fileURL: url,
+            bookmarkBase64: bookmarkBase64
+        )
+    }
+
     /// Library identity хранится в tracks(root_folder_id, relative_path), поэтому отдельная привязка не нужна.
     func bindLibraryTrack(
         id trackId: UUID,
