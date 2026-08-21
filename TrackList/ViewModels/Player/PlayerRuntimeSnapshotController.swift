@@ -99,20 +99,27 @@ final class PlayerRuntimeSnapshotController {
 
     /// Применяет событие обновления трека к локальному состоянию.
     func applyTrackUpdateEvent(_ updateEvent: TrackUpdateEvent) -> UUID {
+        applyTrackUpdateEvents([updateEvent]).first ?? updateEvent.trackId
+    }
 
-        let trackId = updateEvent.trackId
+    /// Применяет все подтверждённые snapshot batch-операции до одной следующей presentation-публикации owner-а.
+    func applyTrackUpdateEvents(_ updateEvents: [TrackUpdateEvent]) -> Set<UUID> {
+        var changedTrackIds: Set<UUID> = []
 
-        // TrackUpdateEvent несёт более новый достоверный snapshot и инвалидирует
-        // незавершённую сборку только этого трека до записи нового состояния.
-        invalidateSnapshotGeneration(for: trackId)
+        for updateEvent in updateEvents {
+            let trackId = updateEvent.trackId
 
-        // 1. Обновляем локальный snapshot.
-        snapshotsByTrackId[trackId] = updateEvent.snapshot
+            // TrackUpdateEvent несёт более новый достоверный snapshot и инвалидирует
+            // незавершённую сборку только этого трека до записи нового состояния.
+            invalidateSnapshotGeneration(for: trackId)
 
-        // 2. Сбрасываем старую now playing обложку.
-        nowPlayingArtworkByTrackId[trackId] = nil
+            // Обновляем snapshot и сбрасываем связанную Now Playing artwork.
+            snapshotsByTrackId[trackId] = updateEvent.snapshot
+            nowPlayingArtworkByTrackId[trackId] = nil
+            changedTrackIds.insert(trackId)
+        }
 
-        return trackId
+        return changedTrackIds
     }
 
     /// Асинхронно запрашивает большую обложку через общую подсистему подготовки.

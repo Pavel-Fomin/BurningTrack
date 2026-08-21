@@ -1606,6 +1606,7 @@ private final class RestorationPlayerEventObserverSpy: PlayerEventObserving {
     var onTrackDurationUpdated: ((TimeInterval) -> Void)?
     var onTrackDidFinish: (() -> Void)?
     var onTrackDidUpdate: ((TrackUpdateEvent) -> Void)?
+    var onTrackBatchDidUpdate: (([TrackUpdateEvent]) -> Void)?
     var onSettingsChanged: (() -> Void)?
 }
 

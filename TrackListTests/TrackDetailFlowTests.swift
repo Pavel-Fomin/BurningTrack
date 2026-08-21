@@ -191,6 +191,43 @@ final class TrackDetailFlowTests: XCTestCase {
         XCTAssertFalse(viewModel.state.canSave)
     }
 
+    func testBatchUpdateAppliesOnlySnapshotOfPresentedTrack() {
+        let track = TrackDetailLocalTrack()
+        let events = TrackDetailEventProviderSpy()
+        let executor = TrackDetailExecutorSpy()
+        let presenter = TrackDetailPresenter(toastPresenter: TrackDetailToastSpy())
+        let viewModel = TrackDetailViewModel(
+            track: track,
+            initialMode: .view,
+            presenter: presenter,
+            actionHandler: makeActionHandler(executor: executor),
+            eventProvider: events
+        )
+
+        events.trackBatchDidUpdateSubject.send([
+            TrackUpdateEvent(
+                trackId: UUID(),
+                reason: .metadataUpdated,
+                changedFields: [.title],
+                snapshot: makeConfirmedTrackDetailSnapshot(
+                    trackId: UUID(),
+                    fileName: "Unrelated.flac"
+                )
+            ),
+            TrackUpdateEvent(
+                trackId: track.trackId,
+                reason: .metadataUpdated,
+                changedFields: [.title],
+                snapshot: makeConfirmedTrackDetailSnapshot(
+                    trackId: track.trackId,
+                    fileName: "Batch Updated.flac"
+                )
+            )
+        ])
+
+        XCTAssertEqual(viewModel.state.fileName, "Batch Updated")
+    }
+
     private func makeActionHandler(
         executor: TrackDetailExecutorSpy,
         playbackFileReleaser: TrackDetailPlaybackReleaserSpy? = nil,
@@ -439,4 +476,34 @@ private struct TrackDetailEmptyEventProvider: TrackDetailEventProviding {
     var trackDidUpdate: AnyPublisher<TrackUpdateEvent, Never> {
         Empty(completeImmediately: true).eraseToAnyPublisher()
     }
+
+    var trackBatchDidUpdate: AnyPublisher<[TrackUpdateEvent], Never> {
+        Empty(completeImmediately: true).eraseToAnyPublisher()
+    }
+}
+
+/// Передаёт контролируемые runtime-события в изолированный Track Detail тест.
+@MainActor
+private final class TrackDetailEventProviderSpy: TrackDetailEventProviding {
+    let trackDidUpdateSubject = PassthroughSubject<TrackUpdateEvent, Never>()
+    let trackBatchDidUpdateSubject = PassthroughSubject<[TrackUpdateEvent], Never>()
+
+    var trackDidUpdate: AnyPublisher<TrackUpdateEvent, Never> {
+        trackDidUpdateSubject.eraseToAnyPublisher()
+    }
+
+    var trackBatchDidUpdate: AnyPublisher<[TrackUpdateEvent], Never> {
+        trackBatchDidUpdateSubject.eraseToAnyPublisher()
+    }
+}
+
+/// Представляет локальный трек без зависимости теста от SQLite-модели.
+private struct TrackDetailLocalTrack: TrackDisplayable {
+    let id = UUID()
+    let trackId = UUID()
+    let fileName = "Original.flac"
+    let title: String? = "Original"
+    let artist: String? = "Artist"
+    let duration = 180.0
+    let isAvailable = true
 }

@@ -810,55 +810,21 @@ final class AppCommandExecutor {
     ) async throws -> TrackTagsUpdatedSuccess {
         do {
             return try await trackFileOperationCoordinator.run(trackId: trackId) {
-                // URL mutable-файла резолвится под тем же ownership, что и subsequent tag write.
-                guard let url = await self.trackFileURLResolver.url(forTrackId: trackId) else {
-                    throw MutationFailure(
-                        stage: .prepare,
-                        appError: .bookmarkResolveFailed,
-                        recovery: .untouched
-                    )
-                }
-
-                let didStartAccess = url.startAccessingSecurityScopedResource()
-                defer { if didStartAccess { url.stopAccessingSecurityScopedResource() } }
-
-                var finalPatch = patch
-                switch artworkAction {
-                case .none:
-                    break
-                case .remove:
-                    finalPatch.artwork = .remove
-                case .replace(let data):
-                    finalPatch.artwork = .set(
-                        data: data,
-                        mime: artworkMimeType(for: data)
-                    )
-                }
-
-                do {
-                    try await self.tagsWriter.writeTags(to: url, patch: finalPatch)
-                } catch {
-                    // Writer не подтвердил завершение записи, поэтому batch получает не произвольный Error, а untouched mutation.
-                    throw self.tagWriteFailure(from: error)
-                }
-
-                let changedFields = changedFieldsForTagUpdate(
-                    patch: finalPatch,
+                let preparedUpdate = try await self.prepareTagUpdate(
+                    trackId: trackId,
+                    patch: patch,
                     artworkAction: artworkAction
                 )
-                let updateReason: TrackUpdateReason = artworkAction == .none
-                    ? .metadataUpdated
-                    : .artworkUpdated
 
                 let updateEvent = try await self.confirmedTrackUpdate(
-                    forTrackId: trackId,
-                    reason: updateReason,
-                    changedFields: changedFields,
+                    forTrackId: preparedUpdate.trackId,
+                    reason: preparedUpdate.reason,
+                    changedFields: preparedUpdate.changedFields,
                     previousURL: nil
                 )
 
                 return TrackTagsUpdatedSuccess(
-                    trackId: trackId,
+                    trackId: preparedUpdate.trackId,
                     snapshot: updateEvent.snapshot
                 )
             }
@@ -882,11 +848,141 @@ final class AppCommandExecutor {
             )
         }
     }
+
+    /// Массово обновляет теги, сохраняя подтверждение каждого физического трека.
+    ///
+    /// Все trackId удерживаются до подготовки новых snapshot и единственной batch-публикации.
+    /// Поэтому строковые mutation results остаются точными, а presentation не получает
+    /// отдельное глобальное событие после каждой из сотен подтверждённых записей.
+    func updateTrackTagsBatch(
+        _ commands: [BatchTagEditWriteCommand]
+    ) async -> BatchTagEditSaveResult {
+        guard !commands.isEmpty else {
+            return BatchTagEditSaveResult(confirmed: [], failures: [])
+        }
+
+        do {
+            return try await trackFileOperationCoordinator.run(
+                trackIds: commands.map(\.trackId)
+            ) {
+                var confirmed: [BatchTagEditSaveSuccess] = []
+                var failures: [BatchTagEditSaveFailure] = []
+                var updateEvents: [TrackUpdateEvent] = []
+
+                for command in commands {
+                    do {
+                        let preparedUpdate = try await self.prepareTagUpdate(
+                            trackId: command.trackId,
+                            patch: command.patch,
+                            artworkAction: command.artworkAction
+                        )
+                        let updateEvent = try await self.preparedTrackUpdate(
+                            forTrackId: preparedUpdate.trackId,
+                            reason: preparedUpdate.reason,
+                            changedFields: preparedUpdate.changedFields,
+                            previousURL: nil
+                        )
+                        updateEvents.append(updateEvent)
+                        confirmed.append(
+                            BatchTagEditSaveSuccess(
+                                trackId: preparedUpdate.trackId,
+                                snapshot: updateEvent.snapshot
+                            )
+                        )
+                    } catch {
+                        // Ошибка одного файла не отменяет подтверждённые mutation остальных строк batch.
+                        failures.append(
+                            BatchTagEditSaveFailure(
+                                trackId: command.trackId,
+                                failure: self.batchTagMutationFailure(from: error)
+                            )
+                        )
+                    }
+                }
+
+                // Одно агрегированное событие передаёт всем consumer-ам полный подтверждённый набор snapshot.
+                await self.trackPostUpdateHandler.publishTrackBatchUpdateEvents(updateEvents)
+                return BatchTagEditSaveResult(
+                    confirmed: confirmed,
+                    failures: failures
+                )
+            }
+        } catch {
+            // Отмена до получения batch ownership не запускает writer ни для одной строки.
+            let failure = batchTagMutationFailure(from: error)
+            return BatchTagEditSaveResult(
+                confirmed: [],
+                failures: commands.map {
+                    BatchTagEditSaveFailure(trackId: $0.trackId, failure: failure)
+                }
+            )
+        }
+    }
 }
 
 // MARK: - Подтверждение post-update
 
+/// Фиксирует результат записи тегов до выбора одиночной или batch-публикации snapshot.
+private struct PreparedTagUpdate {
+    let trackId: UUID
+    let reason: TrackUpdateReason
+    let changedFields: Set<TrackChangedField>
+}
+
 private extension AppCommandExecutor {
+
+    /// Пишет теги под уже полученным ownership и готовит параметры канонического post-update pipeline.
+    func prepareTagUpdate(
+        trackId: UUID,
+        patch: TagWritePatch,
+        artworkAction: ArtworkWriteAction
+    ) async throws -> PreparedTagUpdate {
+        // URL mutable-файла резолвится под тем же ownership, что и subsequent tag write.
+        guard let url = await trackFileURLResolver.url(forTrackId: trackId) else {
+            throw MutationFailure(
+                stage: .prepare,
+                appError: .bookmarkResolveFailed,
+                recovery: .untouched
+            )
+        }
+
+        let didStartAccess = url.startAccessingSecurityScopedResource()
+        defer { if didStartAccess { url.stopAccessingSecurityScopedResource() } }
+
+        var finalPatch = patch
+        switch artworkAction {
+        case .none:
+            break
+        case .remove:
+            finalPatch.artwork = .remove
+        case .replace(let data):
+            finalPatch.artwork = .set(
+                data: data,
+                mime: artworkMimeType(for: data)
+            )
+        }
+
+        do {
+            try await tagsWriter.writeTags(to: url, patch: finalPatch)
+        } catch {
+            // Writer не подтвердил завершение записи, поэтому batch получает не произвольный Error, а untouched mutation.
+            throw tagWriteFailure(from: error)
+        }
+
+        let changedFields = changedFieldsForTagUpdate(
+            patch: finalPatch,
+            artworkAction: artworkAction
+        )
+        let reason: TrackUpdateReason = artworkAction == .none
+            ? .metadataUpdated
+            : .artworkUpdated
+
+        return PreparedTagUpdate(
+            trackId: trackId,
+            reason: reason,
+            changedFields: changedFields
+        )
+    }
 
     /// Преобразует известный результат TagWriter в mutation failure до передачи его batch-слою.
     nonisolated func tagWriteFailure(from error: Error) -> MutationFailure {
@@ -919,6 +1015,20 @@ private extension AppCommandExecutor {
         return MutationFailure(
             stage: .perform,
             appError: appError,
+            recovery: .untouched,
+            operationErrorDescription: String(describing: error)
+        )
+    }
+
+    /// Преобразует ошибку до запуска batch-body в одинаковый результат всех нетронутых строк.
+    nonisolated func batchTagMutationFailure(from error: Error) -> MutationFailure {
+        if let failure = error as? MutationFailure {
+            return failure
+        }
+
+        return MutationFailure(
+            stage: .prepare,
+            appError: .tagWriteFailed,
             recovery: .untouched,
             operationErrorDescription: String(describing: error)
         )

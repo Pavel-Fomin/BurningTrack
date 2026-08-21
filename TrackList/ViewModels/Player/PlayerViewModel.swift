@@ -316,6 +316,10 @@ final class PlayerViewModel: ObservableObject {
             self?.applyTrackUpdateEvent(event)
         }
 
+        eventObserver.onTrackBatchDidUpdate = { [weak self] events in
+            self?.applyTrackUpdateEvents(events)
+        }
+
         // Обновление runtime snapshot после изменения настроек приложения
         eventObserver.onSettingsChanged = { [weak self] in
             self?.reloadSnapshotsAfterSettingsChange()
@@ -1533,12 +1537,20 @@ final class PlayerViewModel: ObservableObject {
     ///
     /// - Parameter updateEvent: Событие обновления трека
     private func applyTrackUpdateEvent(_ updateEvent: TrackUpdateEvent) {
-        let changedTrackId = runtimeSnapshotController.applyTrackUpdateEvent(updateEvent)
+        applyTrackUpdateEvents([updateEvent])
+    }
+
+    /// Применяет batch snapshot-ов до одной публикации runtime presentation плеера.
+    private func applyTrackUpdateEvents(_ updateEvents: [TrackUpdateEvent]) {
+        let changedTrackIds = runtimeSnapshotController.applyTrackUpdateEvents(updateEvents)
+        guard !changedTrackIds.isEmpty else {
+            return
+        }
 
         publishRuntimeSnapshots()
 
         if let current = currentTrackDisplayable,
-           current.trackId == changedTrackId {
+           changedTrackIds.contains(current.trackId) {
             updateMiniPlayerStaticState(for: current)
             playerManager.applyNowPlaying(
                 snapshot: makeNowPlayingSnapshot(for: current)

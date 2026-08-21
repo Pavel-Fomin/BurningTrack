@@ -40,6 +40,40 @@ final class AsyncConcurrencyLimiterTests: XCTestCase {
         XCTAssertEqual(finalMaximumRunning, 3)
     }
 
+    /// Проверяет границу production limiter-а для типичных размеров массовой операции без device-dependent тайминга.
+    func testBatchSizesKeepMaximumConcurrencyWithinConfiguredLimit() async {
+        let limit = 6
+
+        for count in [1, 10, 100, 300, 500] {
+            let limiter = AsyncConcurrencyLimiter(limit: limit)
+            let gate = ControlledLimiterOperationGate()
+            let tasks = (0..<count).map { identifier in
+                Task {
+                    await limiter.withSlot {
+                        await gate.run(identifier: identifier)
+                        return identifier
+                    }
+                }
+            }
+
+            let expectedConcurrency = min(count, limit)
+            await gate.waitForStartedCount(expectedConcurrency)
+            await gate.waitForHeldCount(expectedConcurrency)
+            let maximumRunning = await gate.maximumRunning
+
+            XCTAssertEqual(maximumRunning, expectedConcurrency, "count=\(count)")
+
+            await gate.openAndResumeAll()
+            var completedResultCount = 0
+            for task in tasks {
+                if await task.value != nil {
+                    completedResultCount += 1
+                }
+            }
+            XCTAssertEqual(completedResultCount, count, "count=\(count)")
+        }
+    }
+
     func testWaitingOperationDoesNotStartBeforeOwnerReleasesSlot() async {
         let limiter = AsyncConcurrencyLimiter(limit: 1)
         let gate = ControlledLimiterOperationGate()

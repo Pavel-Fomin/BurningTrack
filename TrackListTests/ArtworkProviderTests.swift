@@ -34,6 +34,37 @@ final class ArtworkProviderTests: XCTestCase {
         XCTAssertEqual(largePreparationCount, 0)
     }
 
+    /// Сто одновременных запросов одного cache key ожидают общую подготовку, не создавая повторный decode.
+    func testOneHundredConcurrentRequestsForSameCacheKeyShareSinglePreparation() async {
+        let expectedImage = UIImage()
+        let preparation = ControlledArtworkPreparation()
+        let provider = ArtworkProvider(
+            prepareImage: { _, _ in
+                await preparation.prepare()
+            },
+            positiveCache: ArtworkPositiveImageCache()
+        )
+        let request = makeRequest(purpose: .trackList)
+        let loads = (0..<100).map { _ in
+            Task { await provider.image(for: request) }
+        }
+
+        await preparation.waitForInvocationCount(1)
+        for _ in 0..<16 {
+            await Task.yield()
+        }
+        await preparation.resumeNext(returning: expectedImage)
+
+        var images: [UIImage?] = []
+        for load in loads {
+            images.append(await load.value)
+        }
+        let invocationCount = await preparation.invocationCount()
+
+        XCTAssertEqual(invocationCount, 1)
+        XCTAssertTrue(images.allSatisfy { $0 === expectedImage })
+    }
+
     /// Одновременные крупные purpose используют единственную large-подготовку.
     func testLargePurposesShareSinglePreparation() async {
         let expectedImage = UIImage()
@@ -189,6 +220,38 @@ final class ArtworkProviderTests: XCTestCase {
         XCTAssertEqual(Set(cache.removedKeys), expectedRemovedKeys)
         XCTAssertEqual(smallPreparationCount, 2)
         XCTAssertEqual(largePreparationCount, 2)
+    }
+
+    /// Late completion invalidированного источника не возвращается и не может заполнить положительный кэш.
+    func testInvalidatedInFlightPreparationCannotReturnStaleArtwork() async {
+        let preparation = ControlledArtworkPreparation()
+        let provider = ArtworkProvider(
+            prepareImage: { _, _ in
+                await preparation.prepare()
+            },
+            positiveCache: ArtworkPositiveImageCache()
+        )
+        let trackId = UUID()
+        let request = makeRequest(trackId: trackId, purpose: .trackList)
+        let staleImage = UIImage()
+        let currentImage = UIImage()
+
+        let staleLoad = Task { await provider.image(for: request) }
+        await preparation.waitForInvocationCount(1)
+        await provider.invalidate(trackId: trackId)
+        await preparation.resumeNext(returning: staleImage)
+
+        let staleResult = await staleLoad.value
+        XCTAssertNil(staleResult)
+
+        let currentLoad = Task { await provider.image(for: request) }
+        await preparation.waitForInvocationCount(2)
+        await preparation.resumeNext(returning: currentImage)
+        let currentResult = await currentLoad.value
+
+        XCTAssertTrue(currentResult === currentImage)
+        let invocationCount = await preparation.invocationCount()
+        XCTAssertEqual(invocationCount, 2)
     }
 
     /// Нулевая ширина не попадает в ImageIO или UIKit при подготовке на рабочей очереди.
@@ -353,6 +416,55 @@ private actor ArtworkPreparationSpy {
     /// Возвращает общее число подготовок всех классов размера.
     var totalCount: Int {
         counts.values.reduce(0, +)
+    }
+}
+
+/// Удерживает подготовку изображения до явного completion, чтобы проверить in-flight deduplication и stale-result защиту.
+private actor ControlledArtworkPreparation {
+    private var invocations = 0
+    private var continuations: [CheckedContinuation<UIImage?, Never>] = []
+    private var invocationWaiters: [(count: Int, continuation: CheckedContinuation<Void, Never>)] = []
+
+    func prepare() async -> UIImage? {
+        invocations += 1
+        resumeInvocationWaitersIfNeeded()
+
+        return await withCheckedContinuation { continuation in
+            continuations.append(continuation)
+        }
+    }
+
+    func waitForInvocationCount(_ count: Int) async {
+        guard invocations < count else { return }
+
+        await withCheckedContinuation { continuation in
+            invocationWaiters.append((count, continuation))
+        }
+    }
+
+    func resumeNext(returning image: UIImage?) {
+        guard !continuations.isEmpty else {
+            XCTFail("Не найдена удержанная preparation operation")
+            return
+        }
+
+        continuations.removeFirst().resume(returning: image)
+    }
+
+    func invocationCount() -> Int {
+        invocations
+    }
+
+    private func resumeInvocationWaitersIfNeeded() {
+        var remaining: [(count: Int, continuation: CheckedContinuation<Void, Never>)] = []
+        for waiter in invocationWaiters {
+            if invocations >= waiter.count {
+                waiter.continuation.resume()
+            } else {
+                remaining.append(waiter)
+            }
+        }
+        invocationWaiters = remaining
     }
 }
 

@@ -19,6 +19,8 @@ final class NotificationPlayerEventObserver: PlayerEventObserving {
 
     var onTrackDidUpdate: ((TrackUpdateEvent) -> Void)?
 
+    var onTrackBatchDidUpdate: (([TrackUpdateEvent]) -> Void)?
+
     var onSettingsChanged: (() -> Void)?
 
     // Источник событий целиком принадлежит MainActor: здесь же устанавливаются callbacks
@@ -77,6 +79,20 @@ final class NotificationPlayerEventObserver: PlayerEventObserving {
             }
         }
 
+        let batchUpdateObserver = notificationCenter.addObserver(
+            forName: .trackBatchDidUpdate,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let updateEvents = notification.userInfo?["events"] as? [TrackUpdateEvent] else {
+                return
+            }
+
+            Task { @MainActor [weak self] in
+                self?.onTrackBatchDidUpdate?(updateEvents)
+            }
+        }
+
         let settingsObserver = notificationCenter.addObserver(
             forName: .appSettingsDidChange,
             object: nil,
@@ -91,6 +107,7 @@ final class NotificationPlayerEventObserver: PlayerEventObserving {
             durationObserver,
             finishObserver,
             updateObserver,
+            batchUpdateObserver,
             settingsObserver
         ]
     }

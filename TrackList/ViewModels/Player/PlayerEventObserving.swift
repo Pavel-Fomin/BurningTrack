@@ -19,5 +19,8 @@ protocol PlayerEventObserving: AnyObject {
 
     var onTrackDidUpdate: ((TrackUpdateEvent) -> Void)? { get set }
 
+    /// Передаёт подтверждённый набор обновлений одной массовой операции без разбиения на callbacks.
+    var onTrackBatchDidUpdate: (([TrackUpdateEvent]) -> Void)? { get set }
+
     var onSettingsChanged: (() -> Void)? { get set }
 }

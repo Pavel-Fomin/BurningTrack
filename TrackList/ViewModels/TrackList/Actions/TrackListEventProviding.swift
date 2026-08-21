@@ -14,6 +14,8 @@ import Foundation
 protocol TrackListEventProviding {
     /// Событие обновления runtime snapshot трека.
     var trackDidUpdate: AnyPublisher<TrackUpdateEvent, Never> { get }
+    /// Агрегированное обновление snapshot нескольких треков после одной batch-операции.
+    var trackBatchDidUpdate: AnyPublisher<[TrackUpdateEvent], Never> { get }
     /// Событие изменения настроек приложения.
     var appSettingsDidChange: AnyPublisher<Void, Never> { get }
     /// Событие изменения состава треков конкретного треклиста.

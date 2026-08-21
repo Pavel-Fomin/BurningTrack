@@ -63,6 +63,8 @@ protocol TrackDetailRouting: AnyObject {
 protocol TrackDetailEventProviding {
     /// Единый поток обновления одного трека.
     var trackDidUpdate: AnyPublisher<TrackUpdateEvent, Never> { get }
+    /// Подтверждённый набор обновлений одной batch-операции.
+    var trackBatchDidUpdate: AnyPublisher<[TrackUpdateEvent], Never> { get }
 }
 
 // MARK: - Адаптеры production-слоя
@@ -88,6 +90,13 @@ struct NotificationTrackDetailEventProvider: TrackDetailEventProviding {
     var trackDidUpdate: AnyPublisher<TrackUpdateEvent, Never> {
         NotificationCenter.default.publisher(for: .trackDidUpdate)
             .compactMap { $0.object as? TrackUpdateEvent }
+            .receive(on: RunLoop.main)
+            .eraseToAnyPublisher()
+    }
+
+    var trackBatchDidUpdate: AnyPublisher<[TrackUpdateEvent], Never> {
+        NotificationCenter.default.publisher(for: .trackBatchDidUpdate)
+            .compactMap { $0.userInfo?["events"] as? [TrackUpdateEvent] }
             .receive(on: RunLoop.main)
             .eraseToAnyPublisher()
     }

@@ -137,6 +137,46 @@ final class BatchTagMetadataLoaderTests: XCTestCase {
         let builtTrackIDs = await pipeline.builtTrackIDs
         XCTAssertEqual(builtTrackIDs, [trackID])
     }
+
+    /// Проверяет созданные TaskGroup child tasks на 1–500 треках, отделяя их число от реальной тяжёлой параллельности.
+    func testBatchSizesReturnAllSnapshotsWithoutExceedingConfiguredConcurrency() async {
+        let limit = 6
+
+        for count in [1, 10, 100, 300, 500] {
+            let trackIDs = (0..<count).map { _ in UUID() }
+            let snapshots = Dictionary(uniqueKeysWithValues: trackIDs.map {
+                ($0, makeSnapshot(trackID: $0, title: $0.uuidString))
+            })
+            let pipeline = BoundedBatchTagSnapshotPipeline(snapshots: snapshots)
+            let loader = BatchTagMetadataLoader(
+                concurrentLimit: limit,
+                snapshotLoadingOperation: { trackID in
+                    await pipeline.loadSnapshot(for: trackID)
+                }
+            )
+            let pendingAction = PendingBulkTrackAction(
+                action: .editTags,
+                trackIDs: trackIDs
+            )
+
+            let loadingTask = Task {
+                await loader.loadFlow(pendingAction: pendingAction)
+            }
+            let expectedConcurrency = min(count, limit)
+            await pipeline.waitForStartedCount(expectedConcurrency)
+            await pipeline.waitForHeldCount(expectedConcurrency)
+            let maximumConcurrency = await pipeline.maximumConcurrency
+
+            XCTAssertEqual(maximumConcurrency, expectedConcurrency, "count=\(count)")
+
+            await pipeline.openAndResumeAll()
+            let flow = await loadingTask.value
+            let startedCount = await pipeline.startedCount
+
+            XCTAssertEqual(startedCount, count, "count=\(count)")
+            XCTAssertEqual(flow.tracks.map(\.trackId), trackIDs, "count=\(count)")
+        }
+    }
 }
 
 /// Имитирует store и builder без файловой системы, сохраняя их наблюдаемый контракт для loader-а.
@@ -252,6 +292,94 @@ private actor BlockingBatchTagSnapshotPipeline {
             }
         }
 
+        heldWaiters = remaining
+    }
+}
+
+/// Удерживает первые operation до открытия gate, чтобы измерить фактическую, а не созданную TaskGroup параллельность.
+private actor BoundedBatchTagSnapshotPipeline {
+    private let snapshots: [UUID: TrackRuntimeSnapshot]
+    private var isOpen = false
+    private var started = 0
+    private var running = 0
+    private var maximum = 0
+    private var heldContinuations: [CheckedContinuation<Void, Never>] = []
+    private var startWaiters: [(count: Int, continuation: CheckedContinuation<Void, Never>)] = []
+    private var heldWaiters: [(count: Int, continuation: CheckedContinuation<Void, Never>)] = []
+
+    var maximumConcurrency: Int {
+        maximum
+    }
+
+    var startedCount: Int {
+        started
+    }
+
+    init(snapshots: [UUID: TrackRuntimeSnapshot]) {
+        self.snapshots = snapshots
+    }
+
+    func loadSnapshot(for trackID: UUID) async -> TrackRuntimeSnapshot? {
+        started += 1
+        running += 1
+        maximum = max(maximum, running)
+        resumeStartWaitersIfNeeded()
+
+        if !isOpen {
+            await withCheckedContinuation { continuation in
+                heldContinuations.append(continuation)
+                resumeHeldWaitersIfNeeded()
+            }
+        }
+
+        running -= 1
+        return snapshots[trackID]
+    }
+
+    func waitForStartedCount(_ count: Int) async {
+        guard started < count else { return }
+
+        await withCheckedContinuation { continuation in
+            startWaiters.append((count, continuation))
+        }
+    }
+
+    func waitForHeldCount(_ count: Int) async {
+        guard heldContinuations.count < count else { return }
+
+        await withCheckedContinuation { continuation in
+            heldWaiters.append((count, continuation))
+        }
+    }
+
+    func openAndResumeAll() {
+        isOpen = true
+        let continuations = heldContinuations
+        heldContinuations.removeAll()
+        continuations.forEach { $0.resume() }
+    }
+
+    private func resumeStartWaitersIfNeeded() {
+        var remaining: [(count: Int, continuation: CheckedContinuation<Void, Never>)] = []
+        for waiter in startWaiters {
+            if started >= waiter.count {
+                waiter.continuation.resume()
+            } else {
+                remaining.append(waiter)
+            }
+        }
+        startWaiters = remaining
+    }
+
+    private func resumeHeldWaitersIfNeeded() {
+        var remaining: [(count: Int, continuation: CheckedContinuation<Void, Never>)] = []
+        for waiter in heldWaiters {
+            if heldContinuations.count >= waiter.count {
+                waiter.continuation.resume()
+            } else {
+                remaining.append(waiter)
+            }
+        }
         heldWaiters = remaining
     }
 }

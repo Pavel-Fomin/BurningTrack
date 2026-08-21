@@ -38,6 +38,29 @@ final class MetadataCacheManagerTests: XCTestCase {
         XCTAssertEqual(cached?.title, "Canonical")
     }
 
+    /// Сто конкурентных consumer-ов одного URL присоединяются к одному parser operation до появления cache hit.
+    func testOneHundredConcurrentRequestsForSameURLShareSingleParserOperation() async {
+        let parser = ControlledMetadataParser()
+        let manager = makeManager(parser: parser)
+        let url = makeURL("one-hundred-consumers")
+        let expected = makeMetadata(title: "Canonical")
+        let loads = (0..<100).map { _ in
+            Task { await manager.loadMetadata(for: url) }
+        }
+
+        await parser.waitForInvocationCount(1)
+        await parser.completeNext(for: url, with: expected)
+
+        var results: [TrackMetadataCacheManager.CachedMetadata?] = []
+        for load in loads {
+            results.append(await load.value)
+        }
+        let parserInvocationCount = await parser.invocationCount()
+
+        XCTAssertEqual(parserInvocationCount, 1)
+        XCTAssertEqual(results.compactMap { $0 }.count, 100)
+    }
+
     func testDifferentURLsRunInParallelOnlyUpToConfiguredLimit() async {
         let parser = ControlledMetadataParser()
         let manager = makeManager(parser: parser, maximumConcurrentLoads: 2)
@@ -68,6 +91,42 @@ final class MetadataCacheManagerTests: XCTestCase {
         let maximumRunningCount = await parser.maximumRunningCount()
 
         XCTAssertEqual(maximumRunningCount, 2)
+    }
+
+    /// Триста разных URL не обходят actor-owned ограничитель raw metadata parser-а.
+    func testThreeHundredDifferentURLsKeepParserConcurrencyWithinConfiguredLimit() async {
+        let limit = 6
+        let parser = ControlledMetadataParser()
+        let manager = makeManager(parser: parser, maximumConcurrentLoads: limit)
+        let urls = (0..<300).map { makeURL("distinct-\($0)") }
+        let loads = urls.map { url in
+            Task { await manager.loadMetadata(for: url) }
+        }
+
+        await parser.waitForInvocationCount(limit)
+        let initialMaximumRunningCount = await parser.maximumRunningCount()
+        XCTAssertEqual(initialMaximumRunningCount, limit)
+
+        for completedCount in urls.indices {
+            let startedURLs = await parser.invocationURLs()
+            await parser.completeNext(
+                for: startedURLs[completedCount],
+                with: makeMetadata(title: "Metadata \(completedCount)")
+            )
+
+            if completedCount + limit < urls.count {
+                await parser.waitForInvocationCount(completedCount + limit + 1)
+            }
+        }
+
+        var results: [TrackMetadataCacheManager.CachedMetadata?] = []
+        for load in loads {
+            results.append(await load.value)
+        }
+        let maximumRunningCount = await parser.maximumRunningCount()
+
+        XCTAssertEqual(results.compactMap { $0 }.count, urls.count)
+        XCTAssertEqual(maximumRunningCount, limit)
     }
 
     func testInvalidatingURLRejectsLateResultAndKeepsNewOperation() async {

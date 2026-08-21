@@ -524,6 +524,53 @@ final class TrackFileOperationCoordinatorTests: XCTestCase {
         XCTAssertEqual(recordedEvents, ["tag write", "post", "tag write", "post"])
     }
 
+    /// Массовое сохранение тегов подтверждает каждый трек, но публикует один presentation batch вместо 300 одиночных событий.
+    func testBatchTagSaveForThreeHundredTracksPublishesOneAggregatedUpdate() async {
+        let trackIDs = (0..<300).map { _ in UUID() }
+        let events = TrackFileOperationEventLog()
+        let fileURLResolver = TrackFileURLResolverSpy(initialURL: makeURL(name: "Batch.flac"))
+        let postUpdater = TrackPostUpdateHandlerSpy(
+            events: events,
+            updateGate: TrackFileOperationGate(isOpen: true)
+        )
+        let executor = makeExecutor(
+            fileManager: TrackFileManagerSpy(
+                urlResolver: fileURLResolver,
+                events: events,
+                renameGate: TrackFileOperationGate(isOpen: true),
+                moveGate: TrackFileOperationGate(isOpen: true)
+            ),
+            fileURLResolver: fileURLResolver,
+            postUpdater: postUpdater,
+            tagsWriter: TrackTagsWriterSpy(
+                events: events,
+                writeGate: TrackFileOperationGate(isOpen: true)
+            )
+        )
+        let saveExecutor = BatchTagEditSaveExecutor(appCommandExecutor: executor)
+        let plan = BatchTagEditSavePlan(
+            commands: trackIDs.map {
+                BatchTagEditWriteCommand(
+                    trackId: $0,
+                    patch: TagWritePatch(),
+                    artworkAction: .none
+                )
+            }
+        )
+
+        let result = await saveExecutor.execute(plan: plan)
+        let recordedEvents = await events.values()
+        let publishedBatchCounts = await postUpdater.publishedBatchEventCounts()
+
+        XCTAssertEqual(result.succeededCount, trackIDs.count)
+        XCTAssertEqual(result.failedCount, 0)
+        XCTAssertEqual(recordedEvents.filter { $0 == "tag write" }.count, trackIDs.count)
+        XCTAssertEqual(recordedEvents.filter { $0 == "prepare" }.count, trackIDs.count)
+        XCTAssertEqual(recordedEvents.filter { $0 == "post" }.count, 0)
+        XCTAssertEqual(recordedEvents.filter { $0 == "batch publish" }.count, 1)
+        XCTAssertEqual(publishedBatchCounts, [trackIDs.count])
+    }
+
     func testBatchRenameKeepsConfirmationFailureForChangedFile() async {
         let trackId = UUID()
         let events = TrackFileOperationEventLog()
@@ -909,6 +956,7 @@ private actor TrackPostUpdateHandlerSpy: TrackPostUpdateHandling {
     private let events: TrackFileOperationEventLog
     private let updateGate: TrackFileOperationGate
     private var changedFieldsByCall: [Set<TrackChangedField>] = []
+    private var publishedBatchEventCountsStorage: [Int] = []
 
     init(
         events: TrackFileOperationEventLog,
@@ -941,12 +989,18 @@ private actor TrackPostUpdateHandlerSpy: TrackPostUpdateHandling {
     }
 
     func publishTrackBatchUpdateEvents(_ updateEvents: [TrackUpdateEvent]) async {
+        publishedBatchEventCountsStorage.append(updateEvents.count)
         await events.record("batch publish")
     }
 
     /// Возвращает поля, с которыми command передал управление единому post-update pipeline.
     func handledChangedFields() -> [Set<TrackChangedField>] {
         changedFieldsByCall
+    }
+
+    /// Возвращает размер каждого фактически опубликованного batch без привязки теста к NotificationCenter.
+    func publishedBatchEventCounts() -> [Int] {
+        publishedBatchEventCountsStorage
     }
 }
 

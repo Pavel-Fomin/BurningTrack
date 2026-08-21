@@ -99,6 +99,33 @@ final class NotificationPlayerEventObserverTests: XCTestCase {
         XCTAssertEqual(receivedEvents, [expectedEvent])
     }
 
+    /// Одно batch-уведомление остаётся одним callback плеера даже при 300 подтверждённых snapshot.
+    func testTrackBatchUpdateDeliversThreeHundredEventsInOneCallback() async {
+        let notificationCenter = NotificationCenter()
+        let observer = NotificationPlayerEventObserver(
+            notificationCenter: notificationCenter
+        )
+        let expectedEvents = (0..<300).map { _ in makeTrackUpdateEvent() }
+        var receivedBatches: [[TrackUpdateEvent]] = []
+        let expectation = expectation(description: "Track batch update callback")
+
+        observer.onTrackBatchDidUpdate = { events in
+            receivedBatches.append(events)
+            expectation.fulfill()
+        }
+
+        notificationCenter.post(
+            name: .trackBatchDidUpdate,
+            object: nil,
+            userInfo: ["events": expectedEvents]
+        )
+
+        await fulfillment(of: [expectation], timeout: 1)
+
+        XCTAssertEqual(receivedBatches.count, 1)
+        XCTAssertEqual(receivedBatches.first, expectedEvents)
+    }
+
     func testInvalidTrackUpdateEventIsIgnored() {
         let notificationCenter = NotificationCenter()
         let observer = NotificationPlayerEventObserver(

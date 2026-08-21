@@ -328,6 +328,15 @@ final class TrackDetailViewModel: ObservableObject {
                 self?.handleExternalSnapshot(event.snapshot)
             }
             .store(in: &cancellables)
+
+        eventProvider.trackBatchDidUpdate
+            .compactMap { [weak self] events in
+                events.first { $0.trackId == self?.track.trackId }
+            }
+            .sink { [weak self] event in
+                self?.handleExternalSnapshot(event.snapshot)
+            }
+            .store(in: &cancellables)
     }
 
     /// Не меняет активный draft; в view применяет событие сразу.

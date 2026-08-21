@@ -244,6 +244,14 @@ final class TrackListViewModel: ObservableObject {
             }
             .store(in: &cancellables)
 
+        eventProvider.trackBatchDidUpdate
+            .sink { [weak self] updateEvents in
+                Task { @MainActor in
+                    self?.applyTrackUpdateEvents(updateEvents)
+                }
+            }
+            .store(in: &cancellables)
+
         eventProvider.appSettingsDidChange
             .sink { [weak self] _ in
                 Task { @MainActor in
@@ -504,17 +512,28 @@ final class TrackListViewModel: ObservableObject {
 
     /// Принимает каноничный event только для physical track, представленного в текущем detail snapshot.
     private func applyTrackUpdateEvent(_ updateEvent: TrackUpdateEvent) {
-        guard tracks.contains(where: { $0.trackId == updateEvent.trackId }) else {
+        applyTrackUpdateEvents([updateEvent])
+    }
+
+    /// Применяет один batch атомарно для detail presentation, не пересобирая ScreenState по каждому треку.
+    private func applyTrackUpdateEvents(_ updateEvents: [TrackUpdateEvent]) {
+        let representedTrackIds = Set(tracks.map(\.trackId))
+        let relevantEvents = updateEvents.filter {
+            representedTrackIds.contains($0.trackId)
+        }
+        guard !relevantEvents.isEmpty else {
             return
         }
 
-        // Каноничный snapshot имеет приоритет над любым прежним асинхронным file read.
-        invalidateSnapshotRequest(for: updateEvent.trackId)
-        snapshotsByTrackId[updateEvent.trackId] = updateEvent.snapshot
+        for updateEvent in relevantEvents {
+            // Каноничный snapshot имеет приоритет над любым прежним асинхронным file read.
+            invalidateSnapshotRequest(for: updateEvent.trackId)
+            snapshotsByTrackId[updateEvent.trackId] = updateEvent.snapshot
+        }
         rebuildScreenState()
         reloadCollectionNavigationTargets()
 
-        guard updateEvent.changedFields.contains(.duration) else {
+        guard relevantEvents.contains(where: { $0.changedFields.contains(.duration) }) else {
             return
         }
 

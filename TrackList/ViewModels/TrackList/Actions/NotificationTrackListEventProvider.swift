@@ -25,6 +25,13 @@ final class NotificationTrackListEventProvider: TrackListEventProviding {
             .eraseToAnyPublisher()
     }
 
+    /// Передаёт целиком подтверждённый набор snapshot, не разворачивая его в N одиночных событий.
+    var trackBatchDidUpdate: AnyPublisher<[TrackUpdateEvent], Never> {
+        notificationCenter.publisher(for: .trackBatchDidUpdate)
+            .compactMap { $0.userInfo?["events"] as? [TrackUpdateEvent] }
+            .eraseToAnyPublisher()
+    }
+
     /// Событие изменения настроек приложения.
     var appSettingsDidChange: AnyPublisher<Void, Never> {
         notificationCenter.publisher(for: .appSettingsDidChange)

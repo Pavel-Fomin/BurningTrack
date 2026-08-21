@@ -12,7 +12,7 @@ import Foundation
 /// Executor массового сохранения тегов.
 ///
 /// Роль:
-/// - последовательно выполняет команды записи;
+/// - передаёт полный набор команд единому batch ownership;
 /// - использует AppCommandExecutor как единый write-layer;
 /// - возвращает общий результат batch-операции;
 /// - не знает про UI и SheetManager.
@@ -28,50 +28,7 @@ struct BatchTagEditSaveExecutor {
     func execute(
         plan: BatchTagEditSavePlan
     ) async -> BatchTagEditSaveResult {
-        var confirmed: [BatchTagEditSaveSuccess] = []
-        var failures: [BatchTagEditSaveFailure] = []
-
-        for command in plan.commands {
-            do {
-                let result = try await appCommandExecutor.updateTrackTags(
-                    trackId: command.trackId,
-                    patch: command.patch,
-                    artworkAction: command.artworkAction
-                )
-                confirmed.append(
-                    BatchTagEditSaveSuccess(
-                        trackId: command.trackId,
-                        snapshot: result.snapshot
-                    )
-                )
-            } catch {
-                failures.append(
-                    BatchTagEditSaveFailure(
-                        trackId: command.trackId,
-                        failure: mutationFailure(from: error)
-                    )
-                )
-            }
-        }
-
-        return BatchTagEditSaveResult(
-            confirmed: confirmed,
-            failures: failures
-        )
-    }
-
-    /// AppCommandExecutor нормализует все пути updateTrackTags в MutationFailure.
-    /// Защитное преобразование удерживает batch-контракт, если новый adapter нарушит это правило.
-    private func mutationFailure(from error: Error) -> MutationFailure {
-        if let failure = error as? MutationFailure {
-            return failure
-        }
-
-        return MutationFailure(
-            stage: .perform,
-            appError: .tagWriteFailed,
-            recovery: .untouched,
-            operationErrorDescription: String(describing: error)
-        )
+        // Executor сохраняет результат каждой строки, а AppCommandExecutor публикует один batch после подготовки всех snapshot.
+        await appCommandExecutor.updateTrackTagsBatch(plan.commands)
     }
 }

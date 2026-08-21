@@ -889,6 +889,7 @@ private final class DetailLoader: TrackListDetailLoading {
 /// Публикует только локально управляемые invalidation-сигналы detail-flow.
 private final class DetailEventProvider: TrackListEventProviding {
     let trackDidUpdateSubject = PassthroughSubject<TrackUpdateEvent, Never>()
+    let trackBatchDidUpdateSubject = PassthroughSubject<[TrackUpdateEvent], Never>()
     let appSettingsDidChangeSubject = PassthroughSubject<Void, Never>()
     let trackListTracksSubject = PassthroughSubject<UUID, Never>()
     let libraryDataDidChangeSubject = PassthroughSubject<Void, Never>()
@@ -896,6 +897,10 @@ private final class DetailEventProvider: TrackListEventProviding {
 
     var trackDidUpdate: AnyPublisher<TrackUpdateEvent, Never> {
         trackDidUpdateSubject.eraseToAnyPublisher()
+    }
+
+    var trackBatchDidUpdate: AnyPublisher<[TrackUpdateEvent], Never> {
+        trackBatchDidUpdateSubject.eraseToAnyPublisher()
     }
 
     var appSettingsDidChange: AnyPublisher<Void, Never> {
