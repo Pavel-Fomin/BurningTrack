@@ -18,6 +18,9 @@ struct PlayerScreenState {
     /// Идентификатор строки, к которой должен прокрутиться список.
     var scrollTargetId: UUID?
 
+    /// Одноразовый intent центрирования после явной навигации MiniPlayer.
+    var automaticListScrollTrigger: AutomaticListScrollTrigger?
+
     /// Количество треков в плейлисте плеера.
     var trackCount: Int
 

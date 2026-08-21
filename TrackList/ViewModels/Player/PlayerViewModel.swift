@@ -30,17 +30,40 @@ final class PlayerViewModel: ObservableObject {
     
     @Published var currentTrackDisplayable: (any TrackDisplayable)? {
         didSet {
-            guard oldValue?.trackId != currentTrackDisplayable?.trackId else {
+            let didChangeDisplayableIdentity: Bool
+            switch (oldValue, currentTrackDisplayable) {
+            case let (oldTrack?, currentTrack?):
+                didChangeDisplayableIdentity = oldTrack.id != currentTrack.id
+                    || type(of: oldTrack) != type(of: currentTrack)
+
+            case (nil, nil):
+                didChangeDisplayableIdentity = false
+
+            case (nil, _),
+                 (_, nil):
+                didChangeDisplayableIdentity = true
+            }
+            guard didChangeDisplayableIdentity else {
                 return
             }
 
-            refreshCurrentTrackFavoriteState()
+            // Новая строка не наследует intent предыдущего перехода, даже если физический trackId повторяется.
+            activeTrackChangeReason = .passive
+            automaticListScrollTrigger = nil
+
+            if oldValue?.trackId != currentTrackDisplayable?.trackId {
+                refreshCurrentTrackFavoriteState()
+            }
         }
     }
     @Published var isPlaying: Bool = false
     @Published var currentTime: TimeInterval = 0.0
     @Published var trackDuration: TimeInterval = 0.0
     @Published var currentContext: PlaybackContext?
+    /// Причина последней смены строки остаётся в playback-state, но не выполняет UI-effect сама.
+    @Published private(set) var activeTrackChangeReason: ActiveTrackChangeReason = .passive
+    /// Одноразовый intent передаётся в feature-local ScreenState только для явной навигации MiniPlayer.
+    @Published private(set) var automaticListScrollTrigger: AutomaticListScrollTrigger?
     /// Показывает, что для текущего трека получен достоверный playback-массив, а не только ранняя display-модель.
     @Published private(set) var isPlaybackContextReady = false
     /// Разрешает переход к предыдущему треку только после проверки готового playback-контекста.
@@ -1786,6 +1809,21 @@ final class PlayerViewModel: ObservableObject {
         context: [any TrackDisplayable] = [],
         source: PlaybackContextSource = .playerQueue
     ) {
+        play(
+            track: track,
+            context: context,
+            source: source,
+            changeReason: .passive
+        )
+    }
+
+    /// Выполняет смену трека с семантикой источника, не расширяя общий playback capability для внешних feature.
+    private func play(
+        track: any TrackDisplayable,
+        context: [any TrackDisplayable],
+        source: PlaybackContextSource,
+        changeReason: ActiveTrackChangeReason
+    ) {
         
         // Определяем контекст воспроизведения
         let contextType = PlaybackContext.detect(from: context)
@@ -1846,6 +1884,11 @@ final class PlayerViewModel: ObservableObject {
             "newSource=\(playbackSourceLogDescription(resolvedSource)) caller=userPlay"
         )
         currentTrackDisplayable = track
+        publishAutomaticListScrollTriggerIfNeeded(
+            reason: changeReason,
+            track: track,
+            context: contextType
+        )
         setPlaybackContextReady(hasConfirmedPlaybackContext)
         miniPlayerStaticState = nil
         currentTime = 0
@@ -2154,18 +2197,22 @@ final class PlayerViewModel: ObservableObject {
     // MARK: - Переход между треками
     
     /// Следующий трек в текущем контексте
-    func playNextTrack() {
+    func playNextTrack(
+        reason: ActiveTrackChangeReason = .passive
+    ) {
         guard isPlaybackContextReady,
               canPlayNextTrack else {
             return
         }
 
-        _ = startNextTrack()
+        _ = startNextTrack(reason: reason)
     }
 
     /// Запускает следующий трек и сообщает, был ли найден переход.
     @discardableResult
-    private func startNextTrack() -> Bool {
+    private func startNextTrack(
+        reason: ActiveTrackChangeReason = .passive
+    ) -> Bool {
         guard isPlaybackContextReady,
               canPlayNextTrack,
               let current = currentTrackDisplayable,
@@ -2180,14 +2227,17 @@ final class PlayerViewModel: ObservableObject {
             play(
                 track: next.track,
                 context: next.context,
-                source: currentPlaybackContextSource
+                source: currentPlaybackContextSource,
+                changeReason: reason
             )
         }
         return true
     }
     
     /// Предыдущий трек в текущем контексте
-    func playPreviousTrack() {
+    func playPreviousTrack(
+        reason: ActiveTrackChangeReason = .passive
+    ) {
         guard isPlaybackContextReady,
               canPlayPreviousTrack,
               let current = currentTrackDisplayable else {
@@ -2210,7 +2260,27 @@ final class PlayerViewModel: ObservableObject {
         play(
             track: previous.track,
             context: previous.context,
-            source: currentPlaybackContextSource
+            source: currentPlaybackContextSource,
+            changeReason: reason
+        )
+    }
+
+    /// Публикует одноразовый scroll intent только после смены displayable-строки из MiniPlayer.
+    private func publishAutomaticListScrollTriggerIfNeeded(
+        reason: ActiveTrackChangeReason,
+        track: any TrackDisplayable,
+        context: PlaybackContext
+    ) {
+        activeTrackChangeReason = reason
+
+        guard reason.requestsMatchingListCentering else {
+            return
+        }
+
+        automaticListScrollTrigger = AutomaticListScrollTrigger(
+            id: UUID(),
+            targetDisplayableId: track.id,
+            targetContext: context
         )
     }
     

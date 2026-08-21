@@ -42,4 +42,21 @@ struct PurchasedITunesScreenState: Equatable {
     let canExport: Bool
     /// Полный playback-контекст в том же порядке, что и строки экрана.
     let tracks: [PurchasedITunesPlayableTrack]
+    /// Одноразовый intent центрирования после явной навигации MiniPlayer.
+    let automaticListScrollTrigger: AutomaticListScrollTrigger?
+
+    /// Собирает screen state и сохраняет совместимость обычных состояний загрузки без scroll intent.
+    init(
+        content: Content,
+        sortMode: PurchasedITunesTrackSortMode,
+        canExport: Bool,
+        tracks: [PurchasedITunesPlayableTrack],
+        automaticListScrollTrigger: AutomaticListScrollTrigger? = nil
+    ) {
+        self.content = content
+        self.sortMode = sortMode
+        self.canExport = canExport
+        self.tracks = tracks
+        self.automaticListScrollTrigger = automaticListScrollTrigger
+    }
 }

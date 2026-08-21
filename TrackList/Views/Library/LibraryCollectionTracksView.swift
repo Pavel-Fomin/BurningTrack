@@ -25,8 +25,6 @@ struct LibraryCollectionTracksView: View {
     /// Передаёт действия выбранного значения коллекции отдельному обработчику экспорта.
     let onCollectionTracksAction: ((LibraryCollectionTracksAction) -> Void)?
 
-    @Environment(\.scenePhase) private var scenePhase
-
     // MARK: - ViewModel
 
     /// View наблюдает готовые объекты graph, не создавая production-зависимости самостоятельно.
@@ -44,8 +42,8 @@ struct LibraryCollectionTracksView: View {
 
     // MARK: - Состояние
 
-    /// Отложенная команда прокрутки к текущему треку.
-    @State private var scrollRequest: LibraryScrollRequest?
+    /// UI-политика сохраняет ручную позицию списка независимо от playback snapshot.
+    @StateObject private var automaticScrollCoordinator = AutomaticListScrollCoordinator()
 
     // MARK: - Инициализация
 
@@ -248,10 +246,11 @@ struct LibraryCollectionTracksView: View {
             .onAppear {
                 handleTracksListAppear()
             }
-            .onChange(of: scrollRequest) { _, request in
+            .onChange(of: automaticScrollCoordinator.pendingScrollRequest) { _, request in
                 handleScrollRequest(request, proxy: proxy)
             }
             .onChange(of: tracksViewModel.state.sections) { _, _ in
+                requestExplicitPlaybackNavigationScrollIfNeeded(proxy: proxy)
                 requestActiveTrackScrollIfNeeded()
             }
             .onChange(of: playbackStateController.currentDisplayableId) { _, _ in
@@ -260,8 +259,16 @@ struct LibraryCollectionTracksView: View {
             .onChange(of: playbackStateController.currentContext) { _, _ in
                 requestActiveTrackScrollIfNeeded()
             }
-            .onChange(of: scenePhase) { _, newPhase in
-                handleScenePhaseChange(newPhase)
+            .onChange(of: playbackStateController.automaticListScrollTrigger) { _, _ in
+                requestExplicitPlaybackNavigationScrollIfNeeded(proxy: proxy)
+            }
+            .onScrollPhaseChange { _, newPhase in
+                handleScrollRequest(
+                    automaticScrollCoordinator.receiveScrollPhase(
+                        ListScrollPhase(newPhase)
+                    ),
+                    proxy: proxy
+                )
             }
         }
     }
@@ -288,7 +295,7 @@ struct LibraryCollectionTracksView: View {
     /// Синхронизирует состояние при появлении списка.
     private func handleTracksListAppear() {
         screenStore.cloudAvailabilityActionHandler.handle(.screenDidAppear)
-        requestActiveTrackScrollIfNeeded()
+        requestActiveTrackScrollIfNeeded(initialAppearance: true)
         restoreSelectionActionBarIfNeeded()
     }
 
@@ -326,24 +333,31 @@ struct LibraryCollectionTracksView: View {
         resetMultiselect()
     }
 
-    /// Выполняет программную прокрутку по отложенному запросу.
+    /// Выполняет auto-scroll только после проверки identity строки в текущих секциях.
     private func handleScrollRequest(
-        _ request: LibraryScrollRequest?,
+        _ request: AutomaticListScrollCoordinator.Request?,
         proxy: ScrollViewProxy
     ) {
         guard let request else { return }
+        guard allVisibleTracks.contains(where: { $0.id == request.targetId }) else {
+            automaticScrollCoordinator.rejectScroll(request)
+            return
+        }
+        guard automaticScrollCoordinator.beginScroll(request) else {
+            return
+        }
 
-        withAnimation(.easeInOut(duration: 0.35)) {
+        if request.isAnimated {
+            withAnimation(.easeInOut(duration: 0.35)) {
+                proxy.scrollTo(request.targetId, anchor: .center)
+            }
+        } else {
             proxy.scrollTo(request.targetId, anchor: .center)
         }
 
-        scrollRequest = nil
-    }
-
-    /// Обрабатывает возврат приложения в активную фазу.
-    private func handleScenePhaseChange(_ newPhase: ScenePhase) {
-        guard newPhase == .active else { return }
-        requestActiveTrackScrollIfNeeded()
+        automaticScrollCoordinator.finishProgrammaticScroll(
+            isAnimated: request.isAnimated
+        )
     }
 
     /// Синхронизирует готовое presentation-состояние нижней панели с общим host.
@@ -378,12 +392,46 @@ struct LibraryCollectionTracksView: View {
     }
 
     /// Запрашивает прокрутку к активному треку, если он есть в текущем списке.
-    private func requestActiveTrackScrollIfNeeded() {
-        guard scrollRequest == nil else { return }
+    private func requestActiveTrackScrollIfNeeded(
+        initialAppearance: Bool = false
+    ) {
         guard playbackStateController.currentContext == .library else { return }
         guard let currentTrackId = playbackStateController.currentDisplayableId else { return }
-        guard allVisibleTracks.contains(where: { $0.id == currentTrackId }) else { return }
+        let isTargetAvailable = allVisibleTracks.contains { $0.id == currentTrackId }
 
-        scrollRequest = .activeTrack(currentTrackId)
+        if initialAppearance {
+            automaticScrollCoordinator.requestInitialScrollIfNeeded(
+                targetId: currentTrackId,
+                isTargetAvailable: isTargetAvailable
+            )
+        } else {
+            automaticScrollCoordinator.requestActiveTrackScrollIfNeeded(
+                targetId: currentTrackId,
+                isTargetAvailable: isTargetAvailable
+            )
+        }
+    }
+
+    /// Явная навигация MiniPlayer центрирует только строку текущего collection source.
+    private func requestExplicitPlaybackNavigationScrollIfNeeded(
+        proxy: ScrollViewProxy
+    ) {
+        guard let trigger = playbackStateController.automaticListScrollTrigger,
+              trigger.targetContext == .library,
+              trigger.targetDisplayableId == playbackStateController.currentDisplayableId else {
+            return
+        }
+
+        // Явная команда materialize в текущем обновлении списка и не зависит от второго Published-callback.
+        handleScrollRequest(
+            automaticScrollCoordinator.requestExplicitPlaybackNavigationScrollIfNeeded(
+                triggerId: trigger.id,
+                targetId: trigger.targetDisplayableId,
+                isTargetAvailable: allVisibleTracks.contains {
+                    $0.id == trigger.targetDisplayableId
+                }
+            ),
+            proxy: proxy
+        )
     }
 }

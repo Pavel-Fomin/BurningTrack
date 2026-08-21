@@ -17,6 +17,7 @@ struct PlayerPlaylistView: View {
         PlayerView(
             rows: screenViewModel.state.rows,
             scrollTargetId: screenViewModel.state.scrollTargetId,
+            automaticListScrollTrigger: screenViewModel.state.automaticListScrollTrigger,
             onTrackTap: { queueItemId in
                 screenViewModel.handle(
                     .playPause(queueItemId: queueItemId)

@@ -24,7 +24,10 @@ struct PurchasedITunesMusicView: View {
     let onAction: (PurchasedITunesMusicAction) -> Void
     /// Передаёт действия строки стабильному handler-у из ScreenStore.
     let onTrackAction: (PurchasedITunesTrackAction) -> Void
-    @Environment(\.scenePhase) private var scenePhase
+    /// Общая UI-политика auto-scroll не объединяет iTunes identity с queue или track-list row identity.
+    @StateObject private var automaticScrollCoordinator = AutomaticListScrollCoordinator()
+    /// Последний reveal остаётся pending, пока список занят программной или ручной прокруткой.
+    @State private var pendingRevealRequest: LibraryRevealRequest?
 
     // MARK: - Интерфейс
 
@@ -119,43 +122,69 @@ struct PurchasedITunesMusicView: View {
             .globalBottomScrollReserve()
             .scrollContentBackground(.hidden)
             .onAppear {
-                scrollToCurrentTrackIfNeeded(
-                    using: proxy,
-                    rows: rows,
-                    animated: false
-                )
-                revealTrackIfNeeded(
+                receiveRevealRequest(revealRequest)
+                revealTrackIfPossible(
                     using: proxy,
                     tracks: tracks
                 )
+                requestInitialScrollIfNeeded(rows: rows)
             }
             .onChange(of: revealRequest?.requestId) { _, _ in
-                revealTrackIfNeeded(
+                receiveRevealRequest(revealRequest)
+                revealTrackIfPossible(
                     using: proxy,
                     tracks: tracks
                 )
             }
             .onChange(of: currentTrackID(in: rows)) { _, _ in
-                scrollToCurrentTrackIfNeeded(
-                    using: proxy,
+                requestActiveTrackScrollIfNeeded(rows: rows)
+            }
+            .onChange(of: state.automaticListScrollTrigger) { _, trigger in
+                requestExplicitPlaybackNavigationScrollIfNeeded(
+                    trigger,
                     rows: rows,
-                    animated: true
+                    using: proxy
                 )
             }
             .onChange(of: tracks.map(\.trackId)) { _, _ in
-                // После смены порядка сохраняем существующее поведение фокуса на текущем треке.
-                scrollToCurrentTrackIfNeeded(
+                // Reveal остаётся выше auto-focus и получает первую попытку после смены данных.
+                revealTrackIfPossible(
                     using: proxy,
+                    tracks: tracks
+                )
+                requestExplicitPlaybackNavigationScrollIfNeeded(
+                    state.automaticListScrollTrigger,
                     rows: rows,
-                    animated: true
+                    using: proxy
+                )
+                requestActiveTrackScrollIfNeeded(rows: rows)
+            }
+            .onChange(of: automaticScrollCoordinator.pendingScrollRequest) { _, request in
+                handleScrollRequest(
+                    request,
+                    using: proxy,
+                    rows: rows
                 )
             }
-            .onChange(of: scenePhase) { _, newPhase in
-                guard newPhase == .active else { return }
-                scrollToCurrentTrackIfNeeded(
+            .onScrollPhaseChange { _, newPhase in
+                if newPhase == .idle,
+                   pendingRevealRequest != nil {
+                    // Reveal получает приоритет до materialization отложенного MiniPlayer intent.
+                    automaticScrollCoordinator.discardExplicitPlaybackNavigationForReveal()
+                }
+                handleScrollRequest(
+                    automaticScrollCoordinator.receiveScrollPhase(
+                        ListScrollPhase(newPhase)
+                    ),
                     using: proxy,
-                    rows: rows,
-                    animated: true
+                    rows: rows
+                )
+
+                // Ожидающий reveal может стартовать только после завершения физической или программной прокрутки.
+                guard newPhase == .idle else { return }
+                revealTrackIfPossible(
+                    using: proxy,
+                    tracks: tracks
                 )
             }
         }
@@ -168,48 +197,138 @@ struct PurchasedITunesMusicView: View {
         rows.first(where: \.isCurrent)?.track.id
     }
 
-    /// Прокручивает список к текущему iTunes-треку, если он есть на экране.
-    private func scrollToCurrentTrackIfNeeded(
-        using proxy: ScrollViewProxy,
-        rows: [PurchasedITunesTrackRowState],
-        animated: Bool
+    /// Передаёт первый active track в UI-policy только после появления строк iTunes.
+    private func requestInitialScrollIfNeeded(
+        rows: [PurchasedITunesTrackRowState]
     ) {
-        guard let targetTrackId = currentTrackID(
-            in: rows
-        ) else {
+        let targetTrackId = currentTrackID(in: rows)
+        automaticScrollCoordinator.requestInitialScrollIfNeeded(
+            targetId: targetTrackId,
+            isTargetAvailable: rows.contains { $0.track.id == targetTrackId }
+        )
+    }
+
+    /// Смена текущего iTunes-трека не возвращает список после ручного позиционирования.
+    private func requestActiveTrackScrollIfNeeded(
+        rows: [PurchasedITunesTrackRowState]
+    ) {
+        guard pendingRevealRequest == nil else {
             return
         }
 
-        if animated {
-            withAnimation(.easeInOut(duration: 0.25)) {
-                proxy.scrollTo(targetTrackId, anchor: .center)
-            }
-        } else {
-            proxy.scrollTo(targetTrackId, anchor: .center)
-        }
+        let targetTrackId = currentTrackID(in: rows)
+        automaticScrollCoordinator.requestActiveTrackScrollIfNeeded(
+            targetId: targetTrackId,
+            isTargetAvailable: rows.contains { $0.track.id == targetTrackId }
+        )
     }
 
-    /// Прокручивает открытый раздел к запрошенному iTunes-треку и завершает общий reveal-intent.
-    private func revealTrackIfNeeded(
+    /// Явная навигация MiniPlayer центрирует только текущую строку iTunes и не опережает reveal.
+    private func requestExplicitPlaybackNavigationScrollIfNeeded(
+        _ trigger: AutomaticListScrollTrigger?,
+        rows: [PurchasedITunesTrackRowState],
+        using proxy: ScrollViewProxy
+    ) {
+        guard pendingRevealRequest == nil,
+              let trigger,
+              trigger.targetContext == .purchasedITunes,
+              trigger.targetDisplayableId == currentTrackID(in: rows) else {
+            return
+        }
+
+        // Явная команда materialize в текущем обновлении списка и не зависит от второго Published-callback.
+        handleScrollRequest(
+            automaticScrollCoordinator.requestExplicitPlaybackNavigationScrollIfNeeded(
+                triggerId: trigger.id,
+                targetId: trigger.targetDisplayableId,
+                isTargetAvailable: rows.contains {
+                    $0.track.id == trigger.targetDisplayableId
+                }
+            ),
+            using: proxy,
+            rows: rows
+        )
+    }
+
+    /// Materializes ровно один принятый auto-scroll после проверки готового row identity.
+    private func handleScrollRequest(
+        _ request: AutomaticListScrollCoordinator.Request?,
+        using proxy: ScrollViewProxy,
+        rows: [PurchasedITunesTrackRowState]
+    ) {
+        guard let request else { return }
+        guard pendingRevealRequest == nil else {
+            automaticScrollCoordinator.rejectScroll(request)
+            return
+        }
+        guard rows.contains(where: { $0.track.id == request.targetId }) else {
+            automaticScrollCoordinator.rejectScroll(request)
+            return
+        }
+        guard automaticScrollCoordinator.beginScroll(request) else {
+            return
+        }
+
+        if request.isAnimated {
+            withAnimation(.easeInOut(duration: 0.25)) {
+                proxy.scrollTo(request.targetId, anchor: .center)
+            }
+        } else {
+            proxy.scrollTo(request.targetId, anchor: .center)
+        }
+
+        automaticScrollCoordinator.finishProgrammaticScroll(
+            isAnimated: request.isAnimated
+        )
+    }
+
+    /// Сохраняет только самый новый reveal intent до готовности списка к явной прокрутке.
+    private func receiveRevealRequest(
+        _ request: LibraryRevealRequest?
+    ) {
+        guard let request,
+              request.destination == .purchasedITunes else {
+            pendingRevealRequest = nil
+            return
+        }
+
+        guard pendingRevealRequest?.requestId != request.requestId else {
+            return
+        }
+
+        pendingRevealRequest = request
+    }
+
+    /// Прокручивает только актуальный reveal и не позволяет старому request завершить новый.
+    private func revealTrackIfPossible(
         using proxy: ScrollViewProxy,
         tracks: [PurchasedITunesPlayableTrack]
     ) {
-        guard let revealRequest,
-              revealRequest.destination == .purchasedITunes else {
+        guard let request = pendingRevealRequest else {
             return
         }
 
-        defer {
-            onRevealHandled(revealRequest.requestId)
+        guard tracks.contains(where: { $0.trackId == request.targetTrackId }) else {
+            pendingRevealRequest = nil
+            onRevealHandled(request.requestId)
+            return
         }
 
-        guard tracks.contains(where: { $0.trackId == revealRequest.targetTrackId }) else {
+        guard automaticScrollCoordinator.beginRevealScroll() else {
+            return
+        }
+        guard pendingRevealRequest?.requestId == request.requestId else {
+            automaticScrollCoordinator.cancelExplicitScrollReservation()
             return
         }
 
         withAnimation(.easeInOut(duration: 0.25)) {
-            proxy.scrollTo(revealRequest.targetTrackId, anchor: .center)
+            proxy.scrollTo(request.targetTrackId, anchor: .center)
         }
+
+        pendingRevealRequest = nil
+        onRevealHandled(request.requestId)
+        automaticScrollCoordinator.finishProgrammaticScroll(isAnimated: true)
     }
 }
 

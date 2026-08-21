@@ -31,9 +31,9 @@ protocol MiniPlayerPlaybackControlling: AnyObject {
     /// Переключает воспроизведение и паузу текущего трека.
     func togglePlayPause()
     /// Переходит к предыдущему треку текущего playback-контекста.
-    func playPreviousTrack()
+    func playPreviousTrack(reason: ActiveTrackChangeReason)
     /// Переходит к следующему треку текущего playback-контекста.
-    func playNextTrack()
+    func playNextTrack(reason: ActiveTrackChangeReason)
     /// Перематывает текущий трек к указанному времени.
     func seek(to time: TimeInterval)
     /// Переключает режим случайного воспроизведения.

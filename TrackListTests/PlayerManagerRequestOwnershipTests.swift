@@ -8,7 +8,10 @@
 //
 
 import AVFoundation
+import CoreGraphics
 import Foundation
+// MediaPlayer вызывает callback обложки на собственной очереди, что проверяется ниже.
+@preconcurrency import MediaPlayer
 import XCTest
 @testable import TrackList
 
@@ -194,6 +197,37 @@ final class PlayerManagerRequestOwnershipTests: XCTestCase {
         XCTAssertTrue(securityScope.startedURLs.isEmpty)
     }
 
+    /// Callback обложки не наследует MainActor и безопасно вызывается системной очередью MediaPlayer.
+    func testNowPlayingArtworkCallbackCanRunOnSystemQueue() async throws {
+        let manager = makeManager(runtime: PlayerRuntimeSpy())
+        let nowPlayingCenter = MPNowPlayingInfoCenter.default()
+        let previousInfo = nowPlayingCenter.nowPlayingInfo
+        defer { nowPlayingCenter.nowPlayingInfo = previousInfo }
+
+        manager.applyNowPlaying(
+            snapshot: NowPlayingSnapshot(
+                title: "Title",
+                artist: "Artist",
+                album: "Album",
+                artwork: makeArtwork(),
+                currentTime: 0,
+                duration: 180,
+                isPlaying: true
+            )
+        )
+
+        let artwork = try XCTUnwrap(
+            nowPlayingCenter.nowPlayingInfo?[MPMediaItemPropertyArtwork] as? MPMediaItemArtwork
+        )
+
+        // Detached task намеренно моделирует очередь MediaPlayer, не связанную с MainActor.
+        let imageWasCreated = await Task.detached { @Sendable in
+            artwork.image(at: CGSize(width: 1, height: 1)) != nil
+        }.value
+
+        XCTAssertTrue(imageWasCreated)
+    }
+
     /// Собирает PlayerManager с контролируемыми runtime зависимостями без реального AVPlayer и файловой системы.
     private func makeManager(
         runtime: PlayerRuntimeSpy,
@@ -233,6 +267,21 @@ final class PlayerManagerRequestOwnershipTests: XCTestCase {
         FileManager.default.temporaryDirectory.appendingPathComponent(
             "PlayerManagerRequestOwnershipTests-\(UUID().uuidString)-\(fileName)"
         )
+    }
+
+    /// Создаёт минимальное валидное изображение без зависимости от файловой системы или UIKit runtime.
+    private func makeArtwork() -> CGImage {
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let context = CGContext(
+            data: nil,
+            width: 1,
+            height: 1,
+            bitsPerComponent: 8,
+            bytesPerRow: 4,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )!
+        return context.makeImage()!
     }
 
     /// Ожидает только контролируемую continuation без временной задержки устройства.

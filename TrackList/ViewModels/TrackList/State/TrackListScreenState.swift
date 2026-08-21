@@ -30,6 +30,9 @@ struct TrackListScreenState {
 
     /// Идентификатор строки, к которой нужно проскроллить список.
     let scrollTargetRowId: UUID?
+
+    /// Одноразовый intent центрирования после явной навигации MiniPlayer.
+    let automaticListScrollTrigger: AutomaticListScrollTrigger?
 }
 
 /// Состояние строки трека в одном треклисте.

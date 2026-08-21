@@ -19,7 +19,9 @@ extension PlayerViewModel: PlaybackStateProviding, TrackPlaybackControlling, Cur
             currentTrackId: currentTrackDisplayable?.trackId,
             currentContext: currentContext,
             currentContextSource: currentPlaybackContextSource,
-            isPlaying: isPlaying
+            isPlaying: isPlaying,
+            activeTrackChangeReason: activeTrackChangeReason,
+            automaticListScrollTrigger: automaticListScrollTrigger
         )
     }
 
@@ -46,13 +48,26 @@ extension PlayerViewModel: PlaybackStateProviding, TrackPlaybackControlling, Cur
             $isPlaying,
             $currentPlaybackContextSource
         )
-        .map { currentTrackDisplayable, currentContext, isPlaying, currentContextSource in
-            PlaybackStateSnapshot(
+        .combineLatest(
+            $activeTrackChangeReason.combineLatest($automaticListScrollTrigger)
+        )
+        .map { playbackState, scrollState in
+            let (
+                currentTrackDisplayable,
+                currentContext,
+                isPlaying,
+                currentContextSource
+            ) = playbackState
+            let (activeTrackChangeReason, automaticListScrollTrigger) = scrollState
+
+            return PlaybackStateSnapshot(
                 currentDisplayableId: currentTrackDisplayable?.id,
                 currentTrackId: currentTrackDisplayable?.trackId,
                 currentContext: currentContext,
                 currentContextSource: currentTrackDisplayable == nil ? nil : currentContextSource,
-                isPlaying: isPlaying
+                isPlaying: isPlaying,
+                activeTrackChangeReason: activeTrackChangeReason,
+                automaticListScrollTrigger: automaticListScrollTrigger
             )
         }
         .removeDuplicates()

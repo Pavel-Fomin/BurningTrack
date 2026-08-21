@@ -13,6 +13,7 @@ import SwiftUI
 struct PlayerView: View {
     let rows: [PlayerTrackRowState]
     let scrollTargetId: UUID?
+    let automaticListScrollTrigger: AutomaticListScrollTrigger?
     let onTrackTap: (UUID) -> Void
     let onUnavailableTrackTap: (UUID) -> Void
     let onMoveTracks: (IndexSet, Int) -> Void
@@ -29,7 +30,9 @@ struct PlayerView: View {
     let onArtworkTap: (UUID) -> Void
     let onRequestSnapshot: (UUID) -> Void
     let onRenameTrack: (UUID, FileRenameStrategy) -> Void
-    @Environment(\.scenePhase) private var scenePhase
+    /// Локальная UI-политика не раскрывает список или SwiftUI proxy в PlayerScreenViewModel.
+    @StateObject private var automaticScrollCoordinator = AutomaticListScrollCoordinator()
+
     var body: some View {
         ScrollViewReader { proxy in
             List {
@@ -66,27 +69,93 @@ struct PlayerView: View {
             .scrollContentBackground(.hidden)
             .background(Color(.systemBackground))
             .onAppear {
-                scrollToCurrentTrackIfNeeded(using: proxy, animated: false)
+                requestInitialScrollIfNeeded()
             }
             .onChange(of: scrollTargetId) { _, _ in
-                scrollToCurrentTrackIfNeeded(using: proxy, animated: true)
+                requestActiveTrackScrollIfNeeded()
             }
-            .onChange(of: scenePhase) { _, newPhase in
-                guard newPhase == .active else { return }
-                scrollToCurrentTrackIfNeeded(using: proxy, animated: true)
+            .onChange(of: automaticListScrollTrigger) { _, trigger in
+                requestExplicitPlaybackNavigationScrollIfNeeded(
+                    trigger,
+                    proxy: proxy
+                )
+            }
+            .onChange(of: automaticScrollCoordinator.pendingScrollRequest) { _, request in
+                handleScrollRequest(request, proxy: proxy)
+            }
+            .onScrollPhaseChange { _, newPhase in
+                handleScrollRequest(
+                    automaticScrollCoordinator.receiveScrollPhase(
+                        ListScrollPhase(newPhase)
+                    ),
+                    proxy: proxy
+                )
             }
         }
     }
-    private func scrollToCurrentTrackIfNeeded(using proxy: ScrollViewProxy, animated: Bool) {
-        guard let scrollTargetId else { return }
-        guard rows.contains(where: { $0.id == scrollTargetId }) else { return }
-        if animated {
+
+    /// Отдельное правило initial appearance не повторяется при foreground или remount списка.
+    private func requestInitialScrollIfNeeded() {
+        automaticScrollCoordinator.requestInitialScrollIfNeeded(
+            targetId: scrollTargetId,
+            isTargetAvailable: rows.contains { $0.id == scrollTargetId }
+        )
+    }
+
+    /// Текущий queue item может запросить auto-scroll только без ручного позиционирования.
+    private func requestActiveTrackScrollIfNeeded() {
+        automaticScrollCoordinator.requestActiveTrackScrollIfNeeded(
+            targetId: scrollTargetId,
+            isTargetAvailable: rows.contains { $0.id == scrollTargetId }
+        )
+    }
+
+    /// Явная команда MiniPlayer центрирует только текущую строку очереди и может быть отложена coordinator-ом до idle.
+    private func requestExplicitPlaybackNavigationScrollIfNeeded(
+        _ trigger: AutomaticListScrollTrigger?,
+        proxy: ScrollViewProxy
+    ) {
+        guard let trigger,
+              trigger.targetContext == .player else {
+            return
+        }
+
+        // Явное действие должно materialize в текущем View update, а не ждать второе наблюдение Published-состояния.
+        handleScrollRequest(
+            automaticScrollCoordinator.requestExplicitPlaybackNavigationScrollIfNeeded(
+                triggerId: trigger.id,
+                targetId: trigger.targetDisplayableId,
+                isTargetAvailable: rows.contains { $0.id == trigger.targetDisplayableId }
+            ),
+            proxy: proxy
+        )
+    }
+
+    /// Выполняет `scrollTo` на UI-стороне и подтверждает lifecycle coordinator только для своего request.
+    private func handleScrollRequest(
+        _ request: AutomaticListScrollCoordinator.Request?,
+        proxy: ScrollViewProxy
+    ) {
+        guard let request else { return }
+        guard rows.contains(where: { $0.id == request.targetId }) else {
+            automaticScrollCoordinator.rejectScroll(request)
+            return
+        }
+        guard automaticScrollCoordinator.beginScroll(request) else {
+            return
+        }
+
+        if request.isAnimated {
             withAnimation(.easeInOut(duration: 0.25)) {
-                proxy.scrollTo(scrollTargetId, anchor: .center)
+                proxy.scrollTo(request.targetId, anchor: .center)
             }
         } else {
-            proxy.scrollTo(scrollTargetId, anchor: .center)
+            proxy.scrollTo(request.targetId, anchor: .center)
         }
+
+        automaticScrollCoordinator.finishProgrammaticScroll(
+            isAnimated: request.isAnimated
+        )
     }
     // MARK: - Компонент строк плеера
     

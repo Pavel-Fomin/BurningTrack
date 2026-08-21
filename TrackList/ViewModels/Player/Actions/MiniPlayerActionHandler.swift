@@ -56,10 +56,10 @@ final class MiniPlayerActionHandler {
             playbackController.togglePlayPause()
         case .playPrevious:
             guard hasCurrentTrack else { return }
-            playbackController.playPreviousTrack()
+            playbackController.playPreviousTrack(reason: .miniPlayerNavigation)
         case .playNext:
             guard hasCurrentTrack else { return }
-            playbackController.playNextTrack()
+            playbackController.playNextTrack(reason: .miniPlayerNavigation)
         case .seek(let time):
             guard hasCurrentTrack else { return }
             playbackController.seek(to: time)

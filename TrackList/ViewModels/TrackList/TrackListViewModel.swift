@@ -71,6 +71,8 @@ final class TrackListViewModel: ObservableObject {
     private var currentContext: PlaybackContext?
     /// Активно ли воспроизведение текущей строки.
     private var isPlaybackActive = false
+    /// Одноразовый intent хранится рядом с playback snapshot до построения feature-local ScreenState.
+    private var automaticListScrollTrigger: AutomaticListScrollTrigger?
     /// Идентификатор подсвеченной строки треклиста.
     private var highlightedRowId: UUID?
     /// Снимок «Избранного» из publisher хранится локально, чтобы builder не перечитывал потенциально старое свойство provider.
@@ -327,6 +329,7 @@ final class TrackListViewModel: ObservableObject {
         currentTrackId = playbackState.currentDisplayableId
         currentContext = playbackState.currentContext
         isPlaybackActive = playbackState.isPlaying
+        automaticListScrollTrigger = playbackState.automaticListScrollTrigger
         rebuildScreenState()
     }
 
@@ -348,6 +351,7 @@ final class TrackListViewModel: ObservableObject {
                 currentTrackId: currentTrackId,
                 currentContext: currentContext,
                 isPlaying: isPlaybackActive,
+                automaticListScrollTrigger: automaticListScrollTrigger,
                 highlightedRowId: highlightedRowId,
                 favoriteTrackIds: favoriteTrackIds,
                 settings: rowPresentationSettings,

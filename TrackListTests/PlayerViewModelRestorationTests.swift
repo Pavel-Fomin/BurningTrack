@@ -166,6 +166,99 @@ final class PlayerViewModelRestorationTests: XCTestCase {
         XCTAssertEqual(playerManager.playCallsCount, 1)
     }
 
+    /// Пассивный переход после завершения трека не создаёт intent центрирования для вручную прокрученного списка.
+    func testPassiveNextDoesNotPublishAutomaticListScrollTrigger() async {
+        let firstTrack = makeLibraryTrack(fileName: "Passive First.m4a")
+        let secondTrack = makeLibraryTrack(fileName: "Passive Second.m4a")
+        let playerManager = RestorationPlayerManagerSpy()
+        let viewModel = makeViewModel(
+            playerManager: playerManager,
+            statePersistence: RestorationStatePersistenceSpy(
+                state: makeLibraryState(trackId: firstTrack.trackId)
+            ),
+            libraryContextLoader: LibraryContextLoaderSpy(tracks: [firstTrack, secondTrack]),
+            fastTrackProvider: FastLibraryTrackProviderSpy(track: firstTrack),
+            libraryAccessState: LibraryAccessState(isRestored: false)
+        )
+
+        await waitUntil {
+            viewModel.isPlaybackContextReady && viewModel.canPlayNextTrack
+        }
+
+        viewModel.playNextTrack()
+
+        await waitUntil {
+            viewModel.currentTrackDisplayable?.id == secondTrack.id
+        }
+
+        XCTAssertEqual(viewModel.activeTrackChangeReason, .passive)
+        XCTAssertNil(viewModel.automaticListScrollTrigger)
+    }
+
+    /// Явный Next MiniPlayer публикует одноразовый intent с identity следующей строки фонотеки.
+    func testMiniPlayerNextPublishesAutomaticListScrollTrigger() async {
+        let firstTrack = makeLibraryTrack(fileName: "Mini Next First.m4a")
+        let secondTrack = makeLibraryTrack(fileName: "Mini Next Second.m4a")
+        let playerManager = RestorationPlayerManagerSpy()
+        let viewModel = makeViewModel(
+            playerManager: playerManager,
+            statePersistence: RestorationStatePersistenceSpy(
+                state: makeLibraryState(trackId: firstTrack.trackId)
+            ),
+            libraryContextLoader: LibraryContextLoaderSpy(tracks: [firstTrack, secondTrack]),
+            fastTrackProvider: FastLibraryTrackProviderSpy(track: firstTrack),
+            libraryAccessState: LibraryAccessState(isRestored: false)
+        )
+
+        await waitUntil {
+            viewModel.isPlaybackContextReady && viewModel.canPlayNextTrack
+        }
+
+        viewModel.playNextTrack(reason: .miniPlayerNavigation)
+
+        await waitUntil {
+            viewModel.automaticListScrollTrigger?.targetDisplayableId == secondTrack.id
+        }
+
+        XCTAssertEqual(viewModel.activeTrackChangeReason, .miniPlayerNavigation)
+        XCTAssertEqual(
+            viewModel.automaticListScrollTrigger?.targetContext,
+            .library
+        )
+    }
+
+    /// Явный Previous MiniPlayer публикует одноразовый intent с identity предыдущей строки фонотеки.
+    func testMiniPlayerPreviousPublishesAutomaticListScrollTrigger() async {
+        let firstTrack = makeLibraryTrack(fileName: "Mini Previous First.m4a")
+        let secondTrack = makeLibraryTrack(fileName: "Mini Previous Second.m4a")
+        let playerManager = RestorationPlayerManagerSpy()
+        let viewModel = makeViewModel(
+            playerManager: playerManager,
+            statePersistence: RestorationStatePersistenceSpy(
+                state: makeLibraryState(trackId: secondTrack.trackId)
+            ),
+            libraryContextLoader: LibraryContextLoaderSpy(tracks: [firstTrack, secondTrack]),
+            fastTrackProvider: FastLibraryTrackProviderSpy(track: secondTrack),
+            libraryAccessState: LibraryAccessState(isRestored: false)
+        )
+
+        await waitUntil {
+            viewModel.isPlaybackContextReady && viewModel.canPlayPreviousTrack
+        }
+
+        viewModel.playPreviousTrack(reason: .miniPlayerNavigation)
+
+        await waitUntil {
+            viewModel.automaticListScrollTrigger?.targetDisplayableId == firstTrack.id
+        }
+
+        XCTAssertEqual(viewModel.activeTrackChangeReason, .miniPlayerNavigation)
+        XCTAssertEqual(
+            viewModel.automaticListScrollTrigger?.targetContext,
+            .library
+        )
+    }
+
     /// Предварительный контекст не запускает воспроизведение без явного действия пользователя.
     func testPreliminaryLibraryContextDoesNotStartPlayAutomatically() async {
         let firstTrack = makeLibraryTrack(fileName: "No Auto Play First.m4a")

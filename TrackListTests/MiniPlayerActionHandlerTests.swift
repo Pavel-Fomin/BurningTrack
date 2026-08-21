@@ -29,6 +29,14 @@ final class MiniPlayerActionHandlerTests: XCTestCase {
         XCTAssertEqual(harness.playbackController.togglePlayPauseCount, 1)
         XCTAssertEqual(harness.playbackController.playPreviousCount, 1)
         XCTAssertEqual(harness.playbackController.playNextCount, 1)
+        XCTAssertEqual(
+            harness.playbackController.playPreviousReasons,
+            [.miniPlayerNavigation]
+        )
+        XCTAssertEqual(
+            harness.playbackController.playNextReasons,
+            [.miniPlayerNavigation]
+        )
         XCTAssertEqual(harness.playbackController.seekedTimes, [42])
         XCTAssertEqual(harness.playbackController.toggleShuffleCount, 1)
         XCTAssertEqual(harness.playbackController.toggleRepeatAllCount, 1)
@@ -187,6 +195,8 @@ private final class MiniPlayerPlaybackControllerSpy: MiniPlayerPlaybackControlli
     private(set) var togglePlayPauseCount = 0
     private(set) var playPreviousCount = 0
     private(set) var playNextCount = 0
+    private(set) var playPreviousReasons: [ActiveTrackChangeReason] = []
+    private(set) var playNextReasons: [ActiveTrackChangeReason] = []
     private(set) var seekedTimes: [TimeInterval] = []
     private(set) var toggleShuffleCount = 0
     private(set) var toggleRepeatAllCount = 0
@@ -196,12 +206,14 @@ private final class MiniPlayerPlaybackControllerSpy: MiniPlayerPlaybackControlli
         togglePlayPauseCount += 1
     }
 
-    func playPreviousTrack() {
+    func playPreviousTrack(reason: ActiveTrackChangeReason) {
         playPreviousCount += 1
+        playPreviousReasons.append(reason)
     }
 
-    func playNextTrack() {
+    func playNextTrack(reason: ActiveTrackChangeReason) {
         playNextCount += 1
+        playNextReasons.append(reason)
     }
 
     func seek(to time: TimeInterval) {

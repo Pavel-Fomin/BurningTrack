@@ -22,6 +22,8 @@ final class LibraryTrackPlaybackStateController: ObservableObject {
     @Published private(set) var currentContext: PlaybackContext?
     /// Воспроизводится ли текущий трек.
     @Published private(set) var isPlaying = false
+    /// Одноразовый intent центрирования передаётся только списку совпадающего playback-контекста.
+    @Published private(set) var automaticListScrollTrigger: AutomaticListScrollTrigger?
 
     // MARK: - Подписки
 
@@ -67,6 +69,7 @@ final class LibraryTrackPlaybackStateController: ObservableObject {
         updateCurrentDisplayableId(snapshot.currentDisplayableId)
         updateCurrentContext(snapshot.currentContext)
         updatePlaybackState(snapshot.isPlaying)
+        updateAutomaticListScrollTrigger(snapshot.automaticListScrollTrigger)
     }
 
     /// Не публикует одинаковый идентификатор текущей строки повторно.
@@ -100,5 +103,16 @@ final class LibraryTrackPlaybackStateController: ObservableObject {
         }
 
         self.isPlaying = isPlaying
+    }
+
+    /// Не публикует тот же intent повторно при обычном rebuild playback-снимка.
+    private func updateAutomaticListScrollTrigger(
+        _ trigger: AutomaticListScrollTrigger?
+    ) {
+        guard automaticListScrollTrigger != trigger else {
+            return
+        }
+
+        automaticListScrollTrigger = trigger
     }
 }

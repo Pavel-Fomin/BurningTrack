@@ -48,9 +48,12 @@ struct LibraryTracksView: View {
     @State private var commandHandler: LibraryTrackCommandHandler
     private let selectionActionBarCoordinator = LibrarySelectionActionBarCoordinator()
 
-    // MARK: -  Локальное состояние для скролла
-    
-    @State private var scrollRequest: LibraryScrollRequest?
+    // MARK: - Локальное состояние прокрутки
+
+    /// Reveal хранит requestId до materialization `scrollTo`, чтобы новый intent мог отменить старый.
+    @State private var revealScrollRequest: LibraryTrackRevealScrollRequest?
+    /// Общая UI-политика не знает identity фонотеки и не владеет SwiftUI proxy.
+    @StateObject private var automaticScrollCoordinator = AutomaticListScrollCoordinator()
 
     /// Показывает, активен ли локальный режим выбора фонотеки.
     private var isSelecting: Bool {
@@ -242,8 +245,11 @@ struct LibraryTracksView: View {
                 handleTracksListAppear()
             }
             // Как только появилась цель — скроллим.
-            .onChange(of: scrollRequest) { _, request in
-                handleScrollRequest(request, proxy: proxy)
+            .onChange(of: revealScrollRequest) { _, request in
+                handleRevealScrollRequest(request, proxy: proxy)
+            }
+            .onChange(of: automaticScrollCoordinator.pendingScrollRequest) { _, request in
+                handleAutomaticScrollRequest(request, proxy: proxy)
             }
             .onChange(of: tracksViewModel.state.sections) { _, _ in
                 handleRevealDecision(
@@ -253,6 +259,7 @@ struct LibraryTracksView: View {
                         isLoading: tracksViewModel.state.isLoading
                     )
                 )
+                requestExplicitPlaybackNavigationScrollIfNeeded(proxy: proxy)
             }
             .onChange(of: playbackStateController.currentDisplayableId) { _, _ in
                 requestActiveTrackScrollIfNeeded()
@@ -260,9 +267,34 @@ struct LibraryTracksView: View {
             .onChange(of: playbackStateController.currentContext) { _, _ in
                 requestActiveTrackScrollIfNeeded()
             }
+            .onChange(of: playbackStateController.automaticListScrollTrigger) { _, _ in
+                requestExplicitPlaybackNavigationScrollIfNeeded(proxy: proxy)
+            }
             .onChange(of: scenePhase) { _, newPhase in
                 tracksViewModel.send(.scenePhaseChanged(newPhase))
-                handleScenePhaseChange(newPhase)
+            }
+            .onScrollPhaseChange { _, newPhase in
+                if newPhase == .idle,
+                   revealCoordinator.hasPendingRevealRequest {
+                    // Reveal получает приоритет до materialization отложенного MiniPlayer intent.
+                    automaticScrollCoordinator.discardExplicitPlaybackNavigationForReveal()
+                }
+                handleAutomaticScrollRequest(
+                    automaticScrollCoordinator.receiveScrollPhase(
+                        ListScrollPhase(newPhase)
+                    ),
+                    proxy: proxy
+                )
+
+                if newPhase == .idle {
+                    handleRevealDecision(
+                        revealCoordinator.evaluateReveal(
+                            trackSections: tracksViewModel.state.sections,
+                            didLoad: tracksViewModel.state.didLoad,
+                            isLoading: tracksViewModel.state.isLoading
+                        )
+                    )
+                }
             }
         }
     }
@@ -307,7 +339,7 @@ struct LibraryTracksView: View {
     /// Синхронизирует состояние при появлении списка.
     private func handleTracksListAppear() {
         cloudAvailabilityActionHandler.handle(.screenDidAppear)
-        requestActiveTrackScrollIfNeeded()
+        requestActiveTrackScrollIfNeeded(initialAppearance: true)
         restoreSelectionActionBarIfNeeded()
     }
 
@@ -340,31 +372,57 @@ struct LibraryTracksView: View {
         resetMultiselect()
     }
 
-    /// Выполняет программную прокрутку по отложенному запросу.
-    private func handleScrollRequest(
-        _ request: LibraryScrollRequest?,
+    /// Materializes auto-scroll только для всё ещё доступной строки фонотеки.
+    private func handleAutomaticScrollRequest(
+        _ request: AutomaticListScrollCoordinator.Request?,
+        proxy: ScrollViewProxy
+    ) {
+        guard let request else { return }
+        guard revealCoordinator.hasPendingRevealRequest == false else {
+            automaticScrollCoordinator.rejectScroll(request)
+            return
+        }
+        guard revealCoordinator.hasTrack(
+            id: request.targetId,
+            in: tracksViewModel.state.sections
+        ) else {
+            automaticScrollCoordinator.rejectScroll(request)
+            return
+        }
+        guard automaticScrollCoordinator.beginScroll(request) else {
+            return
+        }
+
+        if request.isAnimated {
+            withAnimation(.easeInOut(duration: 0.35)) {
+                proxy.scrollTo(request.targetId, anchor: .center)
+            }
+        } else {
+            proxy.scrollTo(request.targetId, anchor: .center)
+        }
+
+        automaticScrollCoordinator.finishProgrammaticScroll(
+            isAnimated: request.isAnimated
+        )
+    }
+
+    /// Выполняет уже принятую reveal-команду и завершает только её requestId.
+    private func handleRevealScrollRequest(
+        _ request: LibraryTrackRevealScrollRequest?,
         proxy: ScrollViewProxy
     ) {
         guard let request else { return }
 
-        let targetId = request.targetId
-
         withAnimation(.easeInOut(duration: 0.35)) {
-            proxy.scrollTo(targetId, anchor: .center)
+            proxy.scrollTo(request.trackId, anchor: .center)
         }
 
-        if case .reveal(let revealRequest) = request,
-           let handledRequestId = revealCoordinator.markRevealScrollPerformed(revealRequest) {
+        if let handledRequestId = revealCoordinator.markRevealScrollPerformed(request) {
             onRevealHandled(handledRequestId)
         }
 
-        scrollRequest = nil
-    }
-
-    /// Обрабатывает возврат приложения в активную фазу.
-    private func handleScenePhaseChange(_ newPhase: ScenePhase) {
-        guard newPhase == .active else { return }
-        requestActiveTrackScrollIfNeeded()
+        automaticScrollCoordinator.finishProgrammaticScroll(isAnimated: true)
+        revealScrollRequest = nil
     }
 
     /// Синхронизирует конфигурацию нижней панели подтверждения для родительского host.
@@ -399,17 +457,58 @@ struct LibraryTracksView: View {
     }
 
     /// Запрашивает прокрутку к активному треку, если она не конфликтует с reveal.
-    private func requestActiveTrackScrollIfNeeded() {
+    private func requestActiveTrackScrollIfNeeded(
+        initialAppearance: Bool = false
+    ) {
         guard let request = revealCoordinator.activeTrackScrollRequestIfNeeded(
             currentDisplayableId: playbackStateController.currentDisplayableId,
             currentContext: playbackStateController.currentContext,
-            trackSections: tracksViewModel.state.sections,
-            hasPendingScrollRequest: scrollRequest != nil
+            trackSections: tracksViewModel.state.sections
         ) else {
             return
         }
 
-        scrollRequest = request
+        let targetIsAvailable = revealCoordinator.hasTrack(
+            id: request.targetId,
+            in: tracksViewModel.state.sections
+        )
+
+        if initialAppearance {
+            automaticScrollCoordinator.requestInitialScrollIfNeeded(
+                targetId: request.targetId,
+                isTargetAvailable: targetIsAvailable
+            )
+        } else {
+            automaticScrollCoordinator.requestActiveTrackScrollIfNeeded(
+                targetId: request.targetId,
+                isTargetAvailable: targetIsAvailable
+            )
+        }
+    }
+
+    /// Явная навигация MiniPlayer центрирует локальную строку фонотеки, пока reveal не ожидает более важный navigation intent.
+    private func requestExplicitPlaybackNavigationScrollIfNeeded(
+        proxy: ScrollViewProxy
+    ) {
+        guard revealCoordinator.hasPendingRevealRequest == false,
+              let trigger = playbackStateController.automaticListScrollTrigger,
+              trigger.targetContext == .library,
+              trigger.targetDisplayableId == playbackStateController.currentDisplayableId else {
+            return
+        }
+
+        // Явная команда materialize в текущем обновлении списка и не зависит от второго Published-callback.
+        handleAutomaticScrollRequest(
+            automaticScrollCoordinator.requestExplicitPlaybackNavigationScrollIfNeeded(
+                triggerId: trigger.id,
+                targetId: trigger.targetDisplayableId,
+                isTargetAvailable: revealCoordinator.hasTrack(
+                    id: trigger.targetDisplayableId,
+                    in: tracksViewModel.state.sections
+                )
+            ),
+            proxy: proxy
+        )
     }
 
     /// Выполняет SwiftUI-эффекты по готовому решению reveal coordinator.
@@ -426,10 +525,17 @@ struct LibraryTracksView: View {
             Task { @MainActor in
                 // Даём List один проход на создание строки перед scrollTo.
                 await Task.yield()
-                scrollRequest = .reveal(revealRequest)
+                guard automaticScrollCoordinator.beginRevealScroll() else {
+                    return
+                }
+                guard let request = revealCoordinator.prepareRevealScrollIfCurrent(
+                    revealRequest
+                ) else {
+                    automaticScrollCoordinator.cancelExplicitScrollReservation()
+                    return
+                }
 
-                try? await Task.sleep(nanoseconds: 1_200_000_000)
-                revealCoordinator.clearRevealHighlightIfCurrent(revealRequest)
+                revealScrollRequest = request
             }
         }
     }

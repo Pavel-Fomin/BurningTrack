@@ -55,6 +55,8 @@ final class PlayerScreenViewModel: ObservableObject {
 
     /// Последняя известная очередь плеера.
     private var currentTracks: [PlayerTrack] = []
+    /// Одноразовый playback intent хранится до построения ScreenState целевого списка очереди.
+    private var automaticListScrollTrigger: AutomaticListScrollTrigger?
     /// Сохранённые metadata текущей очереди, доступные для перехода к музыкальной коллекции.
     private var collectionNavigationTargetsByTrackId: [UUID: TrackCollectionNavigationTarget] = [:]
     /// Набор локальных треков, для которого уже запрошены сохранённые metadata.
@@ -83,6 +85,7 @@ final class PlayerScreenViewModel: ObservableObject {
         self.state = PlayerScreenState(
             rows: [],
             scrollTargetId: nil,
+            automaticListScrollTrigger: nil,
             trackCount: 0,
             canExport: false,
             canClear: false
@@ -132,9 +135,18 @@ final class PlayerScreenViewModel: ObservableObject {
             shouldShowTags: shouldShowTags,
             shouldShowFileFormat: shouldShowFileFormat
         )
+        let matchingScrollTrigger: AutomaticListScrollTrigger?
+        if let automaticListScrollTrigger,
+           automaticListScrollTrigger.targetContext == .player,
+           automaticListScrollTrigger.targetDisplayableId == currentQueueItemId {
+            matchingScrollTrigger = automaticListScrollTrigger
+        } else {
+            matchingScrollTrigger = nil
+        }
         state = PlayerScreenState(
             rows: rows,
             scrollTargetId: currentQueueItemId,
+            automaticListScrollTrigger: matchingScrollTrigger,
             trackCount: tracks.count,
             canExport: !tracks.isEmpty,
             canClear: !tracks.isEmpty
@@ -213,6 +225,14 @@ final class PlayerScreenViewModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 guard let self else { return }
+                self.updateTracks(self.currentTracks)
+            }
+            .store(in: &cancellables)
+        playerViewModel.$automaticListScrollTrigger
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] automaticListScrollTrigger in
+                guard let self else { return }
+                self.automaticListScrollTrigger = automaticListScrollTrigger
                 self.updateTracks(self.currentTracks)
             }
             .store(in: &cancellables)

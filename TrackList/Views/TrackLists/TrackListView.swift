@@ -12,9 +12,10 @@ import AVFoundation
 
 struct TrackListView: View {
     @Environment(\.colorScheme) var colorScheme
-    @Environment(\.scenePhase) private var scenePhase
     private let state: TrackListScreenState
     private let onAction: (TrackListAction) -> Void
+    /// Локальная UI-политика сохраняет ручную позицию без участия ScreenState или ViewModel.
+    @StateObject private var automaticScrollCoordinator = AutomaticListScrollCoordinator()
 
     init(
         state: TrackListScreenState,
@@ -102,29 +103,98 @@ struct TrackListView: View {
                 .globalBottomScrollReserve()
                 .scrollContentBackground(.hidden)
                 .onAppear {
-                    scrollToCurrentTrackIfNeeded(using: proxy, animated: false)
+                    requestInitialScrollIfNeeded()
                 }
                 .onChange(of: state.scrollTargetRowId) { _, _ in
-                    scrollToCurrentTrackIfNeeded(using: proxy, animated: true)
+                    requestActiveTrackScrollIfNeeded()
                 }
-                .onChange(of: scenePhase) { _, newPhase in
-                    guard newPhase == .active else { return }
-                    scrollToCurrentTrackIfNeeded(using: proxy, animated: true)
+                .onChange(of: state.automaticListScrollTrigger) { _, trigger in
+                    requestExplicitPlaybackNavigationScrollIfNeeded(
+                        trigger,
+                        proxy: proxy
+                    )
+                }
+                .onChange(of: automaticScrollCoordinator.pendingScrollRequest) { _, request in
+                    handleScrollRequest(request, proxy: proxy)
+                }
+                .onScrollPhaseChange { _, newPhase in
+                    handleScrollRequest(
+                        automaticScrollCoordinator.receiveScrollPhase(
+                            ListScrollPhase(newPhase)
+                        ),
+                        proxy: proxy
+                    )
                 }
             }
         }
     }
-    
-    private func scrollToCurrentTrackIfNeeded(using proxy: ScrollViewProxy, animated: Bool) {
-        guard let targetId = state.scrollTargetRowId else { return }
 
-        if animated {
+    /// Запрашивает initial focus только для первого появления detail destination.
+    private func requestInitialScrollIfNeeded() {
+        let targetId = state.scrollTargetRowId
+        automaticScrollCoordinator.requestInitialScrollIfNeeded(
+            targetId: targetId,
+            isTargetAvailable: state.rows.contains { $0.id == targetId }
+        )
+    }
+
+    /// Смена активной строки получает auto-scroll, пока пользователь не выбрал собственную позицию.
+    private func requestActiveTrackScrollIfNeeded() {
+        let targetId = state.scrollTargetRowId
+        automaticScrollCoordinator.requestActiveTrackScrollIfNeeded(
+            targetId: targetId,
+            isTargetAvailable: state.rows.contains { $0.id == targetId }
+        )
+    }
+
+    /// Явная навигация MiniPlayer центрирует только совпадающую row identity треклиста.
+    private func requestExplicitPlaybackNavigationScrollIfNeeded(
+        _ trigger: AutomaticListScrollTrigger?,
+        proxy: ScrollViewProxy
+    ) {
+        guard let trigger,
+              trigger.targetContext == .trackList else {
+            return
+        }
+
+        // Явное действие materialize сразу, чтобы SwiftUI не схлопнул вложенную публикацию команды.
+        handleScrollRequest(
+            automaticScrollCoordinator.requestExplicitPlaybackNavigationScrollIfNeeded(
+                triggerId: trigger.id,
+                targetId: trigger.targetDisplayableId,
+                isTargetAvailable: state.rows.contains {
+                    $0.id == trigger.targetDisplayableId
+                }
+            ),
+            proxy: proxy
+        )
+    }
+
+    /// Оставляет SwiftUI-effect в View и отклоняет request для уже удалённой строки.
+    private func handleScrollRequest(
+        _ request: AutomaticListScrollCoordinator.Request?,
+        proxy: ScrollViewProxy
+    ) {
+        guard let request else { return }
+        guard state.rows.contains(where: { $0.id == request.targetId }) else {
+            automaticScrollCoordinator.rejectScroll(request)
+            return
+        }
+        guard automaticScrollCoordinator.beginScroll(request) else {
+            return
+        }
+
+        if request.isAnimated {
             withAnimation(.easeInOut(duration: 0.25)) {
-                proxy.scrollTo(targetId, anchor: .center)
+                proxy.scrollTo(request.targetId, anchor: .center)
             }
         } else {
-            proxy.scrollTo(targetId, anchor: .center)
+            proxy.scrollTo(request.targetId, anchor: .center)
         }
+
+        automaticScrollCoordinator.finishProgrammaticScroll(
+            isAnimated: request.isAnimated
+        )
     }
 }
 

@@ -73,11 +73,8 @@ final class LibraryTrackRevealCoordinator: ObservableObject {
         pendingRevealRequest != nil
     }
 
-    /// Есть ли reveal scroll, который уже запрошен, но ещё не подтверждён View.
-    private var hasUnperformedRevealScroll: Bool {
-        guard let revealedRequestId else { return false }
-        return completedRequestId != revealedRequestId
-    }
+    /// Задача завершает только визуальный highlight текущего reveal-запроса.
+    private var highlightLifecycleTask: Task<Void, Never>?
 
     // MARK: - Инициализация
 
@@ -96,6 +93,7 @@ final class LibraryTrackRevealCoordinator: ObservableObject {
     ) -> LibraryTrackRevealDecision {
         guard let request else {
             pendingRevealRequest = nil
+            invalidateRevealHighlight()
             return .none
         }
 
@@ -111,6 +109,8 @@ final class LibraryTrackRevealCoordinator: ObservableObject {
             return .none
         }
 
+        // Новый request отменяет lifecycle предыдущей подсветки до её асинхронного завершения.
+        invalidateRevealHighlight()
         pendingRevealRequest = request
 
         return evaluateReveal(
@@ -143,16 +143,29 @@ final class LibraryTrackRevealCoordinator: ObservableObject {
             return .complete(requestId: requestId)
         }
 
-        pendingRevealRequest = nil
-        revealedTrackID = targetTrackId
-        revealedRequestId = requestId
-
         return .reveal(
             LibraryTrackRevealScrollRequest(
                 trackId: targetTrackId,
                 requestId: requestId
             )
         )
+    }
+
+    /// Принимает candidate после того, как View освободила список для явной прокрутки.
+    func prepareRevealScrollIfCurrent(
+        _ request: LibraryTrackRevealScrollRequest
+    ) -> LibraryTrackRevealScrollRequest? {
+        guard pendingRevealRequest?.requestId == request.requestId else {
+            return nil
+        }
+        guard pendingRevealRequest?.targetTrackId == request.trackId else {
+            return nil
+        }
+
+        pendingRevealRequest = nil
+        revealedTrackID = request.trackId
+        revealedRequestId = request.requestId
+        return request
     }
 
     /// Фиксирует, что View выполнила команду прокрутки для reveal-запроса.
@@ -163,6 +176,7 @@ final class LibraryTrackRevealCoordinator: ObservableObject {
         guard revealedRequestId == request.requestId else { return nil }
 
         completedRequestId = request.requestId
+        startHighlightLifecycle(for: request)
         return request.requestId
     }
 
@@ -173,6 +187,8 @@ final class LibraryTrackRevealCoordinator: ObservableObject {
         guard revealedTrackID == request.trackId else { return }
         guard revealedRequestId == request.requestId else { return }
 
+        highlightLifecycleTask?.cancel()
+        highlightLifecycleTask = nil
         revealedTrackID = nil
         revealedRequestId = nil
     }
@@ -183,12 +199,9 @@ final class LibraryTrackRevealCoordinator: ObservableObject {
     func activeTrackScrollRequestIfNeeded(
         currentDisplayableId: UUID?,
         currentContext: PlaybackContext?,
-        trackSections: [TrackSection],
-        hasPendingScrollRequest: Bool
+        trackSections: [TrackSection]
     ) -> LibraryScrollRequest? {
         guard !hasPendingRevealRequest else { return nil }
-        guard !hasUnperformedRevealScroll else { return nil }
-        guard !hasPendingScrollRequest else { return nil }
         guard currentContext == .library else { return nil }
         guard let currentDisplayableId else { return nil }
         guard hasTrack(id: currentDisplayableId, in: trackSections) else { return nil }
@@ -202,6 +215,36 @@ final class LibraryTrackRevealCoordinator: ObservableObject {
     func hasTrack(id: UUID, in trackSections: [TrackSection]) -> Bool {
         trackSections.contains { section in
             section.tracks.contains { $0.id == id }
+        }
+    }
+
+    // MARK: - Lifecycle подсветки
+
+    /// Отменяет только предыдущую визуальную задачу, не затрагивая новый request.
+    private func invalidateRevealHighlight() {
+        highlightLifecycleTask?.cancel()
+        highlightLifecycleTask = nil
+        revealedTrackID = nil
+        revealedRequestId = nil
+    }
+
+    /// Сохраняет длительность highlight как отменяемый визуальный эффект, а не синхронизацию scroll.
+    private func startHighlightLifecycle(
+        for request: LibraryTrackRevealScrollRequest
+    ) {
+        highlightLifecycleTask?.cancel()
+        highlightLifecycleTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(nanoseconds: 1_200_000_000)
+            } catch {
+                return
+            }
+
+            guard Task.isCancelled == false else {
+                return
+            }
+
+            self?.clearRevealHighlightIfCurrent(request)
         }
     }
 }

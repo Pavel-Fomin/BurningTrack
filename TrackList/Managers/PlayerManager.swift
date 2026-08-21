@@ -773,13 +773,19 @@ final class PlayerManager {
         if let artwork = snapshot.artwork,
            artwork.width > 0,
            artwork.height > 0 {
-            info[MPMediaItemPropertyArtwork] =
-                MPMediaItemArtwork(boundsSize: CGSize(width: artwork.width, height: artwork.height)) { _ in
-                    UIImage(cgImage: artwork)
-                }
+            info[MPMediaItemPropertyArtwork] = Self.makeNowPlayingArtwork(from: artwork)
         }
         
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+    }
+
+    /// Формирует callback обложки без наследования MainActor.
+    /// MediaPlayer запрашивает изображение на собственной очереди, поэтому callback
+    /// захватывает только неизменяемый CGImage и не обращается к состоянию PlayerManager.
+    nonisolated private static func makeNowPlayingArtwork(from artwork: CGImage) -> MPMediaItemArtwork {
+        MPMediaItemArtwork(boundsSize: CGSize(width: artwork.width, height: artwork.height)) { _ in
+            UIImage(cgImage: artwork)
+        }
     }
     
     /// Обновляет только время и playbackRate, не трогая остальную карточку.

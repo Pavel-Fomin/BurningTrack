@@ -63,12 +63,21 @@ struct PurchasedITunesPresenter {
                     playbackState: playbackState
                 )
             }
+            let matchingScrollTrigger: AutomaticListScrollTrigger?
+            if let trigger = playbackState.automaticListScrollTrigger,
+               trigger.targetContext == .purchasedITunes,
+               tracks.contains(where: { $0.id == trigger.targetDisplayableId }) {
+                matchingScrollTrigger = trigger
+            } else {
+                matchingScrollTrigger = nil
+            }
 
             return PurchasedITunesScreenState(
                 content: .loaded(rows),
                 sortMode: sortMode,
                 canExport: tracks.isEmpty == false,
-                tracks: tracks
+                tracks: tracks,
+                automaticListScrollTrigger: matchingScrollTrigger
             )
         }
     }

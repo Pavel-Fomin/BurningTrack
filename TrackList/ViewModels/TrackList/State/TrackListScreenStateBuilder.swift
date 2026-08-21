@@ -44,6 +44,7 @@ struct TrackListScreenStateBuilder {
     ///   - currentTrackId: Идентификатор текущего TrackDisplayable; для Track это id строки треклиста.
     ///   - currentContext: Контекст текущего воспроизведения.
     ///   - isPlaying: Идёт ли воспроизведение.
+    ///   - automaticListScrollTrigger: Одноразовый intent центрирования из playback-flow.
     ///   - highlightedRowId: Идентификатор подсвеченной строки.
     ///   - favoriteTrackIds: Подтверждённые идентификаторы треков из единого состояния «Избранного».
     ///   - settings: Снимок настроек отображения строк.
@@ -59,6 +60,7 @@ struct TrackListScreenStateBuilder {
         currentTrackId: UUID?,
         currentContext: PlaybackContext?,
         isPlaying: Bool,
+        automaticListScrollTrigger: AutomaticListScrollTrigger? = nil,
         highlightedRowId: UUID?,
         favoriteTrackIds: Set<UUID>,
         settings: AppSettings,
@@ -80,6 +82,14 @@ struct TrackListScreenStateBuilder {
         }
 
         let scrollTargetRowId = rows.first(where: { $0.isCurrent })?.id
+        let matchingScrollTrigger: AutomaticListScrollTrigger?
+        if let automaticListScrollTrigger,
+           automaticListScrollTrigger.targetContext == .trackList,
+           automaticListScrollTrigger.targetDisplayableId == scrollTargetRowId {
+            matchingScrollTrigger = automaticListScrollTrigger
+        } else {
+            matchingScrollTrigger = nil
+        }
 
         return TrackListScreenState(
             id: id,
@@ -90,7 +100,8 @@ struct TrackListScreenStateBuilder {
             canRenameTrackList: canRenameTrackList,
             summary: summary,
             rows: rows,
-            scrollTargetRowId: scrollTargetRowId
+            scrollTargetRowId: scrollTargetRowId,
+            automaticListScrollTrigger: matchingScrollTrigger
         )
     }
 }
