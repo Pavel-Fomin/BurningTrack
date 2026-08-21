@@ -17,7 +17,7 @@ protocol AddToTrackListTrackListsManaging {
 
     /// Добавляет выбранные треки фонотеки в destination-треклист.
     @discardableResult
-    func addTracks(_ libraryTracks: [LibraryTrack], to trackListId: UUID) throws -> Bool
+    func addTracks(_ libraryTracks: [LibraryTrack], to trackListId: UUID) throws -> TrackList
 }
 
 /// Выполняет ID-based и Purchased iTunes-команды добавления треков в треклист.

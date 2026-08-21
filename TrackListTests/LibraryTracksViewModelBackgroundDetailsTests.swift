@@ -724,23 +724,33 @@ private actor ControlledTrackURLProvider {
 private final class LibraryFolderSyncSpy: LibraryFolderSyncing {
     private(set) var folderIDs: [UUID] = []
 
-    func syncFolderIfNeeded(folderId: UUID) async {
+    func syncFolderIfNeeded(folderId: UUID) async throws -> LibrarySyncOutcome {
         folderIDs.append(folderId)
+        return .confirmed(
+            LibrarySyncReceipt(
+                rootFolderId: folderId,
+                scannedFileCount: 1,
+                insertedTrackCount: 0,
+                updatedTrackCount: 1,
+                removedTrackCount: 0,
+                tracks: []
+            )
+        )
     }
 }
 
 /// Удерживает sync completion, чтобы проверить stale guard после nonthrowing manager contract.
 @MainActor
 private final class ControlledLibraryFolderSyncer: LibraryFolderSyncing {
-    private var pendingContinuations: [CheckedContinuation<Void, Never>] = []
+    private var pendingContinuations: [CheckedContinuation<LibrarySyncOutcome, Never>] = []
     private var calls = 0
     private var callCountWaiters: [CheckedContinuation<Void, Never>] = []
 
-    func syncFolderIfNeeded(folderId: UUID) async {
+    func syncFolderIfNeeded(folderId: UUID) async throws -> LibrarySyncOutcome {
         calls += 1
         notifyCallCountWaiters()
 
-        await withCheckedContinuation { continuation in
+        return await withCheckedContinuation { continuation in
             pendingContinuations.append(continuation)
         }
     }
@@ -758,7 +768,9 @@ private final class ControlledLibraryFolderSyncer: LibraryFolderSyncing {
             return
         }
 
-        pendingContinuations.removeFirst().resume()
+        pendingContinuations.removeFirst().resume(
+            returning: .skipped(.emptyScanProtected)
+        )
     }
 
     private func notifyCallCountWaiters() {

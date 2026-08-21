@@ -186,6 +186,7 @@ final class MoveToFolderFlowTests: XCTestCase {
             .success(
                 CopyPurchasedITunesTrackSuccess(
                     sourceTrackId: purchasedTrack.trackId,
+                    importedTrackId: UUID(),
                     copiedFileURL: URL(fileURLWithPath: "/tmp/copied.m4a"),
                     destinationFolderId: destinationFolderID,
                     destinationFolderName: "Destination"
@@ -479,7 +480,48 @@ final class MoveToFolderFlowTests: XCTestCase {
             trackId: trackID,
             destinationFolderId: destinationFolderID,
             destinationFolderName: "Destination",
-            snapshot: nil
+            snapshot: makeConfirmedMoveSnapshot(trackID: trackID)
+        )
+    }
+
+    /// Создаёт snapshot, который сопровождает только подтверждённый результат перемещения.
+    private func makeConfirmedMoveSnapshot(trackID: UUID) -> TrackRuntimeSnapshot {
+        TrackRuntimeSnapshot(
+            trackId: trackID,
+            fileName: "Track.mp3",
+            isAvailable: true,
+            technicalMetadata: TrackTechnicalMetadata(
+                fileSizeBytes: nil,
+                fileFormat: "MP3",
+                bitrateBitsPerSecond: nil
+            ),
+            title: "Track",
+            artist: "Artist",
+            album: nil,
+            albumArtist: nil,
+            genre: nil,
+            comment: nil,
+            composer: nil,
+            conductor: nil,
+            lyricist: nil,
+            remixer: nil,
+            grouping: nil,
+            bpm: nil,
+            musicalKey: nil,
+            trackNumber: nil,
+            totalTracks: nil,
+            discNumber: nil,
+            totalDiscs: nil,
+            year: nil,
+            date: nil,
+            publisherOrLabel: nil,
+            copyright: nil,
+            encodedBy: nil,
+            isrc: nil,
+            duration: nil,
+            artworkData: nil,
+            artworkSourceIdentifier: nil,
+            updatedAt: Date(timeIntervalSince1970: 0)
         )
     }
 
@@ -661,7 +703,7 @@ private final class MoveToFolderCommandExecutorSpy: MoveToFolderCommandExecuting
         trackId: UUID,
         toFolder folderID: UUID,
         using fileBusyChecker: any TrackFileBusyChecking
-    ) async throws -> MoveTrackSuccess {
+    ) async throws -> MoveTrackCommandResult {
         moveRequests.append(
             MoveRequest(
                 trackID: trackId,
@@ -669,7 +711,7 @@ private final class MoveToFolderCommandExecutorSpy: MoveToFolderCommandExecuting
                 busyCheckerID: ObjectIdentifier(fileBusyChecker)
             )
         )
-        return try moveResult.get()
+        return .confirmed(try moveResult.get())
     }
 
     func copyPurchasedITunesTrack(
@@ -693,12 +735,12 @@ private final class MoveToFolderDeferredCommandExecutorSpy: MoveToFolderCommandE
         trackId _: UUID,
         toFolder _: UUID,
         using _: any TrackFileBusyChecking
-    ) async throws -> MoveTrackSuccess {
+    ) async throws -> MoveTrackCommandResult {
         moveRequestCount += 1
         let result = await withCheckedContinuation { continuation in
             moveContinuations.append(continuation)
         }
-        return try result.get()
+        return .confirmed(try result.get())
     }
 
     func copyPurchasedITunesTrack(
@@ -707,6 +749,7 @@ private final class MoveToFolderDeferredCommandExecutorSpy: MoveToFolderCommandE
     ) async throws -> CopyPurchasedITunesTrackSuccess {
         CopyPurchasedITunesTrackSuccess(
             sourceTrackId: track.trackId,
+            importedTrackId: UUID(),
             copiedFileURL: track.assetURL,
             destinationFolderId: folderID,
             destinationFolderName: nil

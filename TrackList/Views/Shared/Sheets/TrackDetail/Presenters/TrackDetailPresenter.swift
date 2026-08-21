@@ -31,8 +31,8 @@ struct TrackDetailLoadedPresentation {
 
 /// Presentation-результат сохранения, который ViewModel применяет к экранному state.
 enum TrackDetailSavePresentation {
-    /// Сохранение подтверждено; snapshot может быть получен из результата или runtime store.
-    case saved(snapshot: TrackRuntimeSnapshot?)
+    /// Сохранение подтверждено новым snapshot, построенным и сохранённым post-update pipeline.
+    case saved(snapshot: TrackRuntimeSnapshot)
     /// Sheet остаётся в edit mode с необязательным системным alert.
     case keepEditing(alert: TrackDetailAlert?)
 }
@@ -152,7 +152,7 @@ struct TrackDetailPresenter {
     /// Показывает стандартное сообщение успешного сохранения и возвращает новый snapshot.
     func present(
         _ result: TrackEditsSavedSuccess,
-        confirmedSnapshot: TrackRuntimeSnapshot?
+        confirmedSnapshot: TrackRuntimeSnapshot
     ) -> TrackDetailSavePresentation {
         AppCommandToastPresenter(
             toastPresenter: toastPresenter

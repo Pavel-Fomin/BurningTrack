@@ -3144,8 +3144,8 @@ private final class TrackListLoadingOrderSpy: TrackListManaging {
         []
     }
 
-    func saveTracks(_ tracks: [Track], for id: UUID) -> Bool {
-        true
+    func saveTracks(_ tracks: [Track], for id: UUID) throws -> TrackListTracksSaveReceipt {
+        TrackListTracksSaveReceipt(trackListId: id, savedTracksCount: tracks.count)
     }
 }
 

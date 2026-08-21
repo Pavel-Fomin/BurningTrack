@@ -11,8 +11,8 @@ import Foundation
 
 /// Результат массового сохранения тегов.
 struct BatchTagEditSaveResult {
-    /// Успешно сохранённые треки.
-    let succeededTrackIDs: [UUID]
+    /// Индивидуально подтверждённые результаты, содержащие новый сохранённый snapshot.
+    let confirmed: [BatchTagEditSaveSuccess]
     /// Ошибки по трекам.
     let failures: [BatchTagEditSaveFailure]
     /// Были ли ошибки сохранения.
@@ -21,10 +21,25 @@ struct BatchTagEditSaveResult {
     }
     /// Количество успешно сохранённых треков.
     var succeededCount: Int {
-        succeededTrackIDs.count
+        confirmed.count
     }
     /// Количество ошибок.
     var failedCount: Int {
         failures.count
+    }
+
+    /// Идентификаторы используются presentation-слоем, но считаются только из confirmed receipt.
+    var succeededTrackIDs: [UUID] {
+        confirmed.map(\.trackId)
+    }
+}
+
+/// Подтверждённый результат записи тегов одного трека в batch-операции.
+struct BatchTagEditSaveSuccess: Identifiable {
+    let trackId: UUID
+    let snapshot: TrackRuntimeSnapshot
+
+    var id: UUID {
+        trackId
     }
 }

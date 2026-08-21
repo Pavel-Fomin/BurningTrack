@@ -12,6 +12,12 @@
 //
 
 import Foundation
+
+/// Подтверждает удаление одной корневой папки после финальной проверки SQLite.
+struct LibraryFolderRemovalReceipt: Sendable {
+    let rootFolderId: UUID
+    let removedTrackCount: Int
+}
 import SwiftUI
 import UniformTypeIdentifiers
 import Combine
@@ -144,12 +150,17 @@ final class MusicLibraryManager: ObservableObject {
             )
 
             // 4. Синхронизируем реестры по фактическому состоянию ФС (ТОЛЬКО через sync-модуль)
-            try await LibrarySyncModule.shared.syncRootFolder(
+            let syncOutcome = try await LibrarySyncModule.shared.syncRootFolder(
                 rootFolderId: rootFolderId,
                 rootURL: url,
                 mode: .full,
                 logsDatabaseDiagnostics: false
             )
+
+            guard case .confirmed = syncOutcome else {
+                // Прикреплённая папка не считается готовой, пока её реестры не подтверждены sync-проходом.
+                throw AppError.librarySyncFailed
+            }
 
             // 5. Заменяем lite-папку на полноценное дерево
             if let index = attachedFolders.firstIndex(where: { $0.id == rootFolderId }) {
@@ -175,48 +186,68 @@ final class MusicLibraryManager: ObservableObject {
 
     // MARK: - Удаление прикреплённой папки
 
-    func removeBookmark(for url: URL) async throws {
+    func removeBookmark(for url: URL) async throws -> LibraryFolderRemovalReceipt {
 
         // Получаем id корневой папки из её URL
         let rootFolderId = url.libraryFolderId
 
         // Закрываем активный доступ к папке (security-scoped resource),
         // если он был открыт ранее при restoreAccess
+        let didReleaseAccess: Bool
         if let activeURL = activeRootFolderAccess[rootFolderId] {
             activeURL.stopAccessingSecurityScopedResource()
             activeRootFolderAccess.removeValue(forKey: rootFolderId)
+            didReleaseAccess = true
+        } else {
+            didReleaseAccess = false
         }
 
         // Получаем все треки, принадлежащие этой корневой папке
         let tracksInFolder = await TrackRegistry.shared.tracks(inRootFolder: rootFolderId)
 
-        // Удаляем bookmarks для каждого трека из этой папки
-        for track in tracksInFolder {
-            await BookmarksRegistry.shared.removeTrackBookmark(id: track.id)
+        do {
+            // Удаляем bookmarks для каждого трека из этой папки
+            for track in tracksInFolder {
+                await BookmarksRegistry.shared.removeTrackBookmark(id: track.id)
+            }
+
+            // Удаляем bookmark самой папки
+            await BookmarksRegistry.shared.removeFolderBookmark(id: rootFolderId)
+
+            // Удаляем папку и связанные с ней треки из TrackRegistry
+            await TrackRegistry.shared.removeFolder(id: rootFolderId)
+
+            // Финально проверяем записи в SQLite после обновления реестров.
+            // Если запись не прошла, ошибка должна дойти до UI,
+            // чтобы success-toast не был показан ложно.
+            try await BookmarksRegistry.shared.throwPendingPersistenceError()
+            try await TrackRegistry.shared.throwPendingPersistenceError()
+
+            // Сигнал отправляется после полного удаления папки и её треков из SQLite.
+            NotificationCenter.default.post(name: .libraryDataDidChange, object: nil)
+
+            // Обновляем UI-список прикреплённых папок
+            attachedFolders.removeAll { $0.url == url }
+
+            #if DEBUG
+            // Диагностика detach показывает фактическое состояние SQLite после удаления корня.
+            DatabaseDiagnosticsLogger.logLibrarySnapshot()
+            #endif
+
+            return LibraryFolderRemovalReceipt(
+                rootFolderId: rootFolderId,
+                removedTrackCount: tracksInFolder.count
+            )
+        } catch {
+            guard didReleaseAccess else { throw error }
+
+            // Автоматически повторно открывать доступ небезопасно: UI получает failure без ложного success.
+            throw MutationFailure(
+                stage: .persist,
+                appError: .librarySyncFailed,
+                recovery: .accessReleased
+            )
         }
-
-        // Удаляем bookmark самой папки
-        await BookmarksRegistry.shared.removeFolderBookmark(id: rootFolderId)
-
-        // Удаляем папку и связанные с ней треки из TrackRegistry
-        await TrackRegistry.shared.removeFolder(id: rootFolderId)
-
-        // Финально проверяем записи в SQLite после обновления реестров.
-        // Если запись не прошла, ошибка должна дойти до UI,
-        // чтобы success-toast не был показан ложно.
-        try await BookmarksRegistry.shared.throwPendingPersistenceError()
-        try await TrackRegistry.shared.throwPendingPersistenceError()
-
-        // Сигнал отправляется после полного удаления папки и её треков из SQLite.
-        NotificationCenter.default.post(name: .libraryDataDidChange, object: nil)
-
-        // Обновляем UI-список прикреплённых папок
-        attachedFolders.removeAll { $0.url == url }
-
-        #if DEBUG
-        // Диагностика detach показывает фактическое состояние SQLite после удаления корня.
-        DatabaseDiagnosticsLogger.logLibrarySnapshot()
-        #endif
     }
     
     // MARK: - Проверка перед откреплением папки
@@ -377,13 +408,13 @@ final class MusicLibraryManager: ObservableObject {
         /// Сначала выполняем безопасную синхронизацию без удалений.
         for root in rootsToSync {
             do {
-                try await LibrarySyncModule.shared.syncRootFolder(
+                let outcome = try await LibrarySyncModule.shared.syncRootFolder(
                     rootFolderId: root.id,
                     rootURL: root.url,
                     mode: .safe,
                     logsDatabaseDiagnostics: false
                 )
-                print("🔄 Safe sync завершён:", root.name)
+                logSyncOutcome(outcome, rootName: root.name, mode: "safe")
             } catch {
                 print("❌ Safe sync не завершён:", root.name, error)
                 PersistentLogger.log("❌ restoreAccessAsync: safe sync failed: \(root.name), error: \(error)")
@@ -393,20 +424,20 @@ final class MusicLibraryManager: ObservableObject {
         /// После безопасной синхронизации выполняем полную.
         for root in rootsToSync {
             do {
-                try await LibrarySyncModule.shared.syncRootFolder(
+                let outcome = try await LibrarySyncModule.shared.syncRootFolder(
                     rootFolderId: root.id,
                     rootURL: root.url,
                     mode: .full,
                     logsDatabaseDiagnostics: false
                 )
-                print("🔄 Full sync завершён:", root.name)
+                logSyncOutcome(outcome, rootName: root.name, mode: "full")
             } catch {
                 print("❌ Full sync не завершён:", root.name, error)
                 PersistentLogger.log("❌ restoreAccessAsync: full sync failed: \(root.name), error: \(error)")
             }
         }
         
-        PersistentLogger.log("✅ restoreAccessAsync: sync finished")
+        PersistentLogger.log("ℹ️ restoreAccessAsync: обработка sync-запросов завершена")
         isAccessRestored = true
         print("✅ Восстановление доступа завершено (ready)")
         PersistentLogger.log("✅ Восстановление доступа завершено (ready)")
@@ -422,9 +453,8 @@ final class MusicLibraryManager: ObservableObject {
     
     // MARK: - Синхронный фасад для ViewModel
 
-    /// Синхронизирует фонотеку для папки.
-    /// Работает корректно даже для пустых папок.
-    func syncFolderIfNeeded(folderId: UUID) async {
+    /// Синхронизирует фонотеку для папки и явно сообщает о safe skipped-result.
+    func syncFolderIfNeeded(folderId: UUID) async throws -> LibrarySyncOutcome {
 
         // 1. Определяем rootFolderId
         // Если folderId — корневая папка, используем его напрямую.
@@ -438,40 +468,28 @@ final class MusicLibraryManager: ObservableObject {
             // Подпапка: ищем root в дереве attachedFolders.
             guard let root = rootFolder(for: folderId) else {
                 print("❌ Root folder не найден для folderId: \(folderId)")
-                return
+                return .skipped(.rootFolderUnavailable)
             }
 
-            do {
-                try await LibrarySyncModule.shared.syncRootFolder(
-                    rootFolderId: root.id,
-                    rootURL: root.url,
-                    mode: .safe
-                )
-            } catch {
-                print("❌ syncFolderIfNeeded: sync failed:", error)
-                PersistentLogger.log("❌ syncFolderIfNeeded: sync failed for nested folder: \(folderId), error: \(error)")
-            }
-
-            return
+            return try await LibrarySyncModule.shared.syncRootFolder(
+                rootFolderId: root.id,
+                rootURL: root.url,
+                mode: .safe
+            )
         }
 
         // 2. Резолвим URL корневой папки
         guard let rootURL = await BookmarkResolver.url(forFolder: rootFolderId) else {
             print("⚠️ syncFolderIfNeeded: не удалось восстановить URL корневой папки")
-            return
+            return .skipped(.rootAccessUnavailable)
         }
 
         // 3. Запускаем sync
-        do {
-            try await LibrarySyncModule.shared.syncRootFolder(
-                rootFolderId: rootFolderId,
-                rootURL: rootURL,
-                mode: .safe
-            )
-        } catch {
-            print("❌ syncFolderIfNeeded: sync failed:", error)
-            PersistentLogger.log("❌ syncFolderIfNeeded: sync failed for root folder: \(rootFolderId), error: \(error)")
-        }
+        return try await LibrarySyncModule.shared.syncRootFolder(
+            rootFolderId: rootFolderId,
+            rootURL: rootURL,
+            mode: .safe
+        )
     }
     
 
@@ -484,6 +502,21 @@ final class MusicLibraryManager: ObservableObject {
             if contains(folderId: folderId, in: sub) { return true }
         }
         return false
+    }
+
+    /// Отделяет подтверждённую синхронизацию от безопасного пропуска в runtime-журнале.
+    private func logSyncOutcome(
+        _ outcome: LibrarySyncOutcome,
+        rootName: String,
+        mode: String
+    ) {
+        switch outcome {
+        case .confirmed:
+            print("🔄 \(mode) sync подтверждён:", rootName)
+        case .skipped(let reason):
+            PersistentLogger.log("⚠️ restoreAccessAsync: \(mode) sync skipped root=\(rootName) reason=\(reason)")
+            print("⚠️ \(mode) sync пропущен:", rootName, reason)
+        }
     }
 
     /// Рекурсивно строит дерево LibraryFolder из файловой системы через LibraryScanner.

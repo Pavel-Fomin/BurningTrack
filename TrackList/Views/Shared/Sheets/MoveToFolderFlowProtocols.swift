@@ -23,7 +23,7 @@ protocol MoveToFolderCommandExecuting {
         trackId: UUID,
         toFolder folderID: UUID,
         using fileBusyChecker: any TrackFileBusyChecking
-    ) async throws -> MoveTrackSuccess
+    ) async throws -> MoveTrackCommandResult
 
     /// Копирует уже подготовленный iTunes-трек без TrackRegistry и file busy capability.
     func copyPurchasedITunesTrack(

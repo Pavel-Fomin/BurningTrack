@@ -1153,10 +1153,16 @@ private final class DetailTrackListManagerSpy: TrackListManaging {
 
     func loadTracks(for id: UUID) throws -> [Track] { [] }
 
-    func saveTracks(_ tracks: [Track], for id: UUID) -> Bool {
+    func saveTracks(_ tracks: [Track], for id: UUID) throws -> TrackListTracksSaveReceipt {
         savedTrackIds.append(tracks.map(\.id))
         savedTrackListIds.append(id)
-        return shouldSave
+        guard shouldSave else {
+            throw AppError.trackListSaveFailed
+        }
+        return TrackListTracksSaveReceipt(
+            trackListId: id,
+            savedTracksCount: tracks.count
+        )
     }
 }
 

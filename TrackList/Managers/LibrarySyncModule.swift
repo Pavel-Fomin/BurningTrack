@@ -18,6 +18,55 @@
 
 import Foundation
 
+/// Причина безопасного пропуска синхронизации без изменения реестров.
+enum LibrarySyncSkipReason: Sendable {
+    /// Библиотека ещё не завершила восстановление доступа.
+    case libraryNotReady
+    /// Security-scoped доступ к корневой папке недоступен.
+    case rootAccessUnavailable
+    /// Пустой scan защищён от удаления существующего реестра.
+    case emptyScanProtected
+    /// Запрошенная папка не принадлежит известному корню библиотеки.
+    case rootFolderUnavailable
+}
+
+/// Подтверждённая запись одного файла в реестры во время синхронизации.
+struct LibrarySyncTrackReceipt: Sendable {
+    let trackId: UUID
+    let relativePath: String
+}
+
+/// Доказательство полного завершения одного sync-прохода после проверки SQLite.
+struct LibrarySyncReceipt: Sendable {
+    let rootFolderId: UUID
+    let scannedFileCount: Int
+    let insertedTrackCount: Int
+    let updatedTrackCount: Int
+    let removedTrackCount: Int
+    let tracks: [LibrarySyncTrackReceipt]
+
+    /// Возвращает identity файла только по подтверждённому относительному пути корня.
+    func trackId(forRelativePath relativePath: String) -> UUID? {
+        tracks.first(where: { $0.relativePath == relativePath })?.trackId
+    }
+}
+
+/// Итог sync-операции: подтверждённая запись либо осознанный безопасный пропуск.
+enum LibrarySyncOutcome: Sendable {
+    case confirmed(LibrarySyncReceipt)
+    case skipped(LibrarySyncSkipReason)
+}
+
+/// Узкий domain-контракт синхронизации корневой папки для command-сценариев и XCTest.
+protocol LibraryRootSyncing: Sendable {
+    func syncRootFolder(
+        rootFolderId: UUID,
+        rootURL: URL,
+        mode: LibrarySyncModule.SyncMode,
+        logsDatabaseDiagnostics: Bool
+    ) async throws -> LibrarySyncOutcome
+}
+
 /// Координирует логические синхронизации отдельно для каждого корня фонотеки.
 ///
 /// `LibrarySyncModule` остаётся reentrant во время сканирования и операций с реестрами,
@@ -43,17 +92,18 @@ actor LibraryRootSyncCoordinator {
     /// сразу после получения ownership проверяется cancellation, запрос не входит в
     /// operation и освобождает место следующему. Так не нужен отдельный небезопасный
     /// механизм удаления continuation из очереди.
-    func run(
+    func run<Result: Sendable>(
         rootFolderId: UUID,
-        operation: @escaping @Sendable () async throws -> Void
-    ) async throws {
+        operation: @escaping @Sendable () async throws -> Result
+    ) async throws -> Result {
         let requestID = UUID()
         await acquire(rootFolderId: rootFolderId, requestID: requestID)
 
         do {
             try Task.checkCancellation()
-            try await operation()
+            let outcome = try await operation()
             release(rootFolderId: rootFolderId, requestID: requestID)
+            return outcome
         } catch {
             // Ошибка или отмена одной операции не должны удерживать root и блокировать
             // независимый следующий запрос этой же папки.
@@ -119,7 +169,7 @@ enum LibrarySyncReconciliation {
 
 actor LibrarySyncModule {
     
-    enum SyncMode {
+    enum SyncMode: Sendable {
         case safe
         case full
     }
@@ -146,7 +196,7 @@ actor LibrarySyncModule {
         rootURL: URL,
         mode: SyncMode,
         logsDatabaseDiagnostics: Bool = true
-    ) async throws {
+    ) async throws -> LibrarySyncOutcome {
 
         try await rootSyncCoordinator.run(rootFolderId: rootFolderId) {
             try await self.performSyncRootFolder(
@@ -166,7 +216,7 @@ actor LibrarySyncModule {
         rootURL: URL,
         mode: SyncMode,
         logsDatabaseDiagnostics: Bool
-    ) async throws {
+    ) async throws -> LibrarySyncOutcome {
 
         // Отмена между передачей ownership и первой проверкой доступа не должна
         // открывать scope и запускать scan для уже неактуального запроса.
@@ -183,7 +233,7 @@ actor LibrarySyncModule {
         if accessState != .ready {
             PersistentLogger.log("⚠️ sync blocked: library not ready")
             print("⚠️ syncRootFolder: пропуск — библиотека ещё не ready")
-            return
+            return .skipped(.libraryNotReady)
         }
 
         // 1) Открываем доступ к корневой папке на время синка.
@@ -198,7 +248,7 @@ actor LibrarySyncModule {
         let started = rootURL.startAccessingSecurityScopedResource()
         if !started && hasRuntimeRootAccess == false {
             print("❌ syncRootFolder: не удалось начать доступ к папке:", rootURL.path)
-            return
+            return .skipped(.rootAccessUnavailable)
         }
         defer {
             if started {
@@ -215,7 +265,7 @@ actor LibrarySyncModule {
         if LibrarySyncReconciliation.shouldApply(scannedFileCount: scanned.count) == false {
             print("⚠️ syncRootFolder: scan вернул 0 файлов — пропускаем удаление, чтобы не снести реестр:", rootURL.lastPathComponent)
             PersistentLogger.log("⚠️ syncRootFolder: empty scan root=\(rootURL.lastPathComponent) mode=\(mode)")
-            return
+            return .skipped(.emptyScanProtected)
         }
 
         // 3) Получаем текущее состояние реестра по корню
@@ -231,6 +281,9 @@ actor LibrarySyncModule {
 
         // 4) Применяем найденные файлы: upsert + bookmark
         var aliveIds = Set<UUID>()
+        var confirmedTracks: [LibrarySyncTrackReceipt] = []
+        var insertedTrackCount = 0
+        var updatedTrackCount = 0
         for file in scanned {
 
             let fileURL = file.url.resolvingSymlinksInPath()
@@ -267,6 +320,12 @@ actor LibrarySyncModule {
             // Если запись уже была в реестре, сохраняем её старый trackId.
             let existingEntry = existingByRelativePath[relativePath]
 
+            if existingEntry == nil {
+                insertedTrackCount += 1
+            } else {
+                updatedTrackCount += 1
+            }
+
             let trackId = try await TrackIdentityResolver.shared.trackId(
                 forRootFolderId: rootFolderId,
                 relativePath: relativePath,
@@ -274,6 +333,12 @@ actor LibrarySyncModule {
             )
 
             aliveIds.insert(trackId)
+            confirmedTracks.append(
+                LibrarySyncTrackReceipt(
+                    trackId: trackId,
+                    relativePath: relativePath
+                )
+            )
 
             await TrackRegistry.shared.upsertTrack(
                 id: trackId,
@@ -295,11 +360,12 @@ actor LibrarySyncModule {
         }
 
         // 5) Удаляем только в full-режиме
-        for entry in LibrarySyncReconciliation.entriesToDelete(
+        let entriesToDelete = LibrarySyncReconciliation.entriesToDelete(
             existing: existing,
             aliveIDs: aliveIds,
             mode: mode
-        ) {
+        )
+        for entry in entriesToDelete {
             await TrackRegistry.shared.removeTrack(id: entry.id)
             await BookmarksRegistry.shared.removeTrackBookmark(id: entry.id)
 
@@ -341,5 +407,18 @@ actor LibrarySyncModule {
             DatabaseDiagnosticsLogger.logLibrarySnapshot()
         }
         #endif
+
+        return .confirmed(
+            LibrarySyncReceipt(
+                rootFolderId: rootFolderId,
+                scannedFileCount: scanned.count,
+                insertedTrackCount: insertedTrackCount,
+                updatedTrackCount: updatedTrackCount,
+                removedTrackCount: entriesToDelete.count,
+                tracks: confirmedTracks
+            )
+        )
     }
 }
+
+extension LibrarySyncModule: LibraryRootSyncing {}

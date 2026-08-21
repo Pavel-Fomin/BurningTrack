@@ -180,7 +180,7 @@ final class LibraryMasterActionHandler {
         _ folder: LibraryFolder
     ) async {
         do {
-            try await manager.removeBookmark(for: folder.url)
+            _ = try await manager.removeBookmark(for: folder.url)
             toastPresenter.handle(
                 .folderRemoved(name: folder.name)
             )

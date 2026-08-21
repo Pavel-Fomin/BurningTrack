@@ -479,6 +479,71 @@ final class TrackFileOperationCoordinatorTests: XCTestCase {
         )
     }
 
+    func testRenameDoesNotReturnConfirmedResultWhenPostUpdateFails() async {
+        let trackId = UUID()
+        let events = TrackFileOperationEventLog()
+        let fileURLResolver = TrackFileURLResolverSpy(initialURL: makeURL(name: "Original.mp3"))
+        let fileManager = TrackFileManagerSpy(
+            urlResolver: fileURLResolver,
+            events: events,
+            renameGate: TrackFileOperationGate(isOpen: true),
+            moveGate: TrackFileOperationGate(isOpen: true)
+        )
+        let executor = makeExecutor(
+            fileManager: fileManager,
+            fileURLResolver: fileURLResolver,
+            postUpdater: TrackPostUpdateFailureSpy()
+        )
+
+        do {
+            _ = try await executor.renameTrack(
+                trackId: trackId,
+                to: "Renamed.mp3",
+                using: TrackFileBusyCheckerStub()
+            )
+            XCTFail("Переименование без подтверждённого post-update не должно вернуть confirmed result")
+        } catch let failure as MutationFailure {
+            XCTAssertEqual(failure.stage, .confirm)
+            XCTAssertEqual(failure.appError, .trackUpdateConfirmationFailed)
+            XCTAssertEqual(failure.recovery, .confirmationMissing)
+        } catch {
+            XCTFail("Ожидалась MutationFailure, получено: \(error)")
+        }
+    }
+
+    func testPurchasedITunesCopyDoesNotReturnSuccessWhenSyncIsSkipped() async {
+        let copiedFileURL = URL(fileURLWithPath: "/tmp/library/Imported.m4a")
+        let rootURL = URL(fileURLWithPath: "/tmp/library")
+        let executor = AppCommandExecutor(
+            purchasedITunesTrackCopier: PurchasedITunesTrackCopyStub(
+                result: PurchasedITunesTrackCopyResult(
+                    fileURL: copiedFileURL,
+                    folderId: UUID(),
+                    folderName: "Library",
+                    rootFolderId: UUID(),
+                    rootFolderURL: rootURL
+                )
+            ),
+            libraryRootSyncer: LibraryRootSyncStub(
+                outcome: .skipped(.emptyScanProtected)
+            )
+        )
+
+        do {
+            _ = try await executor.copyPurchasedITunesTrack(
+                makePurchasedITunesTrack(),
+                toFolder: UUID()
+            )
+            XCTFail("Пропущенный sync не должен подтверждать импорт iTunes-трека")
+        } catch let failure as MutationFailure {
+            XCTAssertEqual(failure.stage, .confirm)
+            XCTAssertEqual(failure.appError, .purchasedITunesCopyFailed)
+            XCTAssertEqual(failure.recovery, .confirmationMissing)
+        } catch {
+            XCTFail("Ожидалась MutationFailure, получено: \(error)")
+        }
+    }
+
     /// Даёт созданным задачам дойти до actor-owned continuation без busy-wait в production-коде.
     private func allowQueuedTasksToReachCoordinator() async {
         try? await Task.sleep(nanoseconds: 20_000_000)
@@ -507,6 +572,24 @@ final class TrackFileOperationCoordinatorTests: XCTestCase {
     /// Строит test-only URL без обращения к пользовательской Library.
     private func makeURL(name: String) -> URL {
         URL(fileURLWithPath: "/tmp/track-file-operation-tests/\(name)")
+    }
+
+    /// Создаёт доступный iTunes-ассет для изолированной проверки command pipeline.
+    private func makePurchasedITunesTrack() -> PurchasedITunesPlayableTrack {
+        PurchasedITunesPlayableTrack(
+            track: PurchasedITunesTrack(
+                id: 1,
+                title: "Purchased",
+                artist: "Artist",
+                album: nil,
+                year: nil,
+                genre: nil,
+                dateAdded: Date(timeIntervalSince1970: 0),
+                artworkData: nil,
+                duration: 180,
+                assetURL: URL(fileURLWithPath: "/tmp/purchased.m4a")
+            )
+        )
     }
 }
 
@@ -581,21 +664,23 @@ private actor TrackFileManagerSpy: TrackFileOperationManaging {
         id trackId: UUID,
         toFolder destinationFolderId: UUID,
         using fileBusyChecker: any TrackFileBusyChecking
-    ) async throws {
+    ) async throws -> TrackFileMutationOutcome {
         await events.record("move")
         await moveGate.wait()
+        return .confirmed
     }
 
     func renameTrack(
         id trackId: UUID,
         to newFileName: String,
         using fileBusyChecker: any TrackFileBusyChecking
-    ) async throws {
+    ) async throws -> TrackFileMutationOutcome {
         await events.record("rename:\(newFileName)")
         await renameGate.wait()
         await urlResolver.replaceCurrentURL(
             URL(fileURLWithPath: "/tmp/track-file-operation-tests/\(newFileName)")
         )
+        return .confirmed
     }
 }
 
@@ -640,10 +725,10 @@ private actor TrackPostUpdateHandlerSpy: TrackPostUpdateHandling {
         reason: TrackUpdateReason,
         changedFields: Set<TrackChangedField>,
         previousURL: URL?
-    ) async throws -> TrackUpdateEvent? {
+    ) async throws -> TrackUpdateEvent {
         await events.record("post")
         await updateGate.wait()
-        return nil
+        return makeConfirmedTrackUpdateEvent(trackId: trackId)
     }
 
     func prepareTrackUpdate(
@@ -651,14 +736,110 @@ private actor TrackPostUpdateHandlerSpy: TrackPostUpdateHandling {
         reason: TrackUpdateReason,
         changedFields: Set<TrackChangedField>,
         previousURL: URL?
-    ) async throws -> TrackUpdateEvent? {
+    ) async throws -> TrackUpdateEvent {
         await events.record("prepare")
-        return nil
+        return makeConfirmedTrackUpdateEvent(trackId: trackId)
     }
 
     func publishTrackBatchUpdateEvents(_ updateEvents: [TrackUpdateEvent]) async {
         await events.record("batch publish")
     }
+}
+
+/// Имитирует отсутствие финального snapshot после уже выполненной файловой операции.
+private actor TrackPostUpdateFailureSpy: TrackPostUpdateHandling {
+    func handleTrackUpdate(
+        forTrackId trackId: UUID,
+        reason: TrackUpdateReason,
+        changedFields: Set<TrackChangedField>,
+        previousURL: URL?
+    ) async throws -> TrackUpdateEvent {
+        throw AppError.trackUpdateConfirmationFailed
+    }
+
+    func prepareTrackUpdate(
+        forTrackId trackId: UUID,
+        reason: TrackUpdateReason,
+        changedFields: Set<TrackChangedField>,
+        previousURL: URL?
+    ) async throws -> TrackUpdateEvent {
+        throw AppError.trackUpdateConfirmationFailed
+    }
+
+    func publishTrackBatchUpdateEvents(_ updateEvents: [TrackUpdateEvent]) async {}
+}
+
+/// Возвращает заранее подготовленный результат физического копирования без MediaPlayer и файловой системы.
+private struct PurchasedITunesTrackCopyStub: PurchasedITunesTrackCopying {
+    let result: PurchasedITunesTrackCopyResult
+
+    func copy(
+        _ track: PurchasedITunesPlayableTrack,
+        toFolder destinationFolderId: UUID
+    ) async throws -> PurchasedITunesTrackCopyResult {
+        result
+    }
+}
+
+/// Возвращает контролируемый sync outcome без изменения production реестров.
+private struct LibraryRootSyncStub: LibraryRootSyncing {
+    let outcome: LibrarySyncOutcome
+
+    func syncRootFolder(
+        rootFolderId: UUID,
+        rootURL: URL,
+        mode: LibrarySyncModule.SyncMode,
+        logsDatabaseDiagnostics: Bool
+    ) async throws -> LibrarySyncOutcome {
+        outcome
+    }
+}
+
+/// Собирает минимальный подтверждённый snapshot для проверки ownership без production metadata reader.
+private func makeConfirmedTrackUpdateEvent(trackId: UUID) -> TrackUpdateEvent {
+    let snapshot = TrackRuntimeSnapshot(
+        trackId: trackId,
+        fileName: "Track.mp3",
+        isAvailable: true,
+        technicalMetadata: TrackTechnicalMetadata(
+            fileSizeBytes: nil,
+            fileFormat: "MP3",
+            bitrateBitsPerSecond: nil
+        ),
+        title: "Track",
+        artist: "Artist",
+        album: nil,
+        albumArtist: nil,
+        genre: nil,
+        comment: nil,
+        composer: nil,
+        conductor: nil,
+        lyricist: nil,
+        remixer: nil,
+        grouping: nil,
+        bpm: nil,
+        musicalKey: nil,
+        trackNumber: nil,
+        totalTracks: nil,
+        discNumber: nil,
+        totalDiscs: nil,
+        year: nil,
+        date: nil,
+        publisherOrLabel: nil,
+        copyright: nil,
+        encodedBy: nil,
+        isrc: nil,
+        duration: nil,
+        artworkData: nil,
+        artworkSourceIdentifier: nil,
+        updatedAt: Date(timeIntervalSince1970: 0)
+    )
+    return TrackUpdateEvent(
+        trackId: trackId,
+        reason: .metadataUpdated,
+        changedFields: [.title],
+        snapshot: snapshot
+    )
 }
 
 /// Controlled tag writer подтверждает, что запись содержимого файла использует тот же owner.

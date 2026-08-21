@@ -436,7 +436,7 @@ private final class AddToTrackListTrackListsSpy: AddToTrackListTrackListsManagin
         []
     }
 
-    func addTracks(_ libraryTracks: [LibraryTrack], to trackListId: UUID) throws -> Bool {
+    func addTracks(_ libraryTracks: [LibraryTrack], to trackListId: UUID) throws -> TrackList {
         if let libraryBatchError {
             throw libraryBatchError
         }
@@ -444,7 +444,13 @@ private final class AddToTrackListTrackListsSpy: AddToTrackListTrackListsManagin
         libraryBatchRequests.append(
             (destinationID: trackListId, trackIDs: libraryTracks.map(\.trackId))
         )
-        return true
+        return TrackList(
+            id: trackListId,
+            name: "Append target",
+            createdAt: Date(),
+            kind: .regular,
+            tracks: []
+        )
     }
 }
 

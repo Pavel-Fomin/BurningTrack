@@ -31,8 +31,8 @@ struct AppCommandToastPresenter {
         let snapshot = result.snapshot
         toastPresenter.handle(
             .trackMovedInLibrary(
-                title: snapshot?.title ?? snapshot?.fileName ?? "",
-                artist: snapshot?.artist ?? "",
+                title: snapshot.title ?? snapshot.fileName,
+                artist: snapshot.artist ?? "",
                 artwork: ArtworkRequest(
                     trackId: result.trackId,
                     snapshot: snapshot,
@@ -212,8 +212,8 @@ struct AppCommandToastPresenter {
             let snapshot = result.snapshot
             toastPresenter.handle(
                 .tagsUpdated(
-                    title: snapshot?.title ?? snapshot?.fileName ?? result.finalFileName,
-                    artist: snapshot?.artist ?? "",
+                    title: snapshot.title ?? snapshot.fileName,
+                    artist: snapshot.artist ?? "",
                     artwork: ArtworkRequest(
                         trackId: result.trackId,
                         snapshot: snapshot,
@@ -232,8 +232,8 @@ struct AppCommandToastPresenter {
         let snapshot = result.snapshot
         toastPresenter.handle(
             .tagsUpdated(
-                title: snapshot?.title ?? "",
-                artist: snapshot?.artist ?? "",
+                title: snapshot.title ?? "",
+                artist: snapshot.artist ?? "",
                 artwork: ArtworkRequest(
                     trackId: result.trackId,
                     snapshot: snapshot,

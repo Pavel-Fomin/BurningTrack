@@ -8,6 +8,19 @@
 //
 import Foundation
 import SwiftUI
+
+/// Receipt подтверждённой SQLite-записи очереди плеера.
+struct PlayerQueueSaveReceipt: Sendable, Equatable {
+    let itemsCount: Int
+    let mutationVersion: UInt64
+}
+
+/// Разделяет сохранённое изменение очереди и команду, которой нечего менять.
+enum PlayerQueueMutationOutcome: Sendable, Equatable {
+    case confirmed(PlayerQueueSaveReceipt)
+    case unchanged
+}
+
 @MainActor
 final class PlaylistManager: ObservableObject {
 
@@ -128,9 +141,8 @@ final class PlaylistManager: ObservableObject {
 
     // MARK: - Сохранение очереди плеера
 
-    /// Сохраняет текущую очередь плеера в SQLite.
-    @discardableResult
-    func saveQueue() -> Bool {
+    /// Сохраняет текущую очередь плеера в SQLite и подтверждает новую версию только после persist.
+    func saveQueue() throws -> PlayerQueueSaveReceipt {
         do {
             try databaseStore.replaceQueue(tracks)
             queueMutationVersion &+= 1
@@ -140,11 +152,14 @@ final class PlaylistManager: ObservableObject {
                 "💾 PlaylistManager: saved SQLite player queue items=\(tracks.count) " +
                     "queueMutationVersion=\(queueMutationVersion)"
             )
-            return true
+            return PlayerQueueSaveReceipt(
+                itemsCount: tracks.count,
+                mutationVersion: queueMutationVersion
+            )
         } catch {
             PersistentLogger.log("❌ PlaylistManager: SQLite queue save error \(error)")
             print("❌ Ошибка сохранения очереди плеера в SQLite: \(error)")
-            return false
+            throw AppError.playlistSaveFailed
         }
     }
     
@@ -189,8 +204,8 @@ final class PlaylistManager: ObservableObject {
     
     // MARK: - Добавление треков в плеер
 
-    @discardableResult
-    func addTracks(_ tracksToAdd: [PlayerTrack]) -> Bool {
+    /// Добавляет элементы и возвращает confirmed только после сохранения полной очереди.
+    func addTracks(_ tracksToAdd: [PlayerTrack]) throws -> PlayerQueueMutationOutcome {
         let tracksCountBefore = tracks.count
         PersistentLogger.log(
             "PlaylistManager queue addTracks started " +
@@ -202,7 +217,7 @@ final class PlaylistManager: ObservableObject {
                 "PlaylistManager queue addTracks completed " +
                     "saveQueueResult=notRequired tracksCountAfter=\(tracks.count)"
             )
-            return true
+            return .unchanged
         }
 
         // Откат нужен, чтобы runtime-очередь не расходилась с SQLite при ошибке записи.
@@ -213,30 +228,29 @@ final class PlaylistManager: ObservableObject {
                 "tracksCountAfterAppend=\(tracks.count)"
         )
 
-        let didSave = saveQueue()
-        PersistentLogger.log(
-            "PlaylistManager queue addTracks saveQueue result=\(didSave)"
-        )
-
-        guard didSave else {
+        do {
+            let receipt = try saveQueue()
+            PersistentLogger.log(
+                "PlaylistManager queue addTracks saveQueue result=confirmed"
+            )
+            PersistentLogger.log(
+                "PlaylistManager queue addTracks completed " +
+                    "saveQueueResult=confirmed tracksCountAfter=\(tracks.count)"
+            )
+            return .confirmed(receipt)
+        } catch {
             tracks = previousTracks
             PersistentLogger.log(
                 "PlaylistManager queue addTracks completed " +
-                    "saveQueueResult=false tracksCountAfter=\(tracks.count)"
+                    "saveQueueResult=failed tracksCountAfter=\(tracks.count)"
             )
-            return false
+            throw error
         }
-
-        PersistentLogger.log(
-            "PlaylistManager queue addTracks completed " +
-                "saveQueueResult=true tracksCountAfter=\(tracks.count)"
-        )
-        return true
     }
 
-    @discardableResult
-    func addTracks(ids: [UUID]) async -> Bool {
-        guard !ids.isEmpty else { return true }
+    /// Добавляет библиотечные элементы и возвращает confirmed только после сохранения полной очереди.
+    func addTracks(ids: [UUID]) async throws -> PlayerQueueMutationOutcome {
+        guard !ids.isEmpty else { return .unchanged }
 
         // Собираем новые элементы отдельно, чтобы сохранить очередь одним SQLite-обновлением.
         var tracksToAdd: [PlayerTrack] = []
@@ -249,26 +263,43 @@ final class PlaylistManager: ObservableObject {
         let previousTracks = tracks
         tracks.append(contentsOf: tracksToAdd)
 
-        guard saveQueue() else {
+        do {
+            return .confirmed(try saveQueue())
+        } catch {
             tracks = previousTracks
-            return false
+            throw error
         }
-
-        return true
     }
 
     // MARK: - Удаление треков
 
-    @discardableResult
-    func remove(at index: Int) -> Bool {
-        guard index < tracks.count else { return false }
+    /// Удаляет элемент и восстанавливает runtime-очередь, если SQLite persist не подтверждён.
+    func remove(at index: Int) throws -> PlayerQueueMutationOutcome {
+        guard index < tracks.count else {
+            throw AppError.trackNotFound
+        }
+        let previousTracks = tracks
         tracks.remove(at: index)
-        return saveQueue()
+        do {
+            return .confirmed(try saveQueue())
+        } catch {
+            tracks = previousTracks
+            throw error
+        }
     }
     
     @discardableResult
-    func clear() -> Bool {
+    func clear() throws -> PlayerQueueMutationOutcome {
+        guard tracks.isEmpty == false else {
+            return .unchanged
+        }
+        let previousTracks = tracks
         tracks = []
-        return saveQueue()
+        do {
+            return .confirmed(try saveQueue())
+        } catch {
+            tracks = previousTracks
+            throw error
+        }
     }
 }

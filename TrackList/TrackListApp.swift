@@ -131,7 +131,8 @@ struct TrackListApp: App {
             favoritesEvents: favoritesEventCenter
         )
         let favoriteTrackActionHandler = FavoriteTrackActionHandler(
-            favoritesService: favoritesService
+            favoritesService: favoritesService,
+            toastPresenter: toastManager
         )
         // Player production graph полностью собирается в Composition Root до создания PlayerViewModel.
         let playerManager = PlayerManager()

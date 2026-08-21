@@ -579,7 +579,7 @@ private final class NewTrackListSelectionManagerSpy: TrackListFlowManaging {
     func addTracks(
         _ libraryTracks: [LibraryTrack],
         to trackListId: UUID
-    ) throws -> Bool {
+    ) throws -> TrackList {
         if let appendError {
             throw appendError
         }
@@ -587,7 +587,13 @@ private final class NewTrackListSelectionManagerSpy: TrackListFlowManaging {
         appendedRequests.append(
             AppendRequest(trackListID: trackListId, trackIDs: libraryTracks.map(\.id))
         )
-        return true
+        return TrackList(
+            id: trackListId,
+            name: "Append target",
+            createdAt: Date(),
+            kind: .regular,
+            tracks: []
+        )
     }
 
     private func makeTrackList(name: String) -> TrackList {

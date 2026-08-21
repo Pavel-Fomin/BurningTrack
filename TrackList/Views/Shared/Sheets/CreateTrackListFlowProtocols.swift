@@ -19,7 +19,7 @@ protocol TrackListFlowManaging {
     /// Возвращает метаданные треклистов для определения имени append-цели.
     func loadTrackListMetas() throws -> [TrackListMeta]
     /// Добавляет выбранные треки в существующий треклист.
-    func addTracks(_ libraryTracks: [LibraryTrack], to trackListId: UUID) throws -> Bool
+    func addTracks(_ libraryTracks: [LibraryTrack], to trackListId: UUID) throws -> TrackList
 }
 
 /// Предоставляет готовое дерево прикреплённых папок без обращения View к менеджеру фонотеки.

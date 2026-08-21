@@ -186,12 +186,12 @@ final class MoveToFolderActionHandler {
 
         operationTask = Task { [weak self] in
             do {
-                let result = try await commandExecutor.moveTrack(
+                let outcome = try await commandExecutor.moveTrack(
                     trackId: trackID,
                     toFolder: folderID,
                     using: fileBusyChecker
                 )
-                self?.handleMoveSuccess(result, operationID: operationID)
+                self?.handleMoveOutcome(outcome, operationID: operationID)
             } catch let appError as AppError {
                 self?.handleAppError(appError, operationID: operationID)
             } catch {
@@ -237,14 +237,19 @@ final class MoveToFolderActionHandler {
         }
     }
 
-    /// Показывает move success и завершает только совпадающий route.
-    private func handleMoveSuccess(
-        _ result: MoveTrackSuccess,
+    /// Показывает success только после confirmed result; корректный no-op оставляет sheet открытым.
+    private func handleMoveOutcome(
+        _ outcome: MoveTrackCommandResult,
         operationID: UUID
     ) {
         guard isCurrentOperation(operationID) else { return }
-        AppCommandToastPresenter(toastPresenter: toastPresenter).present(result)
-        finishSuccessfulOperation(operationID)
+        switch outcome {
+        case .confirmed(let result):
+            AppCommandToastPresenter(toastPresenter: toastPresenter).present(result)
+            finishSuccessfulOperation(operationID)
+        case .unchanged:
+            finishOperationIfCurrent(operationID)
+        }
     }
 
     /// Показывает Purchased iTunes copy success и завершает только совпадающий route.

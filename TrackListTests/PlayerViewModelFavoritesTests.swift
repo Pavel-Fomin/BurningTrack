@@ -141,7 +141,7 @@ final class PlayerViewModelFavoritesTests: XCTestCase {
         harness.viewModel.play(track: track)
         XCTAssertTrue(harness.viewModel.isCurrentTrackFavorite)
 
-        XCTAssertTrue(harness.playlistManager.clear())
+        XCTAssertNoThrow(try harness.playlistManager.clear())
 
         XCTAssertNil(harness.viewModel.currentTrackDisplayable)
         XCTAssertFalse(harness.viewModel.isCurrentTrackFavorite)

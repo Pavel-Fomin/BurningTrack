@@ -191,6 +191,11 @@ extension AppError {
                 message: TrackDetailPresentationText.metadataReadFailedMessage
             )
 
+        case .trackUpdateConfirmationFailed:
+            return .operationFailed(
+                message: TrackDetailPresentationText.saveFailedMessage
+            )
+
         case .tagWriteFailed:
             return .tagWriteFailed
 

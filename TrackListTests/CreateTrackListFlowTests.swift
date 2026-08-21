@@ -160,8 +160,8 @@ private final class CreateTrackListManagerSpy: TrackListFlowManaging {
     func addTracks(
         _ libraryTracks: [LibraryTrack],
         to trackListId: UUID
-    ) throws -> Bool {
-        true
+    ) throws -> TrackList {
+        makeTrackList(name: "Append target")
     }
 
     private func makeTrackList(name: String) -> TrackList {

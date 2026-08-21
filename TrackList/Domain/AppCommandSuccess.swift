@@ -14,12 +14,20 @@ struct MoveTrackSuccess {
     let trackId: UUID
     let destinationFolderId: UUID
     let destinationFolderName: String?
-    let snapshot: TrackRuntimeSnapshot?
+    let snapshot: TrackRuntimeSnapshot
+}
+
+/// Итог команды перемещения, который не маскирует корректный no-op как success Toast.
+enum MoveTrackCommandResult {
+    case confirmed(MoveTrackSuccess)
+    case unchanged
 }
 
 /// Подтверждает копирование купленного iTunes-трека в фонотеку.
 struct CopyPurchasedITunesTrackSuccess {
     let sourceTrackId: UUID
+    /// Идентичность нового library-трека получена из подтверждённого sync receipt.
+    let importedTrackId: UUID
     let copiedFileURL: URL
     let destinationFolderId: UUID
     let destinationFolderName: String?
@@ -29,7 +37,13 @@ struct CopyPurchasedITunesTrackSuccess {
 struct RenameTrackSuccess {
     let trackId: UUID
     let finalFileName: String
-    let snapshot: TrackRuntimeSnapshot?
+    let snapshot: TrackRuntimeSnapshot
+}
+
+/// Итог команды переименования, который отличает реальное изменение от совпадающего имени.
+enum RenameTrackCommandResult {
+    case confirmed(RenameTrackSuccess)
+    case unchanged
 }
 
 /// Подтверждает добавление одного трека в треклист.
@@ -95,16 +109,22 @@ struct TrackRemovedFromPlayerSuccess {
 /// Подтверждает очистку очереди плеера.
 struct PlayerClearedSuccess {}
 
+/// Разделяет подтверждённую очистку очереди и уже пустую очередь без ложного success UI.
+enum PlayerClearCommandResult {
+    case confirmed(PlayerClearedSuccess)
+    case unchanged
+}
+
 /// Подтверждает сохранение изменений файла, тегов или обложки трека.
 struct TrackEditsSavedSuccess {
     let trackId: UUID
     let finalFileName: String
-    let snapshot: TrackRuntimeSnapshot?
+    let snapshot: TrackRuntimeSnapshot
     let didUpdateTagsOrArtwork: Bool
 }
 
 /// Подтверждает отдельное сохранение тегов или обложки трека.
 struct TrackTagsUpdatedSuccess {
     let trackId: UUID
-    let snapshot: TrackRuntimeSnapshot?
+    let snapshot: TrackRuntimeSnapshot
 }

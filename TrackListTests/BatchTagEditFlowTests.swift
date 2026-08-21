@@ -195,7 +195,10 @@ final class BatchTagEditFlowTests: XCTestCase {
     func testSaveSuccessPreservesToastContract() async {
         let toast = BatchTagToastSpy()
         let executor = BatchTagSaveExecutorSpy(
-            result: BatchTagEditSaveResult(succeededTrackIDs: [UUID()], failures: [])
+            result: BatchTagEditSaveResult(
+                confirmed: [makeConfirmedSaveSuccess(trackId: UUID())],
+                failures: []
+            )
         )
         let viewModel = await makeLoadedViewModel(toast: toast, saveExecutor: executor)
 
@@ -214,7 +217,7 @@ final class BatchTagEditFlowTests: XCTestCase {
         let toast = BatchTagToastSpy()
         let executor = BatchTagSaveExecutorSpy(
             result: BatchTagEditSaveResult(
-                succeededTrackIDs: [flow.tracks[0].trackId],
+                confirmed: [makeConfirmedSaveSuccess(trackId: flow.tracks[0].trackId)],
                 failures: [BatchTagEditSaveFailure(trackId: flow.tracks[1].trackId, error: BatchTagTestError.failed)]
             )
         )
@@ -242,7 +245,7 @@ final class BatchTagEditFlowTests: XCTestCase {
         let toast = BatchTagToastSpy()
         let executor = BatchTagSaveExecutorSpy(
             result: BatchTagEditSaveResult(
-                succeededTrackIDs: [],
+                confirmed: [],
                 failures: [BatchTagEditSaveFailure(trackId: flow.tracks[0].trackId, error: BatchTagTestError.failed)]
             )
         )
@@ -268,7 +271,10 @@ final class BatchTagEditFlowTests: XCTestCase {
     func testReloadRetainsSelectedExistingTrackTarget() async {
         let flow = makeFlow()
         let executor = BatchTagSaveExecutorSpy(
-            result: BatchTagEditSaveResult(succeededTrackIDs: [flow.tracks[0].trackId], failures: [])
+            result: BatchTagEditSaveResult(
+                confirmed: [makeConfirmedSaveSuccess(trackId: flow.tracks[0].trackId)],
+                failures: []
+            )
         )
         let viewModel = await makeLoadedViewModel(flow: flow, saveExecutor: executor)
         let selectedTrackID = flow.tracks[0].trackId
@@ -286,7 +292,10 @@ final class BatchTagEditFlowTests: XCTestCase {
         let reloadedFlow = makeFlow(trackIDs: [originalFlow.tracks[1].trackId])
         let loader = BatchTagMetadataLoaderSpy(flows: [originalFlow, reloadedFlow])
         let executor = BatchTagSaveExecutorSpy(
-            result: BatchTagEditSaveResult(succeededTrackIDs: [originalFlow.tracks[0].trackId], failures: [])
+            result: BatchTagEditSaveResult(
+                confirmed: [makeConfirmedSaveSuccess(trackId: originalFlow.tracks[0].trackId)],
+                failures: []
+            )
         )
         let viewModel = await makeLoadedViewModel(
             flow: originalFlow,
@@ -521,13 +530,57 @@ private final class BatchTagDelayedMetadataLoaderSpy: BatchTagEditMetadataLoadin
 private final class BatchTagSaveExecutorSpy: BatchTagEditSaveExecuting {
     private let result: BatchTagEditSaveResult
 
-    init(result: BatchTagEditSaveResult = BatchTagEditSaveResult(succeededTrackIDs: [], failures: [])) {
+    init(result: BatchTagEditSaveResult = BatchTagEditSaveResult(confirmed: [], failures: [])) {
         self.result = result
     }
 
     func execute(plan: BatchTagEditSavePlan) async -> BatchTagEditSaveResult {
         result
     }
+}
+
+/// Создаёт receipt, который batch использует только для подтверждённого сохранения одного трека.
+private func makeConfirmedSaveSuccess(trackId: UUID) -> BatchTagEditSaveSuccess {
+    BatchTagEditSaveSuccess(
+        trackId: trackId,
+        snapshot: TrackRuntimeSnapshot(
+            trackId: trackId,
+            fileName: "Track.flac",
+            isAvailable: true,
+            technicalMetadata: TrackTechnicalMetadata(
+                fileSizeBytes: nil,
+                fileFormat: "FLAC",
+                bitrateBitsPerSecond: nil
+            ),
+            title: "Track",
+            artist: "Artist",
+            album: nil,
+            albumArtist: nil,
+            genre: nil,
+            comment: nil,
+            composer: nil,
+            conductor: nil,
+            lyricist: nil,
+            remixer: nil,
+            grouping: nil,
+            bpm: nil,
+            musicalKey: nil,
+            trackNumber: nil,
+            totalTracks: nil,
+            discNumber: nil,
+            totalDiscs: nil,
+            year: nil,
+            date: nil,
+            publisherOrLabel: nil,
+            copyright: nil,
+            encodedBy: nil,
+            isrc: nil,
+            duration: nil,
+            artworkData: nil,
+            artworkSourceIdentifier: nil,
+            updatedAt: Date(timeIntervalSince1970: 0)
+        )
+    )
 }
 
 @MainActor

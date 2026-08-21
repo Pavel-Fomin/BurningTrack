@@ -313,12 +313,7 @@ final class TrackDetailViewModel: ObservableObject {
         case let .saved(snapshot):
             pendingExternalSnapshot = nil
             editSession = nil
-
-            if let snapshot {
-                applySnapshot(snapshot)
-            } else {
-                rebuildState(mode: .view, isSaving: false, alert: nil)
-            }
+            applySnapshot(snapshot)
 
         case let .keepEditing(alert):
             rebuildState(isSaving: false, alert: alert)

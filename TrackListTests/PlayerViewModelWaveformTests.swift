@@ -369,7 +369,7 @@ final class PlayerViewModelWaveformTests: XCTestCase {
             in: harness.viewModel
         )
 
-        XCTAssertTrue(harness.playlistManager.clear())
+        XCTAssertNoThrow(try harness.playlistManager.clear())
 
         XCTAssertEqual(harness.viewModel.waveformState, .unavailable)
         XCTAssertNil(harness.viewModel.currentTrackDisplayable)

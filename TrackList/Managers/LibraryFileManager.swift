@@ -30,6 +30,14 @@ enum LibraryFileError: Error {
 
 }
 
+/// Результат файлового слоя до post-update: изменения либо не потребовались.
+enum TrackFileMutationOutcome: Sendable {
+    /// Файл и связанные реестры записаны и прошли финальную проверку persistence.
+    case confirmed
+    /// Команда валидна, но целевой путь уже совпадает с исходным.
+    case unchanged
+}
+
 /// Менеджер, отвечающий за операции с физическими файлами треков.
 /// Не занимается UI и не знает про дерево LibraryFolder.
 ///
@@ -51,7 +59,7 @@ actor LibraryFileManager {
         id trackId: UUID,
         toFolder destinationFolderId: UUID,
         using fileBusyChecker: any TrackFileBusyChecking
-    ) async throws {
+    ) async throws -> TrackFileMutationOutcome {
 
         // 1. Запрещаем перемещение файла, если он сейчас занят плеером.
         guard await fileBusyChecker.isTrackFileBusy(trackId: trackId) == false else {
@@ -88,7 +96,7 @@ actor LibraryFileManager {
         // Если путь не меняется — выходим тихо
         if sourceURL == destinationURL {
             print("ℹ️ moveTrack: исходный и целевой URL совпадают, операция пропущена")
-            return
+            return .unchanged
         }
 
         // 6. Проверяем, нет ли файла с таким именем в целевой папке
@@ -126,62 +134,77 @@ actor LibraryFileManager {
             throw LibraryFileError.moveFailed(underlying: error)
         }
 
-        // 9. Создаём новый bookmark для обновлённого пути
-        guard let newBookmarkBase64 = BookmarkResolver.makeBookmarkBase64(for: destinationURL) else {
-            throw LibraryFileError.bookmarkCreationFailed
-        }
+        do {
+            // 9. Создаём новый bookmark для обновлённого пути
+            guard let newBookmarkBase64 = BookmarkResolver.makeBookmarkBase64(for: destinationURL) else {
+                throw LibraryFileError.bookmarkCreationFailed
+            }
 
-        await BookmarksRegistry.shared.upsertTrackBookmark(
-            id: trackId,
-            base64: newBookmarkBase64
-        )
+            await BookmarksRegistry.shared.upsertTrackBookmark(
+                id: trackId,
+                base64: newBookmarkBase64
+            )
 
-        // 10. Строим новый relativePath относительно прикреплённого корня назначения.
-        let newRelativePath = try makeRelativePath(
-            fileURL: destinationURL,
-            rootFolderURL: destinationRootFolderURL
-        )
-        // После перемещения размер обновляется из атрибута уже нового файла.
-        let fileSize = LibraryFileSizeResolver.fileSize(for: destinationURL)
+            // 10. Строим новый relativePath относительно прикреплённого корня назначения.
+            let newRelativePath = try makeRelativePath(
+                fileURL: destinationURL,
+                rootFolderURL: destinationRootFolderURL
+            )
+            // После перемещения размер обновляется из атрибута уже нового файла.
+            let fileSize = LibraryFileSizeResolver.fileSize(for: destinationURL)
 
-        // 11. Обновляем метаданные трека в реестре
-        await TrackRegistry.shared.upsertTrack(
-            id: trackId,
-            fileName: fileName,
-            relativePath: newRelativePath,
-            folderId: destinationFolderId,
-            rootFolderId: destinationRootFolderId,
-            fileDate: entry.fileDate,
-            fileSize: fileSize,
-            shouldUpdateFileSize: true
-        )
+            // 11. Обновляем метаданные трека в реестре
+            await TrackRegistry.shared.upsertTrack(
+                id: trackId,
+                fileName: fileName,
+                relativePath: newRelativePath,
+                folderId: destinationFolderId,
+                rootFolderId: destinationRootFolderId,
+                fileDate: entry.fileDate,
+                fileSize: fileSize,
+                shouldUpdateFileSize: true
+            )
 
-        // 12. Обновляем library identity:
-        // старый путь убираем, новый путь привязываем к тому же trackId
-        if entry.source == .library,
-           let rootFolderId = entry.rootFolderId,
-           let relativePath = entry.relativePath {
-            try await TrackIdentityResolver.shared.unbindLibraryTrack(
-                rootFolderId: rootFolderId,
-                relativePath: relativePath
+            // 12. Обновляем library identity:
+            // старый путь убираем, новый путь привязываем к тому же trackId
+            if entry.source == .library,
+               let rootFolderId = entry.rootFolderId,
+               let relativePath = entry.relativePath {
+                try await TrackIdentityResolver.shared.unbindLibraryTrack(
+                    rootFolderId: rootFolderId,
+                    relativePath: relativePath
+                )
+            }
+
+            try await TrackIdentityResolver.shared.bindLibraryTrack(
+                id: trackId,
+                rootFolderId: destinationRootFolderId,
+                relativePath: newRelativePath
+            )
+
+            if entry.source == .imported {
+                // После переноса imported-файла в фонотеку его path-identity больше не должен работать как imported.
+                try await TrackIdentityResolver.shared.forgetTrack(id: trackId)
+            }
+
+            // Сохраняем изменения после физического перемещения файла.
+            // Если запись реестров не прошла, операция не должна считаться успешной.
+            try await BookmarksRegistry.shared.throwPendingPersistenceError()
+            try await TrackRegistry.shared.throwPendingPersistenceError()
+            return .confirmed
+        } catch let error as LibraryFileError {
+            throw MutationFailure(
+                stage: .persist,
+                appError: appError(forPersistFailure: error, fallback: .fileMoveFailed),
+                recovery: .physicalChangeCompleted
+            )
+        } catch {
+            throw MutationFailure(
+                stage: .persist,
+                appError: .fileMoveFailed,
+                recovery: .physicalChangeCompleted
             )
         }
-
-        try await TrackIdentityResolver.shared.bindLibraryTrack(
-            id: trackId,
-            rootFolderId: destinationRootFolderId,
-            relativePath: newRelativePath
-        )
-
-        if entry.source == .imported {
-            // После переноса imported-файла в фонотеку его path-identity больше не должен работать как imported.
-            try await TrackIdentityResolver.shared.forgetTrack(id: trackId)
-        }
-
-        // Сохраняем изменения после физического перемещения файла.
-        // Если запись реестров не прошла, операция не должна считаться успешной.
-        try await BookmarksRegistry.shared.throwPendingPersistenceError()
-        try await TrackRegistry.shared.throwPendingPersistenceError()
     }
 
     // MARK: - Переименование файла
@@ -194,8 +217,8 @@ actor LibraryFileManager {
         id trackId: UUID,
         to newFileName: String,
         using fileBusyChecker: any TrackFileBusyChecking
-    ) async throws {
-        
+    ) async throws -> TrackFileMutationOutcome {
+
         // 1. Запрещаем переименование файла, если он сейчас занят плеером.
         guard await fileBusyChecker.isTrackFileBusy(trackId: trackId) == false else {
             throw LibraryFileError.trackIsPlaying
@@ -217,7 +240,7 @@ actor LibraryFileManager {
         // Если имя не поменялось — ничего не делаем
         if sourceURL == destinationURL {
             print("ℹ️ renameTrack: исходный и целевой URL совпадают, операция пропущена")
-            return
+            return .unchanged
         }
         
         // Проверяем, нет ли файла с таким именем
@@ -240,76 +263,91 @@ actor LibraryFileManager {
             throw LibraryFileError.moveFailed(underlying: error)
         }
         
-        // 5. Новый bookmark для нового имени
-        guard let newBookmarkBase64 = BookmarkResolver.makeBookmarkBase64(for: destinationURL) else {
-            throw LibraryFileError.bookmarkCreationFailed
-        }
-        
-        await BookmarksRegistry.shared.upsertTrackBookmark(
-            id: trackId,
-            base64: newBookmarkBase64
-        )
-        
-        if entry.source == .library {
-            // 6. Получаем rootURL, чтобы корректно пересчитать relativePath.
-            guard let rootFolderId = entry.rootFolderId,
-                  let folderId = entry.folderId,
-                  let oldRelativePath = entry.relativePath,
-                  let rootFolderURL = await BookmarkResolver.url(forFolder: rootFolderId)
-            else {
-                throw LibraryFileError.destinationFolderUnavailable
+        do {
+            // 5. Новый bookmark для нового имени
+            guard let newBookmarkBase64 = BookmarkResolver.makeBookmarkBase64(for: destinationURL) else {
+                throw LibraryFileError.bookmarkCreationFailed
             }
 
-            let newRelativePath = try makeRelativePath(
-                fileURL: destinationURL,
-                rootFolderURL: rootFolderURL
-            )
-            // После переименования размер обновляется из атрибута файла по новому URL.
-            let fileSize = LibraryFileSizeResolver.fileSize(for: destinationURL)
-
-            // 7. Обновляем реестры фонотеки.
-            await TrackRegistry.shared.upsertTrack(
+            await BookmarksRegistry.shared.upsertTrackBookmark(
                 id: trackId,
-                fileName: newFileName,
-                relativePath: newRelativePath,
-                folderId: folderId,
-                rootFolderId: rootFolderId,
-                fileDate: entry.fileDate,
-                fileSize: fileSize,
-                shouldUpdateFileSize: true
+                base64: newBookmarkBase64
             )
 
-            // 8. Обновляем library identity:
-            // старый путь убираем, новый путь привязываем к тому же trackId.
-            try await TrackIdentityResolver.shared.unbindLibraryTrack(
-                rootFolderId: rootFolderId,
-                relativePath: oldRelativePath
-            )
+            if entry.source == .library {
+                // 6. Получаем rootURL, чтобы корректно пересчитать relativePath.
+                guard let rootFolderId = entry.rootFolderId,
+                      let folderId = entry.folderId,
+                      let oldRelativePath = entry.relativePath,
+                      let rootFolderURL = await BookmarkResolver.url(forFolder: rootFolderId)
+                else {
+                    throw LibraryFileError.destinationFolderUnavailable
+                }
 
-            try await TrackIdentityResolver.shared.bindLibraryTrack(
-                id: trackId,
-                rootFolderId: rootFolderId,
-                relativePath: newRelativePath
-            )
-        } else {
-            // 6. Imported-трек остаётся вне фонотеки: обновляем только SQLite metadata и imported identity.
-            await TrackRegistry.shared.upsertImportedTrack(
-                id: trackId,
-                fileName: newFileName,
-                fileURL: destinationURL,
-                fileDate: entry.fileDate
-            )
+                let newRelativePath = try makeRelativePath(
+                    fileURL: destinationURL,
+                    rootFolderURL: rootFolderURL
+                )
+                // После переименования размер обновляется из атрибута файла по новому URL.
+                let fileSize = LibraryFileSizeResolver.fileSize(for: destinationURL)
 
-            try await TrackIdentityResolver.shared.replaceImportedTrackIdentity(
-                id: trackId,
-                url: destinationURL
+                // 7. Обновляем реестры фонотеки.
+                await TrackRegistry.shared.upsertTrack(
+                    id: trackId,
+                    fileName: newFileName,
+                    relativePath: newRelativePath,
+                    folderId: folderId,
+                    rootFolderId: rootFolderId,
+                    fileDate: entry.fileDate,
+                    fileSize: fileSize,
+                    shouldUpdateFileSize: true
+                )
+
+                // 8. Обновляем library identity:
+                // старый путь убираем, новый путь привязываем к тому же trackId.
+                try await TrackIdentityResolver.shared.unbindLibraryTrack(
+                    rootFolderId: rootFolderId,
+                    relativePath: oldRelativePath
+                )
+
+                try await TrackIdentityResolver.shared.bindLibraryTrack(
+                    id: trackId,
+                    rootFolderId: rootFolderId,
+                    relativePath: newRelativePath
+                )
+            } else {
+                // 6. Imported-трек остаётся вне фонотеки: обновляем только SQLite metadata и imported identity.
+                await TrackRegistry.shared.upsertImportedTrack(
+                    id: trackId,
+                    fileName: newFileName,
+                    fileURL: destinationURL,
+                    fileDate: entry.fileDate
+                )
+
+                try await TrackIdentityResolver.shared.replaceImportedTrackIdentity(
+                    id: trackId,
+                    url: destinationURL
+                )
+            }
+
+            // Сохраняем изменения после физического переименования файла.
+            // Если запись реестров не прошла, операция не должна считаться успешной.
+            try await BookmarksRegistry.shared.throwPendingPersistenceError()
+            try await TrackRegistry.shared.throwPendingPersistenceError()
+            return .confirmed
+        } catch let error as LibraryFileError {
+            throw MutationFailure(
+                stage: .persist,
+                appError: appError(forPersistFailure: error, fallback: .fileRenameFailed),
+                recovery: .physicalChangeCompleted
+            )
+        } catch {
+            throw MutationFailure(
+                stage: .persist,
+                appError: .fileRenameFailed,
+                recovery: .physicalChangeCompleted
             )
         }
-        
-        // Сохраняем изменения после физического переименования файла.
-        // Если запись реестров не прошла, операция не должна считаться успешной.
-        try await BookmarksRegistry.shared.throwPendingPersistenceError()
-        try await TrackRegistry.shared.throwPendingPersistenceError()
     }
     
     // MARK: - Вспомогательное
@@ -338,5 +376,20 @@ actor LibraryFileManager {
         }
 
         return String(filePath.dropFirst(rootPath.count))
+    }
+
+    /// Переводит техническую persist-ошибку в безопасную пользовательскую причину.
+    private func appError(
+        forPersistFailure error: LibraryFileError,
+        fallback: AppError
+    ) -> AppError {
+        switch error {
+        case .bookmarkCreationFailed:
+            return .bookmarkCreateFailed
+        case .destinationFolderUnavailable:
+            return .libraryFolderUnavailable
+        default:
+            return fallback
+        }
     }
 }

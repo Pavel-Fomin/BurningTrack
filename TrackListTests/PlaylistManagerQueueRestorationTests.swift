@@ -20,7 +20,11 @@ final class PlaylistManagerQueueRestorationTests: XCTestCase {
         let manager = PlaylistManager(databaseStore: store, loadsInitialQueue: false)
 
         store.onFetchQueue = {
-            XCTAssertTrue(manager.addTracks([addedTrack]))
+            do {
+                _ = try manager.addTracks([addedTrack])
+            } catch {
+                XCTFail("Ожидалось подтверждённое сохранение очереди: \(error)")
+            }
         }
 
         manager.reloadQueueAfterLibraryAccessRestored()
@@ -35,7 +39,7 @@ final class PlaylistManagerQueueRestorationTests: XCTestCase {
         let store = PlayerQueuePersistenceSpy(queue: [stalePersistedTrack])
         let manager = PlaylistManager(databaseStore: store, loadsInitialQueue: false)
 
-        XCTAssertTrue(manager.addTracks([addedTrack]))
+        XCTAssertNoThrow(try manager.addTracks([addedTrack]))
         manager.reloadQueueAfterLibraryAccessRestored()
 
         XCTAssertEqual(manager.tracks, [addedTrack])
@@ -50,7 +54,11 @@ final class PlaylistManagerQueueRestorationTests: XCTestCase {
         let manager = PlaylistManager(databaseStore: store)
 
         store.onFetchQueue = {
-            XCTAssertTrue(manager.addTracks([addedTrack]))
+            do {
+                _ = try manager.addTracks([addedTrack])
+            } catch {
+                XCTFail("Ожидалось подтверждённое сохранение очереди: \(error)")
+            }
         }
 
         manager.reloadQueueAfterLibraryAccessRestored()
@@ -66,7 +74,11 @@ final class PlaylistManagerQueueRestorationTests: XCTestCase {
         let manager = PlaylistManager(databaseStore: store)
 
         store.onFetchQueue = {
-            XCTAssertTrue(manager.remove(at: 0))
+            do {
+                _ = try manager.remove(at: 0)
+            } catch {
+                XCTFail("Ожидалось подтверждённое удаление из очереди: \(error)")
+            }
         }
 
         manager.reloadQueueAfterLibraryAccessRestored()
@@ -83,7 +95,11 @@ final class PlaylistManagerQueueRestorationTests: XCTestCase {
 
         store.onFetchQueue = {
             manager.tracks.swapAt(0, 1)
-            XCTAssertTrue(manager.saveQueue())
+            do {
+                _ = try manager.saveQueue()
+            } catch {
+                XCTFail("Ожидалось подтверждённое сохранение очереди: \(error)")
+            }
         }
 
         manager.reloadQueueAfterLibraryAccessRestored()
@@ -179,7 +195,11 @@ final class PlaylistManagerQueueRestorationTests: XCTestCase {
         let manager = PlaylistManager(databaseStore: store)
 
         store.onFetchQueue = {
-            XCTAssertTrue(manager.clear())
+            do {
+                _ = try manager.clear()
+            } catch {
+                XCTFail("Ожидалась подтверждённая очистка очереди: \(error)")
+            }
         }
 
         manager.reloadQueueAfterLibraryAccessRestored()

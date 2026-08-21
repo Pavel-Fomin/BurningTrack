@@ -110,13 +110,11 @@ final class FavoritesService: FavoritesServicing {
         _ tracks: [Track],
         for trackListId: UUID
     ) throws {
-        guard trackListManager.saveTracks(
+        _ = try trackListManager.saveTracks(
             tracks,
             for: trackListId,
             publishesFavoritesEvents: false
-        ) else {
-            throw AppError.trackListSaveFailed
-        }
+        )
     }
 
     /// Публикует ровно одно событие после успешного сохранения и только при фактическом изменении состояния.

@@ -433,7 +433,20 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding, Li
                 return
             }
 
-            await musicLibraryManager.syncFolderIfNeeded(folderId: folderId)
+            do {
+                let syncOutcome = try await musicLibraryManager.syncFolderIfNeeded(
+                    folderId: folderId
+                )
+                if case .skipped(let reason) = syncOutcome {
+                    PersistentLogger.log(
+                        "LibraryTracksViewModel: фоновый sync пропущен folderId=\(folderId) reason=\(reason)"
+                    )
+                }
+            } catch {
+                PersistentLogger.log(
+                    "LibraryTracksViewModel: фоновый sync не подтверждён folderId=\(folderId) error=\(error)"
+                )
+            }
 
             guard Task.isCancelled == false,
                   self?.isCurrentRefresh(refreshGeneration) == true,

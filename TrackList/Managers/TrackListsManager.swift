@@ -231,15 +231,15 @@ final class TrackListsManager {
     /// Добавляет треки из фонотеки в существующий треклист.
     /// Повторное добавление одного и того же трека разрешено.
     @discardableResult
-    func addTracks(_ libraryTracks: [LibraryTrack], to trackListId: UUID) throws -> Bool {
-        guard !libraryTracks.isEmpty else { return true }
+    func addTracks(_ libraryTracks: [LibraryTrack], to trackListId: UUID) throws -> TrackList {
+        guard !libraryTracks.isEmpty else {
+            return try TrackListManager.shared.getTrackListById(trackListId)
+        }
 
         // Конвертация остаётся на уровне manager-а списка треклистов,
         // а сохранение строк делегируется TrackListManager.
         let newTracks = libraryTracks.map { Track(libraryTrack: $0) }
-        try TrackListManager.shared.addTracks(newTracks, to: trackListId)
-
-        return true
+        return try TrackListManager.shared.addTracks(newTracks, to: trackListId)
     }
     
     // MARK: - Удаление и переименование

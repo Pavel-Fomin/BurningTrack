@@ -15,15 +15,15 @@ protocol TrackListManaging {
     /// Загружает треки конкретного треклиста.
     func loadTracks(for id: UUID) throws -> [Track]
 
-    /// Сохраняет треки конкретного треклиста.
-    func saveTracks(_ tracks: [Track], for id: UUID) -> Bool
+    /// Сохраняет треки конкретного треклиста и возвращает receipt только после SQLite persist.
+    func saveTracks(_ tracks: [Track], for id: UUID) throws -> TrackListTracksSaveReceipt
 
     /// Сохраняет треки конкретного треклиста с явным выбором публикации точечных событий Favorites.
     func saveTracks(
         _ tracks: [Track],
         for id: UUID,
         publishesFavoritesEvents: Bool
-    ) -> Bool
+    ) throws -> TrackListTracksSaveReceipt
 }
 
 extension TrackListManaging {
@@ -33,7 +33,7 @@ extension TrackListManaging {
         _ tracks: [Track],
         for id: UUID,
         publishesFavoritesEvents: Bool
-    ) -> Bool {
-        saveTracks(tracks, for: id)
+    ) throws -> TrackListTracksSaveReceipt {
+        try saveTracks(tracks, for: id)
     }
 }

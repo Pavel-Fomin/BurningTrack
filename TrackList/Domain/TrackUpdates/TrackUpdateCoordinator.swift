@@ -51,19 +51,19 @@ final class TrackUpdateCoordinator: Sendable {
     ///   - trackId: Идентификатор трека
     ///   - reason: Причина обновления
     ///   - changedFields: Набор изменённых полей
-    /// - Returns: Готовое событие обновления или nil, если snapshot не удалось собрать
+    /// - Returns: Готовое событие только после подтверждённого сохранения нового snapshot.
     func handleTrackUpdate(
         forTrackId trackId: UUID,
         reason: TrackUpdateReason,
         changedFields: Set<TrackChangedField>,
         previousURL: URL? = nil
-    ) async throws -> TrackUpdateEvent? {
-        guard let updateEvent = try await prepareTrackUpdate(
+    ) async throws -> TrackUpdateEvent {
+        let updateEvent = try await prepareTrackUpdate(
             forTrackId: trackId,
             reason: reason,
             changedFields: changedFields,
             previousURL: previousURL
-        ) else { return nil }
+        )
 
         // Публикуем событие только после успешного сохранения snapshot metadata в SQLite.
         await Self.publishTrackUpdateEvent(updateEvent)
@@ -95,7 +95,7 @@ final class TrackUpdateCoordinator: Sendable {
         reason: TrackUpdateReason,
         changedFields: Set<TrackChangedField>,
         previousURL: URL? = nil
-    ) async throws -> TrackUpdateEvent? {
+    ) async throws -> TrackUpdateEvent {
         try await makeTrackUpdateEvent(
             forTrackId: trackId,
             reason: reason,
@@ -110,14 +110,13 @@ final class TrackUpdateCoordinator: Sendable {
 
         for update in updates {
             do {
-                if let event = try await prepareTrackUpdate(
+                let event = try await prepareTrackUpdate(
                     forTrackId: update.trackId,
                     reason: .fileRenamed,
                     changedFields: [.fileName],
                     previousURL: update.previousURL
-                ) {
-                    events.append(event)
-                }
+                )
+                events.append(event)
             } catch {
                 // Batch-сценарий получает trackId ошибки и не публикует подготовленные события до полного успеха.
                 throw TrackUpdateCoordinatorError.updateFailed(
@@ -141,7 +140,7 @@ final class TrackUpdateCoordinator: Sendable {
         reason: TrackUpdateReason,
         changedFields: Set<TrackChangedField>,
         previousURL: URL? = nil
-    ) async throws -> TrackUpdateEvent? {
+    ) async throws -> TrackUpdateEvent {
 
         // Последний валидный snapshot остаётся доступен потребителям до готовности его замены.
         // Это не даёт параллельным feature увидеть промежуточное пустое runtime-состояние.
@@ -150,7 +149,9 @@ final class TrackUpdateCoordinator: Sendable {
         )
 
         // Получаем актуальный URL трека через существующий bookmark pipeline.
-        guard let url = await BookmarkResolver.url(forTrack: trackId) else { return nil }
+        guard let url = await BookmarkResolver.url(forTrack: trackId) else {
+            throw AppError.bookmarkResolveFailed
+        }
 
         // Сбрасываем runtime-кэши перед повторной сборкой snapshot.
         await invalidateRuntimeCaches(
@@ -162,7 +163,8 @@ final class TrackUpdateCoordinator: Sendable {
 
         // Пересобираем каноничный snapshot трека.
         guard let builtSnapshot = try await TrackRuntimeSnapshotBuilder.shared.buildSnapshot(forTrackId: trackId) else {
-            return nil
+            // Физическое изменение без нового сохранённого snapshot не подтверждает mutation-команду.
+            throw AppError.trackUpdateConfirmationFailed
         }
 
         // Технический reader может быть кратковременно недоступен сразу после записи тегов.

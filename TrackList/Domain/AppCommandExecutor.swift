@@ -43,6 +43,10 @@ final class AppCommandExecutor {
     private let trackFolderNameResolver: any TrackFolderNameResolving
     /// Пишет теги только внутри ownership того же физического файла.
     private let tagsWriter: any TagsWriter
+    /// Копирует iTunes-ассет до отдельного подтверждения его регистрации в библиотеке.
+    private let purchasedITunesTrackCopier: any PurchasedITunesTrackCopying
+    /// Синхронизирует корень и возвращает отличимый confirmed либо skipped outcome.
+    private let libraryRootSyncer: any LibraryRootSyncing
 
     static let shared = AppCommandExecutor()
 
@@ -56,7 +60,9 @@ final class AppCommandExecutor {
         trackFileURLResolver: any TrackFileURLResolving = BookmarkTrackFileURLResolver(),
         trackPostUpdateHandler: any TrackPostUpdateHandling = TrackUpdateCoordinator.shared,
         trackFolderNameResolver: any TrackFolderNameResolving = TrackRegistryFolderNameResolver(),
-        tagsWriter: any TagsWriter = TagLibTagsWriter()
+        tagsWriter: any TagsWriter = TagLibTagsWriter(),
+        purchasedITunesTrackCopier: any PurchasedITunesTrackCopying = PurchasedITunesTrackCopyManager.shared,
+        libraryRootSyncer: any LibraryRootSyncing = LibrarySyncModule.shared
     ) {
         self.trackFileOperationCoordinator = trackFileOperationCoordinator
         self.trackFileManager = trackFileManager
@@ -64,6 +70,8 @@ final class AppCommandExecutor {
         self.trackPostUpdateHandler = trackPostUpdateHandler
         self.trackFolderNameResolver = trackFolderNameResolver
         self.tagsWriter = tagsWriter
+        self.purchasedITunesTrackCopier = purchasedITunesTrackCopier
+        self.libraryRootSyncer = libraryRootSyncer
     }
     
     // MARK: - Переместить трек
@@ -72,23 +80,26 @@ final class AppCommandExecutor {
         trackId: UUID,
         toFolder folderId: UUID,
         using fileBusyChecker: any TrackFileBusyChecking
-    ) async throws -> MoveTrackSuccess {
+    ) async throws -> MoveTrackCommandResult {
         try await trackFileOperationCoordinator.run(trackId: trackId) {
             // Bookmark читается только после получения ownership, иначе он мог бы устареть в очереди.
             let previousURL = await self.trackFileURLResolver.url(forTrackId: trackId)
 
             do {
-                try await self.trackFileManager.moveTrack(
+                let fileMutation = try await self.trackFileManager.moveTrack(
                     id: trackId,
                     toFolder: folderId,
                     using: fileBusyChecker
                 )
+                guard case .confirmed = fileMutation else {
+                    return .unchanged
+                }
             } catch let libraryError as LibraryFileError {
                 throw appError(from: libraryError, fallback: .fileMoveFailed)
             }
 
             // Владение удерживается до конца post-update, чтобы другой command не увидел промежуточный path.
-            let updateEvent = try await self.trackPostUpdateHandler.handleTrackUpdate(
+            let updateEvent = try await self.confirmedTrackUpdate(
                 forTrackId: trackId,
                 reason: .fileMoved,
                 changedFields: [.fileName],
@@ -96,11 +107,13 @@ final class AppCommandExecutor {
             )
 
             let folderName = await self.trackFolderNameResolver.folderName(forFolderId: folderId)
-            return MoveTrackSuccess(
-                trackId: trackId,
-                destinationFolderId: folderId,
-                destinationFolderName: folderName,
-                snapshot: updateEvent?.snapshot
+            return .confirmed(
+                MoveTrackSuccess(
+                    trackId: trackId,
+                    destinationFolderId: folderId,
+                    destinationFolderName: folderName,
+                    snapshot: updateEvent.snapshot
+                )
             )
         }
     }
@@ -115,28 +128,54 @@ final class AppCommandExecutor {
         toFolder folderId: UUID
     ) async throws -> CopyPurchasedITunesTrackSuccess {
         do {
-            let result = try await PurchasedITunesTrackCopyManager.shared.copy(
+            let result = try await purchasedITunesTrackCopier.copy(
                 track,
                 toFolder: folderId
             )
 
             // После физического копирования используем общий sync-путь фонотеки,
             // чтобы новый файл попал в TrackRegistry и BookmarksRegistry.
-            try await LibrarySyncModule.shared.syncRootFolder(
+            let syncOutcome = try await libraryRootSyncer.syncRootFolder(
                 rootFolderId: result.rootFolderId,
                 rootURL: result.rootFolderURL,
-                mode: .safe
+                mode: .safe,
+                logsDatabaseDiagnostics: true
             )
+
+            guard case let .confirmed(syncReceipt) = syncOutcome,
+                  let relativePath = relativePath(
+                    for: result.fileURL,
+                    rootURL: result.rootFolderURL
+                  ),
+                  let importedTrackId = syncReceipt.trackId(forRelativePath: relativePath)
+            else {
+                // Копия файла без подтверждённой записи в реестрах не является успешным импортом.
+                throw MutationFailure(
+                    stage: .confirm,
+                    appError: .purchasedITunesCopyFailed,
+                    recovery: .confirmationMissing
+                )
+            }
 
             return CopyPurchasedITunesTrackSuccess(
                 sourceTrackId: track.trackId,
+                importedTrackId: importedTrackId,
                 copiedFileURL: result.fileURL,
                 destinationFolderId: result.folderId,
                 destinationFolderName: result.folderName
             )
+        } catch let failure as MutationFailure {
+            PersistentLogger.log(
+                "AppCommandExecutor: iTunes copy не подтверждён stage=\(failure.stage) recovery=\(failure.recovery)"
+            )
+            throw failure
         } catch {
             print("❌ copyPurchasedITunesTrack failed:", error)
-            throw AppError.purchasedITunesCopyFailed
+            throw MutationFailure(
+                stage: .perform,
+                appError: .purchasedITunesCopyFailed,
+                recovery: .untouched
+            )
         }
     }
     
@@ -147,32 +186,37 @@ final class AppCommandExecutor {
         trackId: UUID,
         to newFileName: String,
         using fileBusyChecker: any TrackFileBusyChecking
-    ) async throws -> RenameTrackSuccess {
+    ) async throws -> RenameTrackCommandResult {
         try await trackFileOperationCoordinator.run(trackId: trackId) {
             // Старый URL нужен post-update и должен отражать состояние после всех предыдущих команд этого трека.
             let previousURL = await self.trackFileURLResolver.url(forTrackId: trackId)
 
             do {
-                try await self.trackFileManager.renameTrack(
+                let fileMutation = try await self.trackFileManager.renameTrack(
                     id: trackId,
                     to: newFileName,
                     using: fileBusyChecker
                 )
+                guard case .confirmed = fileMutation else {
+                    return .unchanged
+                }
             } catch let libraryError as LibraryFileError {
                 throw appError(from: libraryError, fallback: .fileRenameFailed)
             }
 
-            let updateEvent = try await self.trackPostUpdateHandler.handleTrackUpdate(
+            let updateEvent = try await self.confirmedTrackUpdate(
                 forTrackId: trackId,
                 reason: .fileRenamed,
                 changedFields: [.fileName],
                 previousURL: previousURL
             )
 
-            return RenameTrackSuccess(
-                trackId: trackId,
-                finalFileName: updateEvent?.snapshot.fileName ?? newFileName,
-                snapshot: updateEvent?.snapshot
+            return .confirmed(
+                RenameTrackSuccess(
+                    trackId: trackId,
+                    finalFileName: updateEvent.snapshot.fileName,
+                    snapshot: updateEvent.snapshot
+                )
             )
         }
     }
@@ -200,26 +244,31 @@ final class AppCommandExecutor {
                     do {
                         // Batch получил ownership заранее, поэтому bookmark читается после завершения внешних команд этих треков.
                         let previousURL = await self.trackFileURLResolver.url(forTrackId: command.trackId)
-                        try await self.trackFileManager.renameTrack(
+                        let fileMutation = try await self.trackFileManager.renameTrack(
                             id: command.trackId,
                             to: command.targetFileName,
                             using: fileBusyChecker
                         )
+                        guard case .confirmed = fileMutation else {
+                            throw MutationFailure(
+                                stage: .perform,
+                                appError: .fileRenameFailed,
+                                recovery: .untouched
+                            )
+                        }
 
-                        let updateEvent = try await self.trackPostUpdateHandler.prepareTrackUpdate(
+                        let updateEvent = try await self.preparedTrackUpdate(
                             forTrackId: command.trackId,
                             reason: .fileRenamed,
                             changedFields: [.fileName],
                             previousURL: previousURL
                         )
-                        if let updateEvent {
-                            updateEvents.append(updateEvent)
-                        }
+                        updateEvents.append(updateEvent)
                         succeeded.append(
                             BatchFilenameRenameSuccess(
                                 trackId: command.trackId,
                                 oldFileName: command.currentFileName,
-                                newFileName: command.targetFileName
+                                newFileName: updateEvent.snapshot.fileName
                             )
                         )
                     } catch {
@@ -288,9 +337,7 @@ final class AppCommandExecutor {
         list.tracks.append(imported)
         
         /// 4. Сохраняем обновлённый треклист
-        guard TrackListManager.shared.saveTracks(list.tracks, for: list.id) else {
-            throw TrackListStorageError.saveFailed(trackListId: list.id)
-        }
+        _ = try TrackListManager.shared.saveTracks(list.tracks, for: list.id)
         
         return TrackAddedToTrackListSuccess(
             addedTrack: imported,
@@ -449,9 +496,7 @@ final class AppCommandExecutor {
         list.tracks.remove(at: index)
         
         /// 4. Сохраняем только после фактического удаления
-        guard TrackListManager.shared.saveTracks(list.tracks, for: list.id) else {
-            throw TrackListStorageError.saveFailed(trackListId: list.id)
-        }
+        _ = try TrackListManager.shared.saveTracks(list.tracks, for: list.id)
         
         return TrackRemovedFromTrackListSuccess(
             removedTrack: removedTrack,
@@ -466,10 +511,10 @@ final class AppCommandExecutor {
         let importItem = try await makePlayerTrackImportItem(trackId: trackId)
 
         /// 2. Мутация плеера — строго на MainActor.
-        let didSave = await MainActor.run {
-            PlaylistManager.shared.addTracks([importItem.track])
+        let queueOutcome = try await MainActor.run {
+            try PlaylistManager.shared.addTracks([importItem.track])
         }
-        guard didSave else {
+        guard case .confirmed = queueOutcome else {
             throw AppError.playlistSaveFailed
         }
 
@@ -485,10 +530,10 @@ final class AppCommandExecutor {
     ) async throws -> PurchasedITunesTrackAddedToPlayerSuccess {
         let playerTrack = PlayerTrack.make(from: track)
 
-        let didSave = await MainActor.run {
-            PlaylistManager.shared.addTracks([playerTrack])
+        let queueOutcome = try await MainActor.run {
+            try PlaylistManager.shared.addTracks([playerTrack])
         }
-        guard didSave else {
+        guard case .confirmed = queueOutcome else {
             throw AppError.playlistSaveFailed
         }
 
@@ -510,13 +555,13 @@ final class AppCommandExecutor {
         }
 
         let playerTracks = importItems.map { $0.track }
-        let didSave = await MainActor.run {
-            PlaylistManager.shared.addTracks(
+        let queueOutcome = try await MainActor.run {
+            try PlaylistManager.shared.addTracks(
                 playerTracks
             )
         }
 
-        guard didSave else {
+        guard case .confirmed = queueOutcome else {
             throw AppError.playlistSaveFailed
         }
 
@@ -545,30 +590,14 @@ final class AppCommandExecutor {
         }
         
         // 2. Мутация плеера — строго MainActor
-        let removeResult = await MainActor.run {
-            let previousTracks = PlaylistManager.shared.tracks
-            
+        try await MainActor.run {
             guard let index = PlaylistManager.shared.tracks.firstIndex(where: { $0.id == queueItemId }) else {
-                return PlayerTrackRemovalResult.notFound
+                throw AppError.trackNotFound
             }
-            
-            PlaylistManager.shared.tracks.remove(at: index)
-            
-            guard PlaylistManager.shared.saveQueue() else {
-                PlaylistManager.shared.tracks = previousTracks
-                return PlayerTrackRemovalResult.saveFailed
+            let queueOutcome = try PlaylistManager.shared.remove(at: index)
+            guard case .confirmed = queueOutcome else {
+                throw AppError.playlistSaveFailed
             }
-            
-            return PlayerTrackRemovalResult.removed
-        }
-        
-        switch removeResult {
-        case .removed:
-            break
-        case .notFound:
-            throw AppError.trackNotFound
-        case .saveFailed:
-            throw AppError.playlistSaveFailed
         }
         
         return TrackRemovedFromPlayerSuccess(removedTrack: removedTrack)
@@ -577,21 +606,17 @@ final class AppCommandExecutor {
     
     // MARK: - Очистить плеер
     
-    func clearPlayer() async throws -> PlayerClearedSuccess {
-        
-        // 1. Очистка — строго MainActor
-        let didClear = await MainActor.run {
-            let previousTracks = PlaylistManager.shared.tracks
-            PlaylistManager.shared.tracks.removeAll()
-            guard PlaylistManager.shared.saveQueue() else {
-                PlaylistManager.shared.tracks = previousTracks
-                return false
-            }
-            return true
+    func clearPlayer() async throws -> PlayerClearCommandResult {
+        // 1. Очистка остаётся строго MainActor, а пустая очередь не выдаётся за сохранённую мутацию.
+        let queueOutcome = try await MainActor.run {
+            try PlaylistManager.shared.clear()
         }
-        guard didClear else { throw AppError.playlistSaveFailed }
-
-        return PlayerClearedSuccess()
+        switch queueOutcome {
+        case .confirmed:
+            return .confirmed(PlayerClearedSuccess())
+        case .unchanged:
+            return .unchanged
+        }
     }
     
     
@@ -613,11 +638,18 @@ final class AppCommandExecutor {
 
             if fileChanged {
                 do {
-                    try await self.trackFileManager.renameTrack(
+                    let fileMutation = try await self.trackFileManager.renameTrack(
                         id: trackId,
                         to: newFileName,
                         using: fileBusyChecker
                     )
+                    guard case .confirmed = fileMutation else {
+                        throw MutationFailure(
+                            stage: .perform,
+                            appError: .fileRenameFailed,
+                            recovery: .untouched
+                        )
+                    }
                 } catch let libraryError as LibraryFileError {
                     throw appError(from: libraryError, fallback: .fileRenameFailed)
                 }
@@ -668,17 +700,17 @@ final class AppCommandExecutor {
             }
 
             // Ошибка metadata не скрывается, но ownership освобождается только после выхода из post-update.
-            let updateEvent = try await self.trackPostUpdateHandler.handleTrackUpdate(
+            let updateEvent = try await self.confirmedTrackUpdate(
                 forTrackId: trackId,
                 reason: updateReason,
                 changedFields: changedFields,
                 previousURL: previousURL
             )
-            let snapshot = updateEvent?.snapshot
+            let snapshot = updateEvent.snapshot
 
             return TrackEditsSavedSuccess(
                 trackId: trackId,
-                finalFileName: snapshot?.fileName ?? newFileName,
+                finalFileName: snapshot.fileName,
                 snapshot: snapshot,
                 didUpdateTagsOrArtwork: tagsChanged || artworkChanged
             )
@@ -725,7 +757,7 @@ final class AppCommandExecutor {
                 ? .metadataUpdated
                 : .artworkUpdated
 
-            let updateEvent = try await self.trackPostUpdateHandler.handleTrackUpdate(
+            let updateEvent = try await self.confirmedTrackUpdate(
                 forTrackId: trackId,
                 reason: updateReason,
                 changedFields: changedFields,
@@ -734,9 +766,80 @@ final class AppCommandExecutor {
 
             return TrackTagsUpdatedSuccess(
                 trackId: trackId,
-                snapshot: updateEvent?.snapshot
+                snapshot: updateEvent.snapshot
             )
         }
+    }
+}
+
+// MARK: - Подтверждение post-update
+
+private extension AppCommandExecutor {
+
+    /// Выполняет post-update только как завершающий этап уже изменённого файла.
+    func confirmedTrackUpdate(
+        forTrackId trackId: UUID,
+        reason: TrackUpdateReason,
+        changedFields: Set<TrackChangedField>,
+        previousURL: URL?
+    ) async throws -> TrackUpdateEvent {
+        do {
+            return try await trackPostUpdateHandler.handleTrackUpdate(
+                forTrackId: trackId,
+                reason: reason,
+                changedFields: changedFields,
+                previousURL: previousURL
+            )
+        } catch {
+            throw postUpdateFailure(from: error)
+        }
+    }
+
+    /// Подготавливает batch receipt без публикации, не превращая отсутствие подтверждения в успех строки.
+    func preparedTrackUpdate(
+        forTrackId trackId: UUID,
+        reason: TrackUpdateReason,
+        changedFields: Set<TrackChangedField>,
+        previousURL: URL?
+    ) async throws -> TrackUpdateEvent {
+        do {
+            return try await trackPostUpdateHandler.prepareTrackUpdate(
+                forTrackId: trackId,
+                reason: reason,
+                changedFields: changedFields,
+                previousURL: previousURL
+            )
+        } catch {
+            throw postUpdateFailure(from: error)
+        }
+    }
+
+    /// Не маскирует ошибку финального этапа: файл мог быть уже записан, но успех не подтверждён.
+    func postUpdateFailure(from error: Error) -> MutationFailure {
+        if let failure = error as? MutationFailure {
+            return failure
+        }
+
+        if let appError = error as? AppError {
+            if case .trackUpdateConfirmationFailed = appError {
+                return MutationFailure(
+                    stage: .confirm,
+                    appError: appError,
+                    recovery: .confirmationMissing
+                )
+            }
+            return MutationFailure(
+                stage: .persist,
+                appError: appError,
+                recovery: .physicalChangeCompleted
+            )
+        }
+
+        return MutationFailure(
+            stage: .persist,
+            appError: .trackUpdateConfirmationFailed,
+            recovery: .physicalChangeCompleted
+        )
     }
 }
 
@@ -751,13 +854,13 @@ protocol TrackFileOperationManaging: Sendable {
         id trackId: UUID,
         toFolder destinationFolderId: UUID,
         using fileBusyChecker: any TrackFileBusyChecking
-    ) async throws
+    ) async throws -> TrackFileMutationOutcome
 
     func renameTrack(
         id trackId: UUID,
         to newFileName: String,
         using fileBusyChecker: any TrackFileBusyChecking
-    ) async throws
+    ) async throws -> TrackFileMutationOutcome
 }
 
 /// Резолвит URL существующего файла из bookmark после получения ownership.
@@ -777,14 +880,14 @@ protocol TrackPostUpdateHandling: Sendable {
         reason: TrackUpdateReason,
         changedFields: Set<TrackChangedField>,
         previousURL: URL?
-    ) async throws -> TrackUpdateEvent?
+    ) async throws -> TrackUpdateEvent
 
     func prepareTrackUpdate(
         forTrackId trackId: UUID,
         reason: TrackUpdateReason,
         changedFields: Set<TrackChangedField>,
         previousURL: URL?
-    ) async throws -> TrackUpdateEvent?
+    ) async throws -> TrackUpdateEvent
 
     func publishTrackBatchUpdateEvents(_ updateEvents: [TrackUpdateEvent]) async
 }
@@ -814,11 +917,6 @@ extension TrackUpdateCoordinator: TrackPostUpdateHandling {}
 
 /// Результат удаления трека из очереди плеера.
 /// Нужен, чтобы отличать фактическое удаление от ошибки сохранения.
-private enum PlayerTrackRemovalResult {
-    case removed
-    case notFound
-    case saveFailed
-}
 
 /// Подготовленный элемент импорта в очередь плеера.
 /// Хранит runtime-модель очереди и snapshot, использованный при её формировании.
@@ -890,6 +988,17 @@ private func artworkMimeType(for data: Data) -> String {
     }
 
     return "image/jpeg"
+}
+
+/// Строит каноничный относительный путь файла внутри корня для сверки с sync receipt.
+private func relativePath(for fileURL: URL, rootURL: URL) -> String? {
+    let rootPath = rootURL.standardizedFileURL.path.hasSuffix("/")
+        ? rootURL.standardizedFileURL.path
+        : rootURL.standardizedFileURL.path + "/"
+    let filePath = fileURL.standardizedFileURL.path
+
+    guard filePath.hasPrefix(rootPath) else { return nil }
+    return String(filePath.dropFirst(rootPath.count))
 }
 
 // Собирает набор изменённых полей для события обновления тегов и обложки.

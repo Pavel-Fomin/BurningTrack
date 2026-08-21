@@ -12,8 +12,8 @@ import Foundation
 /// Описывает существующую manager-операцию синхронизации папки без передачи ViewModel root ownership.
 @MainActor
 protocol LibraryFolderSyncing: AnyObject {
-    /// Запрашивает manager-level синхронизацию корня, которому принадлежит папка.
-    func syncFolderIfNeeded(folderId: UUID) async
+    /// Возвращает подтверждённый sync либо явную причину безопасного пропуска.
+    func syncFolderIfNeeded(folderId: UUID) async throws -> LibrarySyncOutcome
 }
 
 /// Production-менеджер сохраняет собственную per-root coordination model за узким контрактом.

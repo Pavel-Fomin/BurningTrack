@@ -369,7 +369,10 @@ private final class RenameTrackFileExecutorSpy: RenameTrackFileCommandExecuting 
             return TrackEditsSavedSuccess(
                 trackId: trackId,
                 finalFileName: newFileName,
-                snapshot: nil,
+                snapshot: makeConfirmedRenameSnapshot(
+                    trackId: trackId,
+                    fileName: newFileName
+                ),
                 didUpdateTagsOrArtwork: false
             )
 
@@ -380,6 +383,50 @@ private final class RenameTrackFileExecutorSpy: RenameTrackFileCommandExecuting 
             throw RenameTrackFileTestError.unknown
         }
     }
+}
+
+/// Создаёт новый snapshot, который имитирует только подтверждённое post-update переименования.
+private func makeConfirmedRenameSnapshot(
+    trackId: UUID,
+    fileName: String
+) -> TrackRuntimeSnapshot {
+    TrackRuntimeSnapshot(
+        trackId: trackId,
+        fileName: fileName,
+        isAvailable: true,
+        technicalMetadata: TrackTechnicalMetadata(
+            fileSizeBytes: nil,
+            fileFormat: "MP3",
+            bitrateBitsPerSecond: nil
+        ),
+        title: "Track",
+        artist: "Artist",
+        album: nil,
+        albumArtist: nil,
+        genre: nil,
+        comment: nil,
+        composer: nil,
+        conductor: nil,
+        lyricist: nil,
+        remixer: nil,
+        grouping: nil,
+        bpm: nil,
+        musicalKey: nil,
+        trackNumber: nil,
+        totalTracks: nil,
+        discNumber: nil,
+        totalDiscs: nil,
+        year: nil,
+        date: nil,
+        publisherOrLabel: nil,
+        copyright: nil,
+        encodedBy: nil,
+        isrc: nil,
+        duration: nil,
+        artworkData: nil,
+        artworkSourceIdentifier: nil,
+        updatedAt: Date(timeIntervalSince1970: 0)
+    )
 }
 
 /// Результат, который fake command executor вернёт следующей попытке сохранения.

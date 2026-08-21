@@ -171,11 +171,9 @@ final class TrackDetailActionHandler {
             )
             pendingSaveCommand = nil
 
-            let confirmedSnapshot = result.snapshot
-                ?? snapshotProvider.snapshot(forTrackId: command.trackId)
             return presenter.present(
                 result,
-                confirmedSnapshot: confirmedSnapshot
+                confirmedSnapshot: result.snapshot
             )
         } catch let appError as AppError {
             if case .fileAccessDenied = appError {

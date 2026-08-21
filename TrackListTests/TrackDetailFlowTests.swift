@@ -291,7 +291,10 @@ private final class TrackDetailExecutorSpy: TrackDetailCommandExecuting {
             return TrackEditsSavedSuccess(
                 trackId: trackId,
                 finalFileName: newFileName,
-                snapshot: nil,
+                snapshot: makeConfirmedTrackDetailSnapshot(
+                    trackId: trackId,
+                    fileName: newFileName
+                ),
                 didUpdateTagsOrArtwork: tagsChanged || artworkChanged
             )
 
@@ -299,6 +302,50 @@ private final class TrackDetailExecutorSpy: TrackDetailCommandExecuting {
             throw error
         }
     }
+}
+
+/// Создаёт новый snapshot, который test double возвращает только для confirmed save-result.
+private func makeConfirmedTrackDetailSnapshot(
+    trackId: UUID,
+    fileName: String
+) -> TrackRuntimeSnapshot {
+    TrackRuntimeSnapshot(
+        trackId: trackId,
+        fileName: fileName,
+        isAvailable: true,
+        technicalMetadata: TrackTechnicalMetadata(
+            fileSizeBytes: nil,
+            fileFormat: "MP3",
+            bitrateBitsPerSecond: nil
+        ),
+        title: "Track",
+        artist: "Artist",
+        album: nil,
+        albumArtist: nil,
+        genre: nil,
+        comment: nil,
+        composer: nil,
+        conductor: nil,
+        lyricist: nil,
+        remixer: nil,
+        grouping: nil,
+        bpm: nil,
+        musicalKey: nil,
+        trackNumber: nil,
+        totalTracks: nil,
+        discNumber: nil,
+        totalDiscs: nil,
+        year: nil,
+        date: nil,
+        publisherOrLabel: nil,
+        copyright: nil,
+        encodedBy: nil,
+        isrc: nil,
+        duration: nil,
+        artworkData: nil,
+        artworkSourceIdentifier: nil,
+        updatedAt: Date(timeIntervalSince1970: 0)
+    )
 }
 
 /// Результат следующего вызова fake command executor.

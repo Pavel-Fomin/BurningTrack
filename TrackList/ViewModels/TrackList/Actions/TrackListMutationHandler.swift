@@ -89,12 +89,13 @@ final class TrackListMutationHandler {
             at: adjustedDestination
         )
 
-        guard trackListManager.saveTracks(
-            reorderedTracks,
-            for: reader.trackListId
-        ) else {
+        do {
+            _ = try trackListManager.saveTracks(
+                reorderedTracks,
+                for: reader.trackListId
+            )
+        } catch {
             toastPresenter.handle(.trackListSaveFailed)
-            return
         }
     }
 

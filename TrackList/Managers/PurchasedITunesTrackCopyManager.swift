@@ -33,6 +33,14 @@ struct PurchasedITunesTrackCopyResult {
     let rootFolderURL: URL
 }
 
+/// Узкий контракт физического копирования iTunes-ассета до подтверждения синхронизацией библиотеки.
+protocol PurchasedITunesTrackCopying: Sendable {
+    func copy(
+        _ track: PurchasedITunesPlayableTrack,
+        toFolder destinationFolderId: UUID
+    ) async throws -> PurchasedITunesTrackCopyResult
+}
+
 /// Выполняет физическое копирование runtime iTunes-ассета в папку фонотеки.
 ///
 /// Менеджер не показывает UI, не пишет в TrackRegistry вручную и не использует
@@ -280,3 +288,5 @@ actor PurchasedITunesTrackCopyManager {
         }
     }
 }
+
+extension PurchasedITunesTrackCopyManager: PurchasedITunesTrackCopying {}

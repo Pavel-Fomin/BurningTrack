@@ -604,7 +604,7 @@ final class FavoritesServiceTests: XCTestCase {
             isAvailable: second.isAvailable
         )
 
-        XCTAssertTrue(trackListManager.saveTracks([first, second, secondDuplicate], for: favorites.id))
+        XCTAssertNoThrow(try trackListManager.saveTracks([first, second, secondDuplicate], for: favorites.id))
         XCTAssertEqual(
             eventsRecorder.events,
             [
@@ -623,10 +623,10 @@ final class FavoritesServiceTests: XCTestCase {
             fileName: first.fileName,
             isAvailable: first.isAvailable
         )
-        XCTAssertTrue(trackListManager.saveTracks([second, changedSnapshot, secondDuplicate], for: favorites.id))
+        XCTAssertNoThrow(try trackListManager.saveTracks([second, changedSnapshot, secondDuplicate], for: favorites.id))
         XCTAssertEqual(eventsRecorder.events, [])
 
-        XCTAssertTrue(trackListManager.saveTracks([second], for: favorites.id))
+        XCTAssertNoThrow(try trackListManager.saveTracks([second], for: favorites.id))
         XCTAssertEqual(
             eventsRecorder.events,
             [FavoritesChangeEvent(trackId: first.trackId, isFavorite: false)]
@@ -640,7 +640,7 @@ final class FavoritesServiceTests: XCTestCase {
             tracks: []
         )
         eventsRecorder.removeAll()
-        XCTAssertTrue(trackListManager.saveTracks([first], for: regular.id))
+        XCTAssertNoThrow(try trackListManager.saveTracks([first], for: regular.id))
         XCTAssertEqual(eventsRecorder.events, [])
     }
 
@@ -856,14 +856,17 @@ private final class FavoritesTrackListManagerSpy: TrackListManaging {
         tracksByListId[id] ?? []
     }
 
-    func saveTracks(_ tracks: [Track], for id: UUID) -> Bool {
+    func saveTracks(_ tracks: [Track], for id: UUID) throws -> TrackListTracksSaveReceipt {
         guard allowsSaving else {
-            return false
+            throw AppError.trackListSaveFailed
         }
 
         tracksByListId[id] = tracks
         saveCallCount += 1
-        return true
+        return TrackListTracksSaveReceipt(
+            trackListId: id,
+            savedTracksCount: tracks.count
+        )
     }
 
     func tracks(for id: UUID) -> [Track] {

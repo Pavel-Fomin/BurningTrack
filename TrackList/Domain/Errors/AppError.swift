@@ -9,7 +9,7 @@
 
 import Foundation
 
-enum AppError: Error {
+enum AppError: Error, Sendable, Equatable {
     case fileNotFound
     case fileAccessDenied
     case fileNotPlayable
@@ -47,9 +47,39 @@ enum AppError: Error {
     case playbackFailed
     case audioSessionFailed
     case metadataReadFailed
+    /// Файл изменён, но новое сохранённое состояние трека не удалось подтвердить.
+    case trackUpdateConfirmationFailed
     case tagWriteFailed
     case artworkLoadFailed
     case showInLibraryFailed
     case presenterUnavailable
     case unknown
+}
+
+/// Этап mutation-пайплайна, на котором операция не получила подтверждённый итог.
+enum MutationStage: Sendable, Equatable {
+    case validate
+    case prepare
+    case perform
+    case persist
+    case confirm
+}
+
+/// Состояние внешних изменений к моменту ошибки mutation-пайплайна.
+enum MutationRecoveryState: Sendable, Equatable {
+    /// Операция не изменила внешнее состояние.
+    case untouched
+    /// Файл уже изменён, но зависимые записи ещё не подтверждены.
+    case physicalChangeCompleted
+    /// Все записи завершены, но финальное подтверждение отсутствует.
+    case confirmationMissing
+    /// Security-scoped доступ уже закрыт, хотя удаление связанных записей не подтверждено.
+    case accessReleased
+}
+
+/// Семантическая ошибка изменяющей операции без передачи небезопасного произвольного Error через async-границу.
+struct MutationFailure: Error, Sendable {
+    let stage: MutationStage
+    let appError: AppError
+    let recovery: MutationRecoveryState
 }

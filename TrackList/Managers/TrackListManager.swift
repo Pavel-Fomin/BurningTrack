@@ -12,8 +12,14 @@
 
 import Foundation
 
-enum TrackListStorageError: Error {
+enum TrackListStorageError: Error, Sendable {
     case saveFailed(trackListId: UUID)
+}
+
+/// Подтверждает, что новое содержимое треклиста сохранено в SQLite и опубликовано подписчикам.
+struct TrackListTracksSaveReceipt: Sendable, Equatable {
+    let trackListId: UUID
+    let savedTracksCount: Int
 }
 
 @MainActor
@@ -63,14 +69,13 @@ final class TrackListManager {
         }
     }
     
-    /// Сохраняет треки по ID треклиста в SQLite.
-    @discardableResult
+    /// Сохраняет треки по ID треклиста в SQLite и возвращает receipt только после публикации изменений.
     func saveTracks(
         _ tracks: [Track],
         for id: UUID,
         postTrackListsDidChange: Bool = true,
         publishesFavoritesEvents: Bool = true
-    ) -> Bool {
+    ) throws -> TrackListTracksSaveReceipt {
         do {
             let isFavoritesTrackList: Bool
             if publishesFavoritesEvents {
@@ -103,10 +108,13 @@ final class TrackListManager {
                 )
             }
             PersistentLogger.log("💾 TrackListManager: saved SQLite tracks=\(tracks.count) id=\(id)")
-            return true
+            return TrackListTracksSaveReceipt(
+                trackListId: id,
+                savedTracksCount: tracks.count
+            )
         } catch {
             PersistentLogger.log("❌ TrackListManager: SQLite saveTracks failed id=\(id) tracks=\(tracks.count) error=\(error)")
-            return false
+            throw AppError.trackListSaveFailed
         }
     }
 
@@ -175,9 +183,7 @@ final class TrackListManager {
 
         list.tracks.append(contentsOf: tracksToAdd)
 
-        guard saveTracks(list.tracks, for: list.id) else {
-            throw TrackListStorageError.saveFailed(trackListId: list.id)
-        }
+        _ = try saveTracks(list.tracks, for: list.id)
 
         return list
     }
@@ -195,9 +201,9 @@ final class TrackListManager {
 
 extension TrackListManager: TrackListManaging {
 
-    /// Сохраняет треки и уведомляет об изменении списка треклистов.
-    func saveTracks(_ tracks: [Track], for id: UUID) -> Bool {
-        saveTracks(
+    /// Сохраняет треки и возвращает receipt после уведомления списка треклистов.
+    func saveTracks(_ tracks: [Track], for id: UUID) throws -> TrackListTracksSaveReceipt {
+        try saveTracks(
             tracks,
             for: id,
             postTrackListsDidChange: true,
@@ -210,8 +216,8 @@ extension TrackListManager: TrackListManaging {
         _ tracks: [Track],
         for id: UUID,
         publishesFavoritesEvents: Bool
-    ) -> Bool {
-        saveTracks(
+    ) throws -> TrackListTracksSaveReceipt {
+        try saveTracks(
             tracks,
             for: id,
             postTrackListsDidChange: true,

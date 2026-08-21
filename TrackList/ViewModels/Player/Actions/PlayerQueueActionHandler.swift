@@ -54,10 +54,11 @@ final class PlayerQueueActionHandler {
             fromOffsets: from,
             toOffset: to
         )
-        guard playlistManager.saveQueue() else {
+        do {
+            _ = try playlistManager.saveQueue()
+        } catch {
             playlistManager.tracks = previousTracks
             toastManager.handle(.playlistSaveFailed)
-            return
         }
     }
 
@@ -90,9 +91,11 @@ final class PlayerQueueActionHandler {
         Task {
             do {
                 let result = try await commandExecutor.clearPlayer()
-                AppCommandToastPresenter(
-                    toastPresenter: toastManager
-                ).present(result)
+                if case .confirmed(let success) = result {
+                    AppCommandToastPresenter(
+                        toastPresenter: toastManager
+                    ).present(success)
+                }
             } catch let appError as AppError {
                 AppCommandToastPresenter(
                     toastPresenter: toastManager

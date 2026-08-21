@@ -28,17 +28,22 @@ struct BatchTagEditSaveExecutor {
     func execute(
         plan: BatchTagEditSavePlan
     ) async -> BatchTagEditSaveResult {
-        var succeededTrackIDs: [UUID] = []
+        var confirmed: [BatchTagEditSaveSuccess] = []
         var failures: [BatchTagEditSaveFailure] = []
 
         for command in plan.commands {
             do {
-                _ = try await appCommandExecutor.updateTrackTags(
+                let result = try await appCommandExecutor.updateTrackTags(
                     trackId: command.trackId,
                     patch: command.patch,
                     artworkAction: command.artworkAction
                 )
-                succeededTrackIDs.append(command.trackId)
+                confirmed.append(
+                    BatchTagEditSaveSuccess(
+                        trackId: command.trackId,
+                        snapshot: result.snapshot
+                    )
+                )
             } catch {
                 failures.append(
                     BatchTagEditSaveFailure(
@@ -50,7 +55,7 @@ struct BatchTagEditSaveExecutor {
         }
 
         return BatchTagEditSaveResult(
-            succeededTrackIDs: succeededTrackIDs,
+            confirmed: confirmed,
             failures: failures
         )
     }
