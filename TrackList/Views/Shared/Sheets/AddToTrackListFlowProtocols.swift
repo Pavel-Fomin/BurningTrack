@@ -21,6 +21,8 @@ protocol AddToTrackListTrackListsManaging {
 }
 
 /// Выполняет ID-based и Purchased iTunes-команды добавления треков в треклист.
+/// Команды начинаются в общем MainActor-bound application flow, а файловая работа остаётся у actor-owner-ов.
+@MainActor
 protocol AddToTrackListExecuting {
     /// Добавляет один файловый трек в destination-треклист.
     func addTrackToTrackList(

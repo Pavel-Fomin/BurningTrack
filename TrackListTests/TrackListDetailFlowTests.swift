@@ -1048,8 +1048,8 @@ private actor ControlledRuntimeSnapshotBuilder: TrackRuntimeSnapshotBuilding {
     }
 }
 
-/// Возвращает последовательность summary результатов без SQLite provider-а.
-private final class DetailSummaryProvider: TrackCollectionSummaryProviding, @unchecked Sendable {
+/// Actor возвращает последовательность summary результатов без SQLite provider-а.
+private actor DetailSummaryProvider: TrackCollectionSummaryProviding {
     private var outcomes: [Result<TrackCollectionSummary, Error>]
 
     init(outcomes: [Result<TrackCollectionSummary, Error>] = []) {

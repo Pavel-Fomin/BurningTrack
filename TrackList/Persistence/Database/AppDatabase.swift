@@ -10,7 +10,10 @@
 import Foundation
 
 // Открывает SQLite один раз за жизненный цикл приложения и запускает миграции.
-final class AppDatabase {
+/// Синхронный фасад пересекает actor-ы без раскрытия SQLite handle: `lock` охраняет
+/// создание, закрытие и чтение connection/executor/URL, а DatabaseExecutor сериализует
+/// сами SQL-вызовы. `close()` вызывается только в lifecycle без активных Store.
+final class AppDatabase: @unchecked Sendable {
     static let shared = AppDatabase(
         location: DatabaseLocation(),
         migrator: DatabaseMigrator(migrations: DatabaseMigration.all)
@@ -22,7 +25,14 @@ final class AppDatabase {
     private var connection: DatabaseConnection?
     private var activeExecutor: DatabaseExecutor?
 
-    private(set) var databaseURL: URL?
+    private var storedDatabaseURL: URL?
+
+    /// Возвращает последний открытый URL под тем же lock, что и lifecycle соединения.
+    var databaseURL: URL? {
+        lock.lock()
+        defer { lock.unlock() }
+        return storedDatabaseURL
+    }
 
     init(location: DatabaseLocation, migrator: DatabaseMigrator) {
         self.location = location
@@ -72,7 +82,7 @@ final class AppDatabase {
 
             connection = openedConnection
             activeExecutor = DatabaseExecutor(connection: openedConnection)
-            databaseURL = url
+            storedDatabaseURL = url
         } catch {
             try? openedConnection.close()
             throw error

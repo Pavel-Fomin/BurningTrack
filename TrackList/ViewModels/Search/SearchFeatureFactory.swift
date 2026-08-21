@@ -13,6 +13,9 @@ struct SearchFeatureFactory {
 
     /// Доменный сервис поиска, подготовленный Composition Root.
     private let searchService: any SearchServicing
+    /// Runtime dependencies передаются feature-фабрике для isolated controller-а поиска.
+    private let runtimeSnapshotStore: any TrackRuntimeSnapshotStoring
+    private let runtimeSnapshotBuilder: any TrackRuntimeSnapshotBuilding
     /// Настройки отображения результатов, подготовленные Composition Root.
     private let settingsManager: any SettingsManaging
     /// Презентер ошибок поиска, подготовленный Composition Root.
@@ -41,6 +44,8 @@ struct SearchFeatureFactory {
     /// Получает готовые production-зависимости и не разрешает singleton самостоятельно.
     init(
         searchService: any SearchServicing,
+        runtimeSnapshotStore: any TrackRuntimeSnapshotStoring,
+        runtimeSnapshotBuilder: any TrackRuntimeSnapshotBuilding,
         settingsManager: any SettingsManaging,
         toastPresenter: any ToastPresenting,
         favoriteTrackIdsProvider: any FavoriteTrackIdsProviding,
@@ -55,6 +60,8 @@ struct SearchFeatureFactory {
         commandToastPresenter: AppCommandToastPresenter
     ) {
         self.searchService = searchService
+        self.runtimeSnapshotStore = runtimeSnapshotStore
+        self.runtimeSnapshotBuilder = runtimeSnapshotBuilder
         self.settingsManager = settingsManager
         self.toastPresenter = toastPresenter
         self.favoriteTrackIdsProvider = favoriteTrackIdsProvider
@@ -73,7 +80,10 @@ struct SearchFeatureFactory {
     func makeScreenStore() -> SearchScreenStore {
         let viewModel = SearchViewModel(
             searchService: searchService,
-            runtimeController: LibraryTrackRuntimeController(),
+            runtimeController: LibraryTrackRuntimeController(
+                runtimeSnapshotStore: runtimeSnapshotStore,
+                runtimeSnapshotBuilder: runtimeSnapshotBuilder
+            ),
             settingsManager: settingsManager,
             favoriteTrackIdsProvider: favoriteTrackIdsProvider,
             playbackStateProvider: playbackStateProvider,

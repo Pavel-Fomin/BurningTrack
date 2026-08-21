@@ -156,11 +156,11 @@ final class PlayerScreenViewModel: ObservableObject {
         collectionNavigationTargetLoadTask?.cancel()
 
         collectionNavigationTargetLoadTask = Task { [weak self] in
-            let metadataByTrackId = await trackRegistry.cachedMetadata(
+            guard let self else { return }
+            let metadataByTrackId = await self.trackRegistry.cachedMetadata(
                 forTrackIds: Array(trackIds)
             )
             guard Task.isCancelled == false,
-                  let self,
                   self.collectionNavigationTargetTrackIds == trackIds else {
                 return
             }

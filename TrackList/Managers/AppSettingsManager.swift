@@ -96,13 +96,13 @@ final class AppSettingsManager: ObservableObject, SettingsManaging, PlaybackMode
         }
     }
 
-    func setTagReadingEnabled(_ value: Bool) {
+    func setTagReadingEnabled(_ value: Bool) async {
         guard settings.visible.metadata.isTagReadingEnabled != value else { return }
 
         settings.visible.metadata.isTagReadingEnabled = value
         save()
 
-        TrackMetadataCacheManager.shared.invalidateAll()
+        await TrackMetadataCacheManager.shared.invalidateAll()
         TrackRuntimeStore.shared.removeAllSnapshots()
         NotificationCenter.default.post(name: .appSettingsDidChange, object: nil)
     }

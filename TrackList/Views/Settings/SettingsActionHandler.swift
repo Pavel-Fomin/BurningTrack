@@ -22,7 +22,13 @@ final class SettingsActionHandler {
     func handle(_ action: SettingsAction) {
         switch action {
         case .setTagReadingEnabled(let value):
-            settingsManager.setTagReadingEnabled(value)
+            let settingsManager = settingsManager
+
+            // Из синхронного SwiftUI action запускаем завершённый async settings-flow.
+            // Сам manager публикует appSettingsDidChange только после logical invalidation raw metadata cache.
+            Task {
+                await settingsManager.setTagReadingEnabled(value)
+            }
 
         case .setTrackListMembershipVisible(let value):
             settingsManager.setTrackListMembershipVisible(value)

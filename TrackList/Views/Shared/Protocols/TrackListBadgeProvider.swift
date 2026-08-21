@@ -10,6 +10,8 @@
 import Foundation
 
 
+/// Индекс бейджей обновляется из UI-событий, поэтому чтение принадлежит MainActor.
+@MainActor
 protocol TrackListBadgeProvider {
     func badges(for trackIds: [UUID]) -> [UUID: [TrackListMembership]]
 }

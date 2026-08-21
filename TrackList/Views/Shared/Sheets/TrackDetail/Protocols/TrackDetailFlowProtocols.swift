@@ -18,7 +18,8 @@ protocol TrackDetailSnapshotProviding: AnyObject {
 }
 
 /// Собирает runtime snapshot для локального или purchased iTunes источника.
-protocol TrackDetailSnapshotBuilding: AnyObject {
+/// Builder передаётся только как stateless Sendable dependency между async-границами.
+protocol TrackDetailSnapshotBuilding: AnyObject, Sendable {
     /// Собирает snapshot локального файлового трека.
     func buildSnapshot(forTrackId trackId: UUID) async throws -> TrackRuntimeSnapshot?
     /// Собирает snapshot purchased iTunes-трека без bookmark pipeline.
@@ -28,12 +29,14 @@ protocol TrackDetailSnapshotBuilding: AnyObject {
 }
 
 /// Резолвит URL файлового трека только для presentation пути.
-protocol TrackDetailFileURLResolving {
+protocol TrackDetailFileURLResolving: Sendable {
     /// Возвращает текущий URL локального трека через существующий bookmark pipeline.
     func fileURL(forTrackId trackId: UUID) async -> URL?
 }
 
 /// Выполняет существующую атомарную команду сохранения изменений трека.
+/// Command flow начинается на MainActor и передаёт длительную работу существующим actor-owner-ам.
+@MainActor
 protocol TrackDetailCommandExecuting {
     /// Сохраняет имя файла, теги и artwork через общий command pipeline.
     func saveTrackEdits(
@@ -69,7 +72,7 @@ extension TrackRuntimeStore: TrackDetailSnapshotProviding {}
 extension TrackRuntimeSnapshotBuilder: TrackDetailSnapshotBuilding {}
 
 /// Адаптирует существующий статический BookmarkResolver к feature-local контракту.
-struct BookmarkTrackDetailFileURLResolver: TrackDetailFileURLResolving {
+struct BookmarkTrackDetailFileURLResolver: Sendable, TrackDetailFileURLResolving {
     func fileURL(forTrackId trackId: UUID) async -> URL? {
         await BookmarkResolver.url(forTrack: trackId)
     }

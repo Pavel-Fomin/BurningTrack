@@ -11,16 +11,47 @@ import Foundation
 import MediaPlayer
 
 /// Одноразово сообщает MainActor о подготовленном локальном файле, не передавая AVPlayer или внутреннее состояние менеджера.
-typealias PlayerPreparedLocalFileHandler = @MainActor (PlayerPreparedLocalFile) -> Void
+typealias PlayerPreparedLocalFileHandler = @MainActor @Sendable (PlayerPreparedLocalFile) -> Void
+
+/// Отличает конкретный запуск playback от business identity трека, который может повторно выбираться пользователем.
+struct PlaybackRequestID: Hashable, Sendable {
+
+    /// Значение создаётся единственным владельцем lifecycle — PlayerManager.
+    let rawValue: UUID
+
+    /// Формирует новую identity только для начала нового пользовательского playback-запроса.
+    init() {
+        rawValue = UUID()
+    }
+}
+
+/// Явно сообщает ViewModel, что поздний запрос не изменил runtime-состояние актуального playback.
+enum PlaybackStartResult: Equatable, Sendable {
+    /// Запрос подготовил и установил свой AVPlayerItem.
+    case started
+    /// Запрос устарел после suspension boundary и освободил только свои временные ресурсы.
+    case superseded
+}
 
 /// Описывает только playback API, который реально нужен PlayerViewModel.
+@MainActor
 protocol PlayerManaging: AnyObject {
 
-    /// Запускает воспроизведение и сообщает о готовом локальном файле до ожидания длительности asset.
+    /// Регистрирует новое пользовательское намерение и инвалидирует все незавершённые более старые запуски.
+    func beginPlaybackRequest() -> PlaybackRequestID
+
+    /// Возвращает актуальность identity, которой владеет фактический AVPlayer lifecycle.
+    func isCurrentPlaybackRequest(_ requestID: PlaybackRequestID) -> Bool
+
+    /// Инвалидирует request только если он всё ещё принадлежит текущему lifecycle.
+    func invalidatePlaybackRequest(_ requestID: PlaybackRequestID)
+
+    /// Запускает воспроизведение для уже зарегистрированного request и сообщает о supersession без ложной ошибки.
     func play(
+        requestID: PlaybackRequestID,
         track: any TrackDisplayable,
         onPreparedLocalFile: @escaping PlayerPreparedLocalFileHandler
-    ) async throws
+    ) async throws -> PlaybackStartResult
 
     /// Продолжает воспроизведение текущего AVPlayerItem.
     func playCurrent()
@@ -44,22 +75,22 @@ protocol PlayerManaging: AnyObject {
     func preparedLocalFileURL(for trackId: UUID) -> URL?
 
     /// Подписывает внешний слой на обновления прогресса воспроизведения.
-    func observeProgress(update: @escaping (TimeInterval) -> Void)
+    func observeProgress(update: @escaping @MainActor @Sendable (TimeInterval) -> Void)
 
     /// Удаляет time observer прогресса воспроизведения.
     func removeTimeObserver()
 
     /// Настраивает обработчики системного Remote Command Center.
     func setupRemoteCommandCenter(
-        onPlay: @escaping () -> Void,
-        onPause: @escaping () -> Void,
-        onNext: @escaping () -> Void,
-        onPrevious: @escaping () -> Void
+        onPlay: @escaping @MainActor @Sendable () -> Void,
+        onPause: @escaping @MainActor @Sendable () -> Void,
+        onNext: @escaping @MainActor @Sendable () -> Void,
+        onPrevious: @escaping @MainActor @Sendable () -> Void
     )
 
     /// Настраивает единственный обработчик системной команды «Избранное».
     func configureFavoriteCommand(
-        handler: @escaping @MainActor (Bool) -> MPRemoteCommandHandlerStatus
+        handler: @escaping @MainActor @Sendable (Bool) -> MPRemoteCommandHandlerStatus
     )
 
     /// Синхронизирует доступность и подтверждённое состояние системной команды «Избранное».
@@ -85,6 +116,19 @@ protocol PlayerManaging: AnyObject {
 }
 
 extension PlayerManaging {
+    /// Изолированные старые doubles не владеют AVPlayer lifecycle и считают собственный запрос актуальным.
+    func beginPlaybackRequest() -> PlaybackRequestID {
+        PlaybackRequestID()
+    }
+
+    /// Default нужен только простым doubles, которые не моделируют конкурентные запросы.
+    func isCurrentPlaybackRequest(_: PlaybackRequestID) -> Bool {
+        true
+    }
+
+    /// Простые doubles не удерживают отдельный request-state.
+    func invalidatePlaybackRequest(_: PlaybackRequestID) {}
+
     /// Тестовые реализации могут ограничиться уже существующим освобождением security-scoped доступа.
     func releaseCurrentTrackForFileOperation() {
         pause()
@@ -99,7 +143,7 @@ extension PlayerManaging {
 
     /// Подмены PlayerManager в изолированных тестах не обязаны регистрировать глобальную системную команду.
     func configureFavoriteCommand(
-        handler: @escaping @MainActor (Bool) -> MPRemoteCommandHandlerStatus
+        handler: @escaping @MainActor @Sendable (Bool) -> MPRemoteCommandHandlerStatus
     ) {}
 
     /// Подмены PlayerManager в изолированных тестах не обязаны хранить состояние глобальной системной команды.

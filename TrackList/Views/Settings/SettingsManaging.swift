@@ -14,7 +14,7 @@ protocol SettingsManaging: AnyObject {
     var settings: AppSettings { get }
     var settingsPublisher: Published<AppSettings>.Publisher { get }
 
-    func setTagReadingEnabled(_ value: Bool)
+    func setTagReadingEnabled(_ value: Bool) async
     func setTrackListMembershipVisible(_ value: Bool)
     func setFileFormatVisible(_ value: Bool)
     func setPurchasedITunesSourceVisible(_ value: Bool)

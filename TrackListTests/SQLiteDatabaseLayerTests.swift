@@ -386,6 +386,7 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
         XCTAssertTrue(foreignKeyViolations.isEmpty)
     }
 
+    @MainActor
     func testCanonicalLocalTrackIDFlowsThroughSearchTrackListAndPlayerQueueAfterReload() async throws {
         let database = try makeDatabase()
         let executor = try database.databaseExecutor()

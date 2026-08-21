@@ -15,13 +15,14 @@ enum SearchServiceError: Error {
 
 }
 
-// Контракт доменного сервиса поиска.
-protocol SearchServicing {
+// Контракт доменного сервиса поиска. Результат и запрос являются immutable Sendable значениями.
+protocol SearchServicing: Sendable {
     func search(query: String) async throws -> SearchResults
 }
 
 // Выполняет поиск без чтения аудиофайлов, TagLib и runtime metadata.
-final class SearchService: SearchServicing {
+/// Сервис хранит только actor- или MainActor-isolated зависимости и не имеет собственного mutable state.
+final class SearchService: Sendable, SearchServicing {
     private let trackRegistry: TrackRegistry
     private let trackListBadgeIndex: TrackListBadgeIndex
     private let trackListsManager: TrackListsManager
@@ -71,9 +72,9 @@ final class SearchService: SearchServicing {
             }
         let trackIds = tracks.map(\.id)
         let cachedMetadataByTrackId = await trackRegistry.cachedMetadata(forTrackIds: trackIds)
-        let trackListMembershipsByTrackId = trackListBadgeIndex.badges(for: trackIds)
+        let trackListMembershipsByTrackId = await trackListBadgeIndex.badges(for: trackIds)
         let folderResults = folderEntries.compactMap(Self.folderResult)
-        let trackListResults = try trackListSearchResults()
+        let trackListResults = try await trackListSearchResults()
 
         try await trackRegistry.throwPendingPersistenceError()
 
@@ -119,20 +120,25 @@ final class SearchService: SearchServicing {
     }
 
     /// Собирает результаты треклистов через существующий manager-слой треклистов.
-    private func trackListSearchResults() throws -> [SearchTrackListResult] {
-        try trackListsManager.loadTrackListMetas()
-            .map { meta in
-                let tracks = try trackListManager.loadTracks(for: meta.id)
-                let trackList = TrackList(
-                    id: meta.id,
-                    name: meta.name,
-                    createdAt: meta.createdAt,
-                    kind: meta.kind,
-                    tracks: tracks
-                )
+    private func trackListSearchResults() async throws -> [SearchTrackListResult] {
+        let metas = try await trackListsManager.loadTrackListMetas()
+        var results: [SearchTrackListResult] = []
+        results.reserveCapacity(metas.count)
 
-                return SearchTrackListResult(trackList: trackList)
-            }
+        for meta in metas {
+            let tracks = try await trackListManager.loadTracks(for: meta.id)
+            let trackList = TrackList(
+                id: meta.id,
+                name: meta.name,
+                createdAt: meta.createdAt,
+                kind: meta.kind,
+                tracks: tracks
+            )
+
+            results.append(SearchTrackListResult(trackList: trackList))
+        }
+
+        return results
     }
 
     /// Преобразует SQLite-папку фонотеки в результат поиска без искусственных fallback-названий.

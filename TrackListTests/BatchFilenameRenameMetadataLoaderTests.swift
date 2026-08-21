@@ -10,11 +10,11 @@
 import XCTest
 @testable import TrackList
 
-/// Проверяет production limiter через internal @testable границу без раскрытия public API.
+/// Проверяет общий production limiter через internal @testable границу без раскрытия public API.
 @MainActor
 final class BatchFilenameRenameMetadataLoaderTests: XCTestCase {
     func testCancelledWaitingTaskDoesNotConsumeReleasedSlot() async {
-        let limiter = BatchFilenameRenameAsyncLimiter(limit: 6)
+        let limiter = AsyncConcurrencyLimiter(limit: 6)
         await acquireAllSlots(of: limiter)
 
         let cancelledWaiter = Task {
@@ -35,7 +35,7 @@ final class BatchFilenameRenameMetadataLoaderTests: XCTestCase {
     }
 
     func testMultipleCancelledWaitersRestoreEntireCapacity() async {
-        let limiter = BatchFilenameRenameAsyncLimiter(limit: 6)
+        let limiter = AsyncConcurrencyLimiter(limit: 6)
         await acquireAllSlots(of: limiter)
 
         let cancelledWaiters = (0..<4).map { _ in
@@ -64,7 +64,7 @@ final class BatchFilenameRenameMetadataLoaderTests: XCTestCase {
     }
 
     func testSequentialCancelledSessionsRestoreCapacityForNewLoads() async {
-        let limiter = BatchFilenameRenameAsyncLimiter(limit: 6)
+        let limiter = AsyncConcurrencyLimiter(limit: 6)
 
         for _ in 0..<3 {
             await acquireAllSlots(of: limiter)
@@ -88,7 +88,7 @@ final class BatchFilenameRenameMetadataLoaderTests: XCTestCase {
 
     /// Занимает весь production limit перед управляемой отменой waiter-а.
     private func acquireAllSlots(
-        of limiter: BatchFilenameRenameAsyncLimiter
+        of limiter: AsyncConcurrencyLimiter
     ) async {
         for _ in 0..<6 {
             let acquiredSlot = await limiter.acquire()
@@ -98,7 +98,7 @@ final class BatchFilenameRenameMetadataLoaderTests: XCTestCase {
 
     /// Освобождает известное число занятых слотов после каждого тестового сценария.
     private func releaseRemainingSlots(
-        of limiter: BatchFilenameRenameAsyncLimiter,
+        of limiter: AsyncConcurrencyLimiter,
         count: Int
     ) {
         for _ in 0..<count {
@@ -109,7 +109,7 @@ final class BatchFilenameRenameMetadataLoaderTests: XCTestCase {
     /// Ожидает постановку continuation в очередь через счётчик production limiter-а без sleep.
     private func waitForWaiterCount(
         _ expectedCount: Int,
-        in limiter: BatchFilenameRenameAsyncLimiter
+        in limiter: AsyncConcurrencyLimiter
     ) async {
         for _ in 0..<128 {
             if limiter.waiterCount >= expectedCount {

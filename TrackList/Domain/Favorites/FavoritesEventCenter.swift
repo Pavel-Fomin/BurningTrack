@@ -11,6 +11,7 @@ import Combine
 import Foundation
 
 /// Передаёт изменения Favorites через принятый в приложении NotificationCenter, не храня их состояние.
+@MainActor
 final class FavoritesEventCenter: FavoritesEvents {
 
     /// Общий экземпляр на весь жизненный цикл приложения.

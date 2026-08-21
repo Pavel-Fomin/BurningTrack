@@ -13,7 +13,7 @@ import Foundation
 /// Контракт намеренно не предоставляет playback-команды, UI-состояние или AVPlayer.
 /// Production-provider — PlayerManager; Domain получает capability вместо конкретного manager-типа.
 @MainActor
-protocol TrackFileBusyChecking: AnyObject {
+protocol TrackFileBusyChecking: AnyObject, Sendable {
 
     /// Возвращает признак использования файла трека активным плеером.
     func isTrackFileBusy(trackId: UUID) -> Bool

@@ -516,7 +516,9 @@ private final class BatchTagDelayedMetadataLoaderSpy: BatchTagEditMetadataLoadin
     }
 }
 
-private actor BatchTagSaveExecutorSpy: BatchTagEditSaveExecuting {
+/// MainActor-double соответствует единой точке запуска batch-команды.
+@MainActor
+private final class BatchTagSaveExecutorSpy: BatchTagEditSaveExecuting {
     private let result: BatchTagEditSaveResult
 
     init(result: BatchTagEditSaveResult = BatchTagEditSaveResult(succeededTrackIDs: [], failures: [])) {

@@ -23,6 +23,8 @@ enum PurchasedITunesMusicAccessState: Equatable {
 }
 
 /// Контракт чтения системной медиатеки позволяет ViewModel тестировать сортировку без MediaPlayer.
+/// MediaPlayer и UIKit остаются на MainActor, поэтому provider не передаётся в фоновые задачи.
+@MainActor
 protocol PurchasedITunesMusicProviding {
     /// Возвращает текущий статус без неявного системного запроса доступа.
     func accessState() -> PurchasedITunesMusicAccessState

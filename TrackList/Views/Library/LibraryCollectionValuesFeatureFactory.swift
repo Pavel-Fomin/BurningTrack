@@ -16,13 +16,20 @@ struct LibraryCollectionValuesFeatureFactory {
     private let trackRegistry: TrackRegistry
     /// Состояние плеера требуется только для реактивной album-подсветки.
     private let playbackStateProvider: any PlaybackStateProviding
+    /// Runtime dependencies поступают из Composition Root, а не разрешаются в destination.
+    private let runtimeSnapshotStore: any TrackRuntimeSnapshotStoring
+    private let runtimeSnapshotBuilder: any TrackRuntimeSnapshotBuilding
 
     init(
         trackRegistry: TrackRegistry,
-        playbackStateProvider: any PlaybackStateProviding
+        playbackStateProvider: any PlaybackStateProviding,
+        runtimeSnapshotStore: any TrackRuntimeSnapshotStoring,
+        runtimeSnapshotBuilder: any TrackRuntimeSnapshotBuilding
     ) {
         self.trackRegistry = trackRegistry
         self.playbackStateProvider = playbackStateProvider
+        self.runtimeSnapshotStore = runtimeSnapshotStore
+        self.runtimeSnapshotBuilder = runtimeSnapshotBuilder
     }
 
     /// Возвращает контейнер одного destination с устойчивой identity категории.
@@ -53,7 +60,10 @@ struct LibraryCollectionValuesFeatureFactory {
         return LibraryCollectionValuesScreenStore(
             viewModel: viewModel,
             actionHandler: actionHandler,
-            runtimeController: LibraryTrackRuntimeController(),
+            runtimeController: LibraryTrackRuntimeController(
+                runtimeSnapshotStore: runtimeSnapshotStore,
+                runtimeSnapshotBuilder: runtimeSnapshotBuilder
+            ),
             playbackStateProvider: playbackStateProvider
         )
     }

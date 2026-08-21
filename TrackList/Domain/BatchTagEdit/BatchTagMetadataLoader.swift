@@ -18,21 +18,33 @@ import Foundation
 /// - собирает BatchTagEditFlow через BatchTagEditFlowBuilder;
 /// - не знает про UI, SheetManager и сохранение тегов.
 struct BatchTagMetadataLoader {
-    /// Хранилище runtime-снимков.
-    private let runtimeStore: TrackRuntimeStore
-    /// Builder runtime-снимка.
-    private let snapshotBuilder: TrackRuntimeSnapshotBuilder
     /// Ограничивает число параллельных загрузок снимков.
-    private let limiter: BatchTagMetadataAsyncLimiter
+    private let limiter: AsyncConcurrencyLimiter
+    /// Выполняет чтение одного снимка после получения limiter slot.
+    private let snapshotLoadingOperation: @Sendable (UUID) async -> TrackRuntimeSnapshot?
 
     init(
         runtimeStore: TrackRuntimeStore,
         snapshotBuilder: TrackRuntimeSnapshotBuilder,
         concurrentLimit: Int = 6
     ) {
-        self.runtimeStore = runtimeStore
-        self.snapshotBuilder = snapshotBuilder
-        self.limiter = BatchTagMetadataAsyncLimiter(limit: concurrentLimit)
+        self.limiter = AsyncConcurrencyLimiter(limit: concurrentLimit)
+        self.snapshotLoadingOperation = { trackID in
+            await Self.loadSnapshot(
+                trackID: trackID,
+                runtimeStore: runtimeStore,
+                snapshotBuilder: snapshotBuilder
+            )
+        }
+    }
+
+    /// Позволяет тестировать TaskGroup и limiter с управляемым runtime pipeline без файловой системы.
+    init(
+        concurrentLimit: Int,
+        snapshotLoadingOperation: @escaping @Sendable (UUID) async -> TrackRuntimeSnapshot?
+    ) {
+        self.limiter = AsyncConcurrencyLimiter(limit: concurrentLimit)
+        self.snapshotLoadingOperation = snapshotLoadingOperation
     }
 
     /// Загружает metadata и возвращает готовый flow массового редактирования тегов.
@@ -48,30 +60,33 @@ struct BatchTagMetadataLoader {
 
     /// Загружает снимки для выбранных треков.
     private func loadSnapshots(trackIDs: [UUID]) async -> [TrackRuntimeSnapshot] {
-        let runtimeStore = runtimeStore
-        let snapshotBuilder = snapshotBuilder
         let limiter = limiter
+        let snapshotLoadingOperation = snapshotLoadingOperation
+
+        guard !Task.isCancelled else { return [] }
 
         return await withTaskGroup(of: TrackRuntimeSnapshot?.self) { group in
             for trackID in trackIDs {
+                guard !Task.isCancelled else { break }
+
                 group.addTask {
-                    await limiter.acquire()
-                    defer {
-                        // `defer` не поддерживает `await`, поэтому освобождение слота передаётся actor после завершения чтения.
-                        Task {
-                            await limiter.release()
-                        }
+                    guard !Task.isCancelled else { return nil }
+
+                    return await limiter.withSlot {
+                        // Отмена после выдачи слота всё равно оставляет withSlot единственным owner-ом release.
+                        guard !Task.isCancelled else { return nil }
+                        return await snapshotLoadingOperation(trackID)
                     }
-                    return await loadSnapshot(
-                        trackID: trackID,
-                        runtimeStore: runtimeStore,
-                        snapshotBuilder: snapshotBuilder
-                    )
                 }
             }
 
             var snapshots: [TrackRuntimeSnapshot] = []
             for await snapshot in group {
+                guard !Task.isCancelled else {
+                    group.cancelAll()
+                    return []
+                }
+
                 if let snapshot {
                     snapshots.append(snapshot)
                 }
@@ -81,45 +96,24 @@ struct BatchTagMetadataLoader {
     }
 
     /// Загружает снимок одного трека.
-    private func loadSnapshot(
+    private static func loadSnapshot(
         trackID: UUID,
         runtimeStore: TrackRuntimeStore,
         snapshotBuilder: TrackRuntimeSnapshotBuilder
     ) async -> TrackRuntimeSnapshot? {
+        guard !Task.isCancelled else { return nil }
+
         if let storedSnapshot = await runtimeStore.snapshot(forTrackId: trackID) {
             return storedSnapshot
         }
 
-        guard let builtSnapshot = try? await snapshotBuilder.buildSnapshot(forTrackId: trackID) else {
+        guard !Task.isCancelled,
+              let builtSnapshot = try? await snapshotBuilder.buildSnapshot(forTrackId: trackID),
+              !Task.isCancelled else {
             return nil
         }
 
         await runtimeStore.storeSnapshot(builtSnapshot)
         return builtSnapshot
-    }
-}
-
-/// Ограничитель параллельных асинхронных операций.
-private actor BatchTagMetadataAsyncLimiter {
-    /// Максимальное количество одновременных операций.
-    private let limit: Int
-    /// Текущее количество активных операций.
-    private var running = 0
-
-    init(limit: Int) {
-        self.limit = limit
-    }
-
-    /// Ожидает свободный слот.
-    func acquire() async {
-        while running >= limit {
-            await Task.yield()
-        }
-        running += 1
-    }
-
-    /// Освобождает слот.
-    func release() {
-        running = max(0, running - 1)
     }
 }

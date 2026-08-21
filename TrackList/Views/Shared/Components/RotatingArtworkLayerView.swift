@@ -10,6 +10,7 @@
 import SwiftUI
 import UIKit
 
+@MainActor
 struct RotatingArtworkView: UIViewRepresentable {
     let image: UIImage
     let isActive: Bool
@@ -43,6 +44,8 @@ struct RotatingArtworkView: UIViewRepresentable {
 
 // MARK: -  Координатор — только нужные флаги
     
+    /// Координатор хранит только UIKit-состояние одного ViewBox и живёт на MainActor.
+    @MainActor
     final class Coordinator {
         var wasActive = false
         var wasPlaying = false
@@ -82,28 +85,41 @@ struct RotatingArtworkView: UIViewRepresentable {
         let nc = NotificationCenter.default
 
         // Уход в неактивное: мгновенно freeze
-        let o1 = nc.addObserver(forName: UIApplication.willResignActiveNotification, object: nil, queue: .main) { _ in
-            context.coordinator.appActive = false
-            CATransaction.begin(); CATransaction.setDisableActions(true)
-            self.ensureSpin(on: v.img.layer)     // гарантируем наличие анимации
-            self.pause(layer: v.img.layer)       // и ставим на паузу
-            CATransaction.commit()
+        let coordinator = context.coordinator
+        let o1 = nc.addObserver(forName: UIApplication.willResignActiveNotification, object: nil, queue: .main) { @Sendable _ in
+            // NotificationCenter callback не изолирован. Короткая задача возвращает его
+            // к MainActor-владельцу UIKit без переноса Notification или mutable state.
+            Task { @MainActor [weak coordinator, weak v] in
+                guard let coordinator, let v else { return }
+                coordinator.appActive = false
+                CATransaction.begin(); CATransaction.setDisableActions(true)
+                self.ensureSpin(on: v.img.layer)     // гарантируем наличие анимации
+                self.pause(layer: v.img.layer)       // и ставим на паузу
+                CATransaction.commit()
+            }
         }
 
         // Возврат: заранее подкладываем анимацию (если играло)
-        let o2 = nc.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main) { _ in
-            if context.coordinator.wasActive && context.coordinator.wasPlaying {
+        let o2 = nc.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main) { @Sendable _ in
+            Task { @MainActor [weak coordinator, weak v] in
+                guard let coordinator, let v,
+                      coordinator.wasActive && coordinator.wasPlaying else {
+                    return
+                }
                 self.ensureSpin(on: v.img.layer)
             }
         }
 
         // Стали активны: только resume при игре, иначе — остаёмся замороженными
-        let o3 = nc.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
-            context.coordinator.appActive = true
-            if context.coordinator.wasActive && context.coordinator.wasPlaying {
-                self.resume(layer: v.img.layer)
-            } else {
-                self.pause(layer: v.img.layer)
+        let o3 = nc.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { @Sendable _ in
+            Task { @MainActor [weak coordinator, weak v] in
+                guard let coordinator, let v else { return }
+                coordinator.appActive = true
+                if coordinator.wasActive && coordinator.wasPlaying {
+                    self.resume(layer: v.img.layer)
+                } else {
+                    self.pause(layer: v.img.layer)
+                }
             }
         }
 

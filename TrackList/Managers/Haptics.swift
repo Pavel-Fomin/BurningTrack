@@ -11,6 +11,7 @@ import Foundation
 import UIKit
 import CoreHaptics
 
+@MainActor
 final class Haptics {
     static let shared = Haptics()
     private init() {}

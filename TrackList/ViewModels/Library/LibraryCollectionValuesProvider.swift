@@ -9,18 +9,19 @@
 
 import Foundation
 
-protocol LibraryCollectionValuesProvider {
+protocol LibraryCollectionValuesProvider: Sendable {
     /// Возвращает значения выбранного раздела коллекции из сохранённых SQLite metadata.
     func values(for category: LibraryCollectionCategory) async -> [LibraryCollectionValue]
 }
 
 /// Provider готовых строк корня режима "Треки".
-protocol LibraryCollectionRootItemsProvider {
+protocol LibraryCollectionRootItemsProvider: Sendable {
     /// Возвращает строки корня с количеством фактических destination-строк.
     func rootItemsState() async -> [LibraryCollectionRootItemState]
 }
 
-final class DefaultLibraryCollectionValuesProvider: LibraryCollectionValuesProvider, LibraryCollectionRootItemsProvider {
+/// Provider хранит только actor-зависимость и не разделяет mutable state между запросами.
+final class DefaultLibraryCollectionValuesProvider: Sendable, LibraryCollectionValuesProvider, LibraryCollectionRootItemsProvider {
     // MARK: - Зависимости
 
     /// Фасад локального SQLite-индекса треков и сохранённых metadata.

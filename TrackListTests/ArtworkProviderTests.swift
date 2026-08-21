@@ -19,13 +19,11 @@ final class ArtworkProviderTests: XCTestCase {
         let spy = ArtworkPreparationSpy(smallResult: expectedImage, largeResult: UIImage())
         let provider = makeProvider(spy: spy)
         let trackId = UUID()
+        let trackListRequest = makeRequest(trackId: trackId, purpose: .trackList)
+        let miniPlayerRequest = makeRequest(trackId: trackId, purpose: .miniPlayer)
 
-        async let trackListImage = provider.image(
-            for: makeRequest(trackId: trackId, purpose: .trackList)
-        )
-        async let miniPlayerImage = provider.image(
-            for: makeRequest(trackId: trackId, purpose: .miniPlayer)
-        )
+        async let trackListImage = provider.image(for: trackListRequest)
+        async let miniPlayerImage = provider.image(for: miniPlayerRequest)
         let images = await (trackListImage, miniPlayerImage)
         let smallPreparationCount = await spy.count(for: .small)
         let largePreparationCount = await spy.count(for: .large)
@@ -42,13 +40,11 @@ final class ArtworkProviderTests: XCTestCase {
         let spy = ArtworkPreparationSpy(smallResult: UIImage(), largeResult: expectedImage)
         let provider = makeProvider(spy: spy)
         let trackId = UUID()
+        let trackInfoRequest = makeRequest(trackId: trackId, purpose: .trackInfoSheet)
+        let nowPlayingRequest = makeRequest(trackId: trackId, purpose: .nowPlaying)
 
-        async let trackInfoImage = provider.image(
-            for: makeRequest(trackId: trackId, purpose: .trackInfoSheet)
-        )
-        async let nowPlayingImage = provider.image(
-            for: makeRequest(trackId: trackId, purpose: .nowPlaying)
-        )
+        async let trackInfoImage = provider.image(for: trackInfoRequest)
+        async let nowPlayingImage = provider.image(for: nowPlayingRequest)
         let images = await (trackInfoImage, nowPlayingImage)
         let smallPreparationCount = await spy.count(for: .small)
         let largePreparationCount = await spy.count(for: .large)
@@ -66,13 +62,11 @@ final class ArtworkProviderTests: XCTestCase {
         let spy = ArtworkPreparationSpy(smallResult: smallImage, largeResult: largeImage)
         let provider = makeProvider(spy: spy)
         let trackId = UUID()
+        let smallRequest = makeRequest(trackId: trackId, purpose: .trackList)
+        let largeRequest = makeRequest(trackId: trackId, purpose: .nowPlaying)
 
-        async let smallResult = provider.image(
-            for: makeRequest(trackId: trackId, purpose: .trackList)
-        )
-        async let largeResult = provider.image(
-            for: makeRequest(trackId: trackId, purpose: .nowPlaying)
-        )
+        async let smallResult = provider.image(for: smallRequest)
+        async let largeResult = provider.image(for: largeRequest)
         let images = await (smallResult, largeResult)
         let smallPreparationCount = await spy.count(for: .small)
         let largePreparationCount = await spy.count(for: .large)
@@ -363,30 +357,49 @@ private actor ArtworkPreparationSpy {
 }
 
 /// Тестовое хранилище фиксирует переданную provider стоимость без сильных ссылок вне самого теста.
+/// `lock` сериализует dictionary и массивы, поэтому Sendable требуется только синхронному тестовому контракту.
 private final class ArtworkPositiveCacheSpy: ArtworkPositiveImageCaching, @unchecked Sendable {
+    /// Защищает один составной снимок тестового кэша при конкурентных запросах provider-а.
+    private let lock = NSLock()
     private var images: [ArtworkCacheKey: UIImage] = [:]
-    private(set) var storedCosts: [Int] = []
-    private(set) var removedKeys: [ArtworkCacheKey] = []
+    private var storedCostsStorage: [Int] = []
+    private var removedKeysStorage: [ArtworkCacheKey] = []
+
+    /// Возвращает snapshot записанных стоимостей после завершения проверяемой операции.
+    var storedCosts: [Int] {
+        lock.withLock { storedCostsStorage }
+    }
+
+    /// Возвращает snapshot ключей, удалённых проверяемой invalidation-операцией.
+    var removedKeys: [ArtworkCacheKey] {
+        lock.withLock { removedKeysStorage }
+    }
 
     /// Возвращает ранее сохранённое изображение.
     func image(for key: ArtworkCacheKey) -> UIImage? {
-        images[key]
+        lock.withLock { images[key] }
     }
 
     /// Сохраняет изображение и стоимость, переданные ArtworkProvider.
     func store(_ image: UIImage, for key: ArtworkCacheKey, cost: Int) {
-        images[key] = image
-        storedCosts.append(cost)
+        lock.withLock {
+            images[key] = image
+            storedCostsStorage.append(cost)
+        }
     }
 
     /// Удаляет одну версию изображения и фиксирует ключ инвалидирования.
     func removeImage(for key: ArtworkCacheKey) {
-        images[key] = nil
-        removedKeys.append(key)
+        lock.withLock {
+            images[key] = nil
+            removedKeysStorage.append(key)
+        }
     }
 
     /// Полностью очищает тестовое хранилище.
     func removeAllImages() {
-        images.removeAll()
+        lock.withLock {
+            images.removeAll()
+        }
     }
 }

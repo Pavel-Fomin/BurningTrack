@@ -143,8 +143,8 @@ final class LibraryFolderActionHandlerTests: XCTestCase {
 
 }
 
-/// Не обращается к постоянной SQLite-базе в тестах действий папки.
-private final class EmptyTrackCollectionSummaryProvider: TrackCollectionSummaryProviding, @unchecked Sendable {
+/// Не обращается к постоянной SQLite-базе в тестах действий папки и не хранит mutable state.
+private final class EmptyTrackCollectionSummaryProvider: TrackCollectionSummaryProviding, Sendable {
     /// Возвращает пустую статистику, не влияющую на проверяемые действия экспорта.
     func summaryForFolder(folderId: UUID) async throws -> TrackCollectionSummary {
         TrackCollectionSummary(

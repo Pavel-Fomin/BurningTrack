@@ -40,7 +40,7 @@ final class BatchFilenameRenameActionHandler {
     /// Подготавливает immutable track-данные и передаёт progress во ViewModel.
     func loadTracks(
         from seeds: [BatchFilenameRenameTrackSeed],
-        progress: @escaping @MainActor (Int, Int) -> Void
+        progress: @escaping @MainActor @Sendable (Int, Int) -> Void
     ) async -> [BatchFilenameRenameTrack] {
         await metadataLoader.loadTracks(from: seeds, progress: progress)
     }
@@ -71,7 +71,7 @@ final class BatchFilenameRenameActionHandler {
     /// Запускает физическое переименование, не дублируя library update pipeline.
     func apply(
         commands: [BatchFilenameRenameCommand],
-        progress: (@MainActor (_ processed: Int, _ total: Int) -> Void)?
+        progress: (@MainActor @Sendable (_ processed: Int, _ total: Int) -> Void)?
     ) async -> BatchFilenameRenameResult {
         await commandExecutor.renameTrackFilesBatch(
             commands,

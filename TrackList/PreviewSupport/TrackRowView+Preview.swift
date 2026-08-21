@@ -11,6 +11,7 @@
 import SwiftUI
 
 /// Создаёт изолированную строку для Xcode Preview из рабочей модели `Track`.
+@MainActor
 private func makeTrackRowPreview(
     track: Track,
     isCurrent: Bool = false,

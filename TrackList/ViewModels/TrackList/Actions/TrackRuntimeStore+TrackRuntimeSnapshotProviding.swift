@@ -9,4 +9,4 @@
 
 import Foundation
 
-extension TrackRuntimeStore: TrackRuntimeSnapshotProviding {}
+extension TrackRuntimeStore: TrackRuntimeSnapshotStoring {}

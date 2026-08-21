@@ -60,7 +60,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding, Li
     /// SQLite-реестр передаётся composition root, чтобы ViewModel не разрешала singleton самостоятельно.
     private let trackRegistry: TrackRegistry
     /// Синхронизация папки остаётся существующей manager-операцией, но её зависимость явна.
-    private let musicLibraryManager: MusicLibraryManager
+    private let musicLibraryManager: any LibraryFolderSyncing
     /// Восстановление URL вынесено из ViewModel в injected capability.
     private let trackURLProvider: @MainActor (UUID) async -> URL?
     /// Разрешает читать и сохранять сортировку в настройках папки.
@@ -127,6 +127,14 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding, Li
     private var presenter: LibraryTracksPresenter?
 
     private var cancellables = Set<AnyCancellable>()
+    /// Отдельное поколение refresh не связано с generation runtime snapshot-ов.
+    private struct RefreshGeneration: Equatable {
+        let rawValue: UInt64
+    }
+    /// Идентичность списка, для которого разрешены фоновые badges и availability.
+    private var currentRefreshGeneration = RefreshGeneration(rawValue: 0)
+    /// ViewModel владеет только фоновой догрузкой текущего refresh.
+    private var backgroundDetailsTask: Task<Void, Never>?
 
     // MARK: - Производное состояние
 
@@ -173,7 +181,7 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding, Li
         runtimeController: LibraryTrackRuntimeController,
         settingsManager: any SettingsManaging,
         trackRegistry: TrackRegistry,
-        musicLibraryManager: MusicLibraryManager,
+        musicLibraryManager: any LibraryFolderSyncing,
         trackURLProvider: @escaping @MainActor (UUID) async -> URL?,
         batchRenameHandler: LibraryBatchRenameHandler,
         batchTagEditHandler: LibraryBatchTagEditHandler,
@@ -207,6 +215,11 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding, Li
         bindTrackUpdateEvents()
         bindSettingsEvents()
         bindBadgeEvents()
+    }
+
+    deinit {
+        // Освобождение destination отменяет только screen-owned догрузку, не manager-level sync корня.
+        backgroundDetailsTask?.cancel()
     }
 
     /// Подключает objects screen-flow после инициализации и исключает сильный цикл ViewModel → Handler → ViewModel.
@@ -293,15 +306,18 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding, Li
     func refresh() async {
         if isLoading {return}
 
+        let refreshGeneration = beginRefresh()
         isLoading = true
         defer { isLoading = false }
 
         await loadInitialTracks()
 
-        Task { [weak self] in
-            guard let self else { return }
-            await self.loadDetailsInBackground()
+        guard Task.isCancelled == false,
+              isCurrentRefresh(refreshGeneration) else {
+            return
         }
+
+        startBackgroundDetails(for: refreshGeneration)
     }
     
     /// Быстро загружает первичный список треков без синхронизации и дополнительных деталей.
@@ -379,23 +395,103 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding, Li
         trackSections.flatMap(\.tracks)
     }
 
-    /// Догружает тяжёлые детали после появления первичного списка.
-    private func loadDetailsInBackground() async {
-        reloadTrackListBadges()
+    /// Инвалидирует старую details-задачу и выдаёт identity следующему refresh списка.
+    private func beginRefresh() -> RefreshGeneration {
+        backgroundDetailsTask?.cancel()
+        backgroundDetailsTask = nil
+        currentRefreshGeneration = RefreshGeneration(
+            rawValue: currentRefreshGeneration.rawValue &+ 1
+        )
 
-        guard let folderId = source.folderId else { return }
-
-        await musicLibraryManager.syncFolderIfNeeded(folderId: folderId)
-        await updateAvailabilityInBackground()
+        return currentRefreshGeneration
     }
 
-    /// Проверяет доступность треков после первичного отображения списка.
-    private func updateAvailabilityInBackground() async {
-        let tracks = trackSections.flatMap { $0.tracks }
+    /// Запускает догрузку только для уже показанного первичного списка текущего refresh.
+    private func startBackgroundDetails(for refreshGeneration: RefreshGeneration) {
+        backgroundDetailsTask?.cancel()
+
+        let source = source
+        let musicLibraryManager = musicLibraryManager
+        let trackURLProvider = trackURLProvider
+
+        backgroundDetailsTask = Task { [weak self] in
+            // Task не удерживает ViewModel: после каждого await owner проверяется заново.
+            defer {
+                self?.finishBackgroundDetailsTask(for: refreshGeneration)
+            }
+
+            guard Task.isCancelled == false,
+                  self?.isCurrentRefresh(refreshGeneration) == true else {
+                return
+            }
+
+            self?.reloadTrackListBadges(for: refreshGeneration)
+
+            guard let folderId = source.folderId,
+                  Task.isCancelled == false,
+                  self?.isCurrentRefresh(refreshGeneration) == true else {
+                return
+            }
+
+            await musicLibraryManager.syncFolderIfNeeded(folderId: folderId)
+
+            guard Task.isCancelled == false,
+                  self?.isCurrentRefresh(refreshGeneration) == true,
+                  let sectionsSnapshot = self?.trackSections else {
+                return
+            }
+
+            let availabilityByRowId = await Self.resolveAvailability(
+                in: sectionsSnapshot,
+                trackURLProvider: trackURLProvider
+            )
+
+            guard let availabilityByRowId,
+                  Task.isCancelled == false,
+                  self?.isCurrentRefresh(refreshGeneration) == true else {
+                return
+            }
+
+            self?.applyAvailability(
+                availabilityByRowId,
+                for: refreshGeneration
+            )
+        }
+    }
+
+    /// Проверяет URL только строк зафиксированного refresh и прекращает цикл после отмены.
+    private static func resolveAvailability(
+        in sectionsSnapshot: [TrackSection],
+        trackURLProvider: @escaping @MainActor (UUID) async -> URL?
+    ) async -> [UUID: Bool]? {
+        let tracks = sectionsSnapshot.flatMap(\.tracks)
         var availabilityByRowId: [UUID: Bool] = [:]
 
         for track in tracks {
-            availabilityByRowId[track.id] = await trackURLProvider(track.trackId) != nil
+            guard Task.isCancelled == false else {
+                return nil
+            }
+
+            let isAvailable = await trackURLProvider(track.trackId) != nil
+
+            guard Task.isCancelled == false else {
+                return nil
+            }
+
+            availabilityByRowId[track.id] = isAvailable
+        }
+
+        return availabilityByRowId
+    }
+
+    /// Применяет availability только к актуальным строкам того же refresh, не возвращая старый snapshot.
+    private func applyAvailability(
+        _ availabilityByRowId: [UUID: Bool],
+        for refreshGeneration: RefreshGeneration
+    ) {
+        guard Task.isCancelled == false,
+              isCurrentRefresh(refreshGeneration) else {
+            return
         }
 
         trackSections = trackSections.map { section in
@@ -420,6 +516,20 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding, Li
         }
     }
 
+    /// Проверяет, что поздняя операция всё ещё относится к отображаемому refresh.
+    private func isCurrentRefresh(_ refreshGeneration: RefreshGeneration) -> Bool {
+        currentRefreshGeneration == refreshGeneration
+    }
+
+    /// Очищает owner только для текущего поколения, не теряя reference на новую задачу.
+    private func finishBackgroundDetailsTask(for refreshGeneration: RefreshGeneration) {
+        guard isCurrentRefresh(refreshGeneration) else {
+            return
+        }
+
+        backgroundDetailsTask = nil
+    }
+
     // MARK: - Бейджи
 
     /// Обновляет бейджи треклистов для уже загруженных треков.
@@ -427,6 +537,16 @@ final class LibraryTracksViewModel: ObservableObject, TrackMetadataProviding, Li
     private func reloadTrackListBadges() {
         let ids = trackSections.flatMap { $0.tracks }.map { $0.trackId }
         trackListMembershipsById = badgeProvider.badges(for: ids)
+    }
+
+    /// Не даёт cancelled или stale details-задаче изменить badges нового списка.
+    private func reloadTrackListBadges(for refreshGeneration: RefreshGeneration) {
+        guard Task.isCancelled == false,
+              isCurrentRefresh(refreshGeneration) else {
+            return
+        }
+
+        reloadTrackListBadges()
     }
 
     // MARK: - Выбор

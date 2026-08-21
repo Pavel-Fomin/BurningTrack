@@ -11,6 +11,8 @@ import Combine
 import Foundation
 
 /// Публикует типизированное изменение состояния одного трека в «Избранном».
+/// Поток событий и его Combine-подписки принадлежат UI owner-у MainActor.
+@MainActor
 protocol FavoritesEventsPublishing: AnyObject {
 
     /// Передаёт событие после успешного изменения сохранённого состояния.
@@ -18,6 +20,8 @@ protocol FavoritesEventsPublishing: AnyObject {
 }
 
 /// Предоставляет поток типизированных изменений состояния «Избранного».
+/// Подписка и отмена происходят у того же MainActor-владельца состояния плеера.
+@MainActor
 protocol FavoritesEventsObserving: AnyObject {
 
     /// События, появившиеся после подписки; начальное состояние не реплицируется.

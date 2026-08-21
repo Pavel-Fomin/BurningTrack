@@ -10,6 +10,7 @@
 import Foundation
 
 /// Преобразует уведомления NotificationCenter в события PlayerViewModel.
+@MainActor
 final class NotificationPlayerEventObserver: PlayerEventObserving {
 
     var onTrackDurationUpdated: ((TimeInterval) -> Void)?
@@ -20,23 +21,28 @@ final class NotificationPlayerEventObserver: PlayerEventObserving {
 
     var onSettingsChanged: (() -> Void)?
 
+    // Источник событий целиком принадлежит MainActor: здесь же устанавливаются callbacks
+    // и хранятся tokens NotificationCenter. Поэтому lifecycle не требует unsafe-доступа.
     private let notificationCenter: NotificationCenter
-    nonisolated(unsafe) private var observers: [NSObjectProtocol] = []
+    private var observers: [NSObjectProtocol] = []
 
     /// Создаёт источник событий и сразу подписывается на нужные уведомления.
-    nonisolated init(notificationCenter: NotificationCenter = .default) {
+    init(notificationCenter: NotificationCenter = .default) {
         self.notificationCenter = notificationCenter
         observeEvents()
     }
 
-    deinit {
+    isolated deinit {
         observers.forEach { observer in
             notificationCenter.removeObserver(observer)
         }
     }
 
     /// Регистрирует все NotificationCenter-подписки, нужные PlayerViewModel.
-    nonisolated private func observeEvents() {
+    private func observeEvents() {
+        // NotificationCenter передаёт @Sendable callback без actor isolation.
+        // Задача переводит только внешний callback в MainActor-контракт observer;
+        // tokens и их lifecycle при этом остаются у единственного владельца.
         let durationObserver = notificationCenter.addObserver(
             forName: .trackDurationUpdated,
             object: nil,
@@ -44,7 +50,7 @@ final class NotificationPlayerEventObserver: PlayerEventObserving {
         ) { [weak self] notification in
             guard let duration = notification.userInfo?["duration"] as? TimeInterval else { return }
 
-            Task { @MainActor in
+            Task { @MainActor [weak self] in
                 self?.onTrackDurationUpdated?(duration)
             }
         }
@@ -54,7 +60,7 @@ final class NotificationPlayerEventObserver: PlayerEventObserving {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            Task { @MainActor in
+            Task { @MainActor [weak self] in
                 self?.onTrackDidFinish?()
             }
         }
@@ -66,7 +72,7 @@ final class NotificationPlayerEventObserver: PlayerEventObserving {
         ) { [weak self] notification in
             guard let updateEvent = notification.object as? TrackUpdateEvent else { return }
 
-            Task { @MainActor in
+            Task { @MainActor [weak self] in
                 self?.onTrackDidUpdate?(updateEvent)
             }
         }
@@ -76,7 +82,7 @@ final class NotificationPlayerEventObserver: PlayerEventObserving {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            Task { @MainActor in
+            Task { @MainActor [weak self] in
                 self?.onSettingsChanged?()
             }
         }

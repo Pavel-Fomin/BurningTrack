@@ -26,7 +26,8 @@ enum ExportFileCopierError: Error {
 }
 
 /// Копирует один файл кусками, не удерживая весь аудиофайл в памяти.
-final class ExportFileCopier {
+/// Копировщик не хранит mutable state, поэтому его можно безопасно использовать actor-сервисами.
+final class ExportFileCopier: Sendable {
 
     /// Размер одного блока чтения и записи.
     private let bufferSize = 1024 * 1024

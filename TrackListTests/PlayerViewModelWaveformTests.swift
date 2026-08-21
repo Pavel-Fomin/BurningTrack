@@ -11,7 +11,6 @@ import Foundation
 import XCTest
 @testable import TrackList
 
-@MainActor
 final class PlayerViewModelWaveformTests: XCTestCase {
 
     /// Временные каталоги нужны только проверке общего пути файлового кэша.
@@ -25,6 +24,7 @@ final class PlayerViewModelWaveformTests: XCTestCase {
     }
 
     /// Выбор нового трека запускает ровно один запрос с фиксированным размером waveform.
+    @MainActor
     func testSelectingNewTrackRequestsWaveformOnceAndPublishesReadyState() async {
         let generator = ImmediateWaveformGenerator(samples: makeSamples(value: 0.4))
         let harness = makeHarness(waveformGenerator: generator)
@@ -49,6 +49,7 @@ final class PlayerViewModelWaveformTests: XCTestCase {
     }
 
     /// Подготовленный файл запускает waveform до завершения ожидания duration в PlayerManager.
+    @MainActor
     func testPreparedLocalFileStartsWaveformBeforePlayerPlayCompletes() async {
         let samples = makeSamples(value: 0.4)
         let generator = ImmediateWaveformGenerator(samples: samples)
@@ -69,6 +70,7 @@ final class PlayerViewModelWaveformTests: XCTestCase {
     }
 
     /// Обновление времени и play/pause управляют playback, но не создают новый файловый запрос.
+    @MainActor
     func testProgressAndPlayPauseDoNotRestartWaveformGeneration() async {
         let generator = ImmediateWaveformGenerator(samples: makeSamples(value: 0.2))
         let harness = makeHarness(waveformGenerator: generator)
@@ -92,6 +94,7 @@ final class PlayerViewModelWaveformTests: XCTestCase {
     }
 
     /// Observer ограничен четырьмя обновлениями в секунду, чтобы progress был плавнее секундного без кадрового таймера.
+    @MainActor
     func testProgressObserverUsesQuarterSecondInterval() {
         XCTAssertEqual(
             PlayerProgressObservationConfiguration.interval,
@@ -101,6 +104,7 @@ final class PlayerViewModelWaveformTests: XCTestCase {
     }
 
     /// Каждое дробное значение observer сразу доходит до состояния мини-плеера и не запускает новую waveform.
+    @MainActor
     func testProgressCallbacksPublishEachQuarterSecondWithoutRestartingWaveform() async {
         let generator = ImmediateWaveformGenerator(samples: makeSamples(value: 0.3))
         let harness = makeHarness(waveformGenerator: generator)
@@ -128,6 +132,7 @@ final class PlayerViewModelWaveformTests: XCTestCase {
     }
 
     /// Seek, пауза, продолжение и конец трека сохраняют единый путь публикации progress.
+    @MainActor
     func testSeekPauseResumeAndTrackEndKeepProgressStateConsistent() async {
         let generator = ImmediateWaveformGenerator(samples: makeSamples(value: 0.6))
         let harness = makeHarness(waveformGenerator: generator)
@@ -167,6 +172,7 @@ final class PlayerViewModelWaveformTests: XCTestCase {
     }
 
     /// Результат отменённой задачи старого трека не должен попасть в состояние нового трека.
+    @MainActor
     func testFastTrackChangeDoesNotPublishOldWaveformResult() async {
         let generator = ControllableWaveformGenerator()
         let harness = makeHarness(waveformGenerator: generator)
@@ -193,7 +199,91 @@ final class PlayerViewModelWaveformTests: XCTestCase {
         await waitForWaveformState(.ready(newSamples), in: harness.viewModel)
     }
 
+    /// Поздний успешный ответ первого user-start не меняет выбранный второй трек, Now Playing или waveform.
+    @MainActor
+    func testLateUserStartSuccessDoesNotPublishSupersededPlayback() async {
+        let samples = makeSamples(value: 0.8)
+        let harness = makeHarness(waveformGenerator: ImmediateWaveformGenerator(samples: samples))
+        let firstTrack = makeTrack(fileName: "First.m4a")
+        let secondTrack = makeTrack(fileName: "Second.m4a")
+        harness.playerManager.setPreparedURL(makeFileURL(named: "First.m4a"), for: firstTrack.trackId)
+        harness.playerManager.setPreparedURL(makeFileURL(named: "Second.m4a"), for: secondTrack.trackId)
+        harness.playerManager.usesControlledPlayCompletion = true
+
+        harness.viewModel.play(track: firstTrack)
+        let firstRequestID = await waitForPlayRequest(at: 0, in: harness.playerManager)
+        harness.viewModel.play(track: secondTrack)
+        let secondRequestID = await waitForPlayRequest(at: 1, in: harness.playerManager)
+
+        harness.playerManager.completePlay(requestID: secondRequestID, result: .started)
+        await waitForPlaybackStart(in: harness.viewModel)
+        harness.playerManager.completePlay(requestID: firstRequestID, result: .started)
+        await Task.yield()
+
+        XCTAssertEqual(harness.viewModel.currentTrackDisplayable?.trackId, secondTrack.trackId)
+        XCTAssertTrue(harness.viewModel.isPlaying)
+        XCTAssertEqual(harness.playerManager.nowPlayingTitles, ["Second.m4a"])
+        XCTAssertEqual(harness.viewModel.waveformState, .ready(samples))
+    }
+
+    /// Поздняя ошибка первого user-start не очищает успешное состояние второго трека и не показывает Toast.
+    @MainActor
+    func testLateUserStartFailureDoesNotPublishSupersededError() async {
+        let harness = makeHarness(waveformGenerator: ImmediateWaveformGenerator(samples: makeSamples(value: 0.6)))
+        let firstTrack = makeTrack(fileName: "First.m4a")
+        let secondTrack = makeTrack(fileName: "Second.m4a")
+        harness.playerManager.usesControlledPlayCompletion = true
+
+        harness.viewModel.play(track: firstTrack)
+        let firstRequestID = await waitForPlayRequest(at: 0, in: harness.playerManager)
+        harness.viewModel.play(track: secondTrack)
+        let secondRequestID = await waitForPlayRequest(at: 1, in: harness.playerManager)
+
+        harness.playerManager.completePlay(requestID: secondRequestID, result: .started)
+        await waitForPlaybackStart(in: harness.viewModel)
+        harness.playerManager.failPlay(requestID: firstRequestID, error: .fileNotPlayable)
+        await Task.yield()
+
+        XCTAssertEqual(harness.viewModel.currentTrackDisplayable?.trackId, secondTrack.trackId)
+        XCTAssertTrue(harness.viewModel.isPlaying)
+        XCTAssertTrue(harness.toastPresenter.errors.isEmpty)
+    }
+
+    /// Два запроса одного trackId с разными queue item используют разные identity и не позволяют A перезаписать B.
+    @MainActor
+    func testLateUserStartWithSameTrackIDDoesNotPublishSupersededPlayback() async {
+        let samples = makeSamples(value: 0.3)
+        let harness = makeHarness(waveformGenerator: ImmediateWaveformGenerator(samples: samples))
+        let trackID = UUID()
+        let firstTrack = makeTrack(
+            fileName: "First occurrence.m4a",
+            trackId: trackID,
+            queueItemId: UUID()
+        )
+        let secondTrack = makeTrack(
+            fileName: "Second occurrence.m4a",
+            trackId: trackID,
+            queueItemId: UUID()
+        )
+        harness.playerManager.usesControlledPlayCompletion = true
+
+        harness.viewModel.play(track: firstTrack)
+        let firstRequestID = await waitForPlayRequest(at: 0, in: harness.playerManager)
+        harness.viewModel.play(track: secondTrack)
+        let secondRequestID = await waitForPlayRequest(at: 1, in: harness.playerManager)
+
+        harness.playerManager.completePlay(requestID: secondRequestID, result: .started)
+        await waitForPlaybackStart(in: harness.viewModel)
+        harness.playerManager.completePlay(requestID: firstRequestID, result: .started)
+        await Task.yield()
+
+        XCTAssertEqual(harness.viewModel.currentTrackDisplayable?.id, secondTrack.id)
+        XCTAssertEqual(harness.playerManager.nowPlayingTitles, ["Second occurrence.m4a"])
+        XCTAssertEqual(harness.viewModel.waveformState, .unavailable)
+    }
+
     /// Смена текущего трека отменяет задачу до того, как начнётся обработка следующего файла.
+    @MainActor
     func testChangingTrackCancelsPreviousWaveformTask() async {
         let generator = ControllableWaveformGenerator()
         let harness = makeHarness(waveformGenerator: generator)
@@ -215,6 +305,7 @@ final class PlayerViewModelWaveformTests: XCTestCase {
     }
 
     /// Поздний сигнал прежнего PlayerManager не отменяет уже работающую waveform текущего трека.
+    @MainActor
     func testLatePreparedLocalFileDoesNotCancelCurrentWaveformTask() async {
         let generator = ControllableWaveformGenerator()
         let harness = makeHarness(waveformGenerator: generator)
@@ -244,6 +335,7 @@ final class PlayerViewModelWaveformTests: XCTestCase {
     }
 
     /// Ошибка waveform остаётся изолированной от состояния воспроизведения и переводит UI в fallback.
+    @MainActor
     func testWaveformFailureDoesNotChangePlaybackState() async {
         let generator = ControllableWaveformGenerator()
         let harness = makeHarness(waveformGenerator: generator)
@@ -262,6 +354,7 @@ final class PlayerViewModelWaveformTests: XCTestCase {
     }
 
     /// Удаление текущего элемента очереди очищает производные данные вместе с мини-плеером.
+    @MainActor
     func testRemovingCurrentTrackMakesWaveformUnavailable() async {
         let generator = ImmediateWaveformGenerator(samples: makeSamples(value: 0.5))
         let harness = makeHarness(waveformGenerator: generator)
@@ -283,6 +376,7 @@ final class PlayerViewModelWaveformTests: XCTestCase {
     }
 
     /// Кэшированный waveform возвращается ViewModel тем же контрактом без повторного декодирования.
+    @MainActor
     func testCachedGeneratorPublishesCachedSamplesThroughSameViewModelState() async throws {
         let directoryURL = try makeTemporaryDirectory(named: "PlayerViewModelWaveformCache")
         let fileURL = try WaveformTestFileFactory.makeRegularFile(
@@ -318,6 +412,7 @@ final class PlayerViewModelWaveformTests: XCTestCase {
     }
 
     /// Отсутствие локального URL оставляет явное состояние unavailable и общую заглушку waveform.
+    @MainActor
     func testUnavailablePreparedFileKeepsWaveformUnavailable() async {
         let generator = ImmediateWaveformGenerator(samples: makeSamples(value: 0.6))
         let harness = makeHarness(waveformGenerator: generator)
@@ -332,6 +427,7 @@ final class PlayerViewModelWaveformTests: XCTestCase {
     }
 
     /// Собирает ViewModel с полностью изолированными зависимостями playback и persistence.
+    @MainActor
     private func makeHarness(
         waveformGenerator: any WaveformGenerating
     ) -> PlayerViewModelWaveformHarness {
@@ -341,14 +437,19 @@ final class PlayerViewModelWaveformTests: XCTestCase {
             loadsInitialQueue: false
         )
         let favoritesService = PlayerFavoritesServiceSpy()
+        let toastPresenter = ToastPresenterSpy()
         let viewModel = PlayerViewModel(
             playerManager: playerManager,
             playbackContextStore: PlayerPlaybackContextStore(
                 playbackModePersistence: PlaybackModePersistenceSpy()
             ),
-            runtimeSnapshotController: PlayerRuntimeSnapshotController(),
+            runtimeSnapshotController: PlayerRuntimeSnapshotController(
+                runtimeSnapshotStore: TrackRuntimeStore.shared,
+                runtimeSnapshotBuilder: TrackRuntimeSnapshotBuilder.shared,
+                artworkProvider: ArtworkProvider.shared
+            ),
             eventObserver: PlayerEventObserverSpy(),
-            toastPresenter: ToastPresenterSpy(),
+            toastPresenter: toastPresenter,
             statePersistence: PlayerStatePersistenceSpy(),
             playlistManager: playlistManager,
             libraryContextLoader: WaveformLibraryContextLoaderSpy(),
@@ -366,16 +467,19 @@ final class PlayerViewModelWaveformTests: XCTestCase {
         return PlayerViewModelWaveformHarness(
             viewModel: viewModel,
             playerManager: playerManager,
-            playlistManager: playlistManager
+            playlistManager: playlistManager,
+            toastPresenter: toastPresenter
         )
     }
 
     /// Использует iTunes-модель, чтобы изолированные тесты не запускали BookmarkResolver и runtime snapshot.
     private func makeTrack(
         fileName: String,
-        trackId: UUID = UUID()
+        trackId: UUID = UUID(),
+        queueItemId: UUID = UUID()
     ) -> PlayerTrack {
         PlayerTrack(
+            queueItemId: queueItemId,
             trackId: trackId,
             title: fileName,
             artist: "Artist",
@@ -427,6 +531,7 @@ final class PlayerViewModelWaveformTests: XCTestCase {
     }
 
     /// Ожидает публикацию итогового состояния, не полагаясь на задержки устройства.
+    @MainActor
     private func waitForWaveformState(
         _ expectedState: PlayerWaveformState,
         in viewModel: PlayerViewModel
@@ -443,6 +548,7 @@ final class PlayerViewModelWaveformTests: XCTestCase {
     }
 
     /// Ожидает регистрацию контролируемого запроса до его завершения из теста.
+    @MainActor
     private func waitForPendingRequest(
         for fileURL: URL,
         in generator: ControllableWaveformGenerator
@@ -458,6 +564,7 @@ final class PlayerViewModelWaveformTests: XCTestCase {
     }
 
     /// Ожидает подтверждение отмены, которое генератор фиксирует через cancellation handler.
+    @MainActor
     private func waitForCancellation(
         of fileURL: URL,
         in generator: ControllableWaveformGenerator
@@ -473,6 +580,7 @@ final class PlayerViewModelWaveformTests: XCTestCase {
     }
 
     /// Ожидает окончание искусственно задержанного PlayerManager.play без предположений о длительности задержки.
+    @MainActor
     private func waitForPlaybackStart(in viewModel: PlayerViewModel) async {
         for _ in 0..<100 {
             if viewModel.isPlaying {
@@ -483,6 +591,23 @@ final class PlayerViewModelWaveformTests: XCTestCase {
 
         XCTFail("PlayerViewModel не подтвердил завершение playback")
     }
+
+    /// Ожидает регистрацию controlled playback-запроса до явного завершения тестом.
+    @MainActor
+    private func waitForPlayRequest(
+        at index: Int,
+        in playerManager: PlayerManagerSpy
+    ) async -> PlaybackRequestID {
+        for _ in 0..<100 {
+            if playerManager.playbackRequestIDs.count > index {
+                return playerManager.playbackRequestIDs[index]
+            }
+            await Task.yield()
+        }
+
+        XCTFail("Не зарегистрирован controlled playback-запрос")
+        return PlaybackRequestID()
+    }
 }
 
 /// Связывает изолированные зависимости, чтобы каждый тест не использовал общий singleton.
@@ -490,24 +615,32 @@ private struct PlayerViewModelWaveformHarness {
     let viewModel: PlayerViewModel
     let playerManager: PlayerManagerSpy
     let playlistManager: PlaylistManager
+    let toastPresenter: ToastPresenterSpy
 }
 
 /// Имитирует подготовленный PlayerManager URL и сохраняет управление playback без AVPlayer.
+@MainActor
 private final class PlayerManagerSpy: PlayerManaging {
     private var preparedURLs: [UUID: URL] = [:]
     private var currentTrackId: UUID?
-    private var progressUpdate: ((TimeInterval) -> Void)?
+    private var progressUpdate: (@MainActor @Sendable (TimeInterval) -> Void)?
     private var playCompletionContinuation: CheckedContinuation<Void, Never>?
     private var delayedPreparedTrackIds: Set<UUID> = []
-    private var delayedPreparedHandlers: [UUID: PlayerPreparedLocalFileHandler] = [:]
+    private var delayedPreparedHandlers: [UUID: (requestID: PlaybackRequestID, handler: PlayerPreparedLocalFileHandler)] = [:]
+    private var activePlaybackRequestID: PlaybackRequestID?
+    private var controlledPlayContinuations: [PlaybackRequestID: CheckedContinuation<PlaybackStartResult, Error>] = [:]
 
     /// Позволяет тесту удержать завершение PlayerManager.play после выдачи подготовленного URL.
     var delaysPlayCompletion = false
+    /// Позволяет тестам завершать каждый запуск отдельно, включая поздний success или failure старого request.
+    var usesControlledPlayCompletion = false
     /// Показывает, что waveform уже может работать, пока основной код ещё ожидает duration.
     var isWaitingForPlayCompletion: Bool {
         playCompletionContinuation != nil
     }
     private(set) var lastSeekTime: TimeInterval?
+    private(set) var playbackRequestIDs: [PlaybackRequestID] = []
+    private(set) var nowPlayingTitles: [String] = []
 
     func setPreparedURL(_ fileURL: URL, for trackId: UUID) {
         preparedURLs[trackId] = fileURL
@@ -518,18 +651,39 @@ private final class PlayerManagerSpy: PlayerManaging {
         delayedPreparedTrackIds.insert(trackId)
     }
 
+    func beginPlaybackRequest() -> PlaybackRequestID {
+        let requestID = PlaybackRequestID()
+        activePlaybackRequestID = requestID
+        return requestID
+    }
+
+    func isCurrentPlaybackRequest(_ requestID: PlaybackRequestID) -> Bool {
+        activePlaybackRequestID == requestID
+    }
+
+    func invalidatePlaybackRequest(_ requestID: PlaybackRequestID) {
+        guard activePlaybackRequestID == requestID else { return }
+        activePlaybackRequestID = nil
+    }
+
     func play(
+        requestID: PlaybackRequestID,
         track: any TrackDisplayable,
         onPreparedLocalFile: @escaping PlayerPreparedLocalFileHandler
-    ) async throws {
+    ) async throws -> PlaybackStartResult {
+        guard isCurrentPlaybackRequest(requestID) else {
+            return .superseded
+        }
+        playbackRequestIDs.append(requestID)
         currentTrackId = track.trackId
 
         if let preparedURL = preparedURLs[track.trackId] {
             if delayedPreparedTrackIds.contains(track.trackId) {
-                delayedPreparedHandlers[track.trackId] = onPreparedLocalFile
+                delayedPreparedHandlers[track.trackId] = (requestID, onPreparedLocalFile)
             } else {
-                await onPreparedLocalFile(
+                onPreparedLocalFile(
                     PlayerPreparedLocalFile(
+                        requestID: requestID,
                         trackId: track.trackId,
                         fileURL: preparedURL
                     )
@@ -537,10 +691,18 @@ private final class PlayerManagerSpy: PlayerManaging {
             }
         }
 
-        guard delaysPlayCompletion else { return }
+        if usesControlledPlayCompletion {
+            return try await withCheckedThrowingContinuation { continuation in
+                controlledPlayContinuations[requestID] = continuation
+            }
+        }
+
+        guard delaysPlayCompletion else { return .started }
         await withCheckedContinuation { continuation in
             playCompletionContinuation = continuation
         }
+
+        return isCurrentPlaybackRequest(requestID) ? .started : .superseded
     }
 
     func playCurrent() {}
@@ -562,7 +724,7 @@ private final class PlayerManagerSpy: PlayerManaging {
         return preparedURLs[trackId]
     }
 
-    func observeProgress(update: @escaping (TimeInterval) -> Void) {
+    func observeProgress(update: @escaping @MainActor @Sendable (TimeInterval) -> Void) {
         progressUpdate = update
     }
 
@@ -571,13 +733,15 @@ private final class PlayerManagerSpy: PlayerManaging {
     }
 
     func setupRemoteCommandCenter(
-        onPlay: @escaping () -> Void,
-        onPause: @escaping () -> Void,
-        onNext: @escaping () -> Void,
-        onPrevious: @escaping () -> Void
+        onPlay: @escaping @MainActor @Sendable () -> Void,
+        onPause: @escaping @MainActor @Sendable () -> Void,
+        onNext: @escaping @MainActor @Sendable () -> Void,
+        onPrevious: @escaping @MainActor @Sendable () -> Void
     ) {}
 
-    func applyNowPlaying(snapshot: NowPlayingSnapshot) {}
+    func applyNowPlaying(snapshot: NowPlayingSnapshot) {
+        nowPlayingTitles.append(snapshot.title)
+    }
 
     func applyPlaybackTime(currentTime: TimeInterval, isPlaying: Bool) {}
 
@@ -587,16 +751,33 @@ private final class PlayerManagerSpy: PlayerManaging {
         playCompletionContinuation = nil
     }
 
+    /// Завершает выбранный request заданным typed result без опоры на порядок async-задач.
+    func completePlay(
+        requestID: PlaybackRequestID,
+        result: PlaybackStartResult
+    ) {
+        controlledPlayContinuations.removeValue(forKey: requestID)?.resume(returning: result)
+    }
+
+    /// Возвращает контролируемую ошибку одному request после того, как новый request уже успешно завершился.
+    func failPlay(
+        requestID: PlaybackRequestID,
+        error: AppError
+    ) {
+        controlledPlayContinuations.removeValue(forKey: requestID)?.resume(throwing: error)
+    }
+
     /// Доставляет сохранённый сигнал так, как если бы предыдущая подготовка завершилась позднее.
     func deliverPreparedLocalFile(for trackId: UUID) async {
         guard let preparedURL = preparedURLs[trackId],
-              let handler = delayedPreparedHandlers.removeValue(forKey: trackId)
+              let delayedHandler = delayedPreparedHandlers.removeValue(forKey: trackId)
         else {
             return
         }
 
-        await handler(
+        delayedHandler.handler(
             PlayerPreparedLocalFile(
+                requestID: delayedHandler.requestID,
                 trackId: trackId,
                 fileURL: preparedURL
             )
@@ -753,9 +934,13 @@ private final class PlayerEventObserverSpy: PlayerEventObserving {
 /// Не показывает UI-сообщения: waveform не должен создавать пользовательские ошибки.
 @MainActor
 private final class ToastPresenterSpy: ToastPresenting {
+    private(set) var errors: [AppError] = []
+
     func handle(_ event: ToastEvent, duration: TimeInterval) {}
 
-    func handle(_ error: AppError) {}
+    func handle(_ error: AppError) {
+        errors.append(error)
+    }
 }
 
 /// Не загружает production-фонотеку в unit-тестах waveform.

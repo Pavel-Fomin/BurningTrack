@@ -9,8 +9,8 @@
 
 import Foundation
 
-/// Создаёт runtime snapshot трека.
-protocol TrackRuntimeSnapshotBuilding {
+/// Создаёт runtime snapshot трека из Sendable идентификатора без screen-local mutable state.
+protocol TrackRuntimeSnapshotBuilding: Sendable {
     /// Собирает runtime snapshot по идентификатору физического трека.
     func buildSnapshot(forTrackId trackId: UUID) async throws -> TrackRuntimeSnapshot?
 }

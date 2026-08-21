@@ -15,9 +15,14 @@ struct LibraryTracksScreenFactory {
     private let tracksProvider: LibraryTracksProvider
     private let badgeProvider: TrackListBadgeProvider
     private let makeEventProvider: () -> any LibraryTrackEventProvider
+    /// Общий runtime store передаётся из Composition Root всем destination фонотеки.
+    private let runtimeSnapshotStore: any TrackRuntimeSnapshotStoring
+    /// Один builder сохраняет каноничный путь загрузки metadata для controller-а.
+    private let runtimeSnapshotBuilder: any TrackRuntimeSnapshotBuilding
     private let settingsManager: AppSettingsManager
     private let trackRegistry: TrackRegistry
-    private let musicLibraryManager: MusicLibraryManager
+    /// Screen-flow зависит только от capability синхронизации текущей папки.
+    private let musicLibraryManager: any LibraryFolderSyncing
     private let playbackStateProvider: any PlaybackStateProviding
     private let playbackController: any TrackPlaybackControlling
     private let favoriteTrackIdsProvider: any FavoriteTrackIdsProviding
@@ -38,9 +43,11 @@ struct LibraryTracksScreenFactory {
         tracksProvider: LibraryTracksProvider,
         badgeProvider: TrackListBadgeProvider,
         makeEventProvider: @escaping () -> any LibraryTrackEventProvider,
+        runtimeSnapshotStore: any TrackRuntimeSnapshotStoring,
+        runtimeSnapshotBuilder: any TrackRuntimeSnapshotBuilding,
         settingsManager: AppSettingsManager,
         trackRegistry: TrackRegistry,
-        musicLibraryManager: MusicLibraryManager,
+        musicLibraryManager: any LibraryFolderSyncing,
         playbackStateProvider: any PlaybackStateProviding,
         playbackController: any TrackPlaybackControlling,
         favoriteTrackIdsProvider: any FavoriteTrackIdsProviding,
@@ -58,6 +65,8 @@ struct LibraryTracksScreenFactory {
         self.tracksProvider = tracksProvider
         self.badgeProvider = badgeProvider
         self.makeEventProvider = makeEventProvider
+        self.runtimeSnapshotStore = runtimeSnapshotStore
+        self.runtimeSnapshotBuilder = runtimeSnapshotBuilder
         self.settingsManager = settingsManager
         self.trackRegistry = trackRegistry
         self.musicLibraryManager = musicLibraryManager
@@ -284,7 +293,10 @@ struct LibraryTracksScreenFactory {
             tracksProvider: tracksProvider,
             badgeProvider: badgeProvider,
             eventProvider: makeEventProvider(),
-            runtimeController: LibraryTrackRuntimeController(),
+            runtimeController: LibraryTrackRuntimeController(
+                runtimeSnapshotStore: runtimeSnapshotStore,
+                runtimeSnapshotBuilder: runtimeSnapshotBuilder
+            ),
             settingsManager: settingsManager,
             trackRegistry: trackRegistry,
             musicLibraryManager: musicLibraryManager,

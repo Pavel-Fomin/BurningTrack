@@ -181,7 +181,8 @@ final class LibraryUnavailableCollectionNavigatorSpy: TrackCollectionIdentifierN
 }
 
 /// Не выполняет добавление в очередь в проверке presentation-намерения.
-actor LibraryUnavailablePlayerAddingSpy: LibraryTrackPlayerAdding {
+@MainActor
+final class LibraryUnavailablePlayerAddingSpy: LibraryTrackPlayerAdding {
     func addTrackToPlayer(trackId: UUID) async throws -> TrackAddedToPlayerSuccess {
         throw LibraryUnavailableTestError.unexpectedCall
     }

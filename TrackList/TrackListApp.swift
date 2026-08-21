@@ -152,7 +152,11 @@ struct TrackListApp: App {
         )
         let fastLibraryTrackProvider = FastLibraryTracksProvider()
         let playerEventObserver = NotificationPlayerEventObserver()
-        let runtimeSnapshotController = PlayerRuntimeSnapshotController()
+        let runtimeSnapshotController = PlayerRuntimeSnapshotController(
+            runtimeSnapshotStore: runtimeSnapshotStore,
+            runtimeSnapshotBuilder: runtimeSnapshotBuilder,
+            artworkProvider: artworkImageProvider
+        )
         let waveformGenerator = WaveformCachedGenerator(
             generator: WaveformGenerator(),
             cache: WaveformFileCache()
@@ -274,6 +278,8 @@ struct TrackListApp: App {
             tracksProvider: FastLibraryTracksProvider(),
             badgeProvider: DefaultTrackListBadgeProvider(),
             makeEventProvider: { NotificationLibraryTrackEventProvider() },
+            runtimeSnapshotStore: runtimeSnapshotStore,
+            runtimeSnapshotBuilder: runtimeSnapshotBuilder,
             settingsManager: appSettingsManager,
             trackRegistry: trackRegistry,
             musicLibraryManager: musicLibraryManager,
@@ -335,7 +341,9 @@ struct TrackListApp: App {
             ),
             collectionValuesFeatureFactory: LibraryCollectionValuesFeatureFactory(
                 trackRegistry: trackRegistry,
-                playbackStateProvider: playbackStateProvider
+                playbackStateProvider: playbackStateProvider,
+                runtimeSnapshotStore: runtimeSnapshotStore,
+                runtimeSnapshotBuilder: runtimeSnapshotBuilder
             ),
             purchasedITunesFeatureFactory: purchasedITunesFeatureFactory,
             folderViewModelFactory: LibraryFolderViewModelFactory(
@@ -354,6 +362,8 @@ struct TrackListApp: App {
                 trackListsManager: trackListsManager,
                 trackListManager: trackListManager
             ),
+            runtimeSnapshotStore: runtimeSnapshotStore,
+            runtimeSnapshotBuilder: runtimeSnapshotBuilder,
             settingsManager: appSettingsManager,
             toastPresenter: toastManager,
             favoriteTrackIdsProvider: favoriteTrackIdsProvider,

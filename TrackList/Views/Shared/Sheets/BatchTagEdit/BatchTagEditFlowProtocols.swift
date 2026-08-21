@@ -26,6 +26,8 @@ protocol BatchTagEditMetadataLoading {
 }
 
 /// Выполняет уже подготовленный план массовой записи тегов.
+/// Общая команда стартует на MainActor, сохраняя единую точку пользовательского намерения.
+@MainActor
 protocol BatchTagEditSaveExecuting {
     /// Последовательно применяет команды плана и возвращает общий результат.
     func execute(plan: BatchTagEditSavePlan) async -> BatchTagEditSaveResult
@@ -39,13 +41,15 @@ protocol BatchTagArtworkDataProviding: AnyObject {
 }
 
 /// Подготавливает новую replacement artwork вне SwiftUI View.
-protocol BatchTagArtworkPreparing {
+/// Stateless adapter безопасно пересекает async-границу, передавая только Data.
+protocol BatchTagArtworkPreparing: Sendable {
     /// Нормализует выбранное пользователем изображение.
     func prepareReplacementArtwork(data: Data) async throws -> Data
 }
 
 /// Сжимает artwork с выбранным ограничением размера вне SwiftUI View.
-protocol BatchTagArtworkCompressing {
+/// Stateless adapter безопасно пересекает async-границу, передавая только Data.
+protocol BatchTagArtworkCompressing: Sendable {
     /// Возвращает JPEG-данные artwork после сжатия.
     func compressArtwork(
         data: Data,
@@ -54,7 +58,7 @@ protocol BatchTagArtworkCompressing {
 }
 
 /// Production-адаптер существующего общего сервиса подготовки artwork.
-struct BatchTagArtworkPreparer: BatchTagArtworkPreparing {
+struct BatchTagArtworkPreparer: Sendable, BatchTagArtworkPreparing {
     /// Применяет заданные feature параметры нормализации замены обложки.
     func prepareReplacementArtwork(data: Data) async throws -> Data {
         try await ArtworkPreparationService.prepare(
@@ -68,7 +72,7 @@ struct BatchTagArtworkPreparer: BatchTagArtworkPreparing {
 }
 
 /// Production-адаптер существующего domain-компрессора artwork.
-struct BatchTagArtworkCompressionService: BatchTagArtworkCompressing {
+struct BatchTagArtworkCompressionService: Sendable, BatchTagArtworkCompressing {
     /// Делегирует сжатие текущему domain-алгоритму без изменения его семантики.
     func compressArtwork(
         data: Data,

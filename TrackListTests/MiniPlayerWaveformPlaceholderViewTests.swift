@@ -11,6 +11,7 @@ import CoreGraphics
 import XCTest
 @testable import TrackList
 
+@MainActor
 final class MiniPlayerWaveformPlaceholderViewTests: XCTestCase {
 
     /// Высота заглушки соответствует контейнеру готовой waveform и не меняет разметку мини-плеера.

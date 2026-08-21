@@ -24,11 +24,35 @@ import CoreGraphics
 @MainActor
 final class PlayerRuntimeSnapshotController {
 
+    private struct SnapshotGeneration: Equatable, Sendable {
+        let global: UInt64
+        let track: UInt64
+    }
+
     private(set) var snapshotsByTrackId: [UUID: TrackRuntimeSnapshot] = [:]
     private(set) var nowPlayingArtworkByTrackId: [UUID: CGImage] = [:]
+    /// Общий store передаётся слоем сборки и остаётся быстрым источником уже готовых данных.
+    private let runtimeSnapshotStore: any TrackRuntimeSnapshotStoring
+    /// Builder внедряется для управляемой проверки позднего асинхронного завершения.
+    private let runtimeSnapshotBuilder: any TrackRuntimeSnapshotBuilding
+    /// Provider обложек разделяет рабочий кэш, но не владеет состоянием controller-а.
+    private let artworkProvider: any ArtworkImageProviding
+    /// Полная очистка инвалидирует все ранее захваченные поколения одним счётчиком.
+    private var globalGeneration: UInt64 = 0
+    /// Точечный TrackUpdateEvent затрагивает только свой physical track ID.
+    private var generationByTrackId: [UUID: UInt64] = [:]
 
-    /// Позволяет создавать контроллер как зависимость по умолчанию в init PlayerViewModel.
-    nonisolated init() {}
+    /// Рабочие зависимости передаются корнем композиции, чтобы controller не разрешал
+    /// application-wide singleton самостоятельно.
+    init(
+        runtimeSnapshotStore: any TrackRuntimeSnapshotStoring,
+        runtimeSnapshotBuilder: any TrackRuntimeSnapshotBuilding,
+        artworkProvider: any ArtworkImageProviding
+    ) {
+        self.runtimeSnapshotStore = runtimeSnapshotStore
+        self.runtimeSnapshotBuilder = runtimeSnapshotBuilder
+        self.artworkProvider = artworkProvider
+    }
 
     /// Возвращает runtime snapshot по trackId.
     func snapshot(for trackId: UUID) -> TrackRuntimeSnapshot? {
@@ -49,16 +73,22 @@ final class PlayerRuntimeSnapshotController {
             return nil
         }
 
+        // Поколение фиксируется до ожидания. TrackUpdateEvent или clear во время сборки
+        // делают поздний результат устаревшим, поэтому он больше не меняет controller.
+        let generation = snapshotGeneration(for: trackId)
+
         // 1. Получаем snapshot из store или собираем через builder.
         let snapshot: TrackRuntimeSnapshot?
 
-        if let storedSnapshot = TrackRuntimeStore.shared.snapshot(forTrackId: trackId) {
+        if let storedSnapshot = runtimeSnapshotStore.snapshot(forTrackId: trackId) {
             snapshot = storedSnapshot
         } else {
-            snapshot = try? await TrackRuntimeSnapshotBuilder.shared.buildSnapshot(forTrackId: trackId)
+            snapshot = try? await runtimeSnapshotBuilder.buildSnapshot(forTrackId: trackId)
         }
 
-        guard let snapshot else {
+        guard let snapshot,
+              Task.isCancelled == false,
+              isCurrent(generation, for: trackId) else {
             return nil
         }
 
@@ -71,6 +101,10 @@ final class PlayerRuntimeSnapshotController {
     func applyTrackUpdateEvent(_ updateEvent: TrackUpdateEvent) -> UUID {
 
         let trackId = updateEvent.trackId
+
+        // TrackUpdateEvent несёт более новый достоверный snapshot и инвалидирует
+        // незавершённую сборку только этого трека до записи нового состояния.
+        invalidateSnapshotGeneration(for: trackId)
 
         // 1. Обновляем локальный snapshot.
         snapshotsByTrackId[trackId] = updateEvent.snapshot
@@ -91,7 +125,11 @@ final class PlayerRuntimeSnapshotController {
         guard nowPlayingArtworkByTrackId[trackId] == nil else { return nil }
         guard let sourceIdentifier else { return nil }
 
-        let image = await ArtworkProvider.shared.image(
+        // Artwork использует то же поколение, что и snapshot, чтобы clear без revision
+        // не позволял позднему результату подготовки изображения воскресить удалённую обложку.
+        let generation = snapshotGeneration(for: trackId)
+
+        let image = await artworkProvider.image(
             for: ArtworkRequest(
                 trackId: trackId,
                 artworkData: artworkData,
@@ -100,7 +138,11 @@ final class PlayerRuntimeSnapshotController {
                 revision: revision
             )
         )
-        guard !Task.isCancelled, let cgImage = image?.cgImage else { return nil }
+        guard !Task.isCancelled,
+              isCurrent(generation, for: trackId),
+              let cgImage = image?.cgImage else {
+            return nil
+        }
 
         // Snapshot мог обновиться, пока общая очередь готовила прежнюю ревизию.
         if let revision,
@@ -114,7 +156,25 @@ final class PlayerRuntimeSnapshotController {
 
     /// Очищает все snapshot-данные.
     func clear() {
+        // Общее поколение инвалидирует все ранее начатые запросы snapshot и artwork.
+        globalGeneration &+= 1
+        generationByTrackId.removeAll()
         snapshotsByTrackId.removeAll()
         nowPlayingArtworkByTrackId.removeAll()
+    }
+
+    private func snapshotGeneration(for trackId: UUID) -> SnapshotGeneration {
+        SnapshotGeneration(
+            global: globalGeneration,
+            track: generationByTrackId[trackId, default: 0]
+        )
+    }
+
+    private func isCurrent(_ generation: SnapshotGeneration, for trackId: UUID) -> Bool {
+        generation == snapshotGeneration(for: trackId)
+    }
+
+    private func invalidateSnapshotGeneration(for trackId: UUID) {
+        generationByTrackId[trackId, default: 0] &+= 1
     }
 }

@@ -16,6 +16,7 @@ enum TrackListStorageError: Error {
     case saveFailed(trackListId: UUID)
 }
 
+@MainActor
 final class TrackListManager {
     
     static let shared = TrackListManager()
@@ -195,7 +196,7 @@ final class TrackListManager {
 extension TrackListManager: TrackListManaging {
 
     /// Сохраняет треки и уведомляет об изменении списка треклистов.
-    nonisolated func saveTracks(_ tracks: [Track], for id: UUID) -> Bool {
+    func saveTracks(_ tracks: [Track], for id: UUID) -> Bool {
         saveTracks(
             tracks,
             for: id,
@@ -205,7 +206,7 @@ extension TrackListManager: TrackListManaging {
     }
 
     /// Сохраняет треки с возможностью передать публикацию точечного события вызывающему сервису.
-    nonisolated func saveTracks(
+    func saveTracks(
         _ tracks: [Track],
         for id: UUID,
         publishesFavoritesEvents: Bool

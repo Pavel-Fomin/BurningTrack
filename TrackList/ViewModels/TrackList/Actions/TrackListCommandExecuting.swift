@@ -9,7 +9,8 @@
 
 import Foundation
 
-/// Выполняет команды изменения одного треклиста.
+/// Выполняет команды изменения одного треклиста через MainActor-bound application command flow.
+@MainActor
 protocol TrackListCommandExecuting {
     /// Удаляет строку трека из треклиста.
     func removeTrackFromTrackList(

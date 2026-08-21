@@ -25,7 +25,8 @@ enum TrackUpdateCoordinatorError: Error {
     case updateFailed(trackId: UUID, underlying: Error)
 }
 
-final class TrackUpdateCoordinator {
+/// Coordinator не хранит mutable state: состояние остаётся у TrackRuntimeStore и других явных owner-ов.
+final class TrackUpdateCoordinator: Sendable {
 
     // MARK: - Единый экземпляр
 
@@ -57,7 +58,7 @@ final class TrackUpdateCoordinator {
         changedFields: Set<TrackChangedField>,
         previousURL: URL? = nil
     ) async throws -> TrackUpdateEvent? {
-        guard let updateEvent = try await makeTrackUpdateEvent(
+        guard let updateEvent = try await prepareTrackUpdate(
             forTrackId: trackId,
             reason: reason,
             changedFields: changedFields,
@@ -65,7 +66,7 @@ final class TrackUpdateCoordinator {
         ) else { return nil }
 
         // Публикуем событие только после успешного сохранения snapshot metadata в SQLite.
-        await publishTrackUpdateEvent(updateEvent)
+        await Self.publishTrackUpdateEvent(updateEvent)
 
         return updateEvent
     }
@@ -77,11 +78,39 @@ final class TrackUpdateCoordinator {
     /// - пересобирает runtime snapshot;
     /// - публикует track update event.
     func handleTrackUpdates(_ updates: [TrackUpdateRequest]) async throws -> [TrackUpdateEvent] {
+        let events = try await prepareTrackUpdates(updates)
+
+        // Пакетное событие публикуется только для полностью подготовленного набора успешно сохранённых snapshot.
+        await Self.publishTrackBatchUpdateEvent(events)
+
+        return events
+    }
+
+    /// Подготавливает post-update одного трека без немедленной публикации события.
+    ///
+    /// Batch filename rename вызывает этот шаг внутри per-track ownership, а одно
+    /// общее событие публикует только после подготовки всего успешного набора.
+    func prepareTrackUpdate(
+        forTrackId trackId: UUID,
+        reason: TrackUpdateReason,
+        changedFields: Set<TrackChangedField>,
+        previousURL: URL? = nil
+    ) async throws -> TrackUpdateEvent? {
+        try await makeTrackUpdateEvent(
+            forTrackId: trackId,
+            reason: reason,
+            changedFields: changedFields,
+            previousURL: previousURL
+        )
+    }
+
+    /// Подготавливает весь batch без публикации, сохраняя прежний контракт частичной ошибки по trackId.
+    func prepareTrackUpdates(_ updates: [TrackUpdateRequest]) async throws -> [TrackUpdateEvent] {
         var events: [TrackUpdateEvent] = []
 
         for update in updates {
             do {
-                if let event = try await makeTrackUpdateEvent(
+                if let event = try await prepareTrackUpdate(
                     forTrackId: update.trackId,
                     reason: .fileRenamed,
                     changedFields: [.fileName],
@@ -98,10 +127,12 @@ final class TrackUpdateCoordinator {
             }
         }
 
-        // Пакетное событие публикуется только для полностью подготовленного набора успешно сохранённых snapshot.
-        await publishTrackBatchUpdateEvent(events)
-
         return events
+    }
+
+    /// Публикует подготовленный batch только после завершения ownership всех его файлов.
+    func publishTrackBatchUpdateEvents(_ updateEvents: [TrackUpdateEvent]) async {
+        await Self.publishTrackBatchUpdateEvent(updateEvents)
     }
 
     /// Собирает событие обновления трека без публикации NotificationCenter.
@@ -192,7 +223,7 @@ final class TrackUpdateCoordinator {
     ///
     /// - Parameter updateEvent: Готовое событие обновления
     @MainActor
-    private func publishTrackUpdateEvent(_ updateEvent: TrackUpdateEvent) {
+    private static func publishTrackUpdateEvent(_ updateEvent: TrackUpdateEvent) {
         NotificationCenter.default.post(name: .trackDidUpdate, object: updateEvent)
     }
 
@@ -200,7 +231,7 @@ final class TrackUpdateCoordinator {
     ///
     /// - Parameter updateEvents: Готовые события обновления треков
     @MainActor
-    private func publishTrackBatchUpdateEvent(_ updateEvents: [TrackUpdateEvent]) {
+    private static func publishTrackBatchUpdateEvent(_ updateEvents: [TrackUpdateEvent]) {
         guard !updateEvents.isEmpty else { return }
 
         NotificationCenter.default.post(

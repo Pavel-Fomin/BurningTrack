@@ -86,7 +86,7 @@ final class MoveToFolderFlowTests: XCTestCase {
         XCTAssertTrue(flow.viewModel.state.isPerformingOperation)
         XCTAssertFalse(flow.viewModel.state.canSubmit)
 
-        await executor.completeMove(
+        executor.completeMove(
             with: .success(
                 makeMoveSuccess(
                     trackID: flow.track.trackId,
@@ -100,7 +100,7 @@ final class MoveToFolderFlowTests: XCTestCase {
         let destinationFolderID = UUID()
         let executor = MoveToFolderCommandExecutorSpy()
         let flow = makeFlow(executor: executor)
-        await executor.setMoveResult(
+        executor.setMoveResult(
             .success(
                 makeMoveSuccess(
                     trackID: flow.track.trackId,
@@ -113,7 +113,7 @@ final class MoveToFolderFlowTests: XCTestCase {
         flow.viewModel.send(.submitTapped)
         await settleTaskQueue()
 
-        let request = await executor.moveRequests.first
+        let request = executor.moveRequests.first
         XCTAssertEqual(request?.trackID, flow.track.trackId)
         XCTAssertEqual(request?.destinationFolderID, destinationFolderID)
         XCTAssertEqual(request?.busyCheckerID, ObjectIdentifier(flow.busyChecker))
@@ -128,7 +128,7 @@ final class MoveToFolderFlowTests: XCTestCase {
         let destinationFolderID = UUID()
         let executor = MoveToFolderCommandExecutorSpy()
         let flow = makeFlow(executor: executor)
-        await executor.setMoveResult(.failure(AppError.fileNotFound))
+        executor.setMoveResult(.failure(AppError.fileNotFound))
 
         flow.viewModel.send(.folderSelectionChanged(destinationFolderID))
         flow.viewModel.send(.submitTapped)
@@ -141,7 +141,7 @@ final class MoveToFolderFlowTests: XCTestCase {
             return XCTFail("AppError должен остаться в AppCommandToastPresenter mapping")
         }
 
-        await executor.setMoveResult(
+        executor.setMoveResult(
             .success(
                 makeMoveSuccess(
                     trackID: flow.track.trackId,
@@ -152,7 +152,7 @@ final class MoveToFolderFlowTests: XCTestCase {
         flow.viewModel.send(.submitTapped)
         await settleTaskQueue()
 
-        let moveRequestCount = await executor.moveRequests.count
+        let moveRequestCount = executor.moveRequests.count
         XCTAssertEqual(moveRequestCount, 2)
         XCTAssertEqual(flow.router.dismissedRouteIDs, [flow.data.id])
     }
@@ -160,7 +160,7 @@ final class MoveToFolderFlowTests: XCTestCase {
     func testMoveGenericErrorShowsFileMoveFailedAndKeepsRouteOpen() async {
         let executor = MoveToFolderCommandExecutorSpy()
         let flow = makeFlow(executor: executor)
-        await executor.setMoveResult(.failure(MoveToFolderTestError.failed))
+        executor.setMoveResult(.failure(MoveToFolderTestError.failed))
 
         flow.viewModel.send(.folderSelectionChanged(UUID()))
         flow.viewModel.send(.submitTapped)
@@ -182,7 +182,7 @@ final class MoveToFolderFlowTests: XCTestCase {
             track: purchasedTrack,
             executor: executor
         )
-        await executor.setCopyResult(
+        executor.setCopyResult(
             .success(
                 CopyPurchasedITunesTrackSuccess(
                     sourceTrackId: purchasedTrack.trackId,
@@ -197,7 +197,7 @@ final class MoveToFolderFlowTests: XCTestCase {
         flow.viewModel.send(.submitTapped)
         await settleTaskQueue()
 
-        let request = await executor.copyRequests.first
+        let request = executor.copyRequests.first
         XCTAssertEqual(request?.trackID, purchasedTrack.trackId)
         XCTAssertEqual(request?.destinationFolderID, destinationFolderID)
         XCTAssertEqual(flow.router.dismissedRouteIDs, [flow.data.id])
@@ -224,8 +224,8 @@ final class MoveToFolderFlowTests: XCTestCase {
             ]
         )
         XCTAssertTrue(flow.router.dismissedRouteIDs.isEmpty)
-        let moveRequests = await executor.moveRequests
-        let copyRequests = await executor.copyRequests
+        let moveRequests = executor.moveRequests
+        let copyRequests = executor.copyRequests
         XCTAssertTrue(moveRequests.isEmpty)
         XCTAssertTrue(copyRequests.isEmpty)
     }
@@ -237,7 +237,7 @@ final class MoveToFolderFlowTests: XCTestCase {
             track: makePurchasedTrack(),
             executor: executor
         )
-        await executor.setCopyResult(.failure(AppError.purchasedITunesCopyFailed))
+        executor.setCopyResult(.failure(AppError.purchasedITunesCopyFailed))
 
         flow.viewModel.send(.folderSelectionChanged(UUID()))
         flow.viewModel.send(.submitTapped)
@@ -257,7 +257,7 @@ final class MoveToFolderFlowTests: XCTestCase {
             track: makePurchasedTrack(),
             executor: executor
         )
-        await executor.setCopyResult(.failure(MoveToFolderTestError.failed))
+        executor.setCopyResult(.failure(MoveToFolderTestError.failed))
 
         flow.viewModel.send(.folderSelectionChanged(UUID()))
         flow.viewModel.send(.submitTapped)
@@ -285,10 +285,10 @@ final class MoveToFolderFlowTests: XCTestCase {
         flow.viewModel.send(.submitTapped)
         await waitForMoveCallCount(1, from: executor)
 
-        let moveRequestCount = await executor.moveRequestCount
+        let moveRequestCount = executor.moveRequestCount
         XCTAssertEqual(moveRequestCount, 1)
 
-        await executor.completeMove(
+        executor.completeMove(
             with: .success(
                 makeMoveSuccess(
                     trackID: flow.track.trackId,
@@ -308,7 +308,7 @@ final class MoveToFolderFlowTests: XCTestCase {
         await waitForMoveCallCount(1, from: executor)
         flow.viewModel.send(.closeTapped)
 
-        await executor.completeMove(
+        executor.completeMove(
             with: .success(
                 makeMoveSuccess(
                     trackID: flow.track.trackId,
@@ -318,7 +318,7 @@ final class MoveToFolderFlowTests: XCTestCase {
         )
         await settleTaskQueue()
 
-        let moveRequestCount = await executor.moveRequestCount
+        let moveRequestCount = executor.moveRequestCount
         XCTAssertEqual(moveRequestCount, 1)
         XCTAssertEqual(flow.router.dismissedRouteIDs, [flow.data.id])
         XCTAssertTrue(flow.toast.events.isEmpty)
@@ -335,7 +335,7 @@ final class MoveToFolderFlowTests: XCTestCase {
         await waitForMoveCallCount(1, from: executor)
         flow.viewModel.send(.sheetDisappeared)
 
-        await executor.completeMove(
+        executor.completeMove(
             with: .success(
                 makeMoveSuccess(
                     trackID: flow.track.trackId,
@@ -505,7 +505,7 @@ final class MoveToFolderFlowTests: XCTestCase {
         from executor: MoveToFolderDeferredCommandExecutorSpy
     ) async {
         for _ in 0..<128 {
-            if await executor.moveRequestCount >= expectedCount {
+            if executor.moveRequestCount >= expectedCount {
                 return
             }
             await Task.yield()
@@ -630,8 +630,9 @@ private actor MoveToFolderDeferredTrackRegistrySpy: MoveToFolderTrackRegistryRea
     }
 }
 
-/// Выполняет immediate command outcomes и фиксирует точные аргументы Move To Folder.
-private actor MoveToFolderCommandExecutorSpy: MoveToFolderCommandExecuting {
+/// MainActor-double фиксирует точные аргументы Move To Folder в едином command flow.
+@MainActor
+private final class MoveToFolderCommandExecutorSpy: MoveToFolderCommandExecuting {
     struct MoveRequest {
         let trackID: UUID
         let destinationFolderID: UUID
@@ -682,8 +683,9 @@ private actor MoveToFolderCommandExecutorSpy: MoveToFolderCommandExecuting {
     }
 }
 
-/// Удерживает move command после submit, чтобы проверить repeated и stale completion сценарии.
-private actor MoveToFolderDeferredCommandExecutorSpy: MoveToFolderCommandExecuting {
+/// Удерживает move command на MainActor после submit, чтобы проверить repeated и stale completion сценарии.
+@MainActor
+private final class MoveToFolderDeferredCommandExecutorSpy: MoveToFolderCommandExecuting {
     private var moveContinuations: [CheckedContinuation<Result<MoveTrackSuccess, Error>, Never>] = []
     private(set) var moveRequestCount = 0
 

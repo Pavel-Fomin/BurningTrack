@@ -10,6 +10,7 @@
 import Foundation
 import SwiftUI
 
+@MainActor
 struct ScrollSpeedObserver: View {
     @ObservedObject var model: ScrollSpeedModel
     var body: some View {
@@ -20,9 +21,11 @@ struct ScrollSpeedObserver: View {
 #if os(iOS) || targetEnvironment(macCatalyst)
 import UIKit
 
+@MainActor
 private struct _PlatformObserver: UIViewRepresentable {
     @ObservedObject var model: ScrollSpeedModel
 
+    @MainActor
     final class ProxyView: UIView {
         weak var scrollView: UIScrollView?
         var lastTime: CFTimeInterval = CACurrentMediaTime()
@@ -34,7 +37,7 @@ private struct _PlatformObserver: UIViewRepresentable {
         }
 
         private func attach() {
-            DispatchQueue.main.async { [weak self] in
+            Task { @MainActor [weak self] in
                 guard let self else { return }
                 // ищем ближайший UIScrollView вверх по иерархии
                 var view: UIView? = self
@@ -48,9 +51,17 @@ private struct _PlatformObserver: UIViewRepresentable {
             }
         }
 
-        override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
-            guard keyPath == #keyPath(UIScrollView.contentOffset),
-                  let sv = scrollView else { return }
+        nonisolated override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
+            guard keyPath == "contentOffset" else { return }
+
+            // KVO callback не получает MainActor isolation от UIKit; mutable UI-state остаётся в ProxyView.
+            Task { @MainActor [weak self] in
+                self?.reportScrollVelocity()
+            }
+        }
+
+        private func reportScrollVelocity() {
+            guard let sv = scrollView else { return }
             let now = CACurrentMediaTime()
             let dt = max(now - lastTime, 0.001)
             let dy = sv.contentOffset.y - lastOffsetY
@@ -63,7 +74,7 @@ private struct _PlatformObserver: UIViewRepresentable {
             lastOffsetY = sv.contentOffset.y
         }
 
-        deinit {
+        isolated deinit {
             if let sv = scrollView {
                 sv.removeObserver(self, forKeyPath: #keyPath(UIScrollView.contentOffset))
             }
@@ -72,9 +83,12 @@ private struct _PlatformObserver: UIViewRepresentable {
 
     func makeUIView(context: Context) -> ProxyView {
         let v = ProxyView()
+        let model = model
         NotificationCenter.default.addObserver(forName: ._scrollVelocityDidUpdate, object: nil, queue: .main) { note in
             if let v = note.userInfo?["v"] as? CGFloat {
-                model.report(velocityAbs: v)
+                Task { @MainActor in
+                    model.report(velocityAbs: v)
+                }
             }
         }
         return v

@@ -14,6 +14,7 @@
 
 import Foundation
 
+@MainActor
 final class DefaultTrackListBadgeProvider: TrackListBadgeProvider {
 
     // MARK: - Публичное

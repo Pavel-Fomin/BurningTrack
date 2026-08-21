@@ -1,6 +1,7 @@
 import Foundation
 
 /// Добавляет локальный трек в очередь без раскрытия строке AppCommandExecutor.
+@MainActor
 protocol LibraryTrackPlayerAdding: AnyObject {
     /// Выполняет существующую доменную команду добавления трека в плеер.
     func addTrackToPlayer(trackId: UUID) async throws -> TrackAddedToPlayerSuccess

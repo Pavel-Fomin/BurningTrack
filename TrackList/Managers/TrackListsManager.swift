@@ -13,6 +13,7 @@
 
 import Foundation
 
+@MainActor
 final class TrackListsManager {
     
     static let shared = TrackListsManager()

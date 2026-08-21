@@ -10,7 +10,7 @@
 import Foundation
 
 
-final class DefaultLibraryTracksProvider: LibraryTracksProvider {
+final class DefaultLibraryTracksProvider: LibraryTracksProvider, Sendable {
 
     func tracks(for source: LibraryTrackListSource) async -> [LibraryTrack] {
         switch source {

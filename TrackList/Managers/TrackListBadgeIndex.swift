@@ -15,6 +15,7 @@
 
 import Foundation
 
+@MainActor
 final class TrackListBadgeIndex {
 
     static let shared = TrackListBadgeIndex()
@@ -42,7 +43,7 @@ final class TrackListBadgeIndex {
         }
     }
 
-    deinit {
+    isolated deinit {
         for observer in observers {
             NotificationCenter.default.removeObserver(observer)
         }
@@ -93,7 +94,10 @@ final class TrackListBadgeIndex {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.rebuild()
+            // NotificationCenter не наследует MainActor, поэтому callback возвращается к owner-у индекса.
+            Task { @MainActor [weak self] in
+                self?.rebuild()
+            }
         }
 
         let trackListTracksObserver = NotificationCenter.default.addObserver(
@@ -101,7 +105,9 @@ final class TrackListBadgeIndex {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.rebuild()
+            Task { @MainActor [weak self] in
+                self?.rebuild()
+            }
         }
 
         observers.append(trackListsObserver)

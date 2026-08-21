@@ -12,6 +12,8 @@ import Combine
 
 enum ScrollSpeedState { case slow, fast }
 
+/// Скорость прокрутки является transient UI-state и изменяется только владельцем MainActor.
+@MainActor
 final class ScrollSpeedModel: ObservableObject {
     @Published private(set) var state: ScrollSpeedState = .slow
 

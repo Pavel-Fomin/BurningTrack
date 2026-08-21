@@ -10,6 +10,7 @@
 import Foundation
 import SwiftUI
 
+@MainActor
 final class ErrorHandler: ObservableObject {
     static let shared = ErrorHandler()
 

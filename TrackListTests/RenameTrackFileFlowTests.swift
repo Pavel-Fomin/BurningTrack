@@ -67,7 +67,7 @@ final class RenameTrackFileFlowTests: XCTestCase {
 
     func testDismissAlertClearsTypedAlertState() async {
         let (viewModel, executor, _, _, _) = makeViewModel()
-        await executor.setOutcomes([.appError(.fileAlreadyExists)])
+        executor.setOutcomes([.appError(.fileAlreadyExists)])
 
         viewModel.send(.fileNameChanged("Conflict"))
         viewModel.send(.rename)
@@ -96,7 +96,7 @@ final class RenameTrackFileFlowTests: XCTestCase {
         )
 
         XCTAssertEqual(presentation, .close)
-        let requests = await executor.requests()
+        let requests = executor.requests()
         XCTAssertEqual(requests.count, 1)
         XCTAssertEqual(requests.first?.trackId, trackId)
         XCTAssertEqual(requests.first?.newFileName, "New Name.m4a")
@@ -128,7 +128,7 @@ final class RenameTrackFileFlowTests: XCTestCase {
 
     func testConfirmStopPlaybackReleasesFileAndRepeatsRename() async {
         let executor = RenameTrackFileExecutorSpy()
-        await executor.setOutcomes([.appError(.fileAccessDenied), .success])
+        executor.setOutcomes([.appError(.fileAccessDenied), .success])
         let releaser = RenameTrackFilePlaybackReleaserSpy()
         let router = RenameTrackFileRouterSpy()
         let handler = makeActionHandler(
@@ -147,14 +147,14 @@ final class RenameTrackFileFlowTests: XCTestCase {
         XCTAssertEqual(firstPresentation, .keepOpen(alert: .stopPlayback))
         XCTAssertEqual(retryPresentation, .close)
         XCTAssertEqual(releaser.releaseCount, 1)
-        let attemptCount = await executor.attemptCount()
+        let attemptCount = executor.attemptCount()
         XCTAssertEqual(attemptCount, 2)
         XCTAssertEqual(router.closeCount, 1)
     }
 
     func testConflictKeepsFlowOpenAndDoesNotReleasePlayback() async {
         let executor = RenameTrackFileExecutorSpy()
-        await executor.setOutcomes([.appError(.fileAlreadyExists)])
+        executor.setOutcomes([.appError(.fileAlreadyExists)])
         let releaser = RenameTrackFilePlaybackReleaserSpy()
         let router = RenameTrackFileRouterSpy()
         let handler = makeActionHandler(
@@ -176,7 +176,7 @@ final class RenameTrackFileFlowTests: XCTestCase {
 
     func testAppErrorUsesExistingToastAndKeepsFlowOpen() async {
         let executor = RenameTrackFileExecutorSpy()
-        await executor.setOutcomes([.appError(.fileRenameFailed)])
+        executor.setOutcomes([.appError(.fileRenameFailed)])
         let toast = RenameTrackFileToastSpy()
         let router = RenameTrackFileRouterSpy()
         let handler = makeActionHandler(
@@ -201,7 +201,7 @@ final class RenameTrackFileFlowTests: XCTestCase {
 
     func testUnknownErrorUsesExistingFailureMessageAndKeepsFlowOpen() async {
         let executor = RenameTrackFileExecutorSpy()
-        await executor.setOutcomes([.unknown])
+        executor.setOutcomes([.unknown])
         let toast = RenameTrackFileToastSpy()
         let router = RenameTrackFileRouterSpy()
         let handler = makeActionHandler(
@@ -239,13 +239,13 @@ final class RenameTrackFileFlowTests: XCTestCase {
         handler.close()
 
         XCTAssertEqual(router.closeCount, 1)
-        let requests = await executor.requests()
+        let requests = executor.requests()
         XCTAssertTrue(requests.isEmpty)
     }
 
     func testViewModelAppliesStopPlaybackPresentationThroughActionChain() async {
         let (viewModel, executor, _, _, releaser) = makeViewModel()
-        await executor.setOutcomes([.appError(.fileAccessDenied), .success])
+        executor.setOutcomes([.appError(.fileAccessDenied), .success])
 
         viewModel.send(.fileNameChanged("Renamed"))
         viewModel.send(.rename)
@@ -322,8 +322,9 @@ final class RenameTrackFileFlowTests: XCTestCase {
     }
 }
 
-/// Запоминает параметры сохранения вместо выполнения файловой операции.
-private actor RenameTrackFileExecutorSpy: RenameTrackFileCommandExecuting {
+/// MainActor-double запоминает параметры запуска файловой операции.
+@MainActor
+private final class RenameTrackFileExecutorSpy: RenameTrackFileCommandExecuting {
     private var outcomes: [RenameTrackFileExecutorOutcome] = [.success]
     private var saveRequests: [RenameTrackFileSaveRequest] = []
     private var attempts = 0

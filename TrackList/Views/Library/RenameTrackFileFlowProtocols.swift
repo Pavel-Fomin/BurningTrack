@@ -10,6 +10,8 @@
 import Foundation
 
 /// Выполняет существующую команду сохранения изменений одного трека.
+/// MainActor сохраняет запуск через единый application command flow, не меняя actor-owner файловой операции.
+@MainActor
 protocol RenameTrackFileCommandExecuting {
     /// Сохраняет новое имя файла вместе с согласованным post-update pipeline.
     func saveTrackEdits(

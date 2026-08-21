@@ -27,17 +27,18 @@ protocol BatchFilenameRenameMetadataLoading {
     /// Возвращает immutable подготовленные треки для route snapshot.
     func loadTracks(
         from seeds: [BatchFilenameRenameTrackSeed],
-        progress: @escaping @MainActor (Int, Int) -> Void
+        progress: @escaping @MainActor @Sendable (Int, Int) -> Void
     ) async -> [BatchFilenameRenameTrack]
 }
 
 /// Выполняет существующий writer массового переименования файлов.
+@MainActor
 protocol BatchFilenameRenameCommandExecuting {
     /// Применяет готовые команды и передаёт progress каждой завершённой строки.
     func renameTrackFilesBatch(
         _ commands: [BatchFilenameRenameCommand],
         using fileBusyChecker: any TrackFileBusyChecking,
-        progress: (@MainActor (_ processed: Int, _ total: Int) -> Void)?
+        progress: (@MainActor @Sendable (_ processed: Int, _ total: Int) -> Void)?
     ) async -> BatchFilenameRenameResult
 }
 

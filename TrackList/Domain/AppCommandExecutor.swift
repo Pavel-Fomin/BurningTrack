@@ -24,13 +24,47 @@ import Foundation
 /// - AppCommandExecutor выполняет сценарий
 /// - UI обновляется реактивно от состояния
 ///
-actor AppCommandExecutor {
+/// MainActor является границей пользовательских намерений, а длительная файловая работа
+/// остаётся у её actor-owner-ов. Это не заменяет per-track ownership coordinator-а.
+@MainActor
+final class AppCommandExecutor {
     
     // MARK: - Зависимости
     
-    private let tagsWriter: TagsWriter = TagLibTagsWriter()
+    /// Явный owner сериализует полный файловый сценарий конкретного трека.
+    private let trackFileOperationCoordinator: TrackFileOperationCoordinator
+    /// Выполняет физическую мутацию файла и обновляет file-level registry state.
+    private let trackFileManager: any TrackFileOperationManaging
+    /// Читает bookmark только после получения ownership конкретного трека.
+    private let trackFileURLResolver: any TrackFileURLResolving
+    /// Выполняет post-update и его batch-публикацию без второго lock owner-а.
+    private let trackPostUpdateHandler: any TrackPostUpdateHandling
+    /// Разрешает display name папки внутри защищённого move-сценария.
+    private let trackFolderNameResolver: any TrackFolderNameResolving
+    /// Пишет теги только внутри ownership того же физического файла.
+    private let tagsWriter: any TagsWriter
+
     static let shared = AppCommandExecutor()
-    private init() {}
+
+    /// Собирает минимальные зависимости file-operation boundary.
+    ///
+    /// Production продолжает использовать существующий shared executor, а узкие
+    /// capability позволяют контролируемо проверить ownership без файловой системы и SQLite.
+    init(
+        trackFileOperationCoordinator: TrackFileOperationCoordinator = TrackFileOperationCoordinator(),
+        trackFileManager: any TrackFileOperationManaging = LibraryFileManager.shared,
+        trackFileURLResolver: any TrackFileURLResolving = BookmarkTrackFileURLResolver(),
+        trackPostUpdateHandler: any TrackPostUpdateHandling = TrackUpdateCoordinator.shared,
+        trackFolderNameResolver: any TrackFolderNameResolving = TrackRegistryFolderNameResolver(),
+        tagsWriter: any TagsWriter = TagLibTagsWriter()
+    ) {
+        self.trackFileOperationCoordinator = trackFileOperationCoordinator
+        self.trackFileManager = trackFileManager
+        self.trackFileURLResolver = trackFileURLResolver
+        self.trackPostUpdateHandler = trackPostUpdateHandler
+        self.trackFolderNameResolver = trackFolderNameResolver
+        self.tagsWriter = tagsWriter
+    }
     
     // MARK: - Переместить трек
     
@@ -39,41 +73,36 @@ actor AppCommandExecutor {
         toFolder folderId: UUID,
         using fileBusyChecker: any TrackFileBusyChecking
     ) async throws -> MoveTrackSuccess {
-        
-        // 1. Запоминаем старый URL до перемещения.
-        let previousURL = await BookmarkResolver.url(forTrack: trackId)
-        
-        // 2. Перемещение файла
-        do {
-            try await LibraryFileManager.shared.moveTrack(
-                id: trackId,
-                toFolder: folderId,
-                using: fileBusyChecker
+        try await trackFileOperationCoordinator.run(trackId: trackId) {
+            // Bookmark читается только после получения ownership, иначе он мог бы устареть в очереди.
+            let previousURL = await self.trackFileURLResolver.url(forTrackId: trackId)
+
+            do {
+                try await self.trackFileManager.moveTrack(
+                    id: trackId,
+                    toFolder: folderId,
+                    using: fileBusyChecker
+                )
+            } catch let libraryError as LibraryFileError {
+                throw appError(from: libraryError, fallback: .fileMoveFailed)
+            }
+
+            // Владение удерживается до конца post-update, чтобы другой command не увидел промежуточный path.
+            let updateEvent = try await self.trackPostUpdateHandler.handleTrackUpdate(
+                forTrackId: trackId,
+                reason: .fileMoved,
+                changedFields: [.fileName],
+                previousURL: previousURL
             )
-        } catch let libraryError as LibraryFileError {
-            throw appError(from: libraryError, fallback: .fileMoveFailed)
+
+            let folderName = await self.trackFolderNameResolver.folderName(forFolderId: folderId)
+            return MoveTrackSuccess(
+                trackId: trackId,
+                destinationFolderId: folderId,
+                destinationFolderName: folderName,
+                snapshot: updateEvent?.snapshot
+            )
         }
-        
-        // 3. Запускаем единый post-update pipeline.
-        let updateEvent = try await TrackUpdateCoordinator.shared.handleTrackUpdate(
-            forTrackId: trackId,
-            reason: .fileMoved,
-            changedFields: [.fileName],
-            previousURL: previousURL
-        )
-        
-        // 4. Имя папки назначения (ЕДИНСТВЕННЫЙ валидный способ)
-        let folderName = await TrackRegistry.shared
-            .allFolders()
-            .first(where: { $0.id == folderId })?
-            .name
-        
-        return MoveTrackSuccess(
-            trackId: trackId,
-            destinationFolderId: folderId,
-            destinationFolderName: folderName,
-            snapshot: updateEvent?.snapshot
-        )
     }
 
     // MARK: - Копировать iTunes-трек
@@ -119,143 +148,114 @@ actor AppCommandExecutor {
         to newFileName: String,
         using fileBusyChecker: any TrackFileBusyChecking
     ) async throws -> RenameTrackSuccess {
-        
-        // 1. Запоминаем старый URL до переименования.
-        // Это нужно, чтобы после rename сбросить raw-cache и по старому пути.
-        let previousURL = await BookmarkResolver.url(forTrack: trackId)
-        
-        // 2. Переименовываем физический файл и обновляем реестры.
-        do {
-            try await LibraryFileManager.shared.renameTrack(
-                id: trackId,
-                to: newFileName,
-                using: fileBusyChecker
+        try await trackFileOperationCoordinator.run(trackId: trackId) {
+            // Старый URL нужен post-update и должен отражать состояние после всех предыдущих команд этого трека.
+            let previousURL = await self.trackFileURLResolver.url(forTrackId: trackId)
+
+            do {
+                try await self.trackFileManager.renameTrack(
+                    id: trackId,
+                    to: newFileName,
+                    using: fileBusyChecker
+                )
+            } catch let libraryError as LibraryFileError {
+                throw appError(from: libraryError, fallback: .fileRenameFailed)
+            }
+
+            let updateEvent = try await self.trackPostUpdateHandler.handleTrackUpdate(
+                forTrackId: trackId,
+                reason: .fileRenamed,
+                changedFields: [.fileName],
+                previousURL: previousURL
             )
-        } catch let libraryError as LibraryFileError {
-            throw appError(from: libraryError, fallback: .fileRenameFailed)
+
+            return RenameTrackSuccess(
+                trackId: trackId,
+                finalFileName: updateEvent?.snapshot.fileName ?? newFileName,
+                snapshot: updateEvent?.snapshot
+            )
         }
-        
-        // 3. Запускаем единый post-update pipeline.
-        let updateEvent = try await TrackUpdateCoordinator.shared.handleTrackUpdate(
-            forTrackId: trackId,
-            reason: .fileRenamed,
-            changedFields: [.fileName],
-            previousURL: previousURL
-        )
-        
-        return RenameTrackSuccess(
-            trackId: trackId,
-            finalFileName: updateEvent?.snapshot.fileName ?? newFileName,
-            snapshot: updateEvent?.snapshot
-        )
     }
 
     /// Массово переименовывает файлы треков.
     ///
-    /// Метод использует `LibraryFileManager.renameTrack` как атомарную операцию одного файла.
-    /// В отличие от одиночного rename-flow, здесь возвращается общий результат всей операции.
+    /// Batch удерживает ownership всех своих trackId до публикации общего post-update события.
+    /// Это сохраняет batch-semantics и не открывает окно между rename отдельного файла и его post-update.
     func renameTrackFilesBatch(
         _ commands: [BatchFilenameRenameCommand],
         using fileBusyChecker: any TrackFileBusyChecking,
-        progress: (@MainActor (_ processed: Int, _ total: Int) -> Void)? = nil
+        progress: (@MainActor @Sendable (_ processed: Int, _ total: Int) -> Void)? = nil
     ) async -> BatchFilenameRenameResult {
-        var succeeded: [BatchFilenameRenameSuccess] = []
-        var failed: [BatchFilenameRenameFailure] = []
-        var successfulUpdates: [TrackUpdateRequest] = []
-        var processedCount = 0
-        let totalCount = commands.count
+        do {
+            return try await trackFileOperationCoordinator.run(
+                trackIds: commands.map(\.trackId)
+            ) {
+                var succeeded: [BatchFilenameRenameSuccess] = []
+                var failed: [BatchFilenameRenameFailure] = []
+                var updateEvents: [TrackUpdateEvent] = []
+                var processedCount = 0
+                let totalCount = commands.count
 
-        for command in commands {
-            do {
-                // Запоминаем старый URL до переименования, чтобы post-update pipeline сбросил cache по старому пути.
-                let previousURL = await BookmarkResolver.url(forTrack: command.trackId)
+                for command in commands {
+                    do {
+                        // Batch получил ownership заранее, поэтому bookmark читается после завершения внешних команд этих треков.
+                        let previousURL = await self.trackFileURLResolver.url(forTrackId: command.trackId)
+                        try await self.trackFileManager.renameTrack(
+                            id: command.trackId,
+                            to: command.targetFileName,
+                            using: fileBusyChecker
+                        )
 
-                try await LibraryFileManager.shared.renameTrack(
-                    id: command.trackId,
-                    to: command.targetFileName,
-                    using: fileBusyChecker
-                )
+                        let updateEvent = try await self.trackPostUpdateHandler.prepareTrackUpdate(
+                            forTrackId: command.trackId,
+                            reason: .fileRenamed,
+                            changedFields: [.fileName],
+                            previousURL: previousURL
+                        )
+                        if let updateEvent {
+                            updateEvents.append(updateEvent)
+                        }
+                        succeeded.append(
+                            BatchFilenameRenameSuccess(
+                                trackId: command.trackId,
+                                oldFileName: command.currentFileName,
+                                newFileName: command.targetFileName
+                            )
+                        )
+                    } catch {
+                        // Физически изменённый файл не откатываем; ошибка остаётся привязанной к конкретной строке batch.
+                        failed.append(
+                            BatchFilenameRenameFailure(
+                                trackId: command.trackId,
+                                targetFileName: command.targetFileName,
+                                error: error
+                            )
+                        )
+                    }
 
-                succeeded.append(
-                    BatchFilenameRenameSuccess(
-                        trackId: command.trackId,
-                        oldFileName: command.currentFileName,
-                        newFileName: command.targetFileName
-                    )
-                )
+                    processedCount += 1
+                    if let progress {
+                        await progress(processedCount, totalCount)
+                    }
+                }
 
-                successfulUpdates.append(
-                    TrackUpdateRequest(
-                        trackId: command.trackId,
-                        previousURL: previousURL
-                    )
-                )
-            } catch {
-                failed.append(
+                // Единое batch-событие публикуется до освобождения ownership всех успешных файлов.
+                await self.trackPostUpdateHandler.publishTrackBatchUpdateEvents(updateEvents)
+                return BatchFilenameRenameResult(succeeded: succeeded, failed: failed)
+            }
+        } catch {
+            // Отменённый batch не выполняет ещё не получившее ownership тело и сообщает ошибку каждой не обработанной строке.
+            return BatchFilenameRenameResult(
+                succeeded: [],
+                failed: commands.map {
                     BatchFilenameRenameFailure(
-                        trackId: command.trackId,
-                        targetFileName: command.targetFileName,
+                        trackId: $0.trackId,
+                        targetFileName: $0.targetFileName,
                         error: error
                     )
-                )
-            }
-
-            processedCount += 1
-            if let progress {
-                await progress(processedCount, totalCount)
-            }
-        }
-
-        // Post-update pipeline может отклонить уже переименованный файл, если его metadata не удалось сохранить.
-        // Файл не откатываем: отмечаем конкретный элемент ошибкой и публикуем batch-событие только для подтверждённых треков.
-        var pendingUpdates = successfulUpdates
-        let commandsByTrackId = Dictionary(
-            uniqueKeysWithValues: commands.map { ($0.trackId, $0) }
-        )
-
-        while pendingUpdates.isEmpty == false {
-            do {
-                _ = try await TrackUpdateCoordinator.shared.handleTrackUpdates(pendingUpdates)
-                break
-            } catch let error as TrackUpdateCoordinatorError {
-                let failedTrackId: UUID
-                let underlyingError: Error
-
-                switch error {
-                case let .updateFailed(trackId, underlying):
-                    failedTrackId = trackId
-                    underlyingError = underlying
                 }
-
-                guard let failedIndex = pendingUpdates.firstIndex(where: { $0.trackId == failedTrackId }),
-                      let command = commandsByTrackId[failedTrackId] else {
-                    PersistentLogger.log("❌ batch rename: не удалось сопоставить ошибку post-update с треком \(failedTrackId)")
-                    break
-                }
-
-                pendingUpdates.remove(at: failedIndex)
-                succeeded.removeAll { $0.trackId == failedTrackId }
-                failed.append(
-                    BatchFilenameRenameFailure(
-                        trackId: failedTrackId,
-                        targetFileName: command.targetFileName,
-                        error: underlyingError
-                    )
-                )
-                PersistentLogger.log("❌ batch rename post-update failed trackId=\(failedTrackId) file already renamed: \(underlyingError)")
-
-                // Повторяем подготовку оставшихся элементов: координатор публикует один batch только после полного успешного прохода.
-            } catch {
-                // Все ошибки подготовки оборачиваются координатором вместе с trackId, поэтому этот путь диагностический.
-                PersistentLogger.log("❌ batch rename: unexpected post-update error \(error)")
-                break
-            }
+            )
         }
-
-        return BatchFilenameRenameResult(
-            succeeded: succeeded,
-            failed: failed
-        )
     }
     
     
@@ -391,7 +391,7 @@ actor AppCommandExecutor {
         }
         
         // PlaylistManager — @MainActor → нужен await
-        let playerTracks = await PlaylistManager.shared.tracks
+        let playerTracks = PlaylistManager.shared.tracks
         
         let tracks: [Track] = playerTracks.map { $0.asTrack() }
         
@@ -607,28 +607,101 @@ actor AppCommandExecutor {
         artworkChanged: Bool,
         using fileBusyChecker: any TrackFileBusyChecking
     ) async throws -> TrackEditsSavedSuccess {
-        // 1. Запоминаем старый URL до возможного переименования.
-        // Это нужно, чтобы post-update pipeline мог сбросить кэши по старому пути.
-        let previousURL = await BookmarkResolver.url(forTrack: trackId)
-        // 2. Переименовываем файл как часть единой операции сохранения.
-        if fileChanged {
-            do {
-                try await LibraryFileManager.shared.renameTrack(
-                    id: trackId,
-                    to: newFileName,
-                    using: fileBusyChecker
-                )
-            } catch let libraryError as LibraryFileError {
-                throw appError(from: libraryError, fallback: .fileRenameFailed)
+        try await trackFileOperationCoordinator.run(trackId: trackId) {
+            // Старый bookmark читается после ownership и остаётся согласованным с rename внутри этой команды.
+            let previousURL = await self.trackFileURLResolver.url(forTrackId: trackId)
+
+            if fileChanged {
+                do {
+                    try await self.trackFileManager.renameTrack(
+                        id: trackId,
+                        to: newFileName,
+                        using: fileBusyChecker
+                    )
+                } catch let libraryError as LibraryFileError {
+                    throw appError(from: libraryError, fallback: .fileRenameFailed)
+                }
             }
+
+            // Tag writer меняет содержимое того же файла, поэтому не может пересечься с move или rename.
+            if tagsChanged || artworkChanged {
+                guard let url = await self.trackFileURLResolver.url(forTrackId: trackId) else {
+                    throw TagWriteError.fileNotFound
+                }
+                let didStartAccess = url.startAccessingSecurityScopedResource()
+                defer { if didStartAccess { url.stopAccessingSecurityScopedResource() } }
+                var finalPatch = patch
+                switch artworkAction {
+                case .none:
+                    break
+                case .remove:
+                    finalPatch.artwork = .remove
+                case .replace(let data):
+                    finalPatch.artwork = .set(
+                        data: data,
+                        mime: artworkMimeType(for: data)
+                    )
+                }
+                try await self.tagsWriter.writeTags(to: url, patch: finalPatch)
+            }
+
+            var changedFields: Set<TrackChangedField> = []
+            if fileChanged {
+                changedFields.insert(.fileName)
+            }
+            if tagsChanged || artworkChanged {
+                changedFields.formUnion(
+                    changedFieldsForTagUpdate(
+                        patch: patch,
+                        artworkAction: artworkAction
+                    )
+                )
+            }
+
+            let updateReason: TrackUpdateReason
+            if artworkChanged {
+                updateReason = .artworkUpdated
+            } else if tagsChanged {
+                updateReason = .metadataUpdated
+            } else {
+                updateReason = .fileRenamed
+            }
+
+            // Ошибка metadata не скрывается, но ownership освобождается только после выхода из post-update.
+            let updateEvent = try await self.trackPostUpdateHandler.handleTrackUpdate(
+                forTrackId: trackId,
+                reason: updateReason,
+                changedFields: changedFields,
+                previousURL: previousURL
+            )
+            let snapshot = updateEvent?.snapshot
+
+            return TrackEditsSavedSuccess(
+                trackId: trackId,
+                finalFileName: snapshot?.fileName ?? newFileName,
+                snapshot: snapshot,
+                didUpdateTagsOrArtwork: tagsChanged || artworkChanged
+            )
         }
-        // 3. Записываем теги и обложку в рамках той же операции.
-        if tagsChanged || artworkChanged {
-            guard let url = await BookmarkResolver.url(forTrack: trackId) else {
+    }
+
+
+    // MARK: - Обновить теги трека
+
+    func updateTrackTags(
+        trackId: UUID,
+        patch: TagWritePatch,
+        artworkAction: ArtworkWriteAction
+    ) async throws -> TrackTagsUpdatedSuccess {
+        try await trackFileOperationCoordinator.run(trackId: trackId) {
+            // URL mutable-файла резолвится под тем же ownership, что и subsequent tag write.
+            guard let url = await self.trackFileURLResolver.url(forTrackId: trackId) else {
                 throw TagWriteError.fileNotFound
             }
+
             let didStartAccess = url.startAccessingSecurityScopedResource()
             defer { if didStartAccess { url.stopAccessingSecurityScopedResource() } }
+
             var finalPatch = patch
             switch artworkAction {
             case .none:
@@ -641,110 +714,101 @@ actor AppCommandExecutor {
                     mime: artworkMimeType(for: data)
                 )
             }
-            try await tagsWriter.writeTags(to: url, patch: finalPatch)
-        }
-        // 4. Собираем список реально изменённых полей для единого post-update pipeline.
-        var changedFields: Set<TrackChangedField> = []
-        if fileChanged {
-            changedFields.insert(.fileName)
-        }
-        if tagsChanged || artworkChanged {
-            changedFields.formUnion(
-                changedFieldsForTagUpdate(
-                    patch: patch,
-                    artworkAction: artworkAction
-                )
+
+            try await self.tagsWriter.writeTags(to: url, patch: finalPatch)
+
+            let changedFields = changedFieldsForTagUpdate(
+                patch: finalPatch,
+                artworkAction: artworkAction
+            )
+            let updateReason: TrackUpdateReason = artworkAction == .none
+                ? .metadataUpdated
+                : .artworkUpdated
+
+            let updateEvent = try await self.trackPostUpdateHandler.handleTrackUpdate(
+                forTrackId: trackId,
+                reason: updateReason,
+                changedFields: changedFields,
+                previousURL: nil
+            )
+
+            return TrackTagsUpdatedSuccess(
+                trackId: trackId,
+                snapshot: updateEvent?.snapshot
             )
         }
-        // 5. Выбираем причину обновления для единого события.
-        let updateReason: TrackUpdateReason
-        if artworkChanged {
-            updateReason = .artworkUpdated
-        } else if tagsChanged {
-            updateReason = .metadataUpdated
-        } else {
-            updateReason = .fileRenamed
-        }
-        // 6. Запускаем единый post-update pipeline после всех успешных операций.
-        // Ошибка сохранения metadata намеренно доходит до вызывающего сценария.
-        let updateEvent = try await TrackUpdateCoordinator.shared.handleTrackUpdate(
-            forTrackId: trackId,
-            reason: updateReason,
-            changedFields: changedFields,
-            previousURL: previousURL
-        )
-        let snapshot = updateEvent?.snapshot
-
-        return TrackEditsSavedSuccess(
-            trackId: trackId,
-            finalFileName: snapshot?.fileName ?? newFileName,
-            snapshot: snapshot,
-            didUpdateTagsOrArtwork: tagsChanged || artworkChanged
-        )
-    }
-    
-    
-    // MARK: - Обновить теги трека
-    
-    func updateTrackTags(
-        trackId: UUID,
-        patch: TagWritePatch,
-        artworkAction: ArtworkWriteAction
-    ) async throws -> TrackTagsUpdatedSuccess {
-
-        // 1. Резолв URL трека через bookmark
-        guard let url = await BookmarkResolver.url(forTrack: trackId) else {
-            throw TagWriteError.fileNotFound
-        }
-
-        let didStartAccess = url.startAccessingSecurityScopedResource()
-        defer { if didStartAccess { url.stopAccessingSecurityScopedResource() } }
-
-        // 2. Собираем финальный patch.
-        // Текстовые теги уже приходят снаружи,
-        // а действие по обложке добавляем здесь.
-        var finalPatch = patch
-
-        switch artworkAction {
-        case .none:
-            break
-
-        case .remove:
-            finalPatch.artwork = .remove
-
-        case .replace(let data):
-            finalPatch.artwork = .set(
-                data: data,
-                mime: artworkMimeType(for: data)
-            )
-        }
-
-        // 3. Запись тегов и обложки
-        try await tagsWriter.writeTags(to: url, patch: finalPatch)
-
-        // 4. Единый post-update pipeline
-        let changedFields = changedFieldsForTagUpdate(
-            patch: finalPatch,
-            artworkAction: artworkAction
-        )
-
-        let updateReason: TrackUpdateReason = artworkAction == .none
-            ? .metadataUpdated
-            : .artworkUpdated
-
-        // Ошибка сохранения metadata доходит до вызывающего action handler.
-        let updateEvent = try await TrackUpdateCoordinator.shared.handleTrackUpdate(
-            forTrackId: trackId,
-            reason: updateReason,
-            changedFields: changedFields
-        )
-
-        return TrackTagsUpdatedSuccess(
-            trackId: trackId,
-            snapshot: updateEvent?.snapshot
-        )
     }
 }
+
+// MARK: - File operation capabilities
+
+/// Выполняет мутации физического файла и связанных file-level реестров.
+///
+/// Per-track ownership остаётся в AppCommandExecutor: реализация capability
+/// не создаёт второй competing lock owner вокруг отдельных вызовов FileManager.
+protocol TrackFileOperationManaging: Sendable {
+    func moveTrack(
+        id trackId: UUID,
+        toFolder destinationFolderId: UUID,
+        using fileBusyChecker: any TrackFileBusyChecking
+    ) async throws
+
+    func renameTrack(
+        id trackId: UUID,
+        to newFileName: String,
+        using fileBusyChecker: any TrackFileBusyChecking
+    ) async throws
+}
+
+/// Резолвит URL существующего файла из bookmark после получения ownership.
+protocol TrackFileURLResolving: Sendable {
+    func url(forTrackId trackId: UUID) async -> URL?
+}
+
+/// Возвращает display name папки для сформированного move-result.
+protocol TrackFolderNameResolving: Sendable {
+    func folderName(forFolderId folderId: UUID) async -> String?
+}
+
+/// Выполняет post-update без владения очередью файловых операций.
+protocol TrackPostUpdateHandling: Sendable {
+    func handleTrackUpdate(
+        forTrackId trackId: UUID,
+        reason: TrackUpdateReason,
+        changedFields: Set<TrackChangedField>,
+        previousURL: URL?
+    ) async throws -> TrackUpdateEvent?
+
+    func prepareTrackUpdate(
+        forTrackId trackId: UUID,
+        reason: TrackUpdateReason,
+        changedFields: Set<TrackChangedField>,
+        previousURL: URL?
+    ) async throws -> TrackUpdateEvent?
+
+    func publishTrackBatchUpdateEvents(_ updateEvents: [TrackUpdateEvent]) async
+}
+
+/// Production-адаптер bookmark resolver без раскрытия global singleton в test seam.
+struct BookmarkTrackFileURLResolver: TrackFileURLResolving {
+    func url(forTrackId trackId: UUID) async -> URL? {
+        await BookmarkResolver.url(forTrack: trackId)
+    }
+}
+
+/// Production-адаптер получения имени destination folder для результата move-команды.
+struct TrackRegistryFolderNameResolver: TrackFolderNameResolving {
+    func folderName(forFolderId folderId: UUID) async -> String? {
+        await TrackRegistry.shared
+            .allFolders()
+            .first(where: { $0.id == folderId })?
+            .name
+    }
+}
+
+extension LibraryFileManager: TrackFileOperationManaging {}
+
+extension TrackUpdateCoordinator: TrackPostUpdateHandling {}
 
 // MARK: - Helper's
 

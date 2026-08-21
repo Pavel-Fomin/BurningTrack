@@ -8,9 +8,10 @@
 //
 
 // Хранит идентификатор миграции и действие, которое изменяет схему базы.
-struct DatabaseMigration {
+/// Immutable-описание миграции не хранит состояние SQLite между вызовами.
+struct DatabaseMigration: Sendable {
     let identifier: String
-    let migrate: (DatabaseConnection) throws -> Void
+    let migrate: @Sendable (DatabaseConnection) throws -> Void
 }
 
 extension DatabaseMigration {

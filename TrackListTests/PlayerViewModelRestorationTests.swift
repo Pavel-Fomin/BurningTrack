@@ -521,6 +521,91 @@ final class PlayerViewModelRestorationTests: XCTestCase {
         }
     }
 
+    /// Поздняя ошибка восстановленного запуска не должна заменить успешный пользовательский запуск и показать устаревший Toast.
+    func testLateRestoredStartFailureDoesNotOverwriteNewUserPlayback() async {
+        let restoredTrack = makeLibraryTrack(fileName: "Restored.m4a")
+        let userTrack = makePurchasedITunesTrack(id: 500, title: "User")
+        let playerManager = RestorationPlayerManagerSpy()
+        playerManager.usesControlledPlayCompletion = true
+        let toastPresenter = RestorationToastPresenterSpy()
+        let viewModel = makeViewModel(
+            playerManager: playerManager,
+            toastPresenter: toastPresenter,
+            statePersistence: RestorationStatePersistenceSpy(
+                state: makeLibraryState(trackId: restoredTrack.trackId)
+            ),
+            fastTrackProvider: FastLibraryTrackProviderSpy(track: restoredTrack),
+            libraryAccessState: LibraryAccessState(isRestored: false)
+        )
+
+        await waitUntil {
+            viewModel.currentTrackDisplayable?.trackId == restoredTrack.trackId
+        }
+
+        viewModel.togglePlayPause()
+        await waitUntil {
+            playerManager.playbackRequestIDs.count == 1
+        }
+        let restoredRequestID = playerManager.playbackRequestIDs[0]
+        viewModel.play(track: userTrack, context: [userTrack], source: .purchasedITunes)
+        await waitUntil {
+            playerManager.playbackRequestIDs.count == 2
+        }
+        let userRequestID = playerManager.playbackRequestIDs[1]
+
+        playerManager.completePlay(requestID: userRequestID, result: .started)
+        await waitUntil {
+            viewModel.isPlaying
+        }
+        playerManager.failPlay(requestID: restoredRequestID, error: .fileNotPlayable)
+        await Task.yield()
+
+        XCTAssertEqual(viewModel.currentTrackDisplayable?.trackId, userTrack.trackId)
+        XCTAssertTrue(viewModel.isPlaying)
+        XCTAssertTrue(toastPresenter.errors.isEmpty)
+    }
+
+    /// Поздний success восстановленного запуска не должен применить свой Now Playing после нового пользовательского выбора.
+    func testLateRestoredStartSuccessDoesNotOverwriteNewUserPlayback() async {
+        let restoredTrack = makeLibraryTrack(fileName: "Restored.m4a")
+        let userTrack = makePurchasedITunesTrack(id: 501, title: "User")
+        let playerManager = RestorationPlayerManagerSpy()
+        playerManager.usesControlledPlayCompletion = true
+        let viewModel = makeViewModel(
+            playerManager: playerManager,
+            statePersistence: RestorationStatePersistenceSpy(
+                state: makeLibraryState(trackId: restoredTrack.trackId)
+            ),
+            fastTrackProvider: FastLibraryTrackProviderSpy(track: restoredTrack),
+            libraryAccessState: LibraryAccessState(isRestored: false)
+        )
+
+        await waitUntil {
+            viewModel.currentTrackDisplayable?.trackId == restoredTrack.trackId
+        }
+
+        viewModel.togglePlayPause()
+        await waitUntil {
+            playerManager.playbackRequestIDs.count == 1
+        }
+        let restoredRequestID = playerManager.playbackRequestIDs[0]
+        viewModel.play(track: userTrack, context: [userTrack], source: .purchasedITunes)
+        await waitUntil {
+            playerManager.playbackRequestIDs.count == 2
+        }
+        let userRequestID = playerManager.playbackRequestIDs[1]
+
+        playerManager.completePlay(requestID: userRequestID, result: .started)
+        await waitUntil {
+            viewModel.isPlaying
+        }
+        playerManager.completePlay(requestID: restoredRequestID, result: .started)
+        await Task.yield()
+
+        XCTAssertEqual(viewModel.currentTrackDisplayable?.trackId, userTrack.trackId)
+        XCTAssertEqual(playerManager.nowPlayingTitles, ["User"])
+    }
+
     /// После запуска приложение восстанавливает текущий iTunes-трек вместе с полным сохранённым порядком.
     func testPurchasedITunesContextRestoresAfterRestart() async {
         let firstTrack = makePurchasedITunesTrack(id: 1, title: "Alpha")
@@ -958,27 +1043,34 @@ final class PlayerViewModelRestorationTests: XCTestCase {
 
     /// Собирает ViewModel только с изолированными зависимостями, чтобы тесты не обращались к SQLite, bookmark и AVPlayer.
     private func makeViewModel(
-        playerManager: RestorationPlayerManagerSpy = RestorationPlayerManagerSpy(),
+        playerManager: RestorationPlayerManagerSpy? = nil,
         eventObserver: RestorationPlayerEventObserverSpy? = nil,
+        toastPresenter: RestorationToastPresenterSpy? = nil,
         statePersistence: RestorationStatePersistenceSpy,
         libraryContextLoader: (any LibraryPlaybackContextLoading)? = nil,
         purchasedITunesContextLoader: (any PurchasedITunesPlaybackContextLoading)? = nil,
         fastTrackProvider: any FastLibraryTrackProviding,
         libraryAccessState: LibraryAccessState
     ) -> PlayerViewModel {
+        let resolvedPlayerManager = playerManager ?? RestorationPlayerManagerSpy()
+        let resolvedToastPresenter = toastPresenter ?? RestorationToastPresenterSpy()
         let resolvedLibraryContextLoader = libraryContextLoader ?? LibraryContextLoaderSpy(tracks: [])
         let resolvedPurchasedITunesContextLoader = purchasedITunesContextLoader ??
             PurchasedITunesContextLoaderSpy(result: .temporarilyUnavailable)
         let favoritesService = PlayerFavoritesServiceSpy()
 
         return PlayerViewModel(
-            playerManager: playerManager,
+            playerManager: resolvedPlayerManager,
             playbackContextStore: PlayerPlaybackContextStore(
                 playbackModePersistence: RestorationPlaybackModePersistenceSpy()
             ),
-            runtimeSnapshotController: PlayerRuntimeSnapshotController(),
+            runtimeSnapshotController: PlayerRuntimeSnapshotController(
+                runtimeSnapshotStore: TrackRuntimeStore.shared,
+                runtimeSnapshotBuilder: TrackRuntimeSnapshotBuilder.shared,
+                artworkProvider: ArtworkProvider.shared
+            ),
             eventObserver: eventObserver ?? RestorationPlayerEventObserverSpy(),
-            toastPresenter: RestorationToastPresenterSpy(),
+            toastPresenter: resolvedToastPresenter,
             statePersistence: statePersistence,
             playlistManager: PlaylistManager(
                 databaseStore: RestorationPlayerQueuePersistenceSpy(),
@@ -1399,25 +1491,40 @@ private final class DelayedLibraryContextLoaderSpy: LibraryPlaybackContextLoadin
 }
 
 /// Подменяет AVPlayer и запоминает только факты запуска, нужные для восстановления контекста.
+@MainActor
 private final class RestorationPlayerManagerSpy: PlayerManaging {
     private(set) var playedTrackIds: [UUID] = []
     private var playCompletionContinuation: CheckedContinuation<Void, Never>?
+    private var controlledPlayContinuations: [PlaybackRequestID: CheckedContinuation<PlaybackStartResult, Error>] = [:]
     var delaysPlayCompletion = false
+    /// Позволяет тесту отдельно завершить старый restored request после успешного нового user-start.
+    var usesControlledPlayCompletion = false
+    private(set) var playbackRequestIDs: [PlaybackRequestID] = []
+    private(set) var nowPlayingTitles: [String] = []
 
     var playCallsCount: Int {
         playedTrackIds.count
     }
 
     func play(
+        requestID: PlaybackRequestID,
         track: any TrackDisplayable,
         onPreparedLocalFile: @escaping PlayerPreparedLocalFileHandler
-    ) async throws {
+    ) async throws -> PlaybackStartResult {
         playedTrackIds.append(track.trackId)
+        playbackRequestIDs.append(requestID)
 
-        guard delaysPlayCompletion else { return }
+        if usesControlledPlayCompletion {
+            return try await withCheckedThrowingContinuation { continuation in
+                controlledPlayContinuations[requestID] = continuation
+            }
+        }
+
+        guard delaysPlayCompletion else { return .started }
         await withCheckedContinuation { continuation in
             playCompletionContinuation = continuation
         }
+        return .started
     }
 
     func playCurrent() {}
@@ -1434,18 +1541,20 @@ private final class RestorationPlayerManagerSpy: PlayerManaging {
         nil
     }
 
-    func observeProgress(update: @escaping (TimeInterval) -> Void) {}
+    func observeProgress(update: @escaping @MainActor @Sendable (TimeInterval) -> Void) {}
 
     func removeTimeObserver() {}
 
     func setupRemoteCommandCenter(
-        onPlay: @escaping () -> Void,
-        onPause: @escaping () -> Void,
-        onNext: @escaping () -> Void,
-        onPrevious: @escaping () -> Void
+        onPlay: @escaping @MainActor @Sendable () -> Void,
+        onPause: @escaping @MainActor @Sendable () -> Void,
+        onNext: @escaping @MainActor @Sendable () -> Void,
+        onPrevious: @escaping @MainActor @Sendable () -> Void
     ) {}
 
-    func applyNowPlaying(snapshot: NowPlayingSnapshot) {}
+    func applyNowPlaying(snapshot: NowPlayingSnapshot) {
+        nowPlayingTitles.append(snapshot.title)
+    }
 
     func applyPlaybackTime(currentTime: TimeInterval, isPlaying: Bool) {}
 
@@ -1453,6 +1562,22 @@ private final class RestorationPlayerManagerSpy: PlayerManaging {
     func completePlay() {
         playCompletionContinuation?.resume()
         playCompletionContinuation = nil
+    }
+
+    /// Возобновляет ровно тот request, который выбрал тест, не полагаясь на порядок задач MainActor.
+    func completePlay(
+        requestID: PlaybackRequestID,
+        result: PlaybackStartResult
+    ) {
+        controlledPlayContinuations.removeValue(forKey: requestID)?.resume(returning: result)
+    }
+
+    /// Отдаёт controlled failure старому request после того, как новый request уже применил UI-state.
+    func failPlay(
+        requestID: PlaybackRequestID,
+        error: AppError
+    ) {
+        controlledPlayContinuations.removeValue(forKey: requestID)?.resume(throwing: error)
     }
 }
 
@@ -1487,7 +1612,11 @@ private final class RestorationPlayerEventObserverSpy: PlayerEventObserving {
 /// Не показывает пользовательские сообщения в проверках без AVPlayer.
 @MainActor
 private final class RestorationToastPresenterSpy: ToastPresenting {
+    private(set) var errors: [AppError] = []
+
     func handle(_ event: ToastEvent, duration: TimeInterval) {}
 
-    func handle(_ error: AppError) {}
+    func handle(_ error: AppError) {
+        errors.append(error)
+    }
 }

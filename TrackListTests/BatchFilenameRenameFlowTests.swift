@@ -176,7 +176,7 @@ final class BatchFilenameRenameFlowTests: XCTestCase {
             ]
         )
         let executor = BatchFilenameRenameExecutorSpy()
-        await executor.setResult(
+        executor.setResult(
             BatchFilenameRenameResult(
                 succeeded: [
                     BatchFilenameRenameSuccess(
@@ -202,7 +202,7 @@ final class BatchFilenameRenameFlowTests: XCTestCase {
         viewModel.send(.renameTapped)
         await completeScheduledTask()
 
-        let commands = await executor.commands
+        let commands = executor.commands
         XCTAssertEqual(commands.map(\.trackId), [seeds[0].trackId, seeds[2].trackId])
         XCTAssertEqual(viewModel.state.rows.map(\.statusStyle), [.success, .error, .error])
         XCTAssertFalse(viewModel.state.isApplyingRename)
@@ -223,8 +223,8 @@ final class BatchFilenameRenameFlowTests: XCTestCase {
         viewModel.send(.renameTapped)
         await completeScheduledTask()
 
-        let callCount = await executor.callCount
-        let commandCount = await executor.commands.count
+        let callCount = executor.callCount
+        let commandCount = executor.commands.count
 
         XCTAssertEqual(callCount, 1)
         XCTAssertEqual(commandCount, 1)
@@ -332,7 +332,7 @@ final class BatchFilenameRenameFlowTests: XCTestCase {
         await settleTaskQueue()
         let secondSessionState = secondViewModel.state
 
-        await executor.completeFirst(
+        executor.completeFirst(
             with: BatchFilenameRenameResult(
                 succeeded: [
                     BatchFilenameRenameSuccess(
@@ -474,7 +474,7 @@ final class BatchFilenameRenameFlowTests: XCTestCase {
         from executor: BatchFilenameRenameDeferredExecutorSpy
     ) async {
         for _ in 0..<128 {
-            if await executor.callCount >= expectedCount {
+            if executor.callCount >= expectedCount {
                 return
             }
             await Task.yield()
@@ -560,8 +560,9 @@ private final class BatchFilenameRenameDeferredMetadataLoaderSpy: BatchFilenameR
     }
 }
 
-/// Выполняет контролируемый batch writer и сохраняет только полученные команды.
-private actor BatchFilenameRenameExecutorSpy: BatchFilenameRenameCommandExecuting {
+/// MainActor-double batch writer сохраняет только полученные команды, как production command flow.
+@MainActor
+private final class BatchFilenameRenameExecutorSpy: BatchFilenameRenameCommandExecuting {
     private var result = BatchFilenameRenameResult(succeeded: [], failed: [])
     private let delayNanoseconds: UInt64
     private(set) var commands: [BatchFilenameRenameCommand] = []
@@ -583,20 +584,21 @@ private actor BatchFilenameRenameExecutorSpy: BatchFilenameRenameCommandExecutin
         self.commands = commands
         callCount += 1
         if let progress {
-            await progress(0, commands.count)
+            progress(0, commands.count)
         }
         if delayNanoseconds > 0 {
             try? await Task.sleep(nanoseconds: delayNanoseconds)
         }
         if let progress {
-            await progress(commands.count, commands.count)
+            progress(commands.count, commands.count)
         }
         return result
     }
 }
 
-/// Удерживает физическое rename до явного завершения, не отменяя apply после закрытия UI.
-private actor BatchFilenameRenameDeferredExecutorSpy: BatchFilenameRenameCommandExecuting {
+/// Удерживает физическое rename на MainActor до явного завершения, не отменяя apply после закрытия UI.
+@MainActor
+private final class BatchFilenameRenameDeferredExecutorSpy: BatchFilenameRenameCommandExecuting {
     private var pendingContinuations: [CheckedContinuation<BatchFilenameRenameResult, Never>] = []
     private(set) var callCount = 0
 
@@ -607,7 +609,7 @@ private actor BatchFilenameRenameDeferredExecutorSpy: BatchFilenameRenameCommand
     ) async -> BatchFilenameRenameResult {
         callCount += 1
         if let progress {
-            await progress(0, commands.count)
+            progress(0, commands.count)
         }
 
         return await withCheckedContinuation { continuation in

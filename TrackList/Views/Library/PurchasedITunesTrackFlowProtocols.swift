@@ -18,6 +18,8 @@ protocol PurchasedITunesTrackRouting: AnyObject {
 }
 
 /// Выполняет единственную команду добавления iTunes-трека в плеер.
+/// MainActor сохраняет единый ownership системного Player и его MediaPlayer callback-ов.
+@MainActor
 protocol PurchasedITunesTrackPlayerAdding: AnyObject {
     func addPurchasedITunesTrackToPlayer(
         _ track: PurchasedITunesPlayableTrack

@@ -396,7 +396,11 @@ final class PlayerViewModelFavoritesTests: XCTestCase {
             playbackContextStore: PlayerPlaybackContextStore(
                 playbackModePersistence: PlayerFavoritesPlaybackModePersistenceSpy()
             ),
-            runtimeSnapshotController: PlayerRuntimeSnapshotController(),
+            runtimeSnapshotController: PlayerRuntimeSnapshotController(
+                runtimeSnapshotStore: TrackRuntimeStore.shared,
+                runtimeSnapshotBuilder: TrackRuntimeSnapshotBuilder.shared,
+                artworkProvider: ArtworkProvider.shared
+            ),
             eventObserver: PlayerFavoritesEventObserverSpy(),
             toastPresenter: PlayerFavoritesToastPresenterSpy(),
             statePersistence: statePersistence,
@@ -605,12 +609,15 @@ private final class PlayerFavoritesPlayerManagerSpy: PlayerManaging {
     private(set) var favoriteCommandSetupCount = 0
     private(set) var favoriteCommandRemovalCount = 0
     private(set) var favoriteCommandStates: [FavoriteCommandState] = []
-    private var favoriteCommandHandler: (@MainActor (Bool) -> MPRemoteCommandHandlerStatus)?
+    private var favoriteCommandHandler: (@MainActor @Sendable (Bool) -> MPRemoteCommandHandlerStatus)?
 
     func play(
+        requestID _: PlaybackRequestID,
         track: any TrackDisplayable,
         onPreparedLocalFile: @escaping PlayerPreparedLocalFileHandler
-    ) async throws {}
+    ) async throws -> PlaybackStartResult {
+        .started
+    }
 
     func playCurrent() {}
 
@@ -626,19 +633,19 @@ private final class PlayerFavoritesPlayerManagerSpy: PlayerManaging {
         nil
     }
 
-    func observeProgress(update: @escaping (TimeInterval) -> Void) {}
+    func observeProgress(update: @escaping @MainActor @Sendable (TimeInterval) -> Void) {}
 
     func removeTimeObserver() {}
 
     func setupRemoteCommandCenter(
-        onPlay: @escaping () -> Void,
-        onPause: @escaping () -> Void,
-        onNext: @escaping () -> Void,
-        onPrevious: @escaping () -> Void
+        onPlay: @escaping @MainActor @Sendable () -> Void,
+        onPause: @escaping @MainActor @Sendable () -> Void,
+        onNext: @escaping @MainActor @Sendable () -> Void,
+        onPrevious: @escaping @MainActor @Sendable () -> Void
     ) {}
 
     func configureFavoriteCommand(
-        handler: @escaping @MainActor (Bool) -> MPRemoteCommandHandlerStatus
+        handler: @escaping @MainActor @Sendable (Bool) -> MPRemoteCommandHandlerStatus
     ) {
         favoriteCommandSetupCount += 1
         favoriteCommandHandler = handler

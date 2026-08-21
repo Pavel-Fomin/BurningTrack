@@ -37,7 +37,7 @@ final class TrackDetailFlowTests: XCTestCase {
         }
         XCTAssertNil(snapshot)
 
-        let requests = await executor.requests()
+        let requests = executor.requests()
         XCTAssertEqual(requests.count, 1)
         XCTAssertEqual(requests[0].newFileName, "Updated File.flac")
         XCTAssertTrue(requests[0].fileChanged)
@@ -60,13 +60,13 @@ final class TrackDetailFlowTests: XCTestCase {
             return XCTFail("Невалидный год не должен запускать сохранение")
         }
         XCTAssertNil(alert)
-        let requests = await executor.requests()
+        let requests = executor.requests()
         XCTAssertTrue(requests.isEmpty)
     }
 
     func testFileNameConflictKeepsDraftOpenWithoutReleasingPlayback() async {
         let executor = TrackDetailExecutorSpy()
-        await executor.setOutcomes([.appError(.fileAlreadyExists)])
+        executor.setOutcomes([.appError(.fileAlreadyExists)])
         let releaser = TrackDetailPlaybackReleaserSpy()
         let handler = makeActionHandler(
             executor: executor,
@@ -82,13 +82,13 @@ final class TrackDetailFlowTests: XCTestCase {
         }
         XCTAssertEqual(alert, .fileNameConflict)
         XCTAssertEqual(releaser.releaseCount, 0)
-        let requests = await executor.requests()
+        let requests = executor.requests()
         XCTAssertEqual(requests.count, 1)
     }
 
     func testConfirmedStopPlaybackRepeatsExactPendingCommand() async {
         let executor = TrackDetailExecutorSpy()
-        await executor.setOutcomes([.appError(.fileAccessDenied), .success])
+        executor.setOutcomes([.appError(.fileAccessDenied), .success])
         let releaser = TrackDetailPlaybackReleaserSpy()
         let handler = makeActionHandler(
             executor: executor,
@@ -114,7 +114,7 @@ final class TrackDetailFlowTests: XCTestCase {
         }
         XCTAssertEqual(releaser.releaseCount, 1)
 
-        let requests = await executor.requests()
+        let requests = executor.requests()
         XCTAssertEqual(requests.count, 2)
         XCTAssertEqual(requests[0], requests[1])
     }
@@ -249,8 +249,9 @@ final class TrackDetailFlowTests: XCTestCase {
     }
 }
 
-/// Запоминает вызовы существующего save-command вместо выполнения файловой операции.
-private actor TrackDetailExecutorSpy: TrackDetailCommandExecuting {
+/// MainActor-double запоминает вызовы существующего save-command вместо файловой операции.
+@MainActor
+private final class TrackDetailExecutorSpy: TrackDetailCommandExecuting {
     private var outcomes: [TrackDetailExecutorOutcome] = [.success]
     private var saveRequests: [TrackDetailSaveRequest] = []
 

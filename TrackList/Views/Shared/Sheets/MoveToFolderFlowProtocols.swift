@@ -10,12 +10,13 @@
 import Foundation
 
 /// Загружает текущую папку локального трека для начального состояния move-flow.
-protocol MoveToFolderTrackRegistryReading {
+protocol MoveToFolderTrackRegistryReading: Sendable {
     /// Возвращает SQLite entry трека, если он ещё существует в фонотеке.
     func entry(for id: UUID) async -> TrackRegistry.TrackEntry?
 }
 
 /// Выполняет существующие команды перемещения local-трека и копирования Purchased iTunes.
+@MainActor
 protocol MoveToFolderCommandExecuting {
     /// Перемещает локальный трек с сохранением проверки занятости файла.
     func moveTrack(

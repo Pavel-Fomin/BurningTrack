@@ -671,6 +671,7 @@ final class FavoritesServiceTests: XCTestCase {
         )
     }
 
+    @MainActor
     func testFavoritesEventCenterDeliversTypedEventToSubscriber() {
         let notificationCenter = NotificationCenter()
         let eventCenter = FavoritesEventCenter(notificationCenter: notificationCenter)

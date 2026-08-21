@@ -13,7 +13,7 @@ import Foundation
 
 // MARK: - Результаты сканирования
 
-struct ScannedFolder {
+struct ScannedFolder: Sendable {
     let url: URL
     let name: String
     /// Содержит только непосредственные подпапки; рекурсивный обход выполняет `scanRecursively(_:)`.
@@ -22,7 +22,7 @@ struct ScannedFolder {
     let audioFiles: [URL]
 }
 
-struct ScannedAudioFile: Hashable {
+struct ScannedAudioFile: Hashable, Sendable {
     let url: URL
     let fileName: String
     let folderURL: URL
@@ -30,7 +30,7 @@ struct ScannedAudioFile: Hashable {
 
 // MARK: - Изменения файлов
 
-enum FileChange {
+enum FileChange: Sendable {
     case added(URL)
     case removed(URL)
     case moved(old: URL, new: URL)
@@ -38,7 +38,8 @@ enum FileChange {
 
 // MARK: - Протокол сканера
 
-protocol LibraryScannerProtocol {
+/// Scanner не хранит mutable filesystem state и безопасно обслуживает разные async-owner-ы.
+protocol LibraryScannerProtocol: Sendable {
     func scanFolder(_ url: URL) async -> ScannedFolder
     func scanRecursively(_ url: URL) async -> [ScannedAudioFile]
     func diff(old: [ScannedAudioFile], new: [ScannedAudioFile]) -> [FileChange]
@@ -46,10 +47,9 @@ protocol LibraryScannerProtocol {
 
 // MARK: - Реализация
 
-final class LibraryScanner: LibraryScannerProtocol {
+final class LibraryScanner: LibraryScannerProtocol, Sendable {
     
     private let allowedExtensions = ["mp3", "flac", "wav", "aiff", "aac", "m4a", "ogg"]
-    private let fm = FileManager.default
     
     // MARK: - Канонизация URL
 
@@ -63,7 +63,7 @@ final class LibraryScanner: LibraryScannerProtocol {
         var subfolders: [URL] = []
         var audioFiles: [URL] = []
 
-        let items = (try? fm.contentsOfDirectory(
+        let items = (try? FileManager.default.contentsOfDirectory(
             at: url,
             includingPropertiesForKeys: [.isDirectoryKey],
             options: [.skipsHiddenFiles]
@@ -99,7 +99,7 @@ final class LibraryScanner: LibraryScannerProtocol {
 
         while let current = stack.popLast() {
 
-            let items = (try? fm.contentsOfDirectory(
+            let items = (try? FileManager.default.contentsOfDirectory(
                 at: current,
                 includingPropertiesForKeys: [.isDirectoryKey],
                 options: [.skipsHiddenFiles]

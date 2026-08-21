@@ -14,7 +14,10 @@
 
 import Foundation
 import Combine
-import MediaPlayer
+// MediaPlayer предоставляет синхронные system callbacks без полной Sendable-аннотации.
+// Граница локализована в PlayerManager, который владеет всеми MediaPlayer token-ами на MainActor.
+@preconcurrency import MediaPlayer
+// AVFoundation callbacks также входят в PlayerManager только через явный MainActor bridge.
 @preconcurrency import AVFoundation
 
 /// Общий интервал обновления пользовательского progress без отдельного визуального таймера.
@@ -24,12 +27,179 @@ enum PlayerProgressObservationConfiguration {
     static let interval: TimeInterval = 0.25
 }
 
+/// Изолирует AVPlayer API для контролируемых XCTest без переноса ownership из PlayerManager.
+@MainActor
+protocol PlayerRuntimeControlling: AnyObject {
+    var currentItem: AVPlayerItem? { get }
+    func replaceCurrentItem(with item: AVPlayerItem?)
+    func play()
+    func pause()
+    func seek(
+        to time: CMTime,
+        toleranceBefore: CMTime,
+        toleranceAfter: CMTime,
+        completionHandler: @escaping @Sendable (Bool) -> Void
+    )
+    func seek(to time: CMTime)
+    func addPeriodicTimeObserver(
+        forInterval interval: CMTime,
+        queue: DispatchQueue,
+        using block: @escaping @Sendable (CMTime) -> Void
+    ) -> Any
+    func removeTimeObserver(_ observer: Any)
+}
+
+/// Production-обёртка сохраняет прямой AVPlayer lifecycle в единственном PlayerManager runtime.
+@MainActor
+private final class AVPlayerRuntime: PlayerRuntimeControlling {
+
+    private let player = AVPlayer()
+
+    var currentItem: AVPlayerItem? {
+        player.currentItem
+    }
+
+    func replaceCurrentItem(with item: AVPlayerItem?) {
+        player.replaceCurrentItem(with: item)
+    }
+
+    func play() {
+        player.play()
+    }
+
+    func pause() {
+        player.pause()
+    }
+
+    func seek(
+        to time: CMTime,
+        toleranceBefore: CMTime,
+        toleranceAfter: CMTime,
+        completionHandler: @escaping @Sendable (Bool) -> Void
+    ) {
+        player.seek(
+            to: time,
+            toleranceBefore: toleranceBefore,
+            toleranceAfter: toleranceAfter,
+            completionHandler: completionHandler
+        )
+    }
+
+    func seek(to time: CMTime) {
+        player.seek(to: time)
+    }
+
+    func addPeriodicTimeObserver(
+        forInterval interval: CMTime,
+        queue: DispatchQueue,
+        using block: @escaping @Sendable (CMTime) -> Void
+    ) -> Any {
+        player.addPeriodicTimeObserver(
+            forInterval: interval,
+            queue: queue,
+            using: block
+        )
+    }
+
+    func removeTimeObserver(_ observer: Any) {
+        player.removeTimeObserver(observer)
+    }
+}
+
+/// Передаёт PlayerManager готовый playback URL и явный security-scope contract источника.
+struct PlayerPlaybackResource {
+    let url: URL
+    let needsSecurityScopedAccess: Bool
+}
+
+/// Позволяет production-коду и controlled XCTest одинаково разрешать источник playback.
+@MainActor
+protocol PlayerPlaybackResourceResolving: AnyObject {
+    func resolvePlaybackResource(
+        for track: any TrackDisplayable
+    ) async throws -> PlayerPlaybackResource
+}
+
+/// Production-resolver сохраняет раздельные contracts purchased iTunes и bookmark-файлов.
+@MainActor
+private final class DefaultPlayerPlaybackResourceResolver: PlayerPlaybackResourceResolving {
+
+    func resolvePlaybackResource(
+        for track: any TrackDisplayable
+    ) async throws -> PlayerPlaybackResource {
+        if let purchasedTrack = track as? PurchasedITunesPlayableTrack {
+            // Трек iTunes приходит из MediaPlayer с готовым assetURL, поэтому BookmarkResolver здесь не нужен.
+            return PlayerPlaybackResource(
+                url: purchasedTrack.assetURL,
+                needsSecurityScopedAccess: false
+            )
+        }
+
+        guard let resolvedURL = await BookmarkResolver.url(forTrack: track.trackId) else {
+            PersistentLogger.log("❌ PlayerManager: no URL for trackId=\(track.trackId)")
+            throw AppError.bookmarkResolveFailed
+        }
+
+        return PlayerPlaybackResource(
+            url: resolvedURL,
+            needsSecurityScopedAccess: true
+        )
+    }
+}
+
+/// Сохраняет AVAsset.load асинхронным и позволяет тесту точно контролировать suspension boundary.
+@MainActor
+protocol PlayerAssetLoading: AnyObject {
+    func loadIsPlayable(for item: AVPlayerItem) async throws
+    func loadDuration(for item: AVPlayerItem) async -> TimeInterval
+}
+
+/// Production-loader не выполняет синхронное файловое чтение на MainActor.
+@MainActor
+private final class AVPlayerAssetLoader: PlayerAssetLoading {
+
+    func loadIsPlayable(for item: AVPlayerItem) async throws {
+        _ = try await item.asset.load(.isPlayable)
+    }
+
+    func loadDuration(for item: AVPlayerItem) async -> TimeInterval {
+        (try? await item.asset.load(.duration))?.seconds ?? 0
+    }
+}
+
+/// Узкая capability security-scoped URL отделяет временный доступ одного request от текущего доступа PlayerManager.
+@MainActor
+protocol PlayerSecurityScopedResourceAccessing: AnyObject {
+    func startAccessing(_ url: URL) -> Bool
+    func stopAccessing(_ url: URL)
+}
+
+/// Production-accessor вызывает только системный URL security-scope API.
+@MainActor
+private final class URLSecurityScopedResourceAccessor: PlayerSecurityScopedResourceAccessing {
+
+    func startAccessing(_ url: URL) -> Bool {
+        url.startAccessingSecurityScopedResource()
+    }
+
+    func stopAccessing(_ url: URL) {
+        url.stopAccessingSecurityScopedResource()
+    }
+}
+
+@MainActor
 final class PlayerManager {
 
     // MARK: - Приватное
 
-    private let player = AVPlayer()
+    /// Единственный runtime AVPlayer принадлежит MainActor-изолированному PlayerManager.
+    private let player: any PlayerRuntimeControlling
+    private let playbackResourceResolver: any PlayerPlaybackResourceResolving
+    private let assetLoader: any PlayerAssetLoading
+    private let securityScopedResourceAccessor: any PlayerSecurityScopedResourceAccessing
+    private let notificationCenter: NotificationCenter
     private var timeObserverToken: Any?
+    private var finishObserver: NSObjectProtocol?
     private var currentAccessedURL: URL?
     /// URL сохраняется после успешной подготовки AVPlayerItem и используется только связанными runtime-сценариями.
     private var currentPreparedURL: URL?
@@ -37,6 +207,12 @@ final class PlayerManager {
     private var remoteCommandTargets: [(command: MPRemoteCommand, token: Any)] = []
     /// Target системной команды «Избранное», который удаляется отдельно при повторной настройке.
     private var favoriteCommandTarget: Any?
+    /// Identity текущего пользовательского запуска принадлежит фактическому AVPlayer lifecycle, а не trackId.
+    private var activePlaybackRequestID: PlaybackRequestID?
+    /// Request установленного item нужен для защиты finish, progress и restart callback от старого lifecycle.
+    private var currentItemPlaybackRequestID: PlaybackRequestID?
+    /// Текущий item хранится вместе с его request identity и доступен XCTest только для проверки уведомлений AVFoundation.
+    private(set) var currentPlaybackItem: AVPlayerItem?
 
     // MARK: - Состояние трека
 
@@ -48,42 +224,113 @@ final class PlayerManager {
 
     // MARK: - Инициализация
 
-    init() {
+    init(
+        player: (any PlayerRuntimeControlling)? = nil,
+        playbackResourceResolver: (any PlayerPlaybackResourceResolving)? = nil,
+        assetLoader: (any PlayerAssetLoading)? = nil,
+        securityScopedResourceAccessor: (any PlayerSecurityScopedResourceAccessing)? = nil,
+        notificationCenter: NotificationCenter = .default
+    ) {
+        self.player = player ?? AVPlayerRuntime()
+        self.playbackResourceResolver = playbackResourceResolver ?? DefaultPlayerPlaybackResourceResolver()
+        self.assetLoader = assetLoader ?? AVPlayerAssetLoader()
+        self.securityScopedResourceAccessor = securityScopedResourceAccessor ?? URLSecurityScopedResourceAccessor()
+        self.notificationCenter = notificationCenter
         print("🧠 PlayerManager инициализирован")
 
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(trackDidFinishPlaying),
-            name: .AVPlayerItemDidPlayToEndTime,
-            object: nil
-        )
+        // Доставка на main queue сохраняет actor boundary и позволяет проверить object текущего AVPlayerItem.
+        finishObserver = notificationCenter.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            // В callback переносим только immutable identity AVPlayerItem, не сам framework object.
+            let finishedItemID = (notification.object as? AVPlayerItem).map(ObjectIdentifier.init)
+            Task { @MainActor [weak self] in
+                self?.handlePlayerItemDidFinish(itemID: finishedItemID)
+            }
+        }
     }
 
-    deinit {
-        NotificationCenter.default.removeObserver(self)
-        removeTimeObserver()
-        removeRemoteCommandTargets()
-        removeFavoriteCommandHandler()
+    isolated deinit {
+        if let finishObserver {
+            notificationCenter.removeObserver(finishObserver)
+        }
+
+        if let timeObserverToken {
+            player.removeTimeObserver(timeObserverToken)
+        }
+        for target in remoteCommandTargets {
+            target.command.removeTarget(target.token)
+        }
+        let favoriteCommand = MPRemoteCommandCenter.shared().likeCommand
+        if let favoriteCommandTarget {
+            favoriteCommand.removeTarget(favoriteCommandTarget)
+        }
+        favoriteCommand.isEnabled = false
+        favoriteCommand.isActive = false
     }
 
     // MARK: - Уведомление о завершении
 
-    @objc private func trackDidFinishPlaying() {
-        // Трек доиграл до конца — считаем, что больше не играет
+    /// Принимает завершение только item актуального request, поэтому старый AVPlayerItem не запускает следующий трек.
+    func handlePlayerItemDidFinish(_ notification: Notification) {
+        let finishedItemID = (notification.object as? AVPlayerItem).map(ObjectIdentifier.init)
+        handlePlayerItemDidFinish(itemID: finishedItemID)
+    }
+
+    /// Сверяет immutable identity callback item с обоими MainActor runtime-owner-ами.
+    private func handlePlayerItemDidFinish(itemID: ObjectIdentifier?) {
+        guard let itemID,
+              let playerItem = player.currentItem,
+              let playbackItem = currentPlaybackItem,
+              ObjectIdentifier(playerItem) == itemID,
+              ObjectIdentifier(playbackItem) == itemID,
+              currentItemPlaybackRequestID == activePlaybackRequestID
+        else {
+            return
+        }
+
+        // Трек доиграл до конца — считаем, что больше не играет.
         isPlaying = false
-        NotificationCenter.default.post(name: .trackDidFinish, object: nil)
+        notificationCenter.post(name: .trackDidFinish, object: nil)
     }
 
     // MARK: - Основное воспроизведение
 
+    /// Регистрирует единственный актуальный запуск до первого suspension boundary.
+    func beginPlaybackRequest() -> PlaybackRequestID {
+        let requestID = PlaybackRequestID()
+        activePlaybackRequestID = requestID
+        return requestID
+    }
+
+    /// Сверяет identity с владельцем фактического AVPlayer lifecycle.
+    func isCurrentPlaybackRequest(_ requestID: PlaybackRequestID) -> Bool {
+        activePlaybackRequestID == requestID
+    }
+
+    /// Не позволяет внешнему lifecycle отменить request, который уже был заменён новым пользовательским намерением.
+    func invalidatePlaybackRequest(_ requestID: PlaybackRequestID) {
+        guard activePlaybackRequestID == requestID else {
+            return
+        }
+
+        activePlaybackRequestID = nil
+    }
+
     func play(
+        requestID: PlaybackRequestID,
         track: any TrackDisplayable,
         onPreparedLocalFile: @escaping PlayerPreparedLocalFileHandler
-    ) async throws {
+    ) async throws -> PlaybackStartResult {
         let trackId = track.trackId
 
         // 1. Получаем URL воспроизведения из подходящего источника.
-        let playbackResource = try await playbackResource(for: track)
+        let playbackResource = try await playbackResourceResolver.resolvePlaybackResource(for: track)
+        guard isCurrentPlaybackRequest(requestID) else {
+            return .superseded
+        }
         let resolvedURL = playbackResource.url
 
         // 2. Активация аудиосессии
@@ -94,36 +341,53 @@ final class PlayerManager {
             PersistentLogger.log("❌ PlayerManager: audio session failed error=\(error)")
             throw AppError.audioSessionFailed
         }
+        guard isCurrentPlaybackRequest(requestID) else {
+            return .superseded
+        }
 
-        // 3. Закрываем старый доступ
-        stopAccessingCurrentTrack()
-
-        // 4. Пытаемся открыть security-scoped доступ только для файлов прикреплённых папок.
+        // 3. Временный scope принадлежит только этому request до успешной установки item.
+        var ownsTemporarySecurityScope = false
         if playbackResource.needsSecurityScopedAccess {
             // В iOS 26 (File Provider Storage) startAccessing на файл может вернуть false,
             // при этом доступ может быть получен через root-scope папки.
-            let started = resolvedURL.startAccessingSecurityScopedResource()
+            let started = securityScopedResourceAccessor.startAccessing(resolvedURL)
             if started {
-                currentAccessedURL = resolvedURL
+                ownsTemporarySecurityScope = true
             } else {
-                currentAccessedURL = nil
                 print("⚠️ startAccessing вернул false для файла, пробуем играть через root-scope:", resolvedURL.lastPathComponent)
                 PersistentLogger.log("⚠️ PlayerManager: startAccessing false file=\(resolvedURL.lastPathComponent)")
             }
-        } else {
-            currentAccessedURL = nil
         }
 
-        // 5. Создаём AVPlayerItem
+        defer {
+            // Поздний request освобождает только scope, который открыл сам, и не трогает новый currentAccessedURL.
+            if ownsTemporarySecurityScope {
+                securityScopedResourceAccessor.stopAccessing(resolvedURL)
+            }
+        }
+
+        guard isCurrentPlaybackRequest(requestID) else {
+            return .superseded
+        }
+
+        // 4. Создаём AVPlayerItem и асинхронно проверяем его доступность.
         let item = AVPlayerItem(url: resolvedURL)
         do {
-            _ = try await item.asset.load(.isPlayable)
+            try await assetLoader.loadIsPlayable(for: item)
         } catch {
             PersistentLogger.log("❌ PlayerManager: not playable error=\(error)")
             throw AppError.fileNotPlayable
         }
+        guard isCurrentPlaybackRequest(requestID) else {
+            return .superseded
+        }
 
-        // 6. Подключаем item и играем
+        // 5. Только актуальный request заменяет прежний scope и AVPlayerItem.
+        stopAccessingCurrentTrack()
+        if ownsTemporarySecurityScope {
+            currentAccessedURL = resolvedURL
+            ownsTemporarySecurityScope = false
+        }
         player.replaceCurrentItem(with: item)
         player.play()
         PersistentLogger.log("▶️ PlayerManager: play started track=\(resolvedURL.lastPathComponent)")
@@ -131,52 +395,50 @@ final class PlayerManager {
         // Обновляем состояние текущего трека
         currentTrackId = trackId
         currentPreparedURL = resolvedURL
+        currentPlaybackItem = item
+        currentItemPlaybackRequestID = requestID
         isPlaying = true
 
         if let preparedLocalFileURL = preparedLocalFileURL(for: trackId) {
             // Контрольная точка появляется после подготовки AVPlayerItem и security scope, но до ожидания duration.
             // Менеджер сообщает только ресурс: запуск waveform остаётся ответственностью ViewModel.
-            await onPreparedLocalFile(
+            onPreparedLocalFile(
                 PlayerPreparedLocalFile(
+                    requestID: requestID,
                     trackId: trackId,
                     fileURL: preparedLocalFileURL
                 )
             )
         }
-
-        // 7. Читаем длительность трека
-        let duration = (try? await item.asset.load(.duration))?.seconds ?? 0
-        await MainActor.run {
-            NotificationCenter.default.post(
-                name: .trackDurationUpdated,
-                object: nil,
-                userInfo: ["duration": duration]
-            )
-        }
-    }
-
-    /// Возвращает URL для AVPlayer и признак необходимости security-scoped доступа.
-    private func playbackResource(
-        for track: any TrackDisplayable
-    ) async throws -> (url: URL, needsSecurityScopedAccess: Bool) {
-        if let purchasedTrack = track as? PurchasedITunesPlayableTrack {
-            // Трек iTunes приходит из MediaPlayer с готовым assetURL, поэтому BookmarkResolver здесь не нужен.
-            return (purchasedTrack.assetURL, false)
+        guard isCurrentPlaybackRequest(requestID),
+              currentPlaybackItem === item,
+              player.currentItem === item
+        else {
+            return .superseded
         }
 
-        guard let resolvedURL = await BookmarkResolver.url(forTrack: track.trackId) else {
-            PersistentLogger.log("❌ PlayerManager: no URL for trackId=\(track.trackId)")
-            throw AppError.bookmarkResolveFailed
+        // 6. Длительность читается асинхронно, а после await проверяется тот же item и request.
+        let duration = await assetLoader.loadDuration(for: item)
+        guard isCurrentPlaybackRequest(requestID),
+              currentPlaybackItem === item,
+              player.currentItem === item
+        else {
+            return .superseded
         }
 
-        return (resolvedURL, true)
+        notificationCenter.post(
+            name: .trackDurationUpdated,
+            object: nil,
+            userInfo: ["duration": duration]
+        )
+        return .started
     }
 
     // MARK: - Доступ безопасности
 
     func stopAccessingCurrentTrack() {
         if let url = currentAccessedURL {
-            url.stopAccessingSecurityScopedResource()
+            securityScopedResourceAccessor.stopAccessing(url)
             currentAccessedURL = nil
         }
 
@@ -187,11 +449,15 @@ final class PlayerManager {
     /// Отсоединяет текущий AVPlayerItem до записи в файл и освобождает связанный security-scoped доступ.
     /// ViewModel сохраняет display-состояние трека и при следующем запуске создаст новый item по актуальному файлу.
     func releaseCurrentTrackForFileOperation() {
+        // Файловая операция не должна позволить уже ожидающему request снова подключить item.
+        activePlaybackRequestID = nil
         player.pause()
         player.replaceCurrentItem(with: nil)
         removeTimeObserver()
         stopAccessingCurrentTrack()
         currentTrackId = nil
+        currentPlaybackItem = nil
+        currentItemPlaybackRequestID = nil
         isPlaying = false
     }
 
@@ -249,16 +515,46 @@ final class PlayerManager {
 
     /// Перезапускает текущий item с нулевой позиции без создания нового item.
     func restartCurrent() {
-        guard player.currentItem != nil else { return }
+        guard let item = player.currentItem,
+              item === currentPlaybackItem,
+              let requestID = currentItemPlaybackRequestID,
+              isCurrentPlaybackRequest(requestID)
+        else {
+            return
+        }
 
         player.seek(
             to: .zero,
             toleranceBefore: .zero,
             toleranceAfter: .zero
-        ) { [weak self] _ in
-            self?.player.play()
+        ) { [weak self] didFinish in
+            Task { @MainActor [weak self] in
+                self?.completeRestartSeek(
+                    for: item,
+                    requestID: requestID,
+                    didFinish: didFinish
+                )
+            }
         }
         isPlaying = true
+    }
+
+    /// Возобновляет playback только для item и request, которые не были заменены пока AVPlayer выполнял seek.
+    func completeRestartSeek(
+        for item: AVPlayerItem,
+        requestID: PlaybackRequestID,
+        didFinish: Bool
+    ) {
+        guard didFinish,
+              player.currentItem === item,
+              currentPlaybackItem === item,
+              currentItemPlaybackRequestID == requestID,
+              isCurrentPlaybackRequest(requestID)
+        else {
+            return
+        }
+
+        player.play()
     }
 
     func seek(to time: TimeInterval) {
@@ -276,8 +572,10 @@ final class PlayerManager {
 
     // MARK: - Прогресс
 
-    func observeProgress(update: @escaping (TimeInterval) -> Void) {
+    func observeProgress(update: @escaping @MainActor @Sendable (TimeInterval) -> Void) {
         removeTimeObserver()
+        let observedItem = player.currentItem
+        let observedRequestID = currentItemPlaybackRequestID
         let interval = CMTimeMakeWithSeconds(
             PlayerProgressObservationConfiguration.interval,
             preferredTimescale: 600
@@ -286,8 +584,20 @@ final class PlayerManager {
         timeObserverToken = player.addPeriodicTimeObserver(
             forInterval: interval,
             queue: .main
-        ) { time in
-            update(time.seconds)
+        ) { [weak self] time in
+            Task { @MainActor [weak self] in
+                guard let self,
+                      self.player.currentItem === observedItem,
+                      self.currentPlaybackItem === observedItem,
+                      self.currentItemPlaybackRequestID == observedRequestID,
+                      let observedRequestID,
+                      self.isCurrentPlaybackRequest(observedRequestID)
+                else {
+                    return
+                }
+
+                update(time.seconds)
+            }
         }
     }
 
@@ -301,10 +611,10 @@ final class PlayerManager {
     // MARK: - Remote Command Center
 
     func setupRemoteCommandCenter(
-        onPlay: @escaping () -> Void,
-        onPause: @escaping () -> Void,
-        onNext: @escaping () -> Void,
-        onPrevious: @escaping () -> Void
+        onPlay: @escaping @MainActor @Sendable () -> Void,
+        onPause: @escaping @MainActor @Sendable () -> Void,
+        onNext: @escaping @MainActor @Sendable () -> Void,
+        onPrevious: @escaping @MainActor @Sendable () -> Void
     ) {
         removeRemoteCommandTargets()
 
@@ -342,12 +652,14 @@ final class PlayerManager {
             (
                 command: center.changePlaybackPositionCommand,
                 token: center.changePlaybackPositionCommand.addTarget { [weak self] event in
-                    guard
-                        let self,
-                        let event = event as? MPChangePlaybackPositionCommandEvent
-                    else { return .commandFailed }
+                    guard let event = event as? MPChangePlaybackPositionCommandEvent else {
+                        return .commandFailed
+                    }
 
-                    self.seek(to: event.positionTime)
+                    // Remote Command Center требует синхронный status, а фактический UI-bound seek переносится на MainActor.
+                    Task { @MainActor [weak self] in
+                        self?.seek(to: event.positionTime)
+                    }
 
                     return .success
                 }
@@ -357,23 +669,22 @@ final class PlayerManager {
 
     /// Настраивает системную команду «Избранное», не затрагивая targets других владельцев.
     func configureFavoriteCommand(
-        handler: @escaping @MainActor (Bool) -> MPRemoteCommandHandlerStatus
+        handler: @escaping @MainActor @Sendable (Bool) -> MPRemoteCommandHandlerStatus
     ) {
         removeFavoriteCommandHandler()
 
         let command = MPRemoteCommandCenter.shared().likeCommand
         command.localizedTitle = String(localized: "tracklist.favorites.title")
         command.localizedShortTitle = String(localized: "tracklist.favorites.title")
-        favoriteCommandTarget = command.addTarget { [weak self] event in
+        favoriteCommandTarget = command.addTarget { event in
             guard
-                let self,
                 let feedbackEvent = event as? MPFeedbackCommandEvent
             else {
                 return .commandFailed
             }
 
             // MPFeedbackCommandEvent передаёт отрицательное действие для отмены ранее активированной обратной связи.
-            return self.handleFavoriteCommand(
+            return PlayerManager.handleFavoriteCommand(
                 isFavorite: feedbackEvent.isNegative == false,
                 handler: handler
             )
@@ -404,9 +715,9 @@ final class PlayerManager {
     }
 
     /// Выполняет доменное действие на MainActor, сохраняя синхронный статус, который требует Remote Command Center.
-    private func handleFavoriteCommand(
+    nonisolated private static func handleFavoriteCommand(
         isFavorite: Bool,
-        handler: @escaping @MainActor (Bool) -> MPRemoteCommandHandlerStatus
+        handler: @escaping @MainActor @Sendable (Bool) -> MPRemoteCommandHandlerStatus
     ) -> MPRemoteCommandHandlerStatus {
         if Thread.isMainThread {
             return MainActor.assumeIsolated {

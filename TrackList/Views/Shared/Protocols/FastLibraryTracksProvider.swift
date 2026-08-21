@@ -20,11 +20,13 @@ import Foundation
 ///
 /// Отдельный контракт нужен восстановлению мини-плеера: ему достаточно display-модели
 /// одного сохранённого трека, пока полный playback-контекст фонотеки готовится отдельно.
+/// Result применяется к MainActor-bound restoration state, поэтому provider остаётся в том же owner-е.
+@MainActor
 protocol FastLibraryTrackProviding {
     func track(for trackId: UUID) async -> LibraryTrack?
 }
 
-final class FastLibraryTracksProvider: LibraryTracksProvider, FastLibraryTrackProviding {
+final class FastLibraryTracksProvider: LibraryTracksProvider, FastLibraryTrackProviding, Sendable {
 
     /// Возвращает одну display-модель из TrackRegistry без проверки доступности файла.
     ///

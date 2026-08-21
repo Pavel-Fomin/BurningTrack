@@ -8,6 +8,8 @@
 //
 
 import Foundation
+// AVFoundation передаёт legacy export callback-и без современных Sendable-аннотаций.
+// Writer изолирует AVAssetExportSession одним вызовом и не передаёт её между owner-ами.
 @preconcurrency import AVFoundation
 
 /// Содержит только runtime-данные iTunes-трека, необходимые файловой операции.
@@ -89,17 +91,18 @@ private final class PurchasedITunesAssetExportCancellation: @unchecked Sendable 
 ///
 /// File URL копируется существующим порционным копировщиком, а media-library URL
 /// экспортируется через AVAssetExportSession без перекодирования.
-struct PurchasedITunesAssetWriter {
+/// Writer хранит только stateless Sendable копировщик; AVAssetExportSession создаётся внутри одного вызова.
+struct PurchasedITunesAssetWriter: Sendable {
 
     /// План фиксирует расширение и способ записи до подготовки итогового URL.
-    struct WritePlan {
+    struct WritePlan: Sendable {
         /// Фактическое расширение создаваемого файла.
         let fileExtension: String
         /// Низкоуровневый способ записи выбранного системного URL.
         fileprivate let method: Method
 
         /// Разделяет обычное копирование и passthrough-экспорт MediaPlayer.
-        fileprivate enum Method {
+        fileprivate enum Method: Sendable {
             case fileCopy
             case assetExport(outputFileType: AVFileType)
         }

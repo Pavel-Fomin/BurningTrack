@@ -110,7 +110,7 @@ final class AddToTrackListFlowTests: XCTestCase {
         viewModel.handle(.submit)
         await Task.yield()
 
-        let requests = await executor.libraryTrackRequests()
+        let requests = executor.libraryTrackRequests()
         XCTAssertTrue(requests.isEmpty)
     }
 
@@ -125,7 +125,7 @@ final class AddToTrackListFlowTests: XCTestCase {
         XCTAssertTrue(viewModel.state.isSubmitting)
         await completeScheduledTask()
 
-        let requests = await executor.libraryTrackRequests()
+        let requests = executor.libraryTrackRequests()
         XCTAssertEqual(requests.count, 1)
     }
 
@@ -158,7 +158,7 @@ final class AddToTrackListFlowTests: XCTestCase {
 
         _ = await handler.submit(request: request, destination: destination)
 
-        let requests = await executor.libraryTrackRequests()
+        let requests = executor.libraryTrackRequests()
         XCTAssertEqual(requests.count, 1)
         XCTAssertEqual(requests.first?.0, track.trackId)
         XCTAssertEqual(requests.first?.1, destination.id)
@@ -184,7 +184,7 @@ final class AddToTrackListFlowTests: XCTestCase {
 
         _ = await handler.submit(request: request, destination: destination)
 
-        let trackIDs = await executor.purchasedTrackIDs()
+        let trackIDs = executor.purchasedTrackIDs()
         XCTAssertEqual(trackIDs, [track.trackId])
         XCTAssertEqual(router.closeCount, 1)
     }
@@ -237,7 +237,7 @@ final class AddToTrackListFlowTests: XCTestCase {
 
         _ = await handler.submit(request: request, destination: destination)
 
-        let requests = await executor.trackListRequests()
+        let requests = executor.trackListRequests()
         XCTAssertEqual(requests.count, 1)
         XCTAssertEqual(requests.first?.0, trackIds)
         XCTAssertEqual(requests.first?.1, destination.id)
@@ -285,7 +285,7 @@ final class AddToTrackListFlowTests: XCTestCase {
             toast: toast,
             router: router
         )
-        await executor.setError(.trackListSaveFailed)
+        executor.setError(.trackListSaveFailed)
 
         let result = await handler.submit(request: request, destination: destination)
 
@@ -300,7 +300,7 @@ final class AddToTrackListFlowTests: XCTestCase {
         let destination = makeTrackListMeta(name: "Destination")
         let (viewModel, _, executor, router) = makeViewModel(trackLists: [destination])
 
-        await executor.setError(.trackListSaveFailed)
+        executor.setError(.trackListSaveFailed)
         viewModel.handle(.trackListSelected(destination.id))
         viewModel.handle(.submit)
         await completeScheduledTask()
@@ -309,13 +309,19 @@ final class AddToTrackListFlowTests: XCTestCase {
         XCTAssertTrue(viewModel.state.canSubmit)
         XCTAssertEqual(router.closeCount, 0)
 
-        await executor.setError(nil)
+        executor.setError(nil)
+        let closeExpectation = expectation(
+            description: "Успешная повторная попытка закрывает route"
+        )
+        router.onDismiss = {
+            closeExpectation.fulfill()
+        }
         viewModel.handle(.submit)
-        await completeScheduledTask()
+        await fulfillment(of: [closeExpectation], timeout: 1)
 
-        let attemptCount = await executor.libraryTrackAttemptCount()
+        let attemptCount = executor.libraryTrackAttemptCount()
         XCTAssertEqual(attemptCount, 2)
-        let requests = await executor.libraryTrackRequests()
+        let requests = executor.libraryTrackRequests()
         XCTAssertEqual(requests.count, 1)
         XCTAssertEqual(router.closeCount, 1)
     }
@@ -442,8 +448,9 @@ private final class AddToTrackListTrackListsSpy: AddToTrackListTrackListsManagin
     }
 }
 
-/// Небольшой actor fake существующего command executor для всех асинхронных веток flow.
-private actor AddToTrackListExecutorSpy: AddToTrackListExecuting {
+/// MainActor-double существующего command executor для всех асинхронных веток flow.
+@MainActor
+private final class AddToTrackListExecutorSpy: AddToTrackListExecuting {
     private var error: AppError?
     private var libraryTrackAttemptCountValue = 0
     private var libraryRequests: [(UUID, UUID)] = []
@@ -551,8 +558,11 @@ private final class AddToTrackListToastSpy: ToastPresenting {
 @MainActor
 private final class AddToTrackListRouterSpy: AddToTrackListRouting {
     var closeCount = 0
+    /// Сигнализирует тесту о действительном завершении асинхронного route, а не о произвольной задержке Task.
+    var onDismiss: (() -> Void)?
 
     func dismissAddToTrackList(_ routeID: UUID) {
         closeCount += 1
+        onDismiss?()
     }
 }

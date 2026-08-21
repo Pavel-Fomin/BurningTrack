@@ -19,7 +19,8 @@
 
 import Foundation
 
-final class TrackRuntimeSnapshotBuilder {
+/// Сборщик не хранит mutable state, поэтому его можно безопасно передавать между async-owner-ами.
+final class TrackRuntimeSnapshotBuilder: Sendable {
 
     // MARK: - Единый экземпляр
 

@@ -258,7 +258,10 @@ private func makeSearchViewModel(
 
     return SearchViewModel(
         searchService: searchService,
-        runtimeController: LibraryTrackRuntimeController(),
+        runtimeController: LibraryTrackRuntimeController(
+            runtimeSnapshotStore: TrackRuntimeStore.shared,
+            runtimeSnapshotBuilder: TrackRuntimeSnapshotBuilder.shared
+        ),
         settingsManager: SearchSettingsManagerSpy(),
         favoriteTrackIdsProvider: SearchFavoriteTrackIdsProviderSpy(),
         playbackStateProvider: resolvedPlaybackStateProvider,

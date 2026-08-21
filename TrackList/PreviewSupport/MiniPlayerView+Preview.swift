@@ -11,6 +11,7 @@
 import SwiftUI
 
 /// Строит изолированный MiniPlayer из готовых presentation-данных без production-зависимостей.
+@MainActor
 private func makeMiniPlayerPreview(
     state: MiniPlayerScreenState
 ) -> some View {
@@ -22,6 +23,7 @@ private func makeMiniPlayerPreview(
 }
 
 /// Готовые состояния позволяют проверить разметку без реального PlayerManager, настроек и навигации.
+@MainActor
 private enum MiniPlayerPreviewStates {
 
     static let empty = MiniPlayerScreenState(

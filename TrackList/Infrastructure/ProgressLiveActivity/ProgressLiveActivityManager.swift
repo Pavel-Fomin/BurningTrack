@@ -10,7 +10,9 @@
 import Foundation
 
 #if canImport(ActivityKit)
-import ActivityKit
+// ActivityKit SDK помечает async update/end так, что его Activity формально пересекает Sendable-границу.
+// Экземпляр Activity остаётся приватным состоянием MainActor-owner и не передаётся другим владельцам.
+@preconcurrency import ActivityKit
 #endif
 
 /// Управляет одной универсальной Live Activity и не раскрывает ActivityKit экспорту.

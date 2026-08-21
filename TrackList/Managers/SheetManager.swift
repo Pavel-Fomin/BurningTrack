@@ -339,7 +339,7 @@ final class SheetManager: ObservableObject {
 
     /// Вызывается только `SheetHostModifier.onDismiss`, когда SwiftUI завершил закрытие конкретного route.
     func handleDismiss() {
-        guard let dismissedSheet = dismissingSheet else {
+        guard dismissingSheet != nil else {
             return
         }
 

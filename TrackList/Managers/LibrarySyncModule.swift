@@ -18,6 +18,105 @@
 
 import Foundation
 
+/// Координирует логические синхронизации отдельно для каждого корня фонотеки.
+///
+/// `LibrarySyncModule` остаётся reentrant во время сканирования и операций с реестрами,
+/// поэтому очередь живёт в отдельном actor. Запрос одного `rootFolderId` начинает scan
+/// только после полного завершения предыдущего; независимые корни не блокируют друг друга.
+actor LibraryRootSyncCoordinator {
+
+    private struct WaitingRequest {
+        let id: UUID
+        let continuation: CheckedContinuation<Void, Never>
+    }
+
+    private struct RootState {
+        var activeRequestID: UUID
+        var waitingRequests: [WaitingRequest]
+    }
+
+    private var states: [UUID: RootState] = [:]
+
+    /// Выполняет operation в очереди её root-папки.
+    ///
+    /// Если ожидающий вызывающий код отменён, continuation намеренно дожидается своей очереди:
+    /// сразу после получения ownership проверяется cancellation, запрос не входит в
+    /// operation и освобождает место следующему. Так не нужен отдельный небезопасный
+    /// механизм удаления continuation из очереди.
+    func run(
+        rootFolderId: UUID,
+        operation: @escaping @Sendable () async throws -> Void
+    ) async throws {
+        let requestID = UUID()
+        await acquire(rootFolderId: rootFolderId, requestID: requestID)
+
+        do {
+            try Task.checkCancellation()
+            try await operation()
+            release(rootFolderId: rootFolderId, requestID: requestID)
+        } catch {
+            // Ошибка или отмена одной операции не должны удерживать root и блокировать
+            // независимый следующий запрос этой же папки.
+            release(rootFolderId: rootFolderId, requestID: requestID)
+            throw error
+        }
+    }
+
+    private func acquire(rootFolderId: UUID, requestID: UUID) async {
+        guard states[rootFolderId] != nil else {
+            states[rootFolderId] = RootState(
+                activeRequestID: requestID,
+                waitingRequests: []
+            )
+            return
+        }
+
+        await withCheckedContinuation { continuation in
+            states[rootFolderId]?.waitingRequests.append(
+                WaitingRequest(id: requestID, continuation: continuation)
+            )
+        }
+    }
+
+    private func release(rootFolderId: UUID, requestID: UUID) {
+        guard var state = states[rootFolderId], state.activeRequestID == requestID else {
+            return
+        }
+
+        guard state.waitingRequests.isEmpty == false else {
+            states[rootFolderId] = nil
+            return
+        }
+
+        let nextRequest = state.waitingRequests.removeFirst()
+        state.activeRequestID = nextRequest.id
+        states[rootFolderId] = state
+        nextRequest.continuation.resume()
+    }
+}
+
+/// Содержит чистые правила reconciliation, используемые sync-body.
+/// Выделение правил сохраняет проверяемыми границы `.safe`, `.full` и empty-scan,
+/// не меняя ownership TrackRegistry и BookmarksRegistry.
+enum LibrarySyncReconciliation {
+
+    static func shouldApply(scannedFileCount: Int) -> Bool {
+        scannedFileCount > 0
+    }
+
+    static func entriesToDelete(
+        existing: [TrackRegistry.TrackEntry],
+        aliveIDs: Set<UUID>,
+        mode: LibrarySyncModule.SyncMode
+    ) -> [TrackRegistry.TrackEntry] {
+        guard case .full = mode else {
+            return []
+        }
+
+        return existing.filter { aliveIDs.contains($0.id) == false }
+    }
+}
+
 actor LibrarySyncModule {
     
     enum SyncMode {
@@ -28,6 +127,7 @@ actor LibrarySyncModule {
     static let shared = LibrarySyncModule()
 
     private let scanner = LibraryScanner()
+    private let rootSyncCoordinator = LibraryRootSyncCoordinator()
 
     private init() {}
 
@@ -47,6 +147,30 @@ actor LibrarySyncModule {
         mode: SyncMode,
         logsDatabaseDiagnostics: Bool = true
     ) async throws {
+
+        try await rootSyncCoordinator.run(rootFolderId: rootFolderId) {
+            try await self.performSyncRootFolder(
+                rootFolderId: rootFolderId,
+                rootURL: rootURL,
+                mode: mode,
+                logsDatabaseDiagnostics: logsDatabaseDiagnostics
+            )
+        }
+    }
+
+    /// Выполняет существующую бизнес-логику одной root-operation после получения ownership.
+    /// Пока этот метод не завершится, следующий sync того же root не может начать scan и
+    /// поэтому не применит snapshot файловой системы, устаревший ещё во время ожидания.
+    private func performSyncRootFolder(
+        rootFolderId: UUID,
+        rootURL: URL,
+        mode: SyncMode,
+        logsDatabaseDiagnostics: Bool
+    ) async throws {
+
+        // Отмена между передачей ownership и первой проверкой доступа не должна
+        // открывать scope и запускать scan для уже неактуального запроса.
+        try Task.checkCancellation()
         
         /// Защита от разрушительного sync во время boot процесса.
         /// Если библиотека ещё не перешла в состояние ready,
@@ -54,6 +178,7 @@ actor LibrarySyncModule {
         let accessState = await MainActor.run {
             MusicLibraryManager.shared.accessState
         }
+        try Task.checkCancellation()
 
         if accessState != .ready {
             PersistentLogger.log("⚠️ sync blocked: library not ready")
@@ -83,7 +208,11 @@ actor LibrarySyncModule {
 
         // 2) Сканируем все аудиофайлы рекурсивно
         let scanned = await scanner.scanRecursively(rootURL)
-        if scanned.isEmpty {
+        // Отмена после scan не начинает registry-mutations. После первой mutation
+        // cancellation специально не проверяется, потому что rollback ещё не существует.
+        try Task.checkCancellation()
+
+        if LibrarySyncReconciliation.shouldApply(scannedFileCount: scanned.count) == false {
             print("⚠️ syncRootFolder: scan вернул 0 файлов — пропускаем удаление, чтобы не снести реестр:", rootURL.lastPathComponent)
             PersistentLogger.log("⚠️ syncRootFolder: empty scan root=\(rootURL.lastPathComponent) mode=\(mode)")
             return
@@ -91,6 +220,8 @@ actor LibrarySyncModule {
 
         // 3) Получаем текущее состояние реестра по корню
         let existing = await TrackRegistry.shared.tracks(inRootFolder: rootFolderId)
+        // Если отмена пришла до первой mutation, root освобождается без частичного sync.
+        try Task.checkCancellation()
 
         var existingByRelativePath: [String: TrackRegistry.TrackEntry] = [:]
         for entry in existing {
@@ -164,27 +295,27 @@ actor LibrarySyncModule {
         }
 
         // 5) Удаляем только в full-режиме
-        if mode == .full {
-            for entry in existing {
-                if aliveIds.contains(entry.id) { continue }
+        for entry in LibrarySyncReconciliation.entriesToDelete(
+            existing: existing,
+            aliveIDs: aliveIds,
+            mode: mode
+        ) {
+            await TrackRegistry.shared.removeTrack(id: entry.id)
+            await BookmarksRegistry.shared.removeTrackBookmark(id: entry.id)
 
-                await TrackRegistry.shared.removeTrack(id: entry.id)
-                await BookmarksRegistry.shared.removeTrackBookmark(id: entry.id)
-
-                // Трек реально исчез из библиотеки.
-                // Значит его library identity тоже нужно забыть.
-                if let rootFolderId = entry.rootFolderId,
-                   let relativePath = entry.relativePath {
-                    try await TrackIdentityResolver.shared.unbindLibraryTrack(
-                        rootFolderId: rootFolderId,
-                        relativePath: relativePath
-                    )
-                }
-
-                // И дополнительно очищаем все привязки к этому trackId,
-                // чтобы потом другой файл по старому пути не воскресил старый id.
-                try await TrackIdentityResolver.shared.forgetTrack(id: entry.id)
+            // Трек реально исчез из библиотеки.
+            // Значит его library identity тоже нужно забыть.
+            if let rootFolderId = entry.rootFolderId,
+               let relativePath = entry.relativePath {
+                try await TrackIdentityResolver.shared.unbindLibraryTrack(
+                    rootFolderId: rootFolderId,
+                    relativePath: relativePath
+                )
             }
+
+            // И дополнительно очищаем все привязки к этому trackId,
+            // чтобы потом другой файл по старому пути не воскресил старый id.
+            try await TrackIdentityResolver.shared.forgetTrack(id: entry.id)
         }
         // 6) Финальная проверка ошибок выполняется только после валидной синхронизации.
         // До этого места код доходит только если:
