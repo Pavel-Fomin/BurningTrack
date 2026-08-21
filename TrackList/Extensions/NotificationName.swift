@@ -20,6 +20,7 @@ extension Notification.Name {
     
     static let trackListsDidChange = Notification.Name("trackListsDidChange")       /// Любое изменение списка треклистов (создание/удаление/переименование)
     static let trackListTracksDidChange = Notification.Name("trackListTracksDidChange") /// Изменились треки внутри одного треклиста
+    static let trackListBadgeIndexDidChange = Notification.Name("trackListBadgeIndexDidChange") /// Точечная мутация индекса принадлежности trackId к треклистам
     static let favoritesDidChange = Notification.Name("favoritesDidChange") /// Точечное изменение состояния trackId в системном треклисте «Избранное»
     static let trackDidUpdate = Notification.Name("trackDidUpdate")                 /// Единое событие обновления трека с payload TrackUpdateEvent
     static let trackBatchDidUpdate = Notification.Name("trackBatchDidUpdate")       /// Пакетное событие обновления треков с payload [TrackUpdateEvent]

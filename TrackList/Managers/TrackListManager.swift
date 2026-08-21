@@ -77,31 +77,47 @@ final class TrackListManager {
         publishesFavoritesEvents: Bool = true
     ) throws -> TrackListTracksSaveReceipt {
         do {
+            // Снимок до записи нужен только для точечного обновления membership по изменившимся trackId.
+            let previousTracks = try databaseStore.fetchTracks(for: id)
+            let meta = try databaseStore.fetchMeta(id: id)
             let isFavoritesTrackList: Bool
             if publishesFavoritesEvents {
-                isFavoritesTrackList = try databaseStore.fetchMeta(id: id).kind == .favorites
+                isFavoritesTrackList = meta.kind == .favorites
             } else {
                 isFavoritesTrackList = false
-            }
-            let favoritesTracksBeforeSaving: [Track]
-            if isFavoritesTrackList {
-                favoritesTracksBeforeSaving = try databaseStore.fetchTracks(for: id)
-            } else {
-                favoritesTracksBeforeSaving = []
             }
 
             try databaseStore.replaceTracks(tracks, for: id)
             if isFavoritesTrackList {
                 publishFavoritesChanges(
-                    from: favoritesTracksBeforeSaving,
+                    from: previousTracks,
                     to: tracks
+                )
+            }
+            let previousTrackIds = Set(previousTracks.map(\.trackId))
+            let updatedTrackIds = Set(tracks.map(\.trackId))
+            let addedTrackIds = updatedTrackIds.subtracting(previousTrackIds)
+            let removedTrackIds = previousTrackIds.subtracting(updatedTrackIds)
+            if addedTrackIds.isEmpty == false || removedTrackIds.isEmpty == false {
+                NotificationCenter.default.post(
+                    name: .trackListBadgeIndexDidChange,
+                    object: TrackListBadgeIndexChange.trackIdsChanged(
+                        trackListId: id,
+                        membership: TrackListMembership(
+                            storedName: meta.name,
+                            kind: meta.kind
+                        ),
+                        addedTrackIds: addedTrackIds,
+                        removedTrackIds: removedTrackIds
+                    )
                 )
             }
             NotificationCenter.default.post(
                 name: .trackListTracksDidChange,
                 object: id
             )
-            if postTrackListsDidChange, TrackListsManager.shared.trackListExists(id: id) {
+            if postTrackListsDidChange {
+                // Проверенный выше meta принадлежит тому же SQLite-хранилищу, поэтому обращение к global singleton не требуется.
                 NotificationCenter.default.post(
                     name: .trackListsDidChange,
                     object: nil

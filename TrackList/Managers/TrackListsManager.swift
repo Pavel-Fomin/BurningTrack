@@ -49,6 +49,7 @@ final class TrackListsManager {
     /// Название используется только при первом создании и никогда не участвует в поиске системного треклиста.
     func ensureFavoritesTrackList() throws -> TrackListMeta {
         var didChangeTrackLists = false
+        var badgeIndexChanges: [TrackListBadgeIndexChange] = []
 
         do {
             let favorites = try databaseStore.transaction {
@@ -69,6 +70,7 @@ final class TrackListsManager {
                         tracks: []
                     )
                     didChangeTrackLists = true
+                    badgeIndexChanges.append(.trackListRelationsReplaced(created))
 
                     return TrackListMeta(
                         id: created.id,
@@ -86,6 +88,7 @@ final class TrackListsManager {
                         updatedAt: Date()
                     )
                     didChangeTrackLists = true
+                    badgeIndexChanges.append(.trackListDeleted(duplicate.id))
                 }
 
                 if primary.isActive == false {
@@ -94,12 +97,19 @@ final class TrackListsManager {
                         updatedAt: Date()
                     )
                     didChangeTrackLists = true
+                    badgeIndexChanges.append(.trackListRelationsReloadRequested(primary.meta.id))
                 }
 
                 return primary.meta
             }
 
             if didChangeTrackLists {
+                for change in badgeIndexChanges {
+                    NotificationCenter.default.post(
+                        name: .trackListBadgeIndexDidChange,
+                        object: change
+                    )
+                }
                 publishTrackListsDidChange()
             }
 
@@ -168,6 +178,10 @@ final class TrackListsManager {
                 kind: kind,
                 createdAt: createdAt,
                 tracks: tracks
+            )
+            NotificationCenter.default.post(
+                name: .trackListBadgeIndexDidChange,
+                object: TrackListBadgeIndexChange.trackListRelationsReplaced(created)
             )
             NotificationCenter.default.post(
                 name: .trackListTracksDidChange,
@@ -253,6 +267,10 @@ final class TrackListsManager {
             }
 
             try databaseStore.deleteTrackList(id: id)
+            NotificationCenter.default.post(
+                name: .trackListBadgeIndexDidChange,
+                object: TrackListBadgeIndexChange.trackListDeleted(id)
+            )
             publishTrackListsDidChange()
         } catch let appError as AppError {
             throw appError
@@ -277,6 +295,17 @@ final class TrackListsManager {
             }
 
             try databaseStore.renameTrackList(id: id, to: newName)
+            NotificationCenter.default.post(
+                name: .trackListBadgeIndexDidChange,
+                object: TrackListBadgeIndexChange.trackListMetadataChanged(
+                    TrackListMeta(
+                        id: meta.id,
+                        name: newName,
+                        createdAt: meta.createdAt,
+                        kind: meta.kind
+                    )
+                )
+            )
             publishTrackListsDidChange()
         } catch let appError as AppError {
             throw appError

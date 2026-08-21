@@ -1504,6 +1504,98 @@ final class SQLiteDatabaseLayerTests: XCTestCase {
     }
 
     @MainActor
+    func testTrackListBadgeIndexAppliesTrackListMutationsWithoutReloadingUnrelatedMemberships() throws {
+        let database = try makeDatabase()
+        let executor = try database.databaseExecutor()
+        let store = TrackListDatabaseStore(executor: executor)
+        let trackListsManager = TrackListsManager(databaseStore: store)
+        let trackListManager = TrackListManager(databaseStore: store)
+        let sharedTrackId = UUID()
+        let addedTrackId = UUID()
+        let unrelatedTrackId = UUID()
+        let target = try store.createTrackList(
+            id: UUID(),
+            name: "Target",
+            kind: .regular,
+            createdAt: Date(timeIntervalSince1970: 100),
+            tracks: [makeTrackListTrack(
+                listItemId: UUID(),
+                trackId: sharedTrackId,
+                title: "Shared"
+            )]
+        )
+        let unrelated = try store.createTrackList(
+            id: UUID(),
+            name: "Unrelated",
+            kind: .regular,
+            createdAt: Date(timeIntervalSince1970: 200),
+            tracks: [
+                makeTrackListTrack(
+                    listItemId: UUID(),
+                    trackId: sharedTrackId,
+                    title: "Shared elsewhere"
+                ),
+                makeTrackListTrack(
+                    listItemId: UUID(),
+                    trackId: unrelatedTrackId,
+                    title: "Unrelated"
+                )
+            ]
+        )
+        let index = TrackListBadgeIndex(
+            trackListsManager: trackListsManager,
+            trackListManager: trackListManager
+        )
+
+        // Сохранение нового trackId меняет только его membership и оставляет остальные связи нетронутыми.
+        try trackListManager.saveTracks(
+            target.tracks + [makeTrackListTrack(
+                listItemId: UUID(),
+                trackId: addedTrackId,
+                title: "Added"
+            )],
+            for: target.id
+        )
+        XCTAssertEqual(
+            index.badges(for: [addedTrackId])[addedTrackId],
+            [TrackListMembership(storedName: target.name, kind: target.kind)]
+        )
+        XCTAssertEqual(
+            index.badges(for: [unrelatedTrackId])[unrelatedTrackId],
+            [TrackListMembership(storedName: unrelated.name, kind: unrelated.kind)]
+        )
+
+        // Удаление связи target не удаляет тот же trackId из другого треклиста.
+        try trackListManager.saveTracks(
+            [makeTrackListTrack(
+                listItemId: UUID(),
+                trackId: addedTrackId,
+                title: "Added"
+            )],
+            for: target.id
+        )
+        XCTAssertEqual(
+            index.badges(for: [sharedTrackId])[sharedTrackId],
+            [TrackListMembership(storedName: unrelated.name, kind: unrelated.kind)]
+        )
+
+        // Переименование обновляет только уже связанные с target trackId, без нового обхода всех списков.
+        try trackListsManager.renameTrackList(id: target.id, to: "Renamed")
+        XCTAssertEqual(
+            index.badges(for: [addedTrackId])[addedTrackId],
+            [TrackListMembership(storedName: "Renamed", kind: target.kind)]
+        )
+
+        // Удаление target очищает его связи через обратный индекс и сохраняет unrelated-треклист.
+        try trackListsManager.deleteTrackList(id: target.id)
+        XCTAssertEqual(index.badges(for: [addedTrackId])[addedTrackId], [])
+        XCTAssertEqual(
+            index.badges(for: [sharedTrackId])[sharedTrackId],
+            [TrackListMembership(storedName: unrelated.name, kind: unrelated.kind)]
+        )
+    }
+
+    @MainActor
     func testTrackListsManagerProtectsFavoritesWithDifferentDisplayName() throws {
         let database = try makeDatabase()
         let executor = try database.databaseExecutor()
