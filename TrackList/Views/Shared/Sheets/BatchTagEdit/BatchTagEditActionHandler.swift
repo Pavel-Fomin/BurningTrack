@@ -66,13 +66,11 @@ final class BatchTagEditActionHandler {
         await metadataLoader.loadFlow(pendingAction: pendingAction)
     }
 
-    /// Строит план, выполняет запись и передаёт семантический результат в Toast.
+    /// Строит план и выполняет запись; presentation сохраняется у ViewModel через Presenter.
     func save(flow: BatchTagEditFlow) async -> BatchTagEditSaveResult? {
         do {
             let plan = try BatchTagEditSavePlanner.makePlan(from: flow)
-            let result = await saveExecutor.execute(plan: plan)
-            presenter.present(result)
-            return result
+            return await saveExecutor.execute(plan: plan)
         } catch {
             presenter.presentSaveValidationFailure(for: flow)
             return nil

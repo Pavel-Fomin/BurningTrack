@@ -212,13 +212,22 @@ final class BatchTagEditFlowTests: XCTestCase {
         })
     }
 
-    func testPartialSavePreservesToastContractAndReloadsFlow() async {
+    func testPartialSaveKeepsFailureSummaryAndReloadsFlow() async {
         let flow = makeFlow()
         let toast = BatchTagToastSpy()
         let executor = BatchTagSaveExecutorSpy(
             result: BatchTagEditSaveResult(
                 confirmed: [makeConfirmedSaveSuccess(trackId: flow.tracks[0].trackId)],
-                failures: [BatchTagEditSaveFailure(trackId: flow.tracks[1].trackId, error: BatchTagTestError.failed)]
+                failures: [
+                    BatchTagEditSaveFailure(
+                        trackId: flow.tracks[1].trackId,
+                        failure: MutationFailure(
+                            stage: .confirm,
+                            appError: .trackUpdateConfirmationFailed,
+                            recovery: .confirmationMissing
+                        )
+                    )
+                ]
             )
         )
         let loader = BatchTagMetadataLoaderSpy(flow: flow)
@@ -233,20 +242,78 @@ final class BatchTagEditFlowTests: XCTestCase {
         viewModel.send(.saveTapped)
         await completeScheduledTask()
 
-        XCTAssertTrue(toast.events.contains { event in
+        XCTAssertEqual(viewModel.state.saveSummary?.confirmedCount, 1)
+        XCTAssertEqual(viewModel.state.saveSummary?.failures.map(\.trackId), [flow.tracks[1].trackId])
+        XCTAssertEqual(
+            viewModel.state.saveSummary?.failures.first?.message,
+            String(localized: "batchMutation.fileChangedDataNotUpdated")
+        )
+        XCTAssertFalse(toast.events.contains { event in
             if case .batchTagsPartiallyUpdated = event { return true }
             return false
         })
         XCTAssertGreaterThanOrEqual(loader.loadCount, 2)
     }
 
-    func testFullyFailedSavePreservesToastContractWithoutReload() async {
+    func testMixedSaveKeepsConfirmedAndBothFailureSemanticsInScreenState() async {
+        let trackIDs = [UUID(), UUID(), UUID()]
+        let flow = makeFlow(trackIDs: trackIDs)
+        let executor = BatchTagSaveExecutorSpy(
+            result: BatchTagEditSaveResult(
+                confirmed: [makeConfirmedSaveSuccess(trackId: trackIDs[0])],
+                failures: [
+                    BatchTagEditSaveFailure(
+                        trackId: trackIDs[1],
+                        failure: MutationFailure(
+                            stage: .perform,
+                            appError: .tagWriteFailed,
+                            recovery: .untouched
+                        )
+                    ),
+                    BatchTagEditSaveFailure(
+                        trackId: trackIDs[2],
+                        failure: MutationFailure(
+                            stage: .confirm,
+                            appError: .trackUpdateConfirmationFailed,
+                            recovery: .confirmationMissing
+                        )
+                    )
+                ]
+            )
+        )
+        let viewModel = await makeLoadedViewModel(flow: flow, saveExecutor: executor)
+
+        viewModel.send(.fieldValueChanged(field: .title, value: "Updated"))
+        viewModel.send(.saveTapped)
+        await completeScheduledTask()
+
+        XCTAssertEqual(viewModel.state.saveSummary?.confirmedCount, 1)
+        XCTAssertEqual(viewModel.state.saveSummary?.failures.map(\.trackId), [trackIDs[1], trackIDs[2]])
+        XCTAssertEqual(
+            viewModel.state.saveSummary?.failures.map(\.message),
+            [
+                String(localized: "batchMutation.changeNotCompleted"),
+                String(localized: "batchMutation.fileChangedDataNotUpdated")
+            ]
+        )
+    }
+
+    func testFullyFailedSaveKeepsFailureSummaryWithoutReload() async {
         let flow = makeFlow()
         let toast = BatchTagToastSpy()
         let executor = BatchTagSaveExecutorSpy(
             result: BatchTagEditSaveResult(
                 confirmed: [],
-                failures: [BatchTagEditSaveFailure(trackId: flow.tracks[0].trackId, error: BatchTagTestError.failed)]
+                failures: [
+                    BatchTagEditSaveFailure(
+                        trackId: flow.tracks[0].trackId,
+                        failure: MutationFailure(
+                            stage: .perform,
+                            appError: .tagWriteFailed,
+                            recovery: .untouched
+                        )
+                    )
+                ]
             )
         )
         let loader = BatchTagMetadataLoaderSpy(flow: flow)
@@ -261,7 +328,13 @@ final class BatchTagEditFlowTests: XCTestCase {
         viewModel.send(.saveTapped)
         await completeScheduledTask()
 
-        XCTAssertTrue(toast.events.contains { event in
+        XCTAssertEqual(viewModel.state.saveSummary?.confirmedCount, 0)
+        XCTAssertEqual(viewModel.state.saveSummary?.failures.map(\.trackId), [flow.tracks[0].trackId])
+        XCTAssertEqual(
+            viewModel.state.saveSummary?.failures.first?.message,
+            String(localized: "batchMutation.changeNotCompleted")
+        )
+        XCTAssertFalse(toast.events.contains { event in
             if case .batchTagsUpdateFailed = event { return true }
             return false
         })

@@ -20,34 +20,52 @@ struct BatchTagEditPresenter {
     }
 
     /// Преобразует feature-local draft в данные, достаточные только для SwiftUI.
-    func makeState(from flow: BatchTagEditFlow) -> BatchTagEditScreenState {
+    func makeState(
+        from flow: BatchTagEditFlow,
+        saveSummary: BatchTagEditSaveSummaryScreenState? = nil
+    ) -> BatchTagEditScreenState {
         BatchTagEditScreenState(
             phase: flow.phase,
             canSave: flow.canSave,
             displayedFields: makeDisplayedFields(from: flow),
-            artwork: makeArtworkState(from: flow)
+            artwork: makeArtworkState(from: flow),
+            saveSummary: saveSummary
         )
     }
 
-    /// Показывает итог массового сохранения без переноса ToastManager во ViewModel.
-    func present(_ result: BatchTagEditSaveResult) {
-        if result.failedCount == 0 {
-            toastPresenter.handle(.batchTagsUpdated(count: result.succeededCount))
-        } else if result.succeededCount > 0 {
-            toastPresenter.handle(
-                .batchTagsPartiallyUpdated(
-                    succeeded: result.succeededCount,
-                    failed: result.failedCount
-                )
-            )
-        } else {
-            toastPresenter.handle(.batchTagsUpdateFailed(failed: result.failedCount))
-        }
+    /// Показывает только подтверждённый полный успех: partial результат остаётся на feature-экране со списком проблем.
+    func presentConfirmedSave(_ result: BatchTagEditSaveResult) {
+        guard result.failedCount == 0 else { return }
+
+        toastPresenter.handle(.batchTagsUpdated(count: result.succeededCount))
     }
 
     /// Сохраняет контракт ошибки, когда planner не смог построить план записи.
     func presentSaveValidationFailure(for flow: BatchTagEditFlow) {
         toastPresenter.handle(.batchTagsUpdateFailed(failed: flow.tracks.count))
+    }
+
+    /// Формирует читаемый список проблем напрямую из MutationFailure без второй доменной модели результата.
+    func makeSaveSummary(
+        for result: BatchTagEditSaveResult,
+        tracks: [BatchTagEditTrack]
+    ) -> BatchTagEditSaveSummaryScreenState? {
+        guard !result.failures.isEmpty else { return nil }
+
+        let namesByTrackId = Dictionary(
+            uniqueKeysWithValues: tracks.map { ($0.trackId, $0.fileName) }
+        )
+
+        return BatchTagEditSaveSummaryScreenState(
+            confirmedCount: result.succeededCount,
+            failures: result.failures.map { failure in
+                BatchTagEditSaveSummaryScreenState.Failure(
+                    trackId: failure.trackId,
+                    trackName: namesByTrackId[failure.trackId] ?? String(localized: "batchMutation.unnamedTrack"),
+                    message: saveFailureMessage(for: failure.failure)
+                )
+            }
+        )
     }
 
     /// Формирует поля для group-режима либо выбранного конкретного трека.
@@ -189,5 +207,20 @@ struct BatchTagEditPresenter {
     private func placeholder(for field: BatchTagFieldEditState) -> String {
         guard field.action == .keep else { return "" }
         return field.summary == .mixed ? TagEditorPresentationText.mixedPlaceholder : ""
+    }
+
+    /// Отделяет физически выполненное изменение от отсутствия подтверждённого runtime snapshot.
+    private func saveFailureMessage(for failure: MutationFailure) -> String {
+        switch failure.recovery {
+        case .physicalChangeCompleted,
+             .confirmationMissing:
+            return String(localized: "batchMutation.fileChangedDataNotUpdated")
+        case .rollbackFailed:
+            return String(localized: "batchMutation.recoveryFailed")
+        case .untouched,
+             .restored,
+             .accessReleased:
+            return String(localized: "batchMutation.changeNotCompleted")
+        }
     }
 }

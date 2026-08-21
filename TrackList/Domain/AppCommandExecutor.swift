@@ -303,7 +303,7 @@ final class AppCommandExecutor {
                             BatchFilenameRenameFailure(
                                 trackId: command.trackId,
                                 targetFileName: command.targetFileName,
-                                error: error
+                                failure: self.renameMutationFailure(from: error)
                             )
                         )
                     }
@@ -326,7 +326,7 @@ final class AppCommandExecutor {
                     BatchFilenameRenameFailure(
                         trackId: $0.trackId,
                         targetFileName: $0.targetFileName,
-                        error: error
+                        failure: self.batchRenamePreparationFailure(from: error)
                     )
                 }
             )
@@ -808,48 +808,77 @@ final class AppCommandExecutor {
         patch: TagWritePatch,
         artworkAction: ArtworkWriteAction
     ) async throws -> TrackTagsUpdatedSuccess {
-        try await trackFileOperationCoordinator.run(trackId: trackId) {
-            // URL mutable-файла резолвится под тем же ownership, что и subsequent tag write.
-            guard let url = await self.trackFileURLResolver.url(forTrackId: trackId) else {
-                throw TagWriteError.fileNotFound
-            }
+        do {
+            return try await trackFileOperationCoordinator.run(trackId: trackId) {
+                // URL mutable-файла резолвится под тем же ownership, что и subsequent tag write.
+                guard let url = await self.trackFileURLResolver.url(forTrackId: trackId) else {
+                    throw MutationFailure(
+                        stage: .prepare,
+                        appError: .bookmarkResolveFailed,
+                        recovery: .untouched
+                    )
+                }
 
-            let didStartAccess = url.startAccessingSecurityScopedResource()
-            defer { if didStartAccess { url.stopAccessingSecurityScopedResource() } }
+                let didStartAccess = url.startAccessingSecurityScopedResource()
+                defer { if didStartAccess { url.stopAccessingSecurityScopedResource() } }
 
-            var finalPatch = patch
-            switch artworkAction {
-            case .none:
-                break
-            case .remove:
-                finalPatch.artwork = .remove
-            case .replace(let data):
-                finalPatch.artwork = .set(
-                    data: data,
-                    mime: artworkMimeType(for: data)
+                var finalPatch = patch
+                switch artworkAction {
+                case .none:
+                    break
+                case .remove:
+                    finalPatch.artwork = .remove
+                case .replace(let data):
+                    finalPatch.artwork = .set(
+                        data: data,
+                        mime: artworkMimeType(for: data)
+                    )
+                }
+
+                do {
+                    try await self.tagsWriter.writeTags(to: url, patch: finalPatch)
+                } catch {
+                    // Writer не подтвердил завершение записи, поэтому batch получает не произвольный Error, а untouched mutation.
+                    throw self.tagWriteFailure(from: error)
+                }
+
+                let changedFields = changedFieldsForTagUpdate(
+                    patch: finalPatch,
+                    artworkAction: artworkAction
+                )
+                let updateReason: TrackUpdateReason = artworkAction == .none
+                    ? .metadataUpdated
+                    : .artworkUpdated
+
+                let updateEvent = try await self.confirmedTrackUpdate(
+                    forTrackId: trackId,
+                    reason: updateReason,
+                    changedFields: changedFields,
+                    previousURL: nil
+                )
+
+                return TrackTagsUpdatedSuccess(
+                    trackId: trackId,
+                    snapshot: updateEvent.snapshot
                 )
             }
-
-            try await self.tagsWriter.writeTags(to: url, patch: finalPatch)
-
-            let changedFields = changedFieldsForTagUpdate(
-                patch: finalPatch,
-                artworkAction: artworkAction
+        } catch let failure as MutationFailure {
+            throw failure
+        } catch is CancellationError {
+            // Отмена до получения ownership не запускала writer и не могла изменить файл.
+            throw MutationFailure(
+                stage: .prepare,
+                appError: .tagWriteFailed,
+                recovery: .untouched,
+                operationErrorDescription: "Операция записи тегов отменена до начала."
             )
-            let updateReason: TrackUpdateReason = artworkAction == .none
-                ? .metadataUpdated
-                : .artworkUpdated
-
-            let updateEvent = try await self.confirmedTrackUpdate(
-                forTrackId: trackId,
-                reason: updateReason,
-                changedFields: changedFields,
-                previousURL: nil
-            )
-
-            return TrackTagsUpdatedSuccess(
-                trackId: trackId,
-                snapshot: updateEvent.snapshot
+        } catch {
+            // Coordinator не начал body при собственной ошибке, поэтому физическая запись не была подтверждена.
+            throw MutationFailure(
+                stage: .prepare,
+                appError: .tagWriteFailed,
+                recovery: .untouched,
+                operationErrorDescription: String(describing: error)
             )
         }
     }
@@ -858,6 +887,79 @@ final class AppCommandExecutor {
 // MARK: - Подтверждение post-update
 
 private extension AppCommandExecutor {
+
+    /// Преобразует известный результат TagWriter в mutation failure до передачи его batch-слою.
+    nonisolated func tagWriteFailure(from error: Error) -> MutationFailure {
+        if let failure = error as? MutationFailure {
+            return failure
+        }
+
+        let appError: AppError
+        if let tagError = error as? TagWriteError {
+            switch tagError {
+            case .fileNotFound:
+                appError = .fileNotFound
+            case .fileNotReadable,
+                 .fileNotWritable,
+                 .securityScopeDenied:
+                appError = .fileAccessDenied
+            case .invalidArtwork:
+                appError = .artworkLoadFailed
+            case .unsupportedFormat,
+                 .tagContainerMissing,
+                 .saveFailed,
+                 .unknown:
+                appError = .tagWriteFailed
+            }
+        } else {
+            // TagsWriter — единственный источник этой ошибки; его неуспешный return не подтверждает изменение файла.
+            appError = .tagWriteFailed
+        }
+
+        return MutationFailure(
+            stage: .perform,
+            appError: appError,
+            recovery: .untouched,
+            operationErrorDescription: String(describing: error)
+        )
+    }
+
+    /// Преобразует ошибку одной строки rename, не теряя уже сформированный MutationFailure post-update pipeline.
+    nonisolated func renameMutationFailure(from error: Error) -> MutationFailure {
+        if let failure = error as? MutationFailure {
+            return failure
+        }
+
+        let mappedAppError: AppError
+        if let libraryError = error as? LibraryFileError {
+            mappedAppError = appError(from: libraryError, fallback: .fileRenameFailed)
+        } else if let knownAppError = error as? AppError {
+            mappedAppError = knownAppError
+        } else {
+            mappedAppError = .fileRenameFailed
+        }
+
+        return MutationFailure(
+            stage: .perform,
+            appError: mappedAppError,
+            recovery: .untouched,
+            operationErrorDescription: String(describing: error)
+        )
+    }
+
+    /// Ошибка до запуска тела batch не меняла ни один файл, поэтому все строки получают одинаковый untouched failure.
+    nonisolated func batchRenamePreparationFailure(from error: Error) -> MutationFailure {
+        if let failure = error as? MutationFailure {
+            return failure
+        }
+
+        return MutationFailure(
+            stage: .prepare,
+            appError: .fileRenameFailed,
+            recovery: .untouched,
+            operationErrorDescription: String(describing: error)
+        )
+    }
 
     /// Выполняет post-update только как завершающий этап уже изменённого файла.
     func confirmedTrackUpdate(

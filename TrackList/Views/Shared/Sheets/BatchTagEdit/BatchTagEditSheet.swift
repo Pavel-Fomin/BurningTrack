@@ -72,6 +72,10 @@ struct BatchTagEditSheet: View {
     private var editingContent: some View {
         ScrollView {
             VStack(spacing: 16) {
+                if let saveSummary = state.saveSummary {
+                    saveSummaryView(saveSummary)
+                }
+
                 BatchTagArtworkEditSection(
                     state: state.artwork,
                     send: send,
@@ -92,6 +96,43 @@ struct BatchTagEditSheet: View {
         .batchTagArtworkReplacementPicker(target: $replacementTarget) { target, data in
             send(.artworkReplacementSelected(target: target, data: data))
         }
+    }
+
+    /// Показывает готовый Presenter-ом partial result без интерпретации MutationFailure внутри View.
+    private func saveSummaryView(
+        _ summary: BatchTagEditSaveSummaryScreenState
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(
+                String.localizedStringWithFormat(
+                    String(localized: "batchMutation.savedCount"),
+                    summary.confirmedCount
+                )
+            )
+            .font(.subheadline.weight(.semibold))
+
+            Text(
+                String.localizedStringWithFormat(
+                    String(localized: "batchMutation.requiresAttentionCount"),
+                    summary.failures.count
+                )
+            )
+            .font(.subheadline.weight(.semibold))
+
+            ForEach(summary.failures) { failure in
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(failure.trackName)
+                        .font(.body)
+                    Text(failure.message)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(Color(.tertiarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
     /// Строка поля передаёт новое значение в ViewModel как action.

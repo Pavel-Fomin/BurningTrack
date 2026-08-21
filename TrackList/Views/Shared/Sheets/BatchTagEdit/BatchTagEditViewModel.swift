@@ -46,6 +46,8 @@ final class BatchTagEditViewModel: ObservableObject {
     /// Write-задача сохраняется до завершения: отмена UI не означает отмену persistence.
     private var saveTask: Task<Void, Never>?
     private var reloadTask: Task<Void, Never>?
+    /// Partial result не теряется при reload: это единственное место, где пользователь видит проблемные треки.
+    private var saveSummary: BatchTagEditSaveSummaryScreenState?
 
     init(
         sheetData: BatchTagEditSheetData,
@@ -156,6 +158,7 @@ final class BatchTagEditViewModel: ObservableObject {
         cancelArtworkOperations()
         let operationID = UUID()
         saveOperationID = operationID
+        saveSummary = nil
         draft.phase = .saving
         refreshState()
 
@@ -175,13 +178,28 @@ final class BatchTagEditViewModel: ObservableObject {
             }
 
             self.saveOperationID = nil
-            guard let result, result.succeededCount > 0 else {
+            guard let result else {
                 self.draft.phase = .editing
                 self.refreshState()
                 return
             }
 
-            // Частичный успех требует повторной загрузки формы, чтобы показать фактические данные всех треков.
+            self.saveSummary = self.presenter.makeSaveSummary(
+                for: result,
+                tracks: savedFlow.tracks
+            )
+
+            if result.failedCount == 0 {
+                self.presenter.presentConfirmedSave(result)
+            }
+
+            guard result.succeededCount > 0 else {
+                self.draft.phase = .editing
+                self.refreshState()
+                return
+            }
+
+            // Reload обновляет форму подтверждёнными данными, но не стирает partial result до следующей попытки сохранения.
             self.startMetadataLoad(restoring: selectedTarget)
         }
     }
@@ -419,7 +437,7 @@ final class BatchTagEditViewModel: ObservableObject {
 
     /// Обновляет опубликованный UI-снимок только через Presenter.
     private func refreshState() {
-        state = presenter.makeState(from: draft)
+        state = presenter.makeState(from: draft, saveSummary: saveSummary)
     }
 
     /// Проверяет, что результат metadata относится к открытому неизменяемому route.

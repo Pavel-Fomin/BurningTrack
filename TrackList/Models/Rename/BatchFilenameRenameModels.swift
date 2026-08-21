@@ -119,6 +119,8 @@ struct BatchFilenameRenameItem: Identifiable, Equatable {
     let strategy: FilenameRenameStrategy?
     /// Статус элемента плана.
     var status: BatchFilenameRenameStatus
+    /// Сохраняет исходную семантику failed mutation до формирования текста строки в Presenter.
+    let mutationFailure: MutationFailure?
 
     /// Возвращает копию элемента с новым статусом без мутации domain-модели.
     func withStatus(_ newStatus: BatchFilenameRenameStatus) -> BatchFilenameRenameItem {
@@ -130,7 +132,26 @@ struct BatchFilenameRenameItem: Identifiable, Equatable {
             artist: artist,
             title: title,
             strategy: strategy,
-            status: newStatus
+            status: newStatus,
+            mutationFailure: nil
+        )
+    }
+
+    /// Возвращает failed-строку, не подменяя технической меткой фактическое состояние mutation.
+    func withMutationFailure(
+        _ failure: MutationFailure,
+        status: BatchFilenameRenameStatus
+    ) -> BatchFilenameRenameItem {
+        BatchFilenameRenameItem(
+            trackId: trackId,
+            folderPath: folderPath,
+            currentFileName: currentFileName,
+            targetFileName: targetFileName,
+            artist: artist,
+            title: title,
+            strategy: strategy,
+            status: status,
+            mutationFailure: failure
         )
     }
 }

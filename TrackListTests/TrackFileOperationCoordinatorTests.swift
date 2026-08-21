@@ -404,6 +404,159 @@ final class TrackFileOperationCoordinatorTests: XCTestCase {
         XCTAssertEqual(finalEvents, ["tag write", "post", "rename:Renamed.mp3", "post"])
     }
 
+    func testTagWriteFailureReturnsUntouchedMutationFailureWithoutPostUpdate() async {
+        let trackId = UUID()
+        let events = TrackFileOperationEventLog()
+        let fileURLResolver = TrackFileURLResolverSpy(initialURL: makeURL(name: "Original.mp3"))
+        let executor = makeExecutor(
+            fileManager: TrackFileManagerSpy(
+                urlResolver: fileURLResolver,
+                events: events,
+                renameGate: TrackFileOperationGate(isOpen: true),
+                moveGate: TrackFileOperationGate(isOpen: true)
+            ),
+            fileURLResolver: fileURLResolver,
+            postUpdater: TrackPostUpdateHandlerSpy(
+                events: events,
+                updateGate: TrackFileOperationGate(isOpen: true)
+            ),
+            tagsWriter: TrackTagsWriterFailureSpy(error: .fileNotWritable)
+        )
+
+        do {
+            _ = try await executor.updateTrackTags(
+                trackId: trackId,
+                patch: TagWritePatch(),
+                artworkAction: .none
+            )
+            XCTFail("Неподтверждённая запись тегов не должна вернуть success")
+        } catch let failure as MutationFailure {
+            XCTAssertEqual(failure.stage, .perform)
+            XCTAssertEqual(failure.appError, .fileAccessDenied)
+            XCTAssertEqual(failure.recovery, .untouched)
+        } catch {
+            XCTFail("Ожидалась MutationFailure, получено: \(error)")
+        }
+
+        let recordedEvents = await events.values()
+        XCTAssertFalse(recordedEvents.contains("post"))
+    }
+
+    func testTagWriteConfirmationFailureReturnsPartialMutationFailureWithoutPostEvent() async {
+        let trackId = UUID()
+        let events = TrackFileOperationEventLog()
+        let fileURLResolver = TrackFileURLResolverSpy(initialURL: makeURL(name: "Original.mp3"))
+        let executor = makeExecutor(
+            fileManager: TrackFileManagerSpy(
+                urlResolver: fileURLResolver,
+                events: events,
+                renameGate: TrackFileOperationGate(isOpen: true),
+                moveGate: TrackFileOperationGate(isOpen: true)
+            ),
+            fileURLResolver: fileURLResolver,
+            postUpdater: TrackPostUpdateFailureSpy(),
+            tagsWriter: TrackTagsWriterSpy(
+                events: events,
+                writeGate: TrackFileOperationGate(isOpen: true)
+            )
+        )
+
+        do {
+            _ = try await executor.updateTrackTags(
+                trackId: trackId,
+                patch: TagWritePatch(),
+                artworkAction: .none
+            )
+            XCTFail("Запись без подтверждённого snapshot не должна вернуть success")
+        } catch let failure as MutationFailure {
+            XCTAssertEqual(failure.stage, .confirm)
+            XCTAssertEqual(failure.appError, .trackUpdateConfirmationFailed)
+            XCTAssertEqual(failure.recovery, .confirmationMissing)
+        } catch {
+            XCTFail("Ожидалась MutationFailure, получено: \(error)")
+        }
+
+        let recordedEvents = await events.values()
+        XCTAssertEqual(recordedEvents, ["tag write"])
+    }
+
+    func testConfirmedTagUpdatesPassExpectedFieldsToCentralPostUpdatePipeline() async throws {
+        let trackId = UUID()
+        let events = TrackFileOperationEventLog()
+        let fileURLResolver = TrackFileURLResolverSpy(initialURL: makeURL(name: "Original.mp3"))
+        let postUpdater = TrackPostUpdateHandlerSpy(
+            events: events,
+            updateGate: TrackFileOperationGate(isOpen: true)
+        )
+        let executor = makeExecutor(
+            fileManager: TrackFileManagerSpy(
+                urlResolver: fileURLResolver,
+                events: events,
+                renameGate: TrackFileOperationGate(isOpen: true),
+                moveGate: TrackFileOperationGate(isOpen: true)
+            ),
+            fileURLResolver: fileURLResolver,
+            postUpdater: postUpdater,
+            tagsWriter: TrackTagsWriterSpy(
+                events: events,
+                writeGate: TrackFileOperationGate(isOpen: true)
+            )
+        )
+        var textPatch = TagWritePatch()
+        textPatch.title = .set("Updated")
+
+        let textSuccess = try await executor.updateTrackTags(
+            trackId: trackId,
+            patch: textPatch,
+            artworkAction: .none
+        )
+        let artworkSuccess = try await executor.updateTrackTags(
+            trackId: trackId,
+            patch: TagWritePatch(),
+            artworkAction: .replace(data: Data([0xFF, 0xD8, 0xFF]))
+        )
+
+        XCTAssertEqual(textSuccess.trackId, trackId)
+        XCTAssertEqual(artworkSuccess.trackId, trackId)
+        let changedFields = await postUpdater.handledChangedFields()
+        XCTAssertEqual(changedFields, [Set([.title]), Set([.artworkData])])
+        let recordedEvents = await events.values()
+        XCTAssertEqual(recordedEvents, ["tag write", "post", "tag write", "post"])
+    }
+
+    func testBatchRenameKeepsConfirmationFailureForChangedFile() async {
+        let trackId = UUID()
+        let events = TrackFileOperationEventLog()
+        let fileURLResolver = TrackFileURLResolverSpy(initialURL: makeURL(name: "Original.mp3"))
+        let executor = makeExecutor(
+            fileManager: TrackFileManagerSpy(
+                urlResolver: fileURLResolver,
+                events: events,
+                renameGate: TrackFileOperationGate(isOpen: true),
+                moveGate: TrackFileOperationGate(isOpen: true)
+            ),
+            fileURLResolver: fileURLResolver,
+            postUpdater: TrackPostUpdateFailureSpy()
+        )
+
+        let result = await executor.renameTrackFilesBatch(
+            [
+                BatchFilenameRenameCommand(
+                    trackId: trackId,
+                    currentFileName: "Original.mp3",
+                    targetFileName: "Renamed.mp3"
+                )
+            ],
+            using: TrackFileBusyCheckerStub()
+        )
+
+        XCTAssertEqual(result.successCount, 0)
+        XCTAssertEqual(result.failureCount, 1)
+        XCTAssertEqual(result.failed.first?.failure.stage, .confirm)
+        XCTAssertEqual(result.failed.first?.failure.appError, .trackUpdateConfirmationFailed)
+        XCTAssertEqual(result.failed.first?.failure.recovery, .confirmationMissing)
+    }
+
     func testBatchRenameKeepsSameTrackSingleRenameOutOfProtectedSection() async throws {
         let firstTrackId = UUID()
         let secondTrackId = UUID()
@@ -755,6 +908,7 @@ private actor TrackFileURLResolverSpy: TrackFileURLResolving {
 private actor TrackPostUpdateHandlerSpy: TrackPostUpdateHandling {
     private let events: TrackFileOperationEventLog
     private let updateGate: TrackFileOperationGate
+    private var changedFieldsByCall: [Set<TrackChangedField>] = []
 
     init(
         events: TrackFileOperationEventLog,
@@ -770,6 +924,7 @@ private actor TrackPostUpdateHandlerSpy: TrackPostUpdateHandling {
         changedFields: Set<TrackChangedField>,
         previousURL: URL?
     ) async throws -> TrackUpdateEvent {
+        changedFieldsByCall.append(changedFields)
         await events.record("post")
         await updateGate.wait()
         return makeConfirmedTrackUpdateEvent(trackId: trackId)
@@ -787,6 +942,11 @@ private actor TrackPostUpdateHandlerSpy: TrackPostUpdateHandling {
 
     func publishTrackBatchUpdateEvents(_ updateEvents: [TrackUpdateEvent]) async {
         await events.record("batch publish")
+    }
+
+    /// Возвращает поля, с которыми command передал управление единому post-update pipeline.
+    func handledChangedFields() -> [Set<TrackChangedField>] {
+        changedFieldsByCall
     }
 }
 
@@ -938,6 +1098,24 @@ private actor TrackTagsWriterSpy: TagsWriter {
     ) async throws {
         await events.record("tag write")
         await writeGate.wait()
+    }
+}
+
+/// Имитирует отказ writer до подтверждённой записи, не создавая физический файл в тесте.
+private actor TrackTagsWriterFailureSpy: TagsWriter {
+    private let error: TagWriteError
+
+    init(error: TagWriteError) {
+        self.error = error
+    }
+
+    func writeTags(
+        to url: URL,
+        patch: TagWritePatch
+    ) async throws {
+        _ = url
+        _ = patch
+        throw error
     }
 }
 

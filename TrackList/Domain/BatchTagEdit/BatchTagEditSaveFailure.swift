@@ -10,11 +10,11 @@
 import Foundation
 
 /// Ошибка сохранения тегов одного трека в batch-операции.
-struct BatchTagEditSaveFailure: Identifiable {
+struct BatchTagEditSaveFailure: Identifiable, Sendable {
     /// Идентификатор трека.
     let trackId: UUID
-    /// Ошибка, полученная при сохранении.
-    let error: Error
+    /// Семантика уже выполненной mutation и её recovery без потери состояния до presentation-слоя.
+    let failure: MutationFailure
     /// Идентификатор для SwiftUI-списков.
     var id: UUID {
         trackId

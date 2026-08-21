@@ -446,6 +446,72 @@
         }
       }
     },
+    "batchMutation.changeNotCompleted" : {
+      "comment" : "Сообщение batch-результата, когда изменение файла не было выполнено или было восстановлено.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Change wasn't completed"
+          }
+        }
+      }
+    },
+    "batchMutation.fileChangedDataNotUpdated" : {
+      "comment" : "Сообщение batch-результата, когда файл изменён, но новое состояние приложения не подтверждено.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "File changed, but app data weren't updated"
+          }
+        }
+      }
+    },
+    "batchMutation.recoveryFailed" : {
+      "comment" : "Сообщение batch-результата, когда обратное действие не смогло вернуть подтверждённое состояние.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changes couldn't be restored"
+          }
+        }
+      }
+    },
+    "batchMutation.requiresAttentionCount" : {
+      "comment" : "Количество треков в batch-результате, которые требуют внимания пользователя.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Requires Attention: %lld"
+          }
+        }
+      }
+    },
+    "batchMutation.savedCount" : {
+      "comment" : "Количество треков с подтверждённым сохранением в batch-результате.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved: %lld"
+          }
+        }
+      }
+    },
+    "batchMutation.unnamedTrack" : {
+      "comment" : "Fallback-название трека, если batch-результат не содержит display name.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Track"
+          }
+        }
+      }
+    },
     "By Artist" : {
       "localizations" : {
         "en" : {

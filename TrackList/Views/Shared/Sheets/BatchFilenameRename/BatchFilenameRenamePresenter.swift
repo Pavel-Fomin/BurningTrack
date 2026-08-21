@@ -51,12 +51,12 @@ struct BatchFilenameRenamePresenter {
         }
 
         return draft.items.map { item in
-            BatchFilenameRenameScreenState.Row(
-                trackId: item.trackId,
-                fileName: displayedFileName(for: item),
-                statusDescription: FileRenamePresentationText.statusDescription(for: item.status),
-                statusStyle: statusStyle(for: item.status)
-            )
+                BatchFilenameRenameScreenState.Row(
+                    trackId: item.trackId,
+                    fileName: displayedFileName(for: item),
+                    statusDescription: statusDescription(for: item),
+                    statusStyle: statusStyle(for: item.status)
+                )
         }
     }
 
@@ -75,6 +75,15 @@ struct BatchFilenameRenamePresenter {
              .invalidTargetName:
             return item.currentFileName
         }
+    }
+
+    /// Преобразует сохранённую MutationFailure в пользовательский текст, не раскрывая её SwiftUI View.
+    private func statusDescription(for item: BatchFilenameRenameItem) -> String? {
+        if let failure = item.mutationFailure {
+            return FileRenamePresentationText.statusDescription(for: failure)
+        }
+
+        return FileRenamePresentationText.statusDescription(for: item.status)
     }
 
     /// Преобразует domain-статус в единственный presentation-стиль строки.

@@ -17,6 +17,8 @@ struct BatchFilenameRenamePlanBuilder {
         let status: BatchFilenameRenameStatus
         /// Целевое имя, для которого был получен этот статус.
         let targetFileName: String
+        /// Исходная mutation failure остаётся единственным источником partial-success семантики.
+        let failure: MutationFailure?
     }
 
     /// Проверяет обязательные metadata до выбора стратегии.
@@ -36,7 +38,8 @@ struct BatchFilenameRenamePlanBuilder {
                 artist: artist,
                 title: title,
                 strategy: nil,
-                status: status
+                status: status,
+                mutationFailure: nil
             )
         }
     }
@@ -60,6 +63,10 @@ struct BatchFilenameRenamePlanBuilder {
             if preservedState.status == .renamed,
                preservedState.targetFileName != item.targetFileName {
                 return item.withStatus(.ready)
+            }
+
+            if let failure = preservedState.failure {
+                return item.withMutationFailure(failure, status: preservedState.status)
             }
 
             return item.withStatus(preservedState.status)
@@ -97,7 +104,10 @@ struct BatchFilenameRenamePlanBuilder {
             }
 
             if let failure = failedById[item.trackId] {
-                return item.withStatus(status(for: failure.error))
+                return item.withMutationFailure(
+                    failure.failure,
+                    status: status(for: failure.failure)
+                )
             }
 
             return item
@@ -136,7 +146,8 @@ struct BatchFilenameRenamePlanBuilder {
             artist: artist,
             title: title,
             strategy: strategy,
-            status: status
+            status: status,
+            mutationFailure: nil
         )
     }
 
@@ -163,7 +174,8 @@ struct BatchFilenameRenamePlanBuilder {
                 artist: item.artist,
                 title: item.title,
                 strategy: item.strategy,
-                status: item.status
+                status: item.status,
+                mutationFailure: nil
             )
         }
     }
@@ -183,7 +195,8 @@ struct BatchFilenameRenamePlanBuilder {
                         item.trackId,
                         PreservedAppliedState(
                             status: item.status,
-                            targetFileName: item.targetFileName
+                            targetFileName: item.targetFileName,
+                            failure: item.mutationFailure
                         )
                     )
                 case .ready,
@@ -288,24 +301,16 @@ struct BatchFilenameRenamePlanBuilder {
             && normalizedFileName != ".."
     }
 
-    /// Преобразует ошибку writer в сохранённый статус строки плана.
-    private func status(for error: Error) -> BatchFilenameRenameStatus {
-        if let libraryError = error as? LibraryFileError {
-            switch libraryError {
-            case .trackIsPlaying:
-                return .trackIsPlaying
-            case .sourceURLUnavailable,
-                 .destinationFolderUnavailable,
-                 .bookmarkCreationFailed,
-                 .relativePathFailed:
-                return .fileAccessDenied
-            case .trackNotFound,
-                 .destinationAlreadyExists,
-                 .moveFailed:
-                return .applyFailed
-            }
+    /// Сохраняет уже существующий row-status, а точный текст partial failure получает Presenter из MutationFailure.
+    private func status(for failure: MutationFailure) -> BatchFilenameRenameStatus {
+        switch failure.appError {
+        case .fileAccessDenied,
+             .bookmarkResolveFailed,
+             .bookmarkMissing,
+             .bookmarkStale:
+            return .fileAccessDenied
+        default:
+            return .applyFailed
         }
-
-        return .applyFailed
     }
 }

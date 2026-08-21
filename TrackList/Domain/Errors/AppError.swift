@@ -82,7 +82,7 @@ enum MutationRecoveryState: Sendable, Equatable {
 }
 
 /// Семантическая ошибка изменяющей операции без передачи небезопасного произвольного Error через async-границу.
-struct MutationFailure: Error, Sendable {
+struct MutationFailure: Error, Sendable, Equatable {
     let stage: MutationStage
     let appError: AppError
     let recovery: MutationRecoveryState

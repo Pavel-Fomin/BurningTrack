@@ -45,15 +45,15 @@ struct BatchFilenameRenameSuccess: Identifiable {
 }
 
 /// Ошибка переименования одного файла.
-struct BatchFilenameRenameFailure: Identifiable {
+struct BatchFilenameRenameFailure: Identifiable, Sendable {
     /// Идентификатор трека.
     let trackId: UUID
 
     /// Имя файла, которое пытались получить.
     let targetFileName: String
 
-    /// Ошибка операции.
-    let error: Error
+    /// Семантика операции, включая возможное уже выполненное переименование файла.
+    let failure: MutationFailure
 
     var id: UUID { trackId }
 }

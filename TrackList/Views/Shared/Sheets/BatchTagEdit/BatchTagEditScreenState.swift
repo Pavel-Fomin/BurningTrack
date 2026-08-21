@@ -75,6 +75,28 @@ struct BatchTagEditArtworkScreenState: Equatable {
     let isCompressing: Bool
 }
 
+/// Готовый итог batch-сохранения, который остаётся на экране, пока пользователь не увидит проблемные треки.
+struct BatchTagEditSaveSummaryScreenState: Equatable {
+    /// Одна понятная пользователю проблема конкретного трека.
+    struct Failure: Identifiable, Equatable {
+        /// Идентичность совпадает с физическим треком batch-операции.
+        let trackId: UUID
+        /// Имя трека, подготовленное без обращения View к domain-модели.
+        let trackName: String
+        /// Понятное описание фактического состояния mutation.
+        let message: String
+
+        var id: UUID {
+            trackId
+        }
+    }
+
+    /// Количество треков с подтверждённым новым runtime snapshot.
+    let confirmedCount: Int
+    /// Ошибки, для которых пользователь должен увидеть состояние каждого трека.
+    let failures: [Failure]
+}
+
 /// Единственное presentation-состояние Batch Tag Edit без mutable draft и manager-ов.
 struct BatchTagEditScreenState: Equatable {
     /// Текущий отображаемый этап feature.
@@ -85,4 +107,6 @@ struct BatchTagEditScreenState: Equatable {
     let displayedFields: [BatchTagEditFieldScreenState]
     /// Готовое состояние artwork-секции.
     let artwork: BatchTagEditArtworkScreenState
+    /// Итог последнего partial или failed batch-сохранения, если он требует внимания пользователя.
+    let saveSummary: BatchTagEditSaveSummaryScreenState?
 }

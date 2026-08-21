@@ -118,6 +118,29 @@ enum FileRenamePresentationText {
         }
     }
 
+    /// Скрывает технические этапы mutation-pipeline за точным текстом результата одной строки batch.
+    static func statusDescription(for failure: MutationFailure) -> String {
+        switch failure.recovery {
+        case .physicalChangeCompleted,
+             .confirmationMissing:
+            return String(localized: "batchMutation.fileChangedDataNotUpdated")
+        case .rollbackFailed:
+            return String(localized: "batchMutation.recoveryFailed")
+        case .untouched,
+             .restored,
+             .accessReleased:
+            switch failure.appError {
+            case .fileAccessDenied,
+                 .bookmarkResolveFailed,
+                 .bookmarkMissing,
+                 .bookmarkStale:
+                return String(localized: "File Access Unavailable")
+            default:
+                return String(localized: "Couldn't Rename File")
+            }
+        }
+    }
+
     static var renamedMessage: String {
         String(localized: "Renamed")
     }

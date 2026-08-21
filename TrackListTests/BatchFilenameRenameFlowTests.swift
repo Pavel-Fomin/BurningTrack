@@ -114,18 +114,28 @@ final class BatchFilenameRenameFlowTests: XCTestCase {
                 BatchFilenameRenameFailure(
                     trackId: readyItems[0].trackId,
                     targetFileName: readyItems[0].targetFileName,
-                    error: LibraryFileError.trackIsPlaying
+                    failure: MutationFailure(
+                        stage: .perform,
+                        appError: .fileAccessDenied,
+                        recovery: .untouched
+                    )
                 ),
                 BatchFilenameRenameFailure(
                     trackId: readyItems[1].trackId,
                     targetFileName: readyItems[1].targetFileName,
-                    error: LibraryFileError.sourceURLUnavailable
+                    failure: MutationFailure(
+                        stage: .prepare,
+                        appError: .bookmarkResolveFailed,
+                        recovery: .untouched
+                    )
                 ),
                 BatchFilenameRenameFailure(
                     trackId: readyItems[2].trackId,
                     targetFileName: readyItems[2].targetFileName,
-                    error: LibraryFileError.moveFailed(
-                        underlying: NSError(domain: "test", code: 1)
+                    failure: MutationFailure(
+                        stage: .perform,
+                        appError: .fileRenameFailed,
+                        recovery: .untouched
                     )
                 )
             ]
@@ -133,7 +143,7 @@ final class BatchFilenameRenameFlowTests: XCTestCase {
 
         XCTAssertEqual(
             builder.applying(result, to: readyItems).map(\.status),
-            [.trackIsPlaying, .fileAccessDenied, .applyFailed]
+            [.fileAccessDenied, .fileAccessDenied, .applyFailed]
         )
     }
 
@@ -189,7 +199,11 @@ final class BatchFilenameRenameFlowTests: XCTestCase {
                     BatchFilenameRenameFailure(
                         trackId: seeds[2].trackId,
                         targetFileName: "Third - Track.m4a",
-                        error: LibraryFileError.trackIsPlaying
+                        failure: MutationFailure(
+                            stage: .perform,
+                            appError: .fileAccessDenied,
+                            recovery: .untouched
+                        )
                     )
                 ]
             )
@@ -206,6 +220,43 @@ final class BatchFilenameRenameFlowTests: XCTestCase {
         XCTAssertEqual(commands.map(\.trackId), [seeds[0].trackId, seeds[2].trackId])
         XCTAssertEqual(viewModel.state.rows.map(\.statusStyle), [.success, .error, .error])
         XCTAssertFalse(viewModel.state.isApplyingRename)
+    }
+
+    func testConfirmationFailureKeepsRenamedFileAttentionMessageInScreenState() async {
+        let seeds = makeSeeds().prefix(1).map { $0 }
+        let loader = BatchFilenameRenameMetadataLoaderSpy(
+            tracks: [track(from: seeds[0], artist: "Artist", title: "Title")]
+        )
+        let executor = BatchFilenameRenameExecutorSpy()
+        executor.setResult(
+            BatchFilenameRenameResult(
+                succeeded: [],
+                failed: [
+                    BatchFilenameRenameFailure(
+                        trackId: seeds[0].trackId,
+                        targetFileName: "Artist - Title.flac",
+                        failure: MutationFailure(
+                            stage: .confirm,
+                            appError: .trackUpdateConfirmationFailed,
+                            recovery: .confirmationMissing
+                        )
+                    )
+                ]
+            )
+        )
+        let viewModel = makeViewModel(seeds: seeds, loader: loader, executor: executor)
+
+        viewModel.send(.appeared)
+        await completeScheduledTask()
+        viewModel.send(.strategySelected(.artistTitle))
+        viewModel.send(.renameTapped)
+        await completeScheduledTask()
+
+        XCTAssertEqual(
+            viewModel.state.rows.first?.statusDescription,
+            String(localized: "batchMutation.fileChangedDataNotUpdated")
+        )
+        XCTAssertEqual(viewModel.state.rows.first?.statusStyle, .error)
     }
 
     func testBusyApplyDoesNotStartSecondOperationOrRetryAutomatically() async {

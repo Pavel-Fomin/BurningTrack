@@ -48,7 +48,7 @@ struct BatchTagEditSaveExecutor {
                 failures.append(
                     BatchTagEditSaveFailure(
                         trackId: command.trackId,
-                        error: error
+                        failure: mutationFailure(from: error)
                     )
                 )
             }
@@ -57,6 +57,21 @@ struct BatchTagEditSaveExecutor {
         return BatchTagEditSaveResult(
             confirmed: confirmed,
             failures: failures
+        )
+    }
+
+    /// AppCommandExecutor нормализует все пути updateTrackTags в MutationFailure.
+    /// Защитное преобразование удерживает batch-контракт, если новый adapter нарушит это правило.
+    private func mutationFailure(from error: Error) -> MutationFailure {
+        if let failure = error as? MutationFailure {
+            return failure
+        }
+
+        return MutationFailure(
+            stage: .perform,
+            appError: .tagWriteFailed,
+            recovery: .untouched,
+            operationErrorDescription: String(describing: error)
         )
     }
 }
