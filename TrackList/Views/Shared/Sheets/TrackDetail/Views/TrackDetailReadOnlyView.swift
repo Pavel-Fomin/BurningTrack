@@ -8,11 +8,16 @@
 //
 
 import SwiftUI
+import UIKit
 
 /// Leaf View без runtime, storage и навигационных зависимостей.
 struct TrackDetailReadOnlyView: View {
     /// Готовое presentation state для вывода данных.
     let state: TrackDetailScreenState
+    /// Узкая capability подготовки обложек приходит из Composition Root.
+    @Environment(\.artworkImageProvider) private var artworkImageProvider
+    /// Результат живёт выше List-header, который SwiftUI может materialize повторно.
+    @State private var artworkImage: UIImage?
 
     var body: some View {
         List {
@@ -50,26 +55,40 @@ struct TrackDetailReadOnlyView: View {
             }
         }
         .listStyle(.insetGrouped)
+        // Разрешает header отрисовать тень за границами scroll-контейнера.
+        .scrollClipDisabled()
+        .task(id: state.artwork.request?.loadIdentifier) {
+            artworkImage = nil
+            guard let request = state.artwork.request else { return }
+
+            let preparedImage = await ArtworkImageLoader(
+                provider: artworkImageProvider
+            ).image(for: request)
+            guard !Task.isCancelled else { return }
+            artworkImage = preparedImage
+        }
     }
 
-    /// Показывает artwork через существующий presentation-only preparation component.
+    /// Показывает artwork из устойчивого состояния родительского View, не создавая новый lifecycle header.
     private var artworkHeader: some View {
-        ArtworkPreparationView(request: state.artwork.request) { image in
-            Image(uiImage: image)
-                .resizable()
-                .aspectRatio(contentMode: .fill)
-                .frame(width: 180, height: 180)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .shadow(radius: 48)
-        } placeholder: {
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.gray.opacity(0.2))
-                .frame(width: 180, height: 180)
-                .overlay(
-                    Image(systemName: "music.note")
-                        .font(.system(size: 40))
-                        .foregroundColor(.gray)
-                )
+        Group {
+            if let artworkImage {
+                Image(uiImage: artworkImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 180, height: 180)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .shadow(radius: 48)
+            } else {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.gray.opacity(0.2))
+                    .frame(width: 180, height: 180)
+                    .overlay(
+                        Image(systemName: "music.note")
+                            .font(.system(size: 40))
+                            .foregroundColor(.gray)
+                    )
+            }
         }
         .frame(maxWidth: .infinity)
         .background(Color.clear)

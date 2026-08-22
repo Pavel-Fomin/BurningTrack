@@ -116,12 +116,18 @@ final class BatchTagEditFlowTests: XCTestCase {
     func testArtworkReplaceUsesPreparedDataAndEnablesSave() async {
         let replacement = Data([7, 8, 9])
         let viewModel = await makeLoadedViewModel(preparer: BatchTagArtworkPreparerSpy(result: replacement))
+        let originalRequests = viewModel.state.artwork.cards.compactMap(\.artworkRequest)
 
         viewModel.send(.artworkReplacementSelected(target: .summary, data: Data([1])))
         await completeScheduledTask()
 
         XCTAssertTrue(viewModel.state.artwork.cards.allSatisfy { $0.hasArtwork })
         XCTAssertTrue(viewModel.state.canSave)
+        XCTAssertTrue(originalRequests.allSatisfy { $0.sizeClass == .large })
+        XCTAssertTrue(
+            viewModel.state.artwork.cards.compactMap(\.artworkRequest)
+                .allSatisfy { $0.sizeClass == .large }
+        )
     }
 
     func testArtworkReplacementFailureLeavesDraftUnchanged() async {

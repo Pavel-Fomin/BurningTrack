@@ -54,9 +54,11 @@ enum ArtworkPurpose: Hashable, CaseIterable {
     /// Относит назначение к одному из двух канонических подготовленных изображений.
     var sizeClass: ArtworkSizeClass {
         switch self {
-        case .trackList, .miniPlayer, .batchTagPreview, .toast:
+        case .trackList, .miniPlayer, .toast:
             .small
-        case .trackInfoSheet, .nowPlaying:
+        // Карточка Batch Tag Edit имеет сторону 150 pt и на 3x-экране требует до 450 px.
+        // Канонический large-вариант 512 px сохраняет детализацию без нового класса кэша.
+        case .trackInfoSheet, .batchTagPreview, .nowPlaying:
             .large
         }
     }

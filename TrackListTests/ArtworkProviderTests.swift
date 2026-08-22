@@ -21,15 +21,18 @@ final class ArtworkProviderTests: XCTestCase {
         let trackId = UUID()
         let trackListRequest = makeRequest(trackId: trackId, purpose: .trackList)
         let miniPlayerRequest = makeRequest(trackId: trackId, purpose: .miniPlayer)
+        let toastRequest = makeRequest(trackId: trackId, purpose: .toast)
 
         async let trackListImage = provider.image(for: trackListRequest)
         async let miniPlayerImage = provider.image(for: miniPlayerRequest)
-        let images = await (trackListImage, miniPlayerImage)
+        async let toastImage = provider.image(for: toastRequest)
+        let images = await (trackListImage, miniPlayerImage, toastImage)
         let smallPreparationCount = await spy.count(for: .small)
         let largePreparationCount = await spy.count(for: .large)
 
         XCTAssertTrue(images.0 === expectedImage)
         XCTAssertTrue(images.1 === expectedImage)
+        XCTAssertTrue(images.2 === expectedImage)
         XCTAssertEqual(smallPreparationCount, 1)
         XCTAssertEqual(largePreparationCount, 0)
     }
@@ -72,16 +75,19 @@ final class ArtworkProviderTests: XCTestCase {
         let provider = makeProvider(spy: spy)
         let trackId = UUID()
         let trackInfoRequest = makeRequest(trackId: trackId, purpose: .trackInfoSheet)
+        let batchTagPreviewRequest = makeRequest(trackId: trackId, purpose: .batchTagPreview)
         let nowPlayingRequest = makeRequest(trackId: trackId, purpose: .nowPlaying)
 
         async let trackInfoImage = provider.image(for: trackInfoRequest)
+        async let batchTagPreviewImage = provider.image(for: batchTagPreviewRequest)
         async let nowPlayingImage = provider.image(for: nowPlayingRequest)
-        let images = await (trackInfoImage, nowPlayingImage)
+        let images = await (trackInfoImage, batchTagPreviewImage, nowPlayingImage)
         let smallPreparationCount = await spy.count(for: .small)
         let largePreparationCount = await spy.count(for: .large)
 
         XCTAssertTrue(images.0 === expectedImage)
         XCTAssertTrue(images.1 === expectedImage)
+        XCTAssertTrue(images.2 === expectedImage)
         XCTAssertEqual(smallPreparationCount, 0)
         XCTAssertEqual(largePreparationCount, 1)
     }
@@ -94,7 +100,7 @@ final class ArtworkProviderTests: XCTestCase {
         let provider = makeProvider(spy: spy)
         let trackId = UUID()
         let smallRequest = makeRequest(trackId: trackId, purpose: .trackList)
-        let largeRequest = makeRequest(trackId: trackId, purpose: .nowPlaying)
+        let largeRequest = makeRequest(trackId: trackId, purpose: .batchTagPreview)
 
         async let smallResult = provider.image(for: smallRequest)
         async let largeResult = provider.image(for: largeRequest)
@@ -309,9 +315,9 @@ final class ArtworkProviderTests: XCTestCase {
     func testArtworkPurposeSizeClassDistribution() {
         XCTAssertEqual(ArtworkPurpose.trackList.sizeClass, .small)
         XCTAssertEqual(ArtworkPurpose.miniPlayer.sizeClass, .small)
-        XCTAssertEqual(ArtworkPurpose.batchTagPreview.sizeClass, .small)
         XCTAssertEqual(ArtworkPurpose.toast.sizeClass, .small)
         XCTAssertEqual(ArtworkPurpose.trackInfoSheet.sizeClass, .large)
+        XCTAssertEqual(ArtworkPurpose.batchTagPreview.sizeClass, .large)
         XCTAssertEqual(ArtworkPurpose.nowPlaying.sizeClass, .large)
     }
 

@@ -9,6 +9,8 @@
 
 import Combine
 import Foundation
+import SwiftUI
+import UIKit
 import XCTest
 @testable import TrackList
 
@@ -137,6 +139,167 @@ final class TrackDetailFlowTests: XCTestCase {
         XCTAssertTrue(presentation.canRemoveArtwork)
     }
 
+    /// Snapshot с raw artwork формирует request крупного Track Detail preview без UIImage в state.
+    func testLoadedPresentationCreatesLargeOriginalArtworkRequest() {
+        let trackId = UUID()
+        let artworkData = Data([1, 2, 3])
+        let presenter = TrackDetailPresenter(toastPresenter: TrackDetailToastSpy())
+
+        let presentation = presenter.makeLoadedPresentation(
+            snapshot: makeConfirmedTrackDetailSnapshot(
+                trackId: trackId,
+                fileName: "Original.flac",
+                artworkData: artworkData
+            ),
+            fileURL: URL(fileURLWithPath: "/tmp/Original.flac")
+        )
+
+        let request = presentation.originalArtworkRequest
+        XCTAssertEqual(request?.trackId, trackId)
+        XCTAssertEqual(request?.artworkData, artworkData)
+        XCTAssertEqual(request?.purpose, .trackInfoSheet)
+        XCTAssertEqual(request?.sizeClass, .large)
+    }
+
+    /// Переход view → edit → cancel сохраняет исходный request между обоими presentation-режимами.
+    func testViewEditAndCancelRetainOriginalArtworkRequest() async {
+        let track = TrackDetailLocalTrack()
+        let originalData = Data([1, 2, 3])
+        let snapshot = makeConfirmedTrackDetailSnapshot(
+            trackId: track.trackId,
+            fileName: track.fileName,
+            artworkData: originalData
+        )
+        let viewModel = makeArtworkViewModel(track: track, snapshot: snapshot)
+
+        viewModel.send(.appeared)
+        await completeScheduledTask()
+        let viewRequest = viewModel.state.artwork.request
+
+        viewModel.send(.editTapped)
+        let editRequest = viewModel.state.artwork.request
+
+        viewModel.send(.closeTapped)
+        let cancelledEditRequest = viewModel.state.artwork.request
+
+        XCTAssertEqual(viewModel.state.mode, .view)
+        XCTAssertEqual(viewRequest, editRequest)
+        XCTAssertEqual(editRequest, cancelledEditRequest)
+        XCTAssertEqual(viewRequest?.artworkData, originalData)
+    }
+
+    /// Внешнее подтверждённое обновление artwork заменяет request текущего режима просмотра.
+    func testExternalSnapshotUpdateReplacesOriginalArtworkRequest() async {
+        let track = TrackDetailLocalTrack()
+        let initialSnapshot = makeConfirmedTrackDetailSnapshot(
+            trackId: track.trackId,
+            fileName: track.fileName,
+            artworkData: Data([1, 2, 3])
+        )
+        let events = TrackDetailEventProviderSpy()
+        let viewModel = makeArtworkViewModel(
+            track: track,
+            snapshot: initialSnapshot,
+            eventProvider: events
+        )
+
+        viewModel.send(.appeared)
+        await completeScheduledTask()
+        let initialRequest = viewModel.state.artwork.request
+        let updatedData = Data([4, 5, 6])
+        let updatedSnapshot = makeConfirmedTrackDetailSnapshot(
+            trackId: track.trackId,
+            fileName: track.fileName,
+            artworkData: updatedData
+        )
+
+        events.trackDidUpdateSubject.send(
+            TrackUpdateEvent(
+                trackId: track.trackId,
+                reason: .artworkUpdated,
+                changedFields: [.artworkData],
+                snapshot: updatedSnapshot
+            )
+        )
+
+        XCTAssertNotEqual(viewModel.state.artwork.request, initialRequest)
+        XCTAssertEqual(viewModel.state.artwork.request?.artworkData, updatedData)
+        XCTAssertEqual(viewModel.state.artwork.request?.sizeClass, .large)
+    }
+
+    /// Несохранённая замена использует transient identity, а локальное удаление возвращает nil request.
+    func testReplacementUsesTransientArtworkRequestAndRemovalClearsIt() async {
+        let track = TrackDetailLocalTrack()
+        let snapshot = makeConfirmedTrackDetailSnapshot(
+            trackId: track.trackId,
+            fileName: track.fileName,
+            artworkData: Data([1, 2, 3])
+        )
+        let viewModel = makeArtworkViewModel(track: track, snapshot: snapshot)
+        let replacementData = Data([7, 8, 9])
+        let revision = UUID()
+
+        viewModel.send(.appeared)
+        await completeScheduledTask()
+        viewModel.send(.editTapped)
+        viewModel.send(.artworkSelected(data: replacementData, revision: revision))
+
+        XCTAssertEqual(
+            viewModel.state.artwork.request?.sourceIdentifier,
+            .transient(revision: revision)
+        )
+        XCTAssertEqual(viewModel.state.artwork.request?.artworkData, replacementData)
+        XCTAssertEqual(viewModel.state.artwork.request?.sizeClass, .large)
+
+        viewModel.send(.artworkRemoveTapped)
+
+        XCTAssertNil(viewModel.state.artwork.request)
+        XCTAssertTrue(viewModel.state.artwork.canAddArtwork)
+        XCTAssertFalse(viewModel.state.artwork.canRemoveArtwork)
+    }
+
+    /// Read-only экран запускает общий artwork pipeline через Environment один раз на request.
+    func testReadOnlyViewLoadsArtworkFromEnvironment() async {
+        let trackId = UUID()
+        let artworkData = Data([1, 2, 3])
+        let request = ArtworkRequest(
+            trackId: trackId,
+            artworkData: artworkData,
+            purpose: .trackInfoSheet,
+            sourceIdentifier: .embeddedArtwork(data: artworkData)
+        )
+        let providerExpectation = expectation(
+            description: "Read-only View передаёт artwork request в Environment provider"
+        )
+        // XCTest ожидает реальный вызов provider из SwiftUI lifecycle, а не искусственную паузу.
+        providerExpectation.assertForOverFulfill = false
+        let provider = TrackDetailArtworkProviderSpy(
+            onRequest: providerExpectation.fulfill
+        )
+        guard let windowScene = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .first else {
+            return XCTFail("Для lifecycle-проверки нужен активный UIWindowScene")
+        }
+        let window = UIWindow(windowScene: windowScene)
+        window.rootViewController = UIHostingController(
+            rootView: TrackDetailReadOnlyView(
+                state: makeReadOnlyState(artworkRequest: request)
+            )
+            .environment(\.artworkImageProvider, provider)
+        )
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true }
+
+        await fulfillment(of: [providerExpectation], timeout: 2)
+        // Completion изображения не должен пересоздавать read-only artwork и запускать тот же provider заново.
+        try? await Task.sleep(nanoseconds: 150_000_000)
+
+        let loadedRequest = provider.request
+        XCTAssertEqual(loadedRequest, request)
+        XCTAssertEqual(provider.requests, [request])
+    }
+
     func testDirectEditRouteKeepsPurchasedITunesTrackReadOnly() async {
         let purchasedTrack = PurchasedITunesPlayableTrack(
             track: PurchasedITunesTrack(
@@ -231,19 +394,69 @@ final class TrackDetailFlowTests: XCTestCase {
     private func makeActionHandler(
         executor: TrackDetailExecutorSpy,
         playbackFileReleaser: TrackDetailPlaybackReleaserSpy? = nil,
-        snapshotBuilder: any TrackDetailSnapshotBuilding = TrackDetailSnapshotBuilderSpy()
+        snapshotBuilder: any TrackDetailSnapshotBuilding = TrackDetailSnapshotBuilderSpy(),
+        snapshotProvider: any TrackDetailSnapshotProviding = TrackDetailSnapshotProviderSpy(),
+        fileURLResolver: any TrackDetailFileURLResolving = TrackDetailFileURLResolverSpy()
     ) -> TrackDetailActionHandler {
         let toast = TrackDetailToastSpy()
         return TrackDetailActionHandler(
-            snapshotProvider: TrackDetailSnapshotProviderSpy(),
+            snapshotProvider: snapshotProvider,
             snapshotBuilder: snapshotBuilder,
-            fileURLResolver: TrackDetailFileURLResolverSpy(),
+            fileURLResolver: fileURLResolver,
             commandExecutor: executor,
             fileBusyChecker: TrackDetailBusyCheckerSpy(),
             playbackFileReleaser: playbackFileReleaser
                 ?? TrackDetailPlaybackReleaserSpy(),
             presenter: TrackDetailPresenter(toastPresenter: toast),
             router: TrackDetailRouterSpy()
+        )
+    }
+
+    /// Собирает feature graph с готовым artwork snapshot без production store и файлового доступа.
+    private func makeArtworkViewModel(
+        track: TrackDetailLocalTrack,
+        snapshot: TrackRuntimeSnapshot,
+        eventProvider: any TrackDetailEventProviding = TrackDetailEmptyEventProvider()
+    ) -> TrackDetailViewModel {
+        let presenter = TrackDetailPresenter(toastPresenter: TrackDetailToastSpy())
+        let actionHandler = makeActionHandler(
+            executor: TrackDetailExecutorSpy(),
+            snapshotProvider: TrackDetailSnapshotProviderSpy(snapshot: snapshot),
+            fileURLResolver: TrackDetailFileURLResolverSpy(
+                fileURL: URL(fileURLWithPath: "/tmp/\(track.fileName)")
+            )
+        )
+        return TrackDetailViewModel(
+            track: track,
+            initialMode: .view,
+            presenter: presenter,
+            actionHandler: actionHandler,
+            eventProvider: eventProvider
+        )
+    }
+
+    /// Формирует минимальное готовое read-only состояние для проверки presentation lifecycle.
+    private func makeReadOnlyState(
+        artworkRequest: ArtworkRequest
+    ) -> TrackDetailScreenState {
+        TrackDetailScreenState(
+            mode: .view,
+            isLoading: false,
+            isSaving: false,
+            canEnterEdit: true,
+            canSave: false,
+            fileName: "Track",
+            editableValues: [:],
+            filePath: nil,
+            technicalInfo: "",
+            artwork: TrackDetailArtworkPresentationState(
+                request: artworkRequest,
+                canAddArtwork: false,
+                canRemoveArtwork: true
+            ),
+            canUseFileNameStrategies: false,
+            yearValidationMessage: nil,
+            alert: nil
         )
     }
 
@@ -344,7 +557,8 @@ private final class TrackDetailExecutorSpy: TrackDetailCommandExecuting {
 /// Создаёт новый snapshot, который test double возвращает только для confirmed save-result.
 private func makeConfirmedTrackDetailSnapshot(
     trackId: UUID,
-    fileName: String
+    fileName: String,
+    artworkData: Data? = nil
 ) -> TrackRuntimeSnapshot {
     TrackRuntimeSnapshot(
         trackId: trackId,
@@ -379,8 +593,8 @@ private func makeConfirmedTrackDetailSnapshot(
         encodedBy: nil,
         isrc: nil,
         duration: nil,
-        artworkData: nil,
-        artworkSourceIdentifier: nil,
+        artworkData: artworkData,
+        artworkSourceIdentifier: artworkData.map(ArtworkSourceIdentifier.embeddedArtwork),
         updatedAt: Date(timeIntervalSince1970: 0)
     )
 }
@@ -405,8 +619,39 @@ private struct TrackDetailSaveRequest: Equatable {
 /// Предоставляет пустой runtime-cache: тесты проверяют только командный flow.
 @MainActor
 private final class TrackDetailSnapshotProviderSpy: TrackDetailSnapshotProviding {
+    /// Snapshot возвращается только соответствующему тестовому треку.
+    private let loadedSnapshot: TrackRuntimeSnapshot?
+
+    /// Создаёт provider с необязательным готовым runtime snapshot.
+    init(snapshot: TrackRuntimeSnapshot? = nil) {
+        loadedSnapshot = snapshot
+    }
+
     func snapshot(forTrackId trackId: UUID) -> TrackRuntimeSnapshot? {
-        nil
+        guard loadedSnapshot?.trackId == trackId else { return nil }
+        return loadedSnapshot
+    }
+}
+
+/// Фиксирует request и завершает XCTest только после реального вызова provider из SwiftUI lifecycle.
+@MainActor
+private final class TrackDetailArtworkProviderSpy: ArtworkImageProviding {
+    /// Последний request, полученный через Environment-boundary.
+    private(set) var request: ArtworkRequest?
+    /// Все вызовы позволяют проверить, что повторный lifecycle не подменил identity обложки.
+    private(set) var requests: [ArtworkRequest] = []
+    /// Внешний сигнал даёт тесту ожидать run-loop, а не угадывать число Task.yield.
+    private let onRequest: () -> Void
+
+    init(onRequest: @escaping () -> Void) {
+        self.onRequest = onRequest
+    }
+
+    func image(for request: ArtworkRequest) async -> UIImage? {
+        self.request = request
+        requests.append(request)
+        onRequest()
+        return UIImage()
     }
 }
 
@@ -434,8 +679,16 @@ private final class TrackDetailSnapshotBuilderSpy: TrackDetailSnapshotBuilding {
 
 /// Не должен участвовать в save-тестах, но завершает dependency graph обработчика.
 private struct TrackDetailFileURLResolverSpy: TrackDetailFileURLResolving {
+    /// Заранее подготовленный file URL нужен только для presentation-пути загрузки.
+    private let resolvedURL: URL?
+
+    /// Создаёт resolver с контролируемым результатом без обращения к BookmarkResolver.
+    init(fileURL: URL? = nil) {
+        resolvedURL = fileURL
+    }
+
     func fileURL(forTrackId trackId: UUID) async -> URL? {
-        nil
+        resolvedURL
     }
 }
 
